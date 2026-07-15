@@ -37,22 +37,23 @@ scripts/task-harness cleanup <issue-number>
 ## Required flow
 
 1. Run `scripts/task-harness doctor`.
-2. Use the specified issue or choose the highest-priority item from `scripts/task-harness queue`.
-3. Run `scripts/task-harness start <issue-number>`.
-4. Change into the `worktree` path printed by `start`; run the remaining issue commands there through merge.
-5. Create the spec with `scripts/task-harness spec <issue-number>`.
-6. Use `$gyeop-spec-writer` to complete the spec.
-7. Have an independent `critic` or `architect` review the spec using only the issue, spec, and SSOT.
-8. Fix all P0/P1 findings and run `scripts/task-harness spec-check <spec-path>`.
-9. Set `status:implementing` and implement only the reviewed spec.
-10. Run `scripts/task-harness status <issue-number> status:qa` before independent QA begins.
-11. Have an independent `verifier` or `test-engineer` review the spec, diff, and relevant SSOT.
-12. Write QA to `docs/temp/qa/issue-<number>.md` using the QA template.
-13. Fix all P0/P1 QA findings and run `scripts/task-harness qa-check <qa-path>`.
-14. Run `./scripts/run-ai-verify --mode full`.
-15. Create the PR with `scripts/task-harness pr <issue-number>`.
-16. Merge only after required CI checks and local full verification pass.
-17. Return to the base checkout, then close the issue and remove its worktree.
+2. Promote a `status:backlog` issue to `status:ready` only after every referenced predecessor issue is closed; the task harness enforces this from the issue's `### 선행 이슈` section.
+3. Use the specified ready issue or choose the highest-priority item from `scripts/task-harness queue`.
+4. Run `scripts/task-harness start <issue-number>`.
+5. Change into the `worktree` path printed by `start`; run the remaining issue commands there through merge.
+6. Create the spec with `scripts/task-harness spec <issue-number>`.
+7. Use `$gyeop-spec-writer` to complete the spec.
+8. Have an independent `critic` or `architect` review the spec using only the issue, spec, and SSOT.
+9. Fix all P0/P1 findings and run `scripts/task-harness spec-check <spec-path>`.
+10. Set `status:implementing` and implement only the reviewed spec.
+11. Run `scripts/task-harness status <issue-number> status:qa` before independent QA begins.
+12. Have an independent `verifier` or `test-engineer` review the spec, diff, and relevant SSOT.
+13. Write QA to `docs/temp/qa/issue-<number>.md` using the QA template.
+14. Fix all P0/P1 QA findings and run `scripts/task-harness qa-check <qa-path>`.
+15. Run `./scripts/run-ai-verify --mode full`.
+16. Create the PR with `scripts/task-harness pr <issue-number>`.
+17. Merge only after required CI checks and local full verification pass.
+18. Return to the base checkout, then close the issue and remove its worktree.
 
 Read `references/review-gates.md` before spec review or QA.
 

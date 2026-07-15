@@ -42,9 +42,9 @@ Use only managed labels:
 - `type:planning`, `type:design`, `type:frontend`, `type:backend`
 - `type:data`, `type:safety`, `type:qa`, `type:ops`
 - `priority:p0`, `priority:p1`, `priority:p2`
-- `status:ready`, `status:spec`, `status:implementing`, `status:qa`, `status:blocked`
+- `status:backlog`, `status:ready`, `status:spec`, `status:implementing`, `status:qa`, `status:blocked`
 
-New executable work normally starts with `status:ready`. Use `status:blocked` only when a concrete external or product decision blocks work.
+Use `status:backlog` when the issue is fully specified but predecessor issues are still open. Promote it to `status:ready` only after every predecessor is closed. New work with no open predecessor starts with `status:ready`. Use `status:blocked` only when a concrete external or product decision blocks work.
 
 ## Register live work
 
@@ -55,6 +55,7 @@ New executable work normally starts with `status:ready`. Use `status:blocked` on
 5. Avoid duplicate issues by searching exact and near-exact titles first.
 6. If `GYEOP_GITHUB_PROJECT_NUMBER` is configured, run `scripts/task-harness project-add <issue-number>`.
 7. Treat `status:*` issue labels as workflow truth; treat the GitHub Project board as a synchronized view.
+8. Give every registered issue exactly one `status:*` label. Never leave dependency-gated work without a workflow state.
 
 When no remote repository exists, produce the complete issue draft and report that live registration and Project sync were skipped. Do not create a remote repository without explicit user direction.
 
@@ -65,4 +66,3 @@ When no remote repository exists, produce the complete issue draft and report th
 - Include `./scripts/run-ai-verify --mode full` plus focused checks.
 - State dependencies and exclusions explicitly.
 - Do not create vague issues such as `MVP 만들기` or `UI 개선`.
-

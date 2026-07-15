@@ -11,6 +11,7 @@
 
 ```mermaid
 flowchart LR
+    A0["status:backlog"] -->|"모든 선행 이슈 닫힘"| A["status:ready"]
     A["status:ready"] --> B["status:spec"]
     B --> C["Spec Review PASS"]
     C --> D["status:implementing"]
@@ -43,7 +44,12 @@ export GYEOP_MAIN_BRANCH=main
 3. `scripts/task-harness label-sync`로 관리 라벨을 동기화한다.
 4. REST `gh api repos/<owner>/<repo>/issues`로 이슈를 생성한다.
 5. Project가 설정되어 있으면 `scripts/task-harness project-add <issue-number>`를 실행한다.
-6. 실행 가능한 이슈에는 `status:ready`를 부여한다.
+6. 모든 등록 이슈에 정확히 하나의 `status:*` 라벨을 부여한다.
+   - 선행 이슈가 모두 닫힌 실행 가능 작업: `status:ready`
+   - 선행 이슈를 기다리는 계획된 작업: `status:backlog`
+   - 외부 입력이나 제품 결정이 필요한 작업: `status:blocked`
+
+`status:backlog`는 요구사항 미정 상태가 아니다. 본문과 완료 기준은 실행 가능하게 작성하되, 선행 이슈가 모두 닫힌 것을 확인한 다음 `scripts/task-harness status <issue-number> status:ready`로 승격한다. 하네스도 본문의 `### 선행 이슈`에 연결된 이슈가 하나라도 열려 있으면 승격을 거부한다. `scripts/task-harness queue`는 `status:ready`만 반환한다.
 
 ## 일감 가져오기와 처리
 

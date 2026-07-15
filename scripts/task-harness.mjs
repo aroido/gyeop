@@ -27,6 +27,7 @@ const projectOwner = process.env.GYEOP_GITHUB_OWNER || (repo ? repo.split("/")[0
 const projectNumber = process.env.GYEOP_GITHUB_PROJECT_NUMBER || "";
 
 const statusLabels = [
+  "status:backlog",
   "status:ready",
   "status:spec",
   "status:implementing",
@@ -35,6 +36,7 @@ const statusLabels = [
 ];
 
 const managedLabels = [
+  ["status:backlog", "d4c5f9", "Planned and waiting for predecessor issues"],
   ["status:ready", "0e8a16", "Ready for Codex task harness intake"],
   ["status:spec", "1d76db", "Spec is being drafted or reviewed"],
   ["status:implementing", "fbca04", "Implementation is in progress"],
@@ -133,9 +135,22 @@ function qaPathForIssue(issue) {
   return `docs/temp/qa/${issueSlug(issue)}.md`;
 }
 
+function dependencyNumbers(body) {
+  const section = String(body || "").match(/### 선행 이슈\s*\n([\s\S]*?)(?=\n### |\n## |$)/)?.[1] || "";
+  return [...new Set([...section.matchAll(/#(\d+)\b/g)].map((match) => Number(match[1])))];
+}
+
+function assertPredecessorsClosed(issue) {
+  for (const number of dependencyNumbers(issue.body)) {
+    const predecessor = getIssue(number);
+    assert(predecessor.state === "closed", `predecessor issue #${number} must be closed before status:ready`);
+  }
+}
+
 function setStatus(number, nextStatus) {
   assert(statusLabels.includes(nextStatus), `unknown status label: ${nextStatus}`);
   const issue = getIssue(number);
+  if (nextStatus === "status:ready") assertPredecessorsClosed(issue);
   const labels = issueLabels(issue).filter((label) => !statusLabels.includes(label));
   labels.push(nextStatus);
   ghApi("PUT", `${issueEndpoint(number)}/labels`, { labels });
@@ -260,6 +275,8 @@ function projectAdd(issueNumber) {
 
 function start(issueNumber) {
   const issue = getIssue(issueNumber);
+  assertIssueStatus(issue, "status:ready");
+  assertPredecessorsClosed(issue);
   const branch = branchForIssue(issue);
   const target = path.join(worktreeRoot, issueSlug(issue));
 
@@ -588,6 +605,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
 export {
   assertIssueStatus,
   branchForIssue,
+  dependencyNumbers,
   defaultWorktreeRoot,
   issueSlug,
   listCheckState,
