@@ -9,7 +9,7 @@
 ## 프로젝트 상태
 
 - 단계: 제품 기획 및 모바일 웹 MVP 준비
-- 코드: 아직 프레임워크를 선택하지 않음
+- 코드: Next.js·Supabase 기반을 선정했으며 아직 애플리케이션 구현 전
 - 기본 방향: 모바일 웹 우선, 방문자는 설치·로그인 없이 참여
 - 브랜치: `main`
 
@@ -20,6 +20,7 @@
 - [질문팩 제품 명세](docs/product/question-pack-spec.md)
 - [전체 제품 기획](docs/product/full-product-plan.md)
 - [의사결정 기록](docs/product/decision-log.md)
+- [P0 개발 기준](docs/engineering/p0-development-plan.md)
 - [GitHub 작업 워크플로우](docs/engineering/github-task-workflow.md)
 - [초기 기획 아카이브](docs/archive/)
 - [모바일 목업](docs/assets/mockups/)
