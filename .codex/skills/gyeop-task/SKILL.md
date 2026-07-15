@@ -39,18 +39,20 @@ scripts/task-harness cleanup <issue-number>
 1. Run `scripts/task-harness doctor`.
 2. Use the specified issue or choose the highest-priority item from `scripts/task-harness queue`.
 3. Run `scripts/task-harness start <issue-number>`.
-4. Create the spec with `scripts/task-harness spec <issue-number>`.
-5. Use `$gyeop-spec-writer` to complete the spec.
-6. Have an independent `critic` or `architect` review the spec using only the issue, spec, and SSOT.
-7. Fix all P0/P1 findings and run `scripts/task-harness spec-check <spec-path>`.
-8. Set `status:implementing` and implement only the reviewed spec.
-9. Have an independent `verifier` or `test-engineer` review the spec, diff, and relevant SSOT.
-10. Write QA to `docs/temp/qa/issue-<number>.md` using the QA template.
-11. Fix all P0/P1 QA findings and run `scripts/task-harness qa-check <qa-path>`.
-12. Run `./scripts/run-ai-verify --mode full`.
-13. Create the PR with `scripts/task-harness pr <issue-number>`.
-14. Merge only after required CI checks and local full verification pass.
-15. Close the issue and remove its worktree.
+4. Change into the `worktree` path printed by `start`; run the remaining issue commands there through merge.
+5. Create the spec with `scripts/task-harness spec <issue-number>`.
+6. Use `$gyeop-spec-writer` to complete the spec.
+7. Have an independent `critic` or `architect` review the spec using only the issue, spec, and SSOT.
+8. Fix all P0/P1 findings and run `scripts/task-harness spec-check <spec-path>`.
+9. Set `status:implementing` and implement only the reviewed spec.
+10. Run `scripts/task-harness status <issue-number> status:qa` before independent QA begins.
+11. Have an independent `verifier` or `test-engineer` review the spec, diff, and relevant SSOT.
+12. Write QA to `docs/temp/qa/issue-<number>.md` using the QA template.
+13. Fix all P0/P1 QA findings and run `scripts/task-harness qa-check <qa-path>`.
+14. Run `./scripts/run-ai-verify --mode full`.
+15. Create the PR with `scripts/task-harness pr <issue-number>`.
+16. Merge only after required CI checks and local full verification pass.
+17. Return to the base checkout, then close the issue and remove its worktree.
 
 Read `references/review-gates.md` before spec review or QA.
 
@@ -69,4 +71,3 @@ Project-owned skill sources live under `.codex/skills/`. Install or refresh name
 ```bash
 scripts/install-codex-skills
 ```
-

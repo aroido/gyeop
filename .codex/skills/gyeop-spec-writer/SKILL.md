@@ -13,7 +13,7 @@ Turn one issue into a spec that another agent can implement without re-interview
 2. Read the issue body completely.
 3. Read `docs/product/core-feature-priority.md` and every SSOT file linked by the issue.
 4. Inspect affected code, routes, tests, and conventions before asking codebase questions.
-5. Create the draft with `scripts/task-harness spec <issue-number>` when the issue exists.
+5. For a live issue, change into the worktree printed by `scripts/task-harness start`, then create the draft with `scripts/task-harness spec <issue-number>`.
 6. For work without a live issue, copy `docs/templates/implementation-spec.md` to a descriptive path under `docs/specs/`.
 
 ## Write the spec
@@ -52,4 +52,3 @@ Use `$gyeop-product-guardrails` first when the issue changes product behavior ra
 ## Output
 
 Return the spec path, issue number or source request, review state, and unresolved blockers. Do not implement while the spec gate is failing.
-

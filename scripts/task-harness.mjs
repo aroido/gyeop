@@ -12,11 +12,17 @@ function repoFromOrigin() {
   return match ? match[1] : "";
 }
 
+function defaultWorktreeRoot(commonDir, cwd = process.cwd()) {
+  const repoRoot = commonDir ? path.dirname(path.resolve(cwd, commonDir)) : cwd;
+  return path.resolve(repoRoot, "..", "gyeop-worktrees");
+}
+
 const repo = process.env.GYEOP_GITHUB_REPO || repoFromOrigin();
 const mainBranch = process.env.GYEOP_MAIN_BRANCH || "main";
+const commonDir = spawnSync("git", ["rev-parse", "--git-common-dir"], { encoding: "utf8" });
 const worktreeRoot =
   process.env.GYEOP_WORKTREE_ROOT ||
-  path.resolve(process.cwd(), "..", "gyeop-worktrees");
+  defaultWorktreeRoot(commonDir.status === 0 ? commonDir.stdout.trim() : "");
 const projectOwner = process.env.GYEOP_GITHUB_OWNER || (repo ? repo.split("/")[0] : "");
 const projectNumber = process.env.GYEOP_GITHUB_PROJECT_NUMBER || "";
 
@@ -93,6 +99,12 @@ function getIssue(number) {
 
 function issueLabels(issue) {
   return (issue.labels || []).map((label) => (typeof label === "string" ? label : label.name));
+}
+
+function assertIssueStatus(issue, expected) {
+  if (!issueLabels(issue).includes(expected)) {
+    throw new Error(`issue #${issue.number} must be ${expected} before PR creation`);
+  }
 }
 
 function slugify(input) {
@@ -432,6 +444,7 @@ function sleep(ms) {
 
 function createPr(issueNumber) {
   const issue = getIssue(issueNumber);
+  assertIssueStatus(issue, "status:qa");
   const branch = currentBranch();
   const specFile = specPathForIssue(issue);
   const qaFile = qaPathForIssue(issue);
@@ -460,7 +473,6 @@ function createPr(issueNumber) {
     body,
     draft: false,
   });
-  setStatus(issueNumber, "status:qa");
   console.log(JSON.stringify({ pr: pr.number, url: pr.html_url, branch }, null, 2));
 }
 
@@ -574,7 +586,9 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
 }
 
 export {
+  assertIssueStatus,
   branchForIssue,
+  defaultWorktreeRoot,
   issueSlug,
   listCheckState,
   qaPathForIssue,

@@ -53,7 +53,7 @@ scripts/task-harness start <issue-number>
 scripts/task-harness spec <issue-number>
 ```
 
-`$gyeop-spec-writer`로 `docs/specs/issue-<number>.md`를 완성하고 독립 검토 결과를 기록한다.
+`start`가 출력한 `worktree` 경로로 이동한 뒤 `spec`과 이후 작업을 실행한다. `$gyeop-spec-writer`로 `docs/specs/issue-<number>.md`를 완성하고 독립 검토 결과를 기록한다.
 
 ```bash
 scripts/task-harness spec-check docs/specs/issue-<number>.md
@@ -63,6 +63,7 @@ scripts/task-harness status <issue-number> status:implementing
 검토된 스펙만 구현한다. QA 결과는 `docs/temp/qa/issue-<number>.md`에 작성한다.
 
 ```bash
+scripts/task-harness status <issue-number> status:qa
 scripts/task-harness qa-check docs/temp/qa/issue-<number>.md
 ./scripts/run-ai-verify --mode full
 scripts/task-harness pr <issue-number>
@@ -75,6 +76,8 @@ scripts/task-harness merge <pr-number>
 scripts/task-harness close <issue-number>
 scripts/task-harness cleanup <issue-number>
 ```
+
+`cleanup`은 병합 후 기본 checkout으로 돌아온 다음 실행한다.
 
 ## 검토 게이트
 

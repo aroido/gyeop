@@ -5,7 +5,9 @@ import path from "node:path";
 import test from "node:test";
 
 import {
+  assertIssueStatus,
   branchForIssue,
+  defaultWorktreeRoot,
   issueSlug,
   qaPathForIssue,
   qaFailures,
@@ -30,6 +32,21 @@ test("issue paths and branch names are deterministic", () => {
   assert.equal(branchForIssue(issue), "codex/issue-123");
   assert.equal(specPathForIssue(issue), "docs/specs/issue-123.md");
   assert.equal(qaPathForIssue(issue), "docs/temp/qa/issue-123.md");
+});
+
+test("worktree root stays anchored to the main checkout", () => {
+  assert.equal(
+    defaultWorktreeRoot("/workspace/gyeop/.git", "/workspace/gyeop-worktrees/issue-123"),
+    "/workspace/gyeop-worktrees",
+  );
+});
+
+test("PR creation requires the QA workflow state", () => {
+  assert.doesNotThrow(() => assertIssueStatus({ number: 123, labels: ["status:qa"] }, "status:qa"));
+  assert.throws(
+    () => assertIssueStatus({ number: 123, labels: ["status:implementing"] }, "status:qa"),
+    /must be status:qa/,
+  );
 });
 
 test("status labels cover the task gate states", () => {
@@ -115,4 +132,3 @@ Status: FAIL
 
   assert.ok(qaFailures(file).length >= 2);
 });
-
