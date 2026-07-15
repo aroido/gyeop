@@ -1,0 +1,4 @@
+interface:
+  display_name: "GYEOP Product Guardrails"
+  short_description: "겹의 핵심 루프와 기획 SSOT를 기준으로 기능을 판단합니다"
+  default_prompt: "Use $gyeop-product-guardrails to evaluate this product decision against GYEOP core loop and update the SSOT."

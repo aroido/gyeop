@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+MODE="full"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --mode)
+      MODE="${2:-}"
+      shift 2
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ "$MODE" != "full" ]]; then
+  echo "Only --mode full is supported." >&2
+  exit 2
+fi
+
+python3 "$ROOT/scripts/verify_project.py"
+
+VALIDATOR="${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py"
+if [[ ! -f "$VALIDATOR" ]]; then
+  echo "Skill validator not found: $VALIDATOR" >&2
+  exit 1
+fi
+
+if python3 -c 'import yaml' >/dev/null 2>&1; then
+  SKILL_VALIDATOR=(python3)
+elif command -v uv >/dev/null 2>&1; then
+  SKILL_VALIDATOR=(uv run --quiet --with pyyaml python)
+else
+  echo "Skill validation requires PyYAML or uv." >&2
+  exit 1
+fi
+
+for skill in "$ROOT"/.codex/skills/*; do
+  "${SKILL_VALIDATOR[@]}" "$VALIDATOR" "$skill"
+done
+
+if rg -n "TODO|TBD" "$ROOT/.codex/skills" --glob 'SKILL.md'; then
+  echo "Unresolved skill placeholders found." >&2
+  exit 1
+fi
+
+echo "GYEOP full verification passed."

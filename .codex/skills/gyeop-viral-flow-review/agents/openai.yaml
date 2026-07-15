@@ -1,0 +1,4 @@
+interface:
+  display_name: "GYEOP Viral Flow Review"
+  short_description: "겹의 모바일 공유·응답·재공유 흐름을 검증합니다"
+  default_prompt: "Use $gyeop-viral-flow-review to review this mobile flow for friction and viral conversion."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "GYEOP Question Pack Design"
+  short_description: "겹의 A/B 질문팩과 응답 샘플링을 설계합니다"
+  default_prompt: "Use $gyeop-question-pack-design to create or review a GYEOP question pack."
