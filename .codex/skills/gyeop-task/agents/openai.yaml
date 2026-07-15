@@ -1,0 +1,4 @@
+interface:
+  display_name: "GYEOP Task Workflow"
+  short_description: "겹 GitHub 일감을 스펙부터 PR 완료까지 처리합니다"
+  default_prompt: "Use $gyeop-task to pick up and complete the next ready GYEOP GitHub issue."

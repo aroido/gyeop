@@ -24,6 +24,10 @@ if [[ "$MODE" != "full" ]]; then
 fi
 
 python3 "$ROOT/scripts/verify_project.py"
+node --check "$ROOT/scripts/task-harness.mjs"
+node --test "$ROOT/scripts/task-harness.test.mjs"
+sh -n "$ROOT/scripts/task-harness"
+sh -n "$ROOT/scripts/install-codex-skills"
 
 VALIDATOR="${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py"
 if [[ ! -f "$VALIDATOR" ]]; then

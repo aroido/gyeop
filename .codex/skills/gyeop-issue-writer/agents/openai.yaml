@@ -1,0 +1,4 @@
+interface:
+  display_name: "GYEOP Issue Writer"
+  short_description: "겹 작업을 GitHub Issue와 Project 일감으로 등록합니다"
+  default_prompt: "Use $gyeop-issue-writer to split this GYEOP work into executable GitHub issues."
