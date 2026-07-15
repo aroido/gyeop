@@ -83,7 +83,6 @@ scripts/task-harness cleanup <issue-number>
 - `./scripts/run-ai-verify --mode full`이 실패하면 완료로 보고하지 않는다.
 - 제품 방향, secret, billing, destructive data, 외부 접근이 필요하면 `status:blocked`와 이유를 남긴다.
 
-## 현재 연결 상태
+## 연결 상태 확인
 
-로컬 저장소에는 아직 `origin`이 없다. 스킬·스펙·QA·검증 하네스는 사용할 수 있지만, live issue 등록·Project 추가·worktree 시작·PR 생성은 GitHub 저장소 연결 후 활성화된다.
-
+`scripts/task-harness doctor`로 현재 checkout의 `origin`, GitHub 인증, worktree, 템플릿, 검증 스크립트를 확인한다. Project 환경 변수가 없으면 Project 동기화만 건너뛰고 `status:*` 라벨을 작업 상태의 기준으로 사용한다.
