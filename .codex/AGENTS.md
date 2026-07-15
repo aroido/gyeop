@@ -38,6 +38,7 @@ Do not silently revive behavior that exists only in archived or older documents.
 - Keep A/B as the only answer format in P0.
 - Do not add payments, ads, public user search, chat, comments, rankings, or MBTI-style fixed labels without an explicit product decision.
 - Use the project skills in `.codex/skills/` for relevant planning and review work.
+- Use `$gyeop-product-doc-writer` when turning rough ideas or notes into product planning documents.
 - Use `$gyeop-spec-writer` before implementing a GitHub issue.
 - Use `$gyeop-issue-writer` when creating or splitting GitHub work.
 - Use `$gyeop-task` for issue execution; keep one issue per worktree, branch, spec, and PR.
