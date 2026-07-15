@@ -8,6 +8,7 @@ import {
   assertIssueStatus,
   branchForIssue,
   defaultWorktreeRoot,
+  dependencyNumbers,
   issueSlug,
   qaPathForIssue,
   qaFailures,
@@ -49,14 +50,35 @@ test("PR creation requires the QA workflow state", () => {
   );
 });
 
+test("task start requires the ready workflow state", () => {
+  assert.doesNotThrow(() => assertIssueStatus({ number: 123, labels: ["status:ready"] }, "status:ready"));
+  assert.throws(
+    () => assertIssueStatus({ number: 123, labels: ["status:backlog"] }, "status:ready"),
+    /must be status:ready/,
+  );
+  assert.throws(
+    () => assertIssueStatus({ number: 123, labels: ["status:blocked"] }, "status:ready"),
+    /must be status:ready/,
+  );
+});
+
 test("status labels cover the task gate states", () => {
   assert.deepEqual(statusLabels, [
+    "status:backlog",
     "status:ready",
     "status:spec",
     "status:implementing",
     "status:qa",
     "status:blocked",
   ]);
+});
+
+test("dependency numbers come only from the predecessor section", () => {
+  assert.deepEqual(
+    dependencyNumbers(`## 목표\n이슈 #99를 설명한다.\n\n## 의존성/블로커\n### 선행 이슈\n- #3\n- #7\n- #3\n\n### 블로커\n- #55 확인 필요\n`),
+    [3, 7],
+  );
+  assert.deepEqual(dependencyNumbers("### 선행 이슈\n- 없음\n"), []);
 });
 
 test("spec gate accepts a complete reviewed GYEOP spec", () => {
