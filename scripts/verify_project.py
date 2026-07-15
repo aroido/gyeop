@@ -31,6 +31,7 @@ EXPECTED_SKILLS = {
 }
 EXPECTED_MOCKUPS = 6
 LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+IGNORED_DIRS = {".git", ".next", "coverage", "dist", "node_modules", "playwright-report", "test-results"}
 
 
 def fail(message: str) -> None:
@@ -68,7 +69,7 @@ def verify_mockups() -> None:
 def verify_markdown_links() -> None:
     errors: list[str] = []
     for markdown in ROOT.rglob("*.md"):
-        if ".git" in markdown.parts:
+        if any(part in IGNORED_DIRS for part in markdown.relative_to(ROOT).parts):
             continue
         text = markdown.read_text(encoding="utf-8")
         for raw_target in LINK_RE.findall(text):

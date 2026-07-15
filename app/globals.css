@@ -1,0 +1,34 @@
+:root {
+  --background: #f4f1ec;
+  --surface: #fffdf9;
+  --surface-muted: #ebe7f4;
+  --ink: #25222b;
+  --ink-muted: #6b6672;
+  --accent: #5f4bb6;
+  --accent-strong: #483690;
+  --line: #ded8e5;
+  --shadow: 0 24px 60px rgb(53 43 73 / 14%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--background);
+  color: var(--ink);
+  font-family:
+    Pretendard,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}

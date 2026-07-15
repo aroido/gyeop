@@ -1,0 +1,43 @@
+{
+  "name": "gyeop",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": "24.16.0"
+  },
+  "packageManager": "pnpm@11.13.0",
+  "scripts": {
+    "predev": "node --env-file-if-exists=.env.local scripts/validate-env.mjs",
+    "dev": "next dev",
+    "prestart": "node --env-file-if-exists=.env.local scripts/validate-env.mjs",
+    "start": "next start",
+    "build": "next build",
+    "format": "prettier --write app tests scripts/validate-env.mjs playwright.config.ts next.config.ts eslint.config.mjs package.json .github/workflows/ci.yml",
+    "format:check": "prettier --check app tests scripts/validate-env.mjs playwright.config.ts next.config.ts eslint.config.mjs package.json .github/workflows/ci.yml",
+    "lint": "eslint app tests/e2e playwright.config.ts next.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/unit/validate-env.test.mjs",
+    "test:secrets": "node --test tests/unit/repository-secrets.test.mjs",
+    "supabase:start": "supabase start --exclude studio,imgproxy,edge-runtime,logflare,vector,storage-api,realtime,supavisor",
+    "supabase:stop": "supabase stop --no-backup",
+    "supabase:reset": "supabase db reset",
+    "test:db": "supabase test db supabase/tests --local",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "next": "16.2.10",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.2.10",
+    "prettier": "3.9.5",
+    "supabase": "2.109.1",
+    "typescript": "5.9.3"
+  }
+}

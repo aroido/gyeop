@@ -1,0 +1,1 @@
+-- Product schema and the old-friend pack seed are intentionally deferred to their own issues.

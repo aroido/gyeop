@@ -23,6 +23,31 @@ if [[ "$MODE" != "full" ]]; then
   exit 2
 fi
 
+cd "$ROOT"
+
+if ! command -v pnpm >/dev/null 2>&1; then
+  echo "pnpm is required. Run: corepack enable && pnpm install --frozen-lockfile" >&2
+  exit 1
+fi
+
+if [[ ! -d "$ROOT/node_modules" ]]; then
+  echo "Dependencies are missing. Run: pnpm install --frozen-lockfile" >&2
+  exit 1
+fi
+
+if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+  echo "A running Docker daemon is required for local Supabase verification." >&2
+  exit 1
+fi
+
+SUPABASE_STARTED_BY_VERIFY=0
+cleanup() {
+  if [[ "$SUPABASE_STARTED_BY_VERIFY" == "1" ]]; then
+    pnpm exec supabase stop --no-backup >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup EXIT
+
 python3 "$ROOT/scripts/verify_project.py"
 node --check "$ROOT/scripts/task-harness.mjs"
 node --test "$ROOT/scripts/task-harness.test.mjs"
@@ -52,5 +77,23 @@ if rg -n "TODO|TBD" "$ROOT/.codex/skills" --glob 'SKILL.md'; then
   echo "Unresolved skill placeholders found." >&2
   exit 1
 fi
+
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm test:secrets
+
+if ! pnpm exec supabase status --output json >/dev/null 2>&1; then
+  SUPABASE_STARTED_BY_VERIFY=1
+fi
+if ! pnpm supabase:start >/dev/null; then
+  echo "Local Supabase failed to start." >&2
+  exit 1
+fi
+pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
+pnpm test:db
+pnpm build
+pnpm test:e2e --project=mobile-chromium
 
 echo "GYEOP full verification passed."
