@@ -2,8 +2,9 @@
 
 Read and follow `.codex/AGENTS.md` before making product, design, documentation, or implementation changes.
 
-Use the matching local skill when the task concerns product decisions, question packs, or the mobile viral flow:
+Use the matching local skill when the task concerns product planning, product decisions, question packs, or the mobile viral flow:
 
+- `.codex/skills/gyeop-product-doc-writer/SKILL.md`
 - `.codex/skills/gyeop-product-guardrails/SKILL.md`
 - `.codex/skills/gyeop-question-pack-design/SKILL.md`
 - `.codex/skills/gyeop-viral-flow-review/SKILL.md`

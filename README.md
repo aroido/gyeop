@@ -11,7 +11,7 @@
 - 단계: 제품 기획 및 모바일 웹 MVP 준비
 - 코드: 아직 프레임워크를 선택하지 않음
 - 기본 방향: 모바일 웹 우선, 방문자는 설치·로그인 없이 참여
-- 브랜치: `codex/bootstrap-product`
+- 브랜치: `main`
 
 ## 문서
 
@@ -26,6 +26,7 @@
 
 ## 프로젝트 스킬
 
+- `$gyeop-product-doc-writer`: 아이디어·메모를 활성 기획 SSOT로 작성
 - `$gyeop-product-guardrails`: 기능·우선순위·SSOT 변경
 - `$gyeop-question-pack-design`: A/B 질문팩 생성과 검수
 - `$gyeop-viral-flow-review`: 모바일 공유·응답·재공유 흐름 검증

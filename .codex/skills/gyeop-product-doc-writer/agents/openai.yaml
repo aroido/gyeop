@@ -1,0 +1,4 @@
+interface:
+  display_name: "GYEOP Product Doc Writer"
+  short_description: "겹의 아이디어를 실행 가능한 기획 SSOT로 작성합니다"
+  default_prompt: "Use $gyeop-product-doc-writer to turn this GYEOP idea into an active Korean product document."

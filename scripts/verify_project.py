@@ -22,6 +22,7 @@ REQUIRED_FILES = [
 ]
 EXPECTED_SKILLS = {
     "gyeop-issue-writer",
+    "gyeop-product-doc-writer",
     "gyeop-product-guardrails",
     "gyeop-question-pack-design",
     "gyeop-spec-writer",
