@@ -31,6 +31,7 @@ EXPECTED_SKILLS = {
 }
 EXPECTED_MOCKUPS = 6
 LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+IGNORED_DIRS = {".git", ".next", "coverage", "dist", "node_modules", "playwright-report", "test-results"}
 
 
 def fail(message: str) -> None:
@@ -55,7 +56,16 @@ def verify_skills() -> None:
         agent_file = skills_root / skill_name / "agents" / "openai.yaml"
         if not skill_file.exists() or not agent_file.exists():
             fail(f"incomplete skill structure: {skill_name}")
-        if "TODO" in skill_file.read_text(encoding="utf-8"):
+        content = skill_file.read_text(encoding="utf-8")
+        frontmatter = re.match(r"^---\n(.*?)\n---\n", content, re.DOTALL)
+        if not frontmatter:
+            fail(f"missing skill frontmatter: {skill_name}")
+        metadata = frontmatter.group(1)
+        if not re.search(rf"^name:\s*{re.escape(skill_name)}\s*$", metadata, re.MULTILINE):
+            fail(f"skill name differs from folder: {skill_name}")
+        if not re.search(r"^description:\s*\S", metadata, re.MULTILINE):
+            fail(f"missing skill description: {skill_name}")
+        if "TODO" in content:
             fail(f"unresolved TODO in {skill_file.relative_to(ROOT)}")
 
 
@@ -68,7 +78,7 @@ def verify_mockups() -> None:
 def verify_markdown_links() -> None:
     errors: list[str] = []
     for markdown in ROOT.rglob("*.md"):
-        if ".git" in markdown.parts:
+        if any(part in IGNORED_DIRS for part in markdown.relative_to(ROOT).parts):
             continue
         text = markdown.read_text(encoding="utf-8")
         for raw_target in LINK_RE.findall(text):

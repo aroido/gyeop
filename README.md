@@ -8,8 +8,8 @@
 
 ## 프로젝트 상태
 
-- 단계: 제품 기획 및 모바일 웹 MVP 준비
-- 코드: Next.js·Supabase 기반을 선정했으며 아직 애플리케이션 구현 전
+- 단계: 모바일 웹 MVP 기반 구현
+- 코드: Next.js 앱 셸, Supabase local stack, 로컬·GitHub Actions 공통 검증 구성
 - 기본 방향: 모바일 웹 우선, 방문자는 설치·로그인 없이 참여
 - 브랜치: `main`
 
@@ -51,8 +51,28 @@ scripts/task-harness queue
 
 저장소는 `origin`에서 자동 감지하거나 `GYEOP_GITHUB_REPO=owner/repo`로 설정한다. GitHub Project 연결은 `GYEOP_GITHUB_PROJECT_NUMBER`와 `GYEOP_GITHUB_OWNER`를 설정한 뒤 `scripts/task-harness project-add <issue-number>`로 사용한다. 작업 상태의 기준은 Project 보드가 아니라 `status:*` 이슈 라벨이다.
 
+## 로컬 개발
+
+Node.js `24.16.0`, pnpm `11.13.0`, 실행 중인 Docker가 필요하다.
+
+```bash
+corepack enable
+pnpm install --frozen-lockfile
+pnpm supabase:start
+pnpm exec supabase status -o env \
+  --override-name api.url=NEXT_PUBLIC_SUPABASE_URL \
+  --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_ANON_KEY > .env.local
+node --input-type=module -e 'import { randomBytes } from "node:crypto"; import { appendFileSync } from "node:fs"; const key=randomBytes(32).toString("base64url"); appendFileSync(".env.local", `ACCOUNT_DELETE_REAUTH_KEYRING=${JSON.stringify({local:key})}\nACCOUNT_DELETE_REAUTH_ACTIVE_VERSION=local\n`)'
+pnpm dev
+```
+
+`.env.local`은 local 전용 값도 포함하므로 출력·커밋·artifact 업로드를 하지 않는다. 작업을 마치면 `pnpm supabase:stop`으로 local stack을 내린다.
+
 ## 검증
 
 ```bash
+pnpm exec playwright install chromium
 ./scripts/run-ai-verify --mode full
 ```
+
+full verify는 Docker를 확인하고 Supabase start·reset·pgTAP, format, lint, typecheck, unit test, production build, mobile Chromium E2E를 실행한다. 검증 전에 local stack이 없었을 때만 종료 시 stack을 정리한다.
