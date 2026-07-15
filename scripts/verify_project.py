@@ -16,10 +16,16 @@ REQUIRED_FILES = [
     ROOT / "docs" / "product" / "question-pack-spec.md",
     ROOT / "docs" / "product" / "decision-log.md",
     ROOT / "docs" / "product" / "full-product-plan.md",
+    ROOT / "docs" / "templates" / "implementation-spec.md",
+    ROOT / "docs" / "templates" / "qa-verdict.md",
+    ROOT / "docs" / "engineering" / "github-task-workflow.md",
 ]
 EXPECTED_SKILLS = {
+    "gyeop-issue-writer",
     "gyeop-product-guardrails",
     "gyeop-question-pack-design",
+    "gyeop-spec-writer",
+    "gyeop-task",
     "gyeop-viral-flow-review",
 }
 EXPECTED_MOCKUPS = 6
