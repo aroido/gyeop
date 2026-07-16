@@ -17,6 +17,7 @@ import {
   issueSlug,
   parseWorktrees,
   prRelationFailures,
+  projectSourceSnapshot,
   qaPathForIssue,
   qaFailures,
   repoFromUrl,
@@ -215,6 +216,70 @@ test("status labels cover the task gate states", () => {
     "blocked-from:implementing",
     "blocked-from:qa",
   ]);
+});
+
+test("Project selections follow workflow, priority, type, and completion labels", () => {
+  const mappings = new Map([
+    ["status:backlog", ["Todo", "선행 작업 대기"]],
+    ["status:ready", ["Todo", "준비"]],
+    ["status:spec", ["In Progress", "스펙 작성"]],
+    ["status:implementing", ["In Progress", "구현 중"]],
+    ["status:qa", ["In Progress", "품질 검증"]],
+    ["status:blocked", ["In Progress", "차단"]],
+  ]);
+  for (const [status, [builtIn, workflow]] of mappings) {
+    const labels = [status, "priority:p0", "type:ops"];
+    if (status === "status:blocked") labels.push("blocked-from:ready");
+    const snapshot = projectSourceSnapshot({
+      number: 44,
+      node_id: "I_44",
+      html_url: "https://github.com/aroido/gyeop/issues/44",
+      state: "open",
+      labels,
+    });
+    assert.deepEqual(snapshot.desired, {
+      Status: builtIn,
+      "작업 상태": workflow,
+      우선순위: "P0",
+      "작업 유형": "운영",
+    });
+  }
+
+  const closed = {
+    number: 44,
+    node_id: "I_44",
+    html_url: "https://github.com/aroido/gyeop/issues/44",
+    state: "closed",
+    labels: ["status:qa", "priority:p1", "type:design"],
+  };
+  assert.deepEqual(projectSourceSnapshot(closed, { completed: true }).desired, {
+    Status: "Done",
+    "작업 상태": "완료",
+    우선순위: "P1",
+    "작업 유형": "디자인",
+  });
+  assert.equal(
+    projectSourceSnapshot(closed, { membershipOnly: true }).desired,
+    null,
+  );
+  assert.throws(
+    () =>
+      projectSourceSnapshot({
+        ...closed,
+        state: "open",
+        labels: ["status:qa", "priority:p0", "priority:p1"],
+      }),
+    /at most one priority/,
+  );
+  assert.throws(
+    () =>
+      projectSourceSnapshot({
+        ...closed,
+        state: "open",
+        labels: ["status:qa", "type:unknown"],
+      }),
+    /unknown type/,
+  );
 });
 
 test("workflow state requires one exact status and valid blocked provenance", () => {
@@ -803,13 +868,40 @@ function fakeGhLines() {
     "  if (state.failPrGetsAfterReady) state.prGetFailures = state.failPrGetsAfterReady;",
     "  save(); process.exit(0);",
     "}",
-    'if (method === "GET" && /\\/issues\\?/.test(endpoint)) {',
+    'if (args[0] === "project" && args[1] === "view") {',
+    "  response = { id: state.project.id, number: state.project.number, owner: { login: state.project.owner } };",
+    "}",
+    'else if (args[0] === "project" && args[1] === "field-list") {',
+    "  response = { totalCount: state.project.fields.length, fields: state.project.fields };",
+    "}",
+    'else if (args[0] === "project" && args[1] === "item-add") {',
+    '  const url = args[args.indexOf("--url") + 1]; state.project.itemExists = true;',
+    '  response = { id: state.project.itemId, type: "Issue", url }; save();',
+    "}",
+    'else if (args[0] === "project" && args[1] === "item-edit") {',
+    '  const fieldId = args[args.indexOf("--field-id") + 1];',
+    "  if (state.project.failEditFieldId === fieldId) { state.project.failEditFieldId = null; save(); process.stderr.write(`project edit failed for ${fieldId}`); process.exit(1); }",
+    '  const optionIndex = args.indexOf("--single-select-option-id");',
+    '  if (args.includes("--clear")) delete state.project.values[fieldId];',
+    "  else { const optionId = args[optionIndex + 1]; const field = state.project.fields.find((candidate) => candidate.id === fieldId); const option = field.options.find((candidate) => candidate.id === optionId); state.project.values[fieldId] = { name: option.name, optionId }; }",
+    "  response = { id: state.project.itemId }; save();",
+    "}",
+    'else if (args[0] === "api" && args[1] === "graphql") {',
+    "  const operationName = payload.operationName; const project = state.project; const projectIssue = Object.values(state.issues || {}).find((candidate) => candidate.node_id === payload.variables.id) || state.issue;",
+    '  if (operationName === "ProjectAccess") response = { data: { node: { __typename: "ProjectV2", id: project.id, number: project.number, viewerCanUpdate: project.viewerCanUpdate !== false, owner: { login: project.owner } } } };',
+    '  else if (operationName === "ProjectMemberships") response = { data: { node: { __typename: "Issue", id: projectIssue.node_id, url: projectIssue.html_url, projectItems: { nodes: project.itemExists === false ? [] : [{ id: project.itemId, isArchived: false, project: { id: project.id, number: project.number, owner: { login: project.owner } } }], pageInfo: { hasNextPage: false, endCursor: null } } } } };',
+    '  else if (operationName === "ProjectItemState") response = { data: { node: { __typename: "ProjectV2Item", id: project.itemId, isArchived: false, project: { id: project.id, number: project.number, owner: { login: project.owner } }, content: { id: projectIssue.node_id, number: projectIssue.number, url: projectIssue.html_url, repository: { nameWithOwner: "aroido/gyeop" } }, fieldValues: { nodes: Object.entries(project.values).map(([fieldId, value]) => ({ ...value, field: { id: fieldId, name: project.fields.find((field) => field.id === fieldId).name } })), pageInfo: { hasNextPage: false, endCursor: null } } } } };',
+    "  else { process.stderr.write(`unexpected GraphQL operation: ${operationName}`); process.exit(1); }",
+    "}",
+    'else if (method === "GET" && /\\/issues\\?/.test(endpoint)) {',
     '  const page = Number(new URLSearchParams(endpoint.split("?")[1]).get("page") || 1);',
     "  if (state.failBacklogPage === page) { process.stderr.write(`backlog page ${page} failed`); process.exit(1); }",
     "  response = state.backlogPages?.[page - 1] || [];",
     "}",
     'else if (method === "GET" && /\\/issues\\/\\d+$/.test(endpoint)) {',
     "  if (state.issueGetFailures?.[issueNumber] > 0) { state.issueGetFailures[issueNumber] -= 1; save(); process.stderr.write(`issue ${issueNumber} GET failed`); process.exit(1); }",
+    "  state.issueReadCount = (state.issueReadCount || 0) + 1; save();",
+    '  if (state.driftIssueOnGetNumber === state.issueReadCount) { const current = readIssue(issueNumber); const drifted = { ...current, labels: [{ name: "status:blocked" }, { name: "blocked-from:qa" }] }; if (state.issues) state.issues[issueNumber] = drifted; else state.issue = drifted; save(); }',
     "  if (issueNumber === 40 && (state.reopenPredecessorOnWorkflowRead || state.dirtyWorktreeOnWorkflowRead || state.invalidSpecOnWorkflowRead)) {",
     "    state.workflowIssueReads = (state.workflowIssueReads || 0) + 1;",
     '    if (state.workflowIssueReads === state.reopenPredecessorOnWorkflowRead) { state.issues[1] = { ...state.issues[1], state: "open" }; delete state.reopenPredecessorOnWorkflowRead; }',
@@ -964,10 +1056,63 @@ function openPr(taskSha, baseSha) {
 function issueState(state = "open") {
   return {
     number: 40,
+    node_id: "I_40",
+    html_url: "https://github.com/aroido/gyeop/issues/40",
     title: "[운영] task harness 안전성 강화",
     state,
     comments: 0,
     labels: [{ name: "status:qa" }],
+  };
+}
+
+function fakeProjectState(overrides = {}) {
+  const definitions = [
+    ["Status", ["Todo", "In Progress", "Done"]],
+    [
+      "작업 상태",
+      [
+        "선행 작업 대기",
+        "준비",
+        "스펙 작성",
+        "구현 중",
+        "품질 검증",
+        "차단",
+        "완료",
+      ],
+    ],
+    ["우선순위", ["P0", "P1", "P2"]],
+    [
+      "작업 유형",
+      [
+        "기획",
+        "디자인",
+        "프론트엔드",
+        "백엔드",
+        "데이터",
+        "안전",
+        "QA",
+        "운영",
+      ],
+    ],
+  ];
+  return {
+    id: "PVT_TEST",
+    number: 5,
+    owner: "aroido",
+    viewerCanUpdate: true,
+    itemId: "PVTI_TEST",
+    itemExists: true,
+    values: {},
+    fields: definitions.map(([name, options], fieldIndex) => ({
+      id: `PVTSSF_${fieldIndex}`,
+      name,
+      type: "ProjectV2SingleSelectField",
+      options: options.map((option, optionIndex) => ({
+        id: `OPTION_${fieldIndex}_${optionIndex}`,
+        name: option,
+      })),
+    })),
+    ...overrides,
   };
 }
 
@@ -987,6 +1132,7 @@ function writeGhState(fixture, overrides = {}) {
     },
     commitStatus: { total_count: 0, statuses: [] },
     merge: { merged: true, sha: "c".repeat(40) },
+    project: fakeProjectState(),
     ...overrides,
   };
   fs.writeFileSync(fixture.ghState, JSON.stringify(state));
@@ -1082,6 +1228,8 @@ function makeRepoFixture(t) {
     GYEOP_MAIN_BRANCH: "main",
     GYEOP_WORKTREE_ROOT: worktreeRoot,
   };
+  delete fixture.env.GYEOP_GITHUB_OWNER;
+  delete fixture.env.GYEOP_GITHUB_PROJECT_NUMBER;
   writeGhState(fixture);
   return fixture;
 }
@@ -1106,6 +1254,256 @@ function readCalls(fixture) {
 function readGhState(fixture) {
   return JSON.parse(fs.readFileSync(fixture.ghState, "utf8"));
 }
+
+test("project-sync uses the three GraphQL boundaries and converges fields", (t) => {
+  const fixture = makeRepoFixture(t);
+  writeGhState(fixture, {
+    issue: {
+      ...issueState(),
+      labels: [
+        { name: "status:qa" },
+        { name: "priority:p0" },
+        { name: "type:ops" },
+      ],
+    },
+  });
+
+  const result = runHarness(fixture, fixture.task, ["project-sync", "40"], {
+    GYEOP_GITHUB_OWNER: "aroido",
+    GYEOP_GITHUB_PROJECT_NUMBER: "5",
+  });
+  assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.projectSynced, true);
+  assert.deepEqual(output.changedFields, [
+    "Status",
+    "작업 상태",
+    "우선순위",
+    "작업 유형",
+  ]);
+  assert.deepEqual(
+    Object.values(readGhState(fixture).project.values).map(({ name }) => name),
+    ["In Progress", "품질 검증", "P0", "운영"],
+  );
+
+  const operations = readCalls(fixture)
+    .map((call) => call.payload?.operationName)
+    .filter(Boolean);
+  assert.deepEqual(operations, [
+    "ProjectAccess",
+    "ProjectMemberships",
+    "ProjectItemState",
+    "ProjectItemState",
+  ]);
+});
+
+test("explicit project-sync without configuration makes no Project call", (t) => {
+  const fixture = makeRepoFixture(t);
+  const labelsBefore = readGhState(fixture).issue.labels;
+  const result = runHarness(fixture, fixture.task, ["project-sync", "40"], {
+    GYEOP_GITHUB_OWNER: "",
+    GYEOP_GITHUB_PROJECT_NUMBER: "",
+  });
+
+  assert.equal(result.status, 1, `${result.stderr}\n${result.stdout}`);
+  assert.match(result.stderr, /Set GYEOP_GITHUB_PROJECT_NUMBER/);
+  assert.deepEqual(readGhState(fixture).issue.labels, labelsBefore);
+  assert.equal(
+    readCalls(fixture).filter(
+      (call) => call.args[0] === "project" || call.payload?.operationName,
+    ).length,
+    0,
+  );
+});
+
+test("partial Project edit reports confirmed fields and preserves labels", (t) => {
+  const fixture = makeRepoFixture(t);
+  const issue = {
+    ...issueState(),
+    labels: [
+      { name: "status:qa" },
+      { name: "priority:p0" },
+      { name: "type:ops" },
+    ],
+  };
+  writeGhState(fixture, {
+    issue,
+    project: fakeProjectState({ failEditFieldId: "PVTSSF_1" }),
+  });
+
+  const result = runHarness(fixture, fixture.task, ["project-sync", "40"], {
+    GYEOP_GITHUB_OWNER: "aroido",
+    GYEOP_GITHUB_PROJECT_NUMBER: "5",
+  });
+  assert.equal(result.status, 1, `${result.stderr}\n${result.stdout}`);
+  const error = JSON.parse(result.stderr);
+  assert.equal(error.authoritativeStatus, "status:qa");
+  assert.equal(error.projectSynced, false);
+  assert.deepEqual(error.confirmedChangedFields, ["Status"]);
+  assert.deepEqual(error.recoveryCommands, [
+    "scripts/task-harness project-sync 40",
+  ]);
+  const state = readGhState(fixture);
+  assert.deepEqual(state.issue.labels, issue.labels);
+  assert.deepEqual(Object.keys(state.project.values), ["PVTSSF_0"]);
+  assert.equal(
+    readCalls(fixture).filter(
+      (call) => call.args[0] === "project" && call.args[1] === "item-edit",
+    ).length,
+    2,
+  );
+});
+
+test("project-add creates missing membership and synchronizes fields", (t) => {
+  const fixture = makeRepoFixture(t);
+  writeGhState(fixture, {
+    issue: {
+      ...issueState(),
+      labels: [
+        { name: "status:qa" },
+        { name: "priority:p0" },
+        { name: "type:ops" },
+      ],
+    },
+    project: fakeProjectState({ itemExists: false }),
+  });
+  const result = runHarness(fixture, fixture.task, ["project-add", "40"], {
+    GYEOP_GITHUB_OWNER: "aroido",
+    GYEOP_GITHUB_PROJECT_NUMBER: "5",
+  });
+  assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+  const state = readGhState(fixture);
+  assert.equal(state.project.itemExists, true);
+  assert.deepEqual(
+    Object.values(state.project.values).map(({ name }) => name),
+    ["In Progress", "품질 검증", "P0", "운영"],
+  );
+  assert.equal(
+    readCalls(fixture).filter(
+      (call) => call.args[0] === "project" && call.args[1] === "item-add",
+    ).length,
+    1,
+  );
+});
+
+test("project-sync clears optional metadata that lost its source labels", (t) => {
+  const fixture = makeRepoFixture(t);
+  writeGhState(fixture, {
+    project: fakeProjectState({
+      values: {
+        PVTSSF_0: { name: "In Progress", optionId: "OPTION_0_1" },
+        PVTSSF_1: { name: "품질 검증", optionId: "OPTION_1_4" },
+        PVTSSF_2: { name: "P1", optionId: "OPTION_2_1" },
+        PVTSSF_3: { name: "디자인", optionId: "OPTION_3_1" },
+      },
+    }),
+  });
+  const result = runHarness(fixture, fixture.task, ["project-sync", "40"], {
+    GYEOP_GITHUB_OWNER: "aroido",
+    GYEOP_GITHUB_PROJECT_NUMBER: "5",
+  });
+  assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+  assert.deepEqual(Object.keys(readGhState(fixture).project.values), [
+    "PVTSSF_0",
+    "PVTSSF_1",
+  ]);
+  const clears = readCalls(fixture).filter(
+    (call) =>
+      call.args[0] === "project" &&
+      call.args[1] === "item-edit" &&
+      call.args.includes("--clear"),
+  );
+  assert.deepEqual(
+    clears.map((call) => call.args[call.args.indexOf("--field-id") + 1]),
+    ["PVTSSF_2", "PVTSSF_3"],
+  );
+});
+
+test("configured status reports post-Project issue drift without rollback", (t) => {
+  const baseline = makeRepoFixture(t);
+  const env = {
+    GYEOP_GITHUB_OWNER: "aroido",
+    GYEOP_GITHUB_PROJECT_NUMBER: "5",
+  };
+  const baselineResult = runHarness(
+    baseline,
+    baseline.task,
+    ["status", "40", "status:qa"],
+    env,
+  );
+  assert.equal(
+    baselineResult.status,
+    0,
+    `${baselineResult.stderr}\n${baselineResult.stdout}`,
+  );
+  const readCount = readCalls(baseline).filter(
+    (call) => call.method === "GET" && /\/issues\/40$/.test(call.endpoint),
+  ).length;
+
+  const fixture = makeRepoFixture(t);
+  writeGhState(fixture, { driftIssueOnGetNumber: readCount });
+  const result = runHarness(
+    fixture,
+    fixture.task,
+    ["status", "40", "status:qa"],
+    env,
+  );
+  assert.equal(result.status, 1, `${result.stderr}\n${result.stdout}`);
+  const error = JSON.parse(result.stderr);
+  assert.equal(error.projectSynced, true);
+  assert.match(error.message, /post-Project label confirmation/);
+  assert.deepEqual(
+    Object.values(readGhState(fixture).project.values).map(({ name }) => name),
+    ["In Progress", "품질 검증"],
+  );
+});
+
+test("close writes completed Project state only after issue closure", (t) => {
+  const fixture = makeRepoFixture(t);
+  writeGhState(fixture, {
+    pr: mergedPrState(fixture, "c".repeat(40)),
+    project: fakeProjectState({
+      values: {
+        PVTSSF_0: { name: "In Progress", optionId: "OPTION_0_1" },
+        PVTSSF_1: { name: "품질 검증", optionId: "OPTION_1_4" },
+      },
+    }),
+  });
+  const result = runHarness(fixture, fixture.repo, ["close", "40", "940"], {
+    GYEOP_GITHUB_OWNER: "aroido",
+    GYEOP_GITHUB_PROJECT_NUMBER: "5",
+  });
+  assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.project.projectSynced, true);
+  const state = readGhState(fixture);
+  assert.equal(state.issue.state, "closed");
+  assert.deepEqual(
+    Object.values(state.project.values).map(({ name }) => name),
+    ["Done", "완료"],
+  );
+});
+
+test("Project access without update permission performs zero field mutation", (t) => {
+  const fixture = makeRepoFixture(t);
+  writeGhState(fixture, {
+    project: fakeProjectState({ viewerCanUpdate: false }),
+  });
+  const result = runHarness(fixture, fixture.task, ["project-sync", "40"], {
+    GYEOP_GITHUB_OWNER: "aroido",
+    GYEOP_GITHUB_PROJECT_NUMBER: "5",
+  });
+  assert.equal(result.status, 1, `${result.stderr}\n${result.stdout}`);
+  assert.match(result.stderr, /not updateable/);
+  assert.equal(
+    readCalls(fixture).filter(
+      (call) =>
+        call.args[0] === "project" &&
+        ["item-add", "item-edit"].includes(call.args[1]),
+    ).length,
+    0,
+  );
+});
 
 function publishMergedMain(fixture, name) {
   const integrator = path.join(fixture.root, name);
@@ -1747,6 +2145,11 @@ test("resume reuses the exact clean task worktree without mutation", (t) => {
     branch: "codex/issue-40",
     worktree: fs.realpathSync.native(fixture.task),
     sha: fixture.taskSha,
+    project: {
+      configured: false,
+      projectSynced: false,
+      status: "skipped",
+    },
   });
   const calls = readCalls(fixture);
   assert.ok(

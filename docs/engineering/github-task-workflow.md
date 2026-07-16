@@ -3,7 +3,7 @@
 ## 원칙
 
 - GitHub Issue와 `status:*` 라벨을 작업 상태의 기준으로 사용한다.
-- GitHub Project는 설정된 경우 이슈를 추가하는 가시화 레이어로 사용한다.
+- GitHub Project는 설정된 경우 이슈 라벨을 한국어 field로 동기화하는 가시화 레이어로 사용한다.
 - 한 이슈는 한 worktree, 한 branch, 한 spec, 한 PR로 처리한다.
 - 구현 전에 스펙 검토를 통과하고, PR 전에 독립 QA와 전체 검증을 통과한다.
 
@@ -40,21 +40,48 @@ flowchart LR
 하네스는 host가 정확히 `github.com`인 `origin` URL에서 `owner/repo`를 자동 감지한다. 환경 변수는 자동 감지 값을 명시적으로 보정할 때만 사용하며, `resume`·`pr`·`merge`·`close`·`cleanup`에서는 설정값이 `origin`의 모든 fetch URL과 push URL repository에 정확히 같아야 한다. `resume`은 각 Git mutation 전후와 반환 직전, 나머지 명령은 전체 검증·local cleanup처럼 긴 단계 뒤의 remote/GitHub mutation 직전에 이를 다시 검사한다. 별도 `remote.origin.pushurl`이 다른 저장소를 가리키거나 원격이 없는 상태에서는 이 다섯 명령이 fail-closed한다.
 
 ```bash
-export GYEOP_GITHUB_REPO=owner/gyeop
-export GYEOP_GITHUB_OWNER=owner
-export GYEOP_GITHUB_PROJECT_NUMBER=1
+export GYEOP_GITHUB_REPO=aroido/gyeop
+export GYEOP_GITHUB_OWNER=aroido
+export GYEOP_GITHUB_PROJECT_NUMBER=5
 export GYEOP_MAIN_BRANCH=main
 ```
 
 토큰을 `.env`나 저장소에 기록하지 않는다. 인증은 사용자의 `gh auth` 세션을 사용한다.
 
+### GitHub Project 동기화
+
+GitHub Issue의 `status:*` 라벨이 workflow source of truth다. Project 값은 상태 전이를 승인하거나 거부하는 입력으로 사용하지 않는다. Project가 설정되면 `status`, `start`, `resume`, `reconcile`, `close`가 라벨 또는 검증된 완료 증거를 반영하고, Project 호출 뒤 기존 issue·artifact·Git gate를 다시 통과해야 성공한다. Project number가 없으면 automatic hook은 `skipped`로 끝나며 기존 workflow를 막지 않는다. 명시적 `project-add`와 `project-sync`는 설정이 없으면 non-zero로 실패한다.
+
+`doctor`는 설정된 Project의 owner·number·node, update 권한, `Status`, `작업 상태`, `우선순위`, `작업 유형` field와 모든 required option을 mutation 없이 검사한다. field와 option ID는 실행 시 exact name으로 찾으며 저장소에 고정하지 않는다.
+
+| Issue label 또는 완료 증거 | 기본 `Status` | `작업 상태`      |
+| -------------------------- | ------------- | ---------------- |
+| `status:backlog`           | `Todo`        | `선행 작업 대기` |
+| `status:ready`             | `Todo`        | `준비`           |
+| `status:spec`              | `In Progress` | `스펙 작성`      |
+| `status:implementing`      | `In Progress` | `구현 중`        |
+| `status:qa`                | `In Progress` | `품질 검증`      |
+| `status:blocked`           | `In Progress` | `차단`           |
+| 검증된 `close` 완료        | `Done`        | `완료`           |
+
+`priority:p0|p1|p2`는 `P0|P1|P2`, `type:planning|design|frontend|backend|data|safety|qa|ops`는 `기획|디자인|프론트엔드|백엔드|데이터|안전|QA|운영`으로 동기화한다. priority 또는 type label이 없으면 해당 field를 비우며, 같은 분류가 중복되거나 알 수 없는 prefixed label이면 Project write 전에 실패한다.
+
+```bash
+scripts/task-harness project-add <issue-number>
+scripts/task-harness project-sync <issue-number>
+```
+
+Project membership은 모든 page를 조회해 판정하며 `project-add`만 누락 item을 추가한다. 열린 이슈의 `project-add`는 membership과 네 field를 함께 맞춘다. 닫힌 이슈에서는 완료를 추정하지 않고 membership만 보장한다. `project-sync`는 열린 exact workflow 이슈의 기존 item만 동기화하며 닫힌 이슈나 missing item을 수정하지 않는다.
+
+여러 field write는 하나의 transaction이 아니다. 일부만 반영되거나 최종 확인이 실패해도 issue label과 Git 상태를 rollback하지 않고 `workflowChanged`, 확인 가능한 authoritative status, 반영이 확인된 field, `projectSynced: false`, ordered recovery command를 error JSON에 남긴다. 열린 existing item은 `project-sync`, 열린 missing item은 `project-add`, 완료 existing item은 같은 `close <issue> <pr>`, 완료 missing item은 `project-add`로 membership을 보장한 뒤 같은 `close`를 재실행한다.
+
 ## 일감 등록
 
 1. `$gyeop-issue-writer`로 한 PR 크기의 이슈를 작성한다.
-2. `scripts/task-harness doctor`로 GitHub 연결을 확인한다.
+2. `scripts/task-harness doctor`로 GitHub 연결과 설정된 Project 권한·schema를 확인한다.
 3. `scripts/task-harness label-sync`로 `status:*`와 `blocked-from:*` 관리 라벨을 동기화한다.
 4. REST `gh api repos/<owner>/<repo>/issues`로 이슈를 생성한다.
-5. Project가 설정되어 있으면 `scripts/task-harness project-add <issue-number>`를 실행한다.
+5. Project가 설정되어 있으면 `scripts/task-harness project-add <issue-number>`로 item을 추가하고 현재 label field를 동기화한다.
 6. 모든 등록 이슈에 정확히 하나의 `status:*` 라벨을 부여한다.
    - 선행 이슈가 모두 닫힌 실행 가능 작업: `status:ready`
    - 선행 이슈를 기다리는 계획된 작업: `status:backlog`
@@ -70,7 +97,7 @@ scripts/task-harness reconcile
 
 `reconcile`은 명시적으로 실행할 때만 동작한다. 첫 mutation 전에 열린 backlog 검색의 모든 page를 수집하고, issue number로 중복 제거·오름차순 정렬하며 PR 항목은 제외한다. page 수집이 하나라도 실패하면 label write 없이 non-zero로 끝난다.
 
-결과 JSON은 항상 `promoted`, `waiting`, `skipped`, `errors` 배열을 포함한다. 선행 이슈가 하나 이상이고 모두 닫혔으면 `promoted`, 하나라도 열려 있으면 `waiting`, 선행 이슈가 없으면 `skipped`, malformed state/body나 조회·write·응답 검증 실패는 `errors`다. 개별 오류 뒤에도 나머지 안전한 항목은 처리하지만 `errors`가 하나라도 있으면 JSON을 출력한 뒤 non-zero로 끝낸다. 재실행 시 이미 ready이고 ready gate가 유효한 항목은 label을 다시 쓰지 않고 `changed: false`로 보고한다. page 수집 중 외부 actor가 backlog label을 바꾸면 GitHub offset 결과가 움직일 수 있으므로 결과를 검토하고 `reconcile`을 다시 실행해 수렴시킨다.
+결과 JSON은 항상 `promoted`, `waiting`, `skipped`, `errors` 배열을 포함한다. 선행 이슈가 하나 이상이고 모두 닫혔으면 `promoted`, 하나라도 열려 있으면 `waiting`, 선행 이슈가 없으면 `skipped`, malformed state/body나 조회·write·응답 검증 실패는 `errors`다. 개별 오류 뒤에도 나머지 안전한 항목은 처리하지만 `errors`가 하나라도 있으면 JSON을 출력한 뒤 non-zero로 끝낸다. Project가 설정된 승격은 `준비`와 `Todo`도 동기화한다. label 승격 뒤 Project가 실패한 항목은 `promoted`와 중복하지 않고 `errors`에만 authoritative `status:ready`와 원인별 `project-add|project-sync` 복구 명령을 남긴다. 재실행 시 이미 ready이고 ready gate가 유효한 항목은 label을 다시 쓰지 않고 `changed: false`로 보고한다. page 수집 중 외부 actor가 backlog label을 바꾸면 GitHub offset 결과가 움직일 수 있으므로 결과를 검토하고 `reconcile`을 다시 실행해 수렴시킨다.
 
 ## 일감 가져오기와 처리
 
@@ -83,7 +110,7 @@ scripts/task-harness spec <issue-number>
 
 새 작업은 `start`, 중단 작업은 `resume`을 사용한다. 명령이 출력한 canonical `worktree` 경로로 이동한 뒤 `spec`과 이후 작업을 실행한다. `$gyeop-spec-writer`로 `docs/specs/issue-<number>.md`를 완성하고 독립 검토 결과를 기록한다.
 
-`start`는 첫 Git mutation 전에 열린 이슈의 exact `status:ready` 또는 재실행 가능한 exact `status:spec`, blocked provenance 부재, 예상 branch/path를 확인한다. worktree 생성 뒤 status write가 실패하면 안전한 부분 상태를 자동 삭제하지 않는다. 오류를 확인하고 같은 `start` 또는 `resume`으로 검증·재사용한다.
+`start`는 첫 Git mutation 전에 열린 이슈의 exact `status:ready` 또는 재실행 가능한 exact `status:spec`, blocked provenance 부재, 예상 branch/path를 확인한다. worktree 생성 뒤 status 또는 Project write가 실패하면 안전한 부분 상태를 자동 삭제하지 않는다. 같은 `start` 또는 `resume`으로 검증·재사용하며, Project 호출 뒤 exact spec status와 checkout gate를 다시 확인해야 성공한다.
 
 ### 중단 작업 이어받기
 
@@ -93,7 +120,7 @@ scripts/task-harness spec <issue-number>
 - `restored-local`: target이 없고 exact local branch가 있어 pinned SHA로 worktree만 복원한다.
 - `restored-remote`: local branch와 target이 없고 검증된 explicit origin URL의 remote branch만 있어 pinned commit을 fetch·검증하고 compare-and-create로 local ref와 worktree를 복원한다.
 
-재개 전에는 open issue의 exact `ready|spec|implementing|qa` 또는 유효한 blocked 상태, 모든 page에서 조회한 같은 repository/base/head의 merged PR 부재, origin 설정·명시적 fetch URL, local/remote SHA-or-absent, worktree registry, canonical target과 shared Git common directory를 고정한다. 첫 mutation 전·각 mutation 후·성공 직전에 다시 검사한다.
+재개 전에는 open issue의 exact `ready|spec|implementing|qa` 또는 유효한 blocked 상태, 모든 page에서 조회한 같은 repository/base/head의 merged PR 부재, origin 설정·명시적 fetch URL, local/remote SHA-or-absent, worktree registry, canonical target과 shared Git common directory를 고정한다. 첫 mutation 전·각 mutation 후·Project 동기화 후 성공 직전에 다시 검사한다.
 
 merged PR, cleanup quarantine, dirty/wrong branch·HEAD·repository worktree, 빈 directory·file·symlink를 포함한 target 충돌, local/remote SHA 불일치, origin·issue·ref·registry drift에서는 delete·reset·rollback 없이 실패한다. 부분 실패 JSON의 `expectedSha`, `localRef`, `registeredWorktree`, `targetExists`로 상태를 확인한 뒤 원인을 고치고 재실행한다.
 
@@ -130,7 +157,7 @@ scripts/task-harness close <issue-number> <pr-number>
 scripts/task-harness cleanup <issue-number> <pr-number>
 ```
 
-`close`는 이슈·PR·merge SHA가 들어간 고정 completion marker를 comment에 먼저 한 번만 기록하고, 이슈가 열려 있을 때만 닫는다. comment나 close 중간 실패 뒤 재실행해도 marker를 찾아 중복 comment 없이 남은 단계만 수행한다.
+`close`는 이슈·PR·merge SHA가 들어간 고정 completion marker를 comment에 먼저 한 번만 기록하고, 이슈가 열려 있을 때만 닫는다. closed GET을 확인한 뒤에만 Project를 `완료`와 `Done`으로 동기화한다. comment·close·Project 중간 실패 뒤 같은 `close`를 재실행해도 marker를 찾아 중복 comment 없이 남은 단계만 수행한다. Project item까지 없으면 `project-add <issue-number>`로 닫힌 이슈의 membership만 보장한 뒤 검증된 같은 `close <issue-number> <pr-number>`를 재실행한다.
 
 `cleanup`은 기본 checkout이 clean `main`인지 확인하고 GitHub 병합 증거를 읽은 뒤 origin fetch·push URL을 다시 검사해 `origin/main`을 fetch한다. 이어 PR merge commit 포함 여부와 대상 worktree·local·remote·remote-tracking ref 및 branch config 원문을 모두 먼저 검사한다. worktree에는 tracked/untracked 변경이 없어야 하고, ignored 경로는 Git의 NUL 구분 literal path 그대로 판정한다. `.DS_Store`, `*.tsbuildinfo`, `node_modules/`, `.next/`, `dist/`, `coverage/`, `playwright-report/`, `test-results/`, `supabase/.temp/`, `supabase/.branches/`, `docs/temp/`, `.omx/`만 disposable generated allowlist로 허용하며 그 밖의 ignored 경로는 사용자 산출물로 간주해 실패한다.
 
@@ -153,4 +180,4 @@ Git은 worktree registry, ref, branch config, working tree 파일, remote 설정
 
 ## 연결 상태 확인
 
-`scripts/task-harness doctor`로 현재 checkout의 `origin`, GitHub 인증, worktree, 템플릿, 검증 스크립트를 확인한다. Project 환경 변수가 없으면 Project 추가만 건너뛰고 `status:*` 라벨을 작업 상태의 기준으로 사용한다. `project-add`는 항목만 추가하며 Project 상태 field는 수동으로 관리한다. `status`, `start`, `resume`, `reconcile`은 GitHub Project field를 자동 동기화하지 않으므로 동기화됐다고 보고하지 않는다.
+`scripts/task-harness doctor`로 현재 checkout의 `origin`, GitHub 인증, worktree, 템플릿, 검증 스크립트와 설정된 Project update 권한·schema를 확인한다. Project 환경 변수가 없으면 automatic hook은 Project 호출 없이 `skipped`를 보고하고 `status:*` 라벨을 작업 상태의 기준으로 사용한다. 설정이 있으면 `project-add`·`project-sync`와 상태 전이 hook의 결과에서 `projectSynced` 및 부분 실패 복구 명령을 확인한다. 성공 JSON이나 실제 readback 증거 없이 보드가 동기화됐다고 보고하지 않는다.

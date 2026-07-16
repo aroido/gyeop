@@ -73,6 +73,130 @@ const projectOwner =
   process.env.GYEOP_GITHUB_OWNER || (repo ? repo.split("/")[0] : "");
 const projectNumber = process.env.GYEOP_GITHUB_PROJECT_NUMBER || "";
 
+const projectFieldNames = ["Status", "작업 상태", "우선순위", "작업 유형"];
+const projectStatusValues = new Map([
+  ["status:backlog", ["Todo", "선행 작업 대기"]],
+  ["status:ready", ["Todo", "준비"]],
+  ["status:spec", ["In Progress", "스펙 작성"]],
+  ["status:implementing", ["In Progress", "구현 중"]],
+  ["status:qa", ["In Progress", "품질 검증"]],
+  ["status:blocked", ["In Progress", "차단"]],
+]);
+const projectPriorityValues = new Map([
+  ["priority:p0", "P0"],
+  ["priority:p1", "P1"],
+  ["priority:p2", "P2"],
+]);
+const projectTypeValues = new Map([
+  ["type:planning", "기획"],
+  ["type:design", "디자인"],
+  ["type:frontend", "프론트엔드"],
+  ["type:backend", "백엔드"],
+  ["type:data", "데이터"],
+  ["type:safety", "안전"],
+  ["type:qa", "QA"],
+  ["type:ops", "운영"],
+]);
+const projectRequiredOptions = new Map([
+  [
+    "Status",
+    [
+      ...new Set([...projectStatusValues.values()].map(([value]) => value)),
+      "Done",
+    ],
+  ],
+  [
+    "작업 상태",
+    [...projectStatusValues.values()].map(([, value]) => value).concat("완료"),
+  ],
+  ["우선순위", [...projectPriorityValues.values()]],
+  ["작업 유형", [...projectTypeValues.values()]],
+]);
+
+const projectAccessQuery = `
+  query ProjectAccess($id: ID!) {
+    node(id: $id) {
+      __typename
+      ... on ProjectV2 {
+        id
+        number
+        viewerCanUpdate
+        owner {
+          ... on Organization { login }
+          ... on User { login }
+        }
+      }
+    }
+  }
+`;
+
+const projectMembershipsQuery = `
+  query ProjectMemberships($id: ID!, $cursor: String) {
+    node(id: $id) {
+      __typename
+      ... on Issue {
+        id
+        url
+        projectItems(first: 100, after: $cursor, includeArchived: true) {
+          nodes {
+            id
+            isArchived
+            project {
+              id
+              number
+              owner {
+                ... on Organization { login }
+                ... on User { login }
+              }
+            }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+`;
+
+const projectItemStateQuery = `
+  query ProjectItemState($id: ID!) {
+    node(id: $id) {
+      __typename
+      ... on ProjectV2Item {
+        id
+        isArchived
+        project {
+          id
+          number
+          owner {
+            ... on Organization { login }
+            ... on User { login }
+          }
+        }
+        content {
+          ... on Issue {
+            id
+            number
+            url
+            repository { nameWithOwner }
+          }
+        }
+        fieldValues(first: 100) {
+          nodes {
+            ... on ProjectV2ItemFieldSingleSelectValue {
+              name
+              optionId
+              field {
+                ... on ProjectV2FieldCommon { id name }
+              }
+            }
+          }
+          pageInfo { hasNextPage endCursor }
+        }
+      }
+    }
+  }
+`;
+
 const statusLabels = [
   "status:backlog",
   "status:ready",
@@ -144,6 +268,39 @@ function run(command, args = [], options = {}) {
   }
 
   return result.stdout || "";
+}
+
+function runJson(command, args, options, label) {
+  try {
+    return JSON.parse(String(run(command, args, options) || ""));
+  } catch (error) {
+    if (error.message.startsWith(`${command} `)) throw error;
+    throw new Error(`${label} did not return valid JSON`);
+  }
+}
+
+function ghGraphql(operationName, query, variables) {
+  const result = runJson(
+    "gh",
+    ["api", "graphql", "--input", "-"],
+    {
+      input: JSON.stringify({ operationName, query, variables }),
+    },
+    `GitHub GraphQL ${operationName}`,
+  );
+  if (Array.isArray(result.errors) && result.errors.length) {
+    const messages = result.errors
+      .map((error) => error?.message)
+      .filter(Boolean)
+      .join("; ");
+    throw new Error(
+      `GitHub GraphQL ${operationName} returned errors${messages ? `: ${messages}` : ""}`,
+    );
+  }
+  if (!result.data || typeof result.data !== "object") {
+    throw new Error(`GitHub GraphQL ${operationName} returned no data`);
+  }
+  return result.data;
 }
 
 function ghApi(method, endpoint, payload) {
@@ -383,6 +540,43 @@ function transitionIssue(number, nextStatus, { expectedSources } = {}) {
     status: initialPlan.status,
     provenance: initialPlan.provenance,
   };
+  const finish = (result) => {
+    const project = syncProjectIfConfigured(number, {
+      workflowChanged: result.changed,
+      expectedStatus: target.status,
+    });
+    try {
+      assertOriginRepo();
+      const postIssue = getIssue(number);
+      assertWorkflowResult(
+        postIssue,
+        target,
+        "post-Project label confirmation",
+      );
+      assertTransitionGates(
+        postIssue,
+        initialState,
+        target,
+        initialPlan.changed,
+      );
+      return {
+        ...result,
+        labels: issueLabels(postIssue),
+        project,
+      };
+    } catch (error) {
+      attachPostProjectDiagnostics(error, {
+        issueNumber: number,
+        expectedStatus: target.status,
+        workflowChanged: result.changed,
+        project,
+        recoveryCommands: [
+          `scripts/task-harness status ${number} ${target.status}`,
+        ],
+      });
+      throw error;
+    }
+  };
   assertTransitionGates(
     initialIssue,
     initialState,
@@ -402,7 +596,7 @@ function transitionIssue(number, nextStatus, { expectedSources } = {}) {
   const writeIssue = getIssue(number);
   const writeState = pinnedTransitionState(writeIssue, initialState, target);
   if (writeState.atTarget || !initialPlan.changed) {
-    return { ...initialPlan, changed: false, labels: issueLabels(writeIssue) };
+    return finish({ ...initialPlan, changed: false });
   }
 
   const labels = issueLabels(writeIssue).filter(
@@ -419,7 +613,7 @@ function transitionIssue(number, nextStatus, { expectedSources } = {}) {
   );
   const confirmedIssue = getIssue(number);
   assertWorkflowResult(confirmedIssue, target, "label GET confirmation");
-  return { ...initialPlan, labels: issueLabels(confirmedIssue) };
+  return finish(initialPlan);
 }
 
 function createOrUpdateLabel(name, color, description) {
@@ -557,7 +751,11 @@ function reconcile() {
       });
       result.promoted.push({ issue: issueNumber, changed: transition.changed });
     } catch (error) {
-      result.errors.push({ issue: issueNumber, reason: error.message });
+      result.errors.push({
+        issue: issueNumber,
+        reason: error.message,
+        ...(error.projectDiagnostics || {}),
+      });
     }
   }
   if (result.errors.length) {
@@ -589,6 +787,7 @@ function doctor() {
       throw new Error("add origin or set GYEOP_GITHUB_REPO=owner/repo");
     ghApi("GET", `repos/${repo}`);
   });
+  if (projectNumber) add("GitHub Project", () => loadProjectSchema());
   add("git worktree", () =>
     run("git", ["status", "--porcelain=v1", "--branch"]),
   );
@@ -629,25 +828,520 @@ function doctor() {
   );
 }
 
-function projectAdd(issueNumber) {
-  if (!projectNumber || !projectOwner) {
+function projectMetadataValue(labels, prefix, values) {
+  const matches = labels.filter((label) => label.startsWith(prefix));
+  const unknown = matches.filter((label) => !values.has(label));
+  if (unknown.length)
+    throw new Error(`unknown ${prefix} label: ${unknown.join(", ")}`);
+  if (matches.length > 1)
+    throw new Error(
+      `expected at most one ${prefix} label, got ${matches.length}`,
+    );
+  return matches.length ? values.get(matches[0]) : null;
+}
+
+function projectSourceSnapshot(
+  issue,
+  { completed = false, membershipOnly = false } = {},
+) {
+  const labels = issueLabels(issue).sort();
+  if (membershipOnly) {
+    if (issue.state !== "closed")
+      throw new Error(`issue #${issue.number} must be closed`);
+    return {
+      issue: issue.number,
+      nodeId: issue.node_id,
+      url: issue.html_url,
+      state: issue.state,
+      labels,
+      status: "closed",
+      desired: null,
+    };
+  }
+
+  let status;
+  if (completed) {
+    if (issue.state !== "closed")
+      throw new Error(
+        `issue #${issue.number} must be closed before Project completion`,
+      );
+    status = "closed";
+  } else {
+    status = workflowState(issue).status;
+  }
+  const [builtInStatus, workflowStatus] = completed
+    ? ["Done", "완료"]
+    : projectStatusValues.get(status) || [];
+  if (!builtInStatus) throw new Error(`no Project mapping for ${status}`);
+  return {
+    issue: issue.number,
+    nodeId: issue.node_id,
+    url: issue.html_url,
+    state: issue.state,
+    labels,
+    status,
+    desired: {
+      Status: builtInStatus,
+      "작업 상태": workflowStatus,
+      우선순위: projectMetadataValue(
+        labels,
+        "priority:",
+        projectPriorityValues,
+      ),
+      "작업 유형": projectMetadataValue(labels, "type:", projectTypeValues),
+    },
+  };
+}
+
+function assertProjectSource(expected, options) {
+  const current = projectSourceSnapshot(getIssue(expected.issue), options);
+  if (JSON.stringify(current) !== JSON.stringify(expected))
+    throw new Error(`issue #${expected.issue} changed during Project sync`);
+  return current;
+}
+
+function requireProjectConfiguration() {
+  if (!projectNumber || !projectOwner)
     throw new Error(
       "Set GYEOP_GITHUB_PROJECT_NUMBER and GYEOP_GITHUB_OWNER before Project sync.",
     );
+  if (!/^\d+$/.test(projectNumber) || Number(projectNumber) < 1)
+    throw new Error("GYEOP_GITHUB_PROJECT_NUMBER must be a positive integer");
+  const owner = repo?.split("/")[0];
+  if (!owner || projectOwner !== owner)
+    throw new Error(
+      `Project owner ${projectOwner || "missing"} must match repository owner ${owner || "missing"}`,
+    );
+  assertOriginRepo();
+}
+
+function loadProjectSchema() {
+  requireProjectConfiguration();
+  const view = runJson(
+    "gh",
+    [
+      "project",
+      "view",
+      projectNumber,
+      "--owner",
+      projectOwner,
+      "--format",
+      "json",
+    ],
+    {},
+    "gh project view",
+  );
+  if (
+    !String(view.id || "").startsWith("PVT_") ||
+    Number(view.number) !== Number(projectNumber) ||
+    view.owner?.login !== projectOwner
+  ) {
+    throw new Error("configured GitHub Project did not match project view");
   }
-  const issue = getIssue(issueNumber);
-  const output = run("gh", [
-    "project",
-    "item-add",
-    projectNumber,
-    "--owner",
-    projectOwner,
-    "--url",
-    issue.html_url,
-    "--format",
-    "json",
-  ]);
-  console.log(output.trim());
+  const access = ghGraphql("ProjectAccess", projectAccessQuery, {
+    id: view.id,
+  }).node;
+  if (
+    access?.__typename !== "ProjectV2" ||
+    access.id !== view.id ||
+    Number(access.number) !== Number(projectNumber) ||
+    access.owner?.login !== projectOwner ||
+    access.viewerCanUpdate !== true
+  ) {
+    throw new Error(
+      "configured GitHub Project is not updateable by the current viewer",
+    );
+  }
+  const response = runJson(
+    "gh",
+    [
+      "project",
+      "field-list",
+      projectNumber,
+      "--owner",
+      projectOwner,
+      "--format",
+      "json",
+      "--limit",
+      "100",
+    ],
+    {},
+    "gh project field-list",
+  );
+  if (
+    !Array.isArray(response.fields) ||
+    response.fields.length !== response.totalCount
+  )
+    throw new Error("GitHub Project field list was truncated or malformed");
+
+  const fields = {};
+  for (const name of projectFieldNames) {
+    const matches = response.fields.filter((field) => field.name === name);
+    if (
+      matches.length !== 1 ||
+      matches[0].type !== "ProjectV2SingleSelectField"
+    )
+      throw new Error(
+        `Project field ${name} must exist exactly once as single select`,
+      );
+    const field = matches[0];
+    const options = new Map();
+    for (const required of projectRequiredOptions.get(name)) {
+      const matches = (field.options || []).filter(
+        (option) => option.name === required,
+      );
+      if (matches.length !== 1 || !matches[0].id)
+        throw new Error(
+          `Project field ${name} option ${required} must exist exactly once`,
+        );
+      options.set(required, matches[0].id);
+    }
+    if (!field.id) throw new Error(`Project field ${name} returned no ID`);
+    fields[name] = { id: field.id, options };
+  }
+  return {
+    id: view.id,
+    owner: projectOwner,
+    number: Number(projectNumber),
+    fields,
+  };
+}
+
+function projectMemberships(source, schema) {
+  if (!source.nodeId || !source.url)
+    throw new Error(`issue #${source.issue} is missing GraphQL identity`);
+  const items = [];
+  const seen = new Set();
+  let cursor = null;
+  for (let page = 1; ; page += 1) {
+    if (page > 1000)
+      throw new Error("Project membership pagination exceeded 1000 pages");
+    const node = ghGraphql("ProjectMemberships", projectMembershipsQuery, {
+      id: source.nodeId,
+      cursor,
+    }).node;
+    if (
+      node?.__typename !== "Issue" ||
+      node.id !== source.nodeId ||
+      node.url !== source.url
+    )
+      throw new Error("Project membership query returned a different issue");
+    const connection = node.projectItems;
+    if (!Array.isArray(connection?.nodes))
+      throw new Error("Project membership query returned no items");
+    for (const item of connection.nodes) {
+      if (seen.has(item.id))
+        throw new Error(`duplicate Project item ${item.id}`);
+      seen.add(item.id);
+      if (item.project?.id === schema.id) items.push(item);
+    }
+    if (!connection.pageInfo?.hasNextPage) break;
+    if (!connection.pageInfo.endCursor)
+      throw new Error("Project membership pagination returned no cursor");
+    cursor = connection.pageInfo.endCursor;
+  }
+  if (items.length > 1)
+    throw new Error(`issue #${source.issue} has duplicate Project membership`);
+  if (items[0]?.isArchived)
+    throw new Error(`issue #${source.issue} Project item is archived`);
+  return items;
+}
+
+function readProjectItem(source, schema, itemId) {
+  const node = ghGraphql("ProjectItemState", projectItemStateQuery, {
+    id: itemId,
+  }).node;
+  if (
+    node?.__typename !== "ProjectV2Item" ||
+    node.id !== itemId ||
+    node.isArchived ||
+    node.project?.id !== schema.id ||
+    Number(node.project?.number) !== schema.number ||
+    node.project?.owner?.login !== schema.owner ||
+    node.content?.id !== source.nodeId ||
+    Number(node.content?.number) !== source.issue ||
+    node.content?.url !== source.url ||
+    node.content?.repository?.nameWithOwner !== repo
+  ) {
+    throw new Error(
+      "Project item did not match the configured issue and Project",
+    );
+  }
+  if (node.fieldValues?.pageInfo?.hasNextPage)
+    throw new Error("Project item field values were truncated");
+  const values = {};
+  for (const name of projectFieldNames) {
+    const matches = (node.fieldValues?.nodes || []).filter(
+      (value) => value?.field?.id === schema.fields[name].id,
+    );
+    if (matches.length > 1)
+      throw new Error(`Project item has duplicate value for ${name}`);
+    values[name] = matches[0] || null;
+  }
+  return values;
+}
+
+function projectValueMatches(value, desired, field) {
+  if (desired === null) return value === null;
+  return (
+    value?.name === desired && value.optionId === field.options.get(desired)
+  );
+}
+
+function attachProjectDiagnostics(error, context) {
+  let authoritativeStatus = null;
+  let finalValues = null;
+  try {
+    const issue = getIssue(context.source?.issue || context.issueNumber);
+    authoritativeStatus =
+      issue.state === "closed" ? "closed" : workflowState(issue).status;
+  } catch {}
+  try {
+    if (context.itemId && context.schema && context.source)
+      finalValues = readProjectItem(
+        context.source,
+        context.schema,
+        context.itemId,
+      );
+  } catch {}
+  const recoveryCommands = context.completed
+    ? [
+        ...(context.missingMembership
+          ? [`scripts/task-harness project-add ${context.issueNumber}`]
+          : []),
+        `scripts/task-harness close ${context.issueNumber} ${context.prNumber}`,
+      ]
+    : context.missingMembership ||
+        (context.allowAdd && !context.membershipConfirmed)
+      ? [`scripts/task-harness project-add ${context.issueNumber}`]
+      : [`scripts/task-harness project-sync ${context.issueNumber}`];
+  error.projectDiagnostics = {
+    workflowChanged: Boolean(context.workflowChanged),
+    authoritativeStatus,
+    lastConfirmedStatus:
+      context.source?.status || context.expectedStatus || null,
+    expectedStatus: context.source?.status || context.expectedStatus || null,
+    projectSynced: false,
+    confirmedChangedFields:
+      finalValues && context.initialValues && context.source?.desired
+        ? projectFieldNames.filter(
+            (name) =>
+              !projectValueMatches(
+                context.initialValues[name],
+                context.source.desired[name],
+                context.schema.fields[name],
+              ) &&
+              projectValueMatches(
+                finalValues[name],
+                context.source.desired[name],
+                context.schema.fields[name],
+              ),
+          )
+        : null,
+    recoveryCommands,
+  };
+}
+
+function attachPostProjectDiagnostics(
+  error,
+  { issueNumber, expectedStatus, workflowChanged, project, recoveryCommands },
+) {
+  if (error.projectDiagnostics) return;
+  let authoritativeStatus = null;
+  try {
+    const issue = getIssue(issueNumber);
+    authoritativeStatus =
+      issue.state === "closed" ? "closed" : workflowState(issue).status;
+  } catch {}
+  error.projectDiagnostics = {
+    workflowChanged: Boolean(workflowChanged),
+    authoritativeStatus,
+    lastConfirmedStatus: expectedStatus,
+    expectedStatus,
+    projectSynced: Boolean(project?.projectSynced),
+    confirmedChangedFields: project?.changedFields || [],
+    recoveryCommands,
+  };
+}
+
+function syncProjectIssue(
+  issueNumber,
+  {
+    allowAdd = false,
+    completed = false,
+    prNumber = null,
+    workflowChanged = false,
+    expectedStatus = null,
+  } = {},
+) {
+  const context = {
+    issueNumber: Number(issueNumber),
+    completed,
+    prNumber,
+    workflowChanged,
+    allowAdd,
+    expectedStatus,
+    missingMembership: false,
+  };
+  try {
+    const issue = getIssue(issueNumber);
+    const membershipOnly = allowAdd && issue.state === "closed" && !completed;
+    const sourceOptions = { completed, membershipOnly };
+    const source = projectSourceSnapshot(issue, sourceOptions);
+    context.source = source;
+    const schema = loadProjectSchema();
+    context.schema = schema;
+    assertProjectSource(source, sourceOptions);
+    let memberships = projectMemberships(source, schema);
+    context.membershipConfirmed = memberships.length === 1;
+    if (!memberships.length) {
+      context.missingMembership = true;
+      if (!allowAdd)
+        throw new Error(
+          `issue #${source.issue} is not in the configured Project`,
+        );
+      assertOriginRepo();
+      assertProjectSource(source, sourceOptions);
+      let addError = null;
+      let addValidationError = null;
+      let addedItemId = null;
+      try {
+        const added = runJson(
+          "gh",
+          [
+            "project",
+            "item-add",
+            projectNumber,
+            "--owner",
+            projectOwner,
+            "--url",
+            source.url,
+            "--format",
+            "json",
+          ],
+          {},
+          "gh project item-add",
+        );
+        if (added.type !== "Issue" || added.url !== source.url || !added.id)
+          addValidationError = new Error(
+            "gh project item-add returned a different item",
+          );
+        else addedItemId = added.id;
+      } catch (error) {
+        addError = error;
+      }
+      assertProjectSource(source, sourceOptions);
+      memberships = projectMemberships(source, schema);
+      if (memberships.length !== 1)
+        throw addError || new Error("Project item add was not confirmed");
+      if (addValidationError) throw addValidationError;
+      if (addedItemId && memberships[0].id !== addedItemId)
+        throw new Error(
+          "Project item-add response did not match membership readback",
+        );
+      context.missingMembership = false;
+      context.membershipConfirmed = true;
+    }
+    const itemId = memberships[0].id;
+    context.itemId = itemId;
+    if (membershipOnly) {
+      readProjectItem(source, schema, itemId);
+      assertOriginRepo();
+      assertProjectSource(source, sourceOptions);
+      return {
+        configured: true,
+        projectSynced: false,
+        status: "membership-only",
+        project: { owner: schema.owner, number: schema.number, id: schema.id },
+        item: itemId,
+        changedFields: [],
+      };
+    }
+
+    const initialValues = readProjectItem(source, schema, itemId);
+    context.initialValues = initialValues;
+    const changedFields = projectFieldNames.filter(
+      (name) =>
+        !projectValueMatches(
+          initialValues[name],
+          source.desired[name],
+          schema.fields[name],
+        ),
+    );
+    for (const name of changedFields) {
+      assertOriginRepo();
+      assertProjectSource(source, sourceOptions);
+      const args = [
+        "project",
+        "item-edit",
+        "--id",
+        itemId,
+        "--project-id",
+        schema.id,
+        "--field-id",
+        schema.fields[name].id,
+      ];
+      const desired = source.desired[name];
+      if (desired === null) args.push("--clear");
+      else
+        args.push(
+          "--single-select-option-id",
+          schema.fields[name].options.get(desired),
+        );
+      args.push("--format", "json");
+      const edited = runJson("gh", args, {}, `gh project item-edit ${name}`);
+      if (edited.id !== itemId)
+        throw new Error(`Project edit for ${name} returned a different item`);
+    }
+    const finalValues = readProjectItem(source, schema, itemId);
+    for (const name of projectFieldNames) {
+      if (
+        !projectValueMatches(
+          finalValues[name],
+          source.desired[name],
+          schema.fields[name],
+        )
+      )
+        throw new Error(
+          `Project field ${name} did not reach ${source.desired[name] ?? "empty"}`,
+        );
+    }
+    assertProjectSource(source, sourceOptions);
+    return {
+      configured: true,
+      projectSynced: true,
+      status: "synced",
+      project: { owner: schema.owner, number: schema.number, id: schema.id },
+      item: itemId,
+      desired: source.desired,
+      changedFields,
+    };
+  } catch (error) {
+    attachProjectDiagnostics(error, context);
+    throw error;
+  }
+}
+
+function syncProjectIfConfigured(issueNumber, options = {}) {
+  if (!projectNumber)
+    return { configured: false, projectSynced: false, status: "skipped" };
+  return syncProjectIssue(issueNumber, options);
+}
+
+function projectAdd(issueNumber) {
+  const result = syncProjectIssue(issueNumber, { allowAdd: true });
+  console.log(
+    JSON.stringify({ issue: Number(issueNumber), ...result }, null, 2),
+  );
+  return result;
+}
+
+function projectSync(issueNumber) {
+  const result = syncProjectIssue(issueNumber);
+  console.log(
+    JSON.stringify({ issue: Number(issueNumber), ...result }, null, 2),
+  );
+  return result;
 }
 
 function start(issueNumber) {
@@ -663,6 +1357,24 @@ function start(issueNumber) {
   const target = expectedTaskPath(issue);
   if (state.status === "status:spec") {
     const checkout = assertStatusGate(issue, "status:spec");
+    let project;
+    try {
+      project = syncProjectIfConfigured(issue.number, {
+        expectedStatus: "status:spec",
+      });
+      const confirmedIssue = getIssue(issue.number);
+      assertIssueStatus(confirmedIssue, "status:spec");
+      assertStatusGate(confirmedIssue, "status:spec");
+    } catch (error) {
+      attachPostProjectDiagnostics(error, {
+        issueNumber: issue.number,
+        expectedStatus: "status:spec",
+        workflowChanged: false,
+        project,
+        recoveryCommands: [`scripts/task-harness start ${issue.number}`],
+      });
+      throw error;
+    }
     console.log(
       JSON.stringify(
         {
@@ -671,6 +1383,7 @@ function start(issueNumber) {
           worktree: checkout.target,
           status: state.status,
           reused: true,
+          project,
         },
         null,
         2,
@@ -703,6 +1416,7 @@ function start(issueNumber) {
           worktree: checkout.target,
           status: result.status,
           reused: true,
+          project: result.project,
         },
         null,
         2,
@@ -764,6 +1478,7 @@ function start(issueNumber) {
         worktree: target,
         status: result.status,
         reused: false,
+        project: result.project,
       },
       null,
       2,
@@ -1678,6 +2393,15 @@ function closeIssue(issueNumber, prNumber) {
     assertOriginRepo();
     ghApi("PATCH", issueEndpoint(issueNumber), { state: "closed" });
   }
+  const closedIssue = getIssue(issueNumber);
+  if (closedIssue.state !== "closed")
+    throw new Error(`issue #${issue.number} close was not confirmed`);
+  const project = syncProjectIfConfigured(issueNumber, {
+    completed: true,
+    prNumber: pr.number,
+    workflowChanged: !alreadyClosed,
+    expectedStatus: "closed",
+  });
   console.log(
     JSON.stringify(
       {
@@ -1686,6 +2410,7 @@ function closeIssue(issueNumber, prNumber) {
         closed: true,
         alreadyClosed,
         alreadyCommented,
+        project,
       },
       null,
       2,
@@ -2113,6 +2838,8 @@ function resumeIssue(issueNumber) {
     remoteSha,
     expectedSha: "",
   };
+  let project;
+  let projectAttempted = false;
 
   try {
     resumeAssertGithub(issue.number, branch, workflow);
@@ -2143,6 +2870,10 @@ function resumeIssue(issueNumber) {
 
     if (targetPresent) {
       resumeAssertPhase(snapshot, initialPhase);
+      projectAttempted = Boolean(projectNumber);
+      project = syncProjectIfConfigured(issue.number, {
+        expectedStatus: workflow.status,
+      });
       resumeAssertPhase(snapshot, initialPhase);
       return {
         issue: issue.number,
@@ -2151,6 +2882,7 @@ function resumeIssue(issueNumber) {
         branch,
         worktree: target,
         sha: expectedSha,
+        project,
       };
     }
 
@@ -2182,6 +2914,10 @@ function resumeIssue(issueNumber) {
       targetPresent: true,
     };
     resumeAssertPhase(snapshot, finalPhase);
+    projectAttempted = Boolean(projectNumber);
+    project = syncProjectIfConfigured(issue.number, {
+      expectedStatus: workflow.status,
+    });
     resumeAssertPhase(snapshot, finalPhase);
     return {
       issue: issue.number,
@@ -2190,8 +2926,17 @@ function resumeIssue(issueNumber) {
       branch,
       worktree: target,
       sha: expectedSha,
+      project,
     };
   } catch (error) {
+    if (projectAttempted)
+      attachPostProjectDiagnostics(error, {
+        issueNumber: issue.number,
+        expectedStatus: workflow.status,
+        workflowChanged: false,
+        project,
+        recoveryCommands: [`scripts/task-harness resume ${issue.number}`],
+      });
     error.resumeDiagnostics = resumePartialDiagnostics(snapshot);
     throw error;
   }
@@ -2667,6 +3412,7 @@ commands:
   doctor
   label-sync
   project-add <issue-number>
+  project-sync <issue-number>
   queue
   reconcile
   status <issue-number> <status-label>
@@ -2687,6 +3433,7 @@ function main(argv = process.argv.slice(2)) {
     if (command === "doctor") return doctor();
     if (command === "label-sync") return labelSync();
     if (command === "project-add" && arg) return projectAdd(arg);
+    if (command === "project-sync" && arg) return projectSync(arg);
     if (command === "queue") return queue();
     if (command === "reconcile") return reconcile();
     if (command === "status" && arg && argv[2]) return status(arg, argv[2]);
@@ -2710,6 +3457,7 @@ function main(argv = process.argv.slice(2)) {
           status: "error",
           message: error.message,
           ...(error.resumeDiagnostics || {}),
+          ...(error.projectDiagnostics || {}),
         },
         null,
         2,
@@ -2735,6 +3483,7 @@ export {
   listCheckState,
   parseWorktrees,
   prRelationFailures,
+  projectSourceSnapshot,
   qaPathForIssue,
   qaFailures,
   repoFromUrl,
