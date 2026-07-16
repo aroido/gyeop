@@ -26,7 +26,7 @@ flowchart LR
 
 ## 환경 설정
 
-하네스는 `origin`에서 `owner/repo`를 자동 감지한다. 원격이 없거나 다른 저장소를 대상으로 할 때 환경 변수를 사용한다.
+하네스는 host가 정확히 `github.com`인 `origin` URL에서 `owner/repo`를 자동 감지한다. 환경 변수는 자동 감지 값을 명시적으로 보정할 때만 사용하며, `pr`·`merge`·`close`·`cleanup`에서는 설정값이 `origin`의 모든 fetch URL과 push URL repository에 정확히 같아야 한다. 명령 시작과 전체 검증·local cleanup처럼 긴 단계 뒤의 remote/GitHub mutation 직전에 이를 다시 검사한다. 별도 `remote.origin.pushurl`이 다른 저장소를 가리키거나 원격이 없는 상태에서는 이 네 명령이 fail-closed한다.
 
 ```bash
 export GYEOP_GITHUB_REPO=owner/gyeop
@@ -75,21 +75,42 @@ scripts/task-harness qa-check docs/temp/qa/issue-<number>.md
 scripts/task-harness pr <issue-number>
 ```
 
-필수 CI가 성공하고 PR이 mergeable일 때만 병합한다.
+`pr`·`merge`·`close`·`cleanup`은 설정된 GitHub repository와 local `origin`의 모든 fetch·push URL에서 파싱한 repository가 정확히 같아야 시작한다. fork, 별도 push URL, 잘못된 환경 변수로 GitHub 증거와 git mutation 대상이 갈리면 fail-closed한다.
+
+`pr`은 이슈가 `status:qa`인지 확인한 뒤 예상 branch, clean working tree, spec·QA gate를 검사한다. 전체 검증 전후의 branch, working tree, HEAD와 QA artifact 원문이 같아야 한다. 전체 검증 전과 직후 push 전에 예상 base/head의 기존 open PR 후보를 각각 조회해 0건 또는 정확히 한 건인지, 후보가 있으면 같은 PR인지와 repository·base/head·현재 remote SHA를 검사한다. PR 본문은 첫 line 전체가 exact `Closes #<issue>`이고 colon 형식을 포함한 그 밖의 GitHub closing keyword reference가 없어야 한다. 후보가 추가·교체되거나 둘 이상이거나 어느 조건이라도 다르면 local upstream과 원격을 변경하지 않고 실패한다. origin fetch·push URL도 push 직전에 다시 검사한다. 통과한 SHA만 push하고 remote head를 대조한 뒤 기존 PR을 재조회하거나 새 draft PR을 만든다. 검증된 draft만 ready로 전환하고 다시 조회해 non-draft 상태를 확인한다. ready 전환 성공 여부를 네트워크 오류로 확정할 수 없으면 PR을 닫지 않고 실패해 다음 재실행에서 복구한다. 유효한 기존 non-draft PR은 재실행 성공으로 반환한다.
+
+이슈 worktree에서 다음 명령을 실행한다. `merge`는 open·non-draft·mergeable PR, `main` base, 현재 저장소와 예상 branch의 head, clean working tree와 PR head SHA가 일치하는지 먼저 검사하고 `base.sha`와 QA artifact 원문을 고정한다. 전체 검증 뒤 checkout·QA gate와 고정한 원문을 다시 확인하고 PR을 재조회해 `base.sha`, head SHA, repository·branch·lifecycle이 그대로인지 검사한다. check run과 commit status가 한 건 이상 존재하며 모두 성공하면 merge API 직전에 PR을 한 번 더 조회해 같은 snapshot을 검증하고, 검증한 head SHA를 지정해 병합한다. GitHub API는 expected `base.sha`를 조건부 인자로 받지 않으므로 마지막 조회 뒤 base 갱신 경쟁은 branch protection과 GitHub mergeability 판정에 의존하는 잔여 위험이다.
 
 ```bash
 scripts/task-harness merge <pr-number>
-scripts/task-harness close <issue-number>
-scripts/task-harness cleanup <issue-number>
 ```
 
-`cleanup`은 병합 후 기본 checkout으로 돌아온 다음 실행한다.
+병합 성공 뒤 기본 checkout으로 돌아와 아래 순서로 실행한다. 두 명령 모두 `<issue-number>`와 같은 이슈를 닫는 병합된 `<pr-number>`를 요구하며, 다른 repository·base·head·close clause 또는 미병합 PR이면 아무것도 변경하지 않고 실패한다.
+
+```bash
+scripts/task-harness close <issue-number> <pr-number>
+scripts/task-harness cleanup <issue-number> <pr-number>
+```
+
+`close`는 이슈·PR·merge SHA가 들어간 고정 completion marker를 comment에 먼저 한 번만 기록하고, 이슈가 열려 있을 때만 닫는다. comment나 close 중간 실패 뒤 재실행해도 marker를 찾아 중복 comment 없이 남은 단계만 수행한다.
+
+`cleanup`은 기본 checkout이 clean `main`인지 확인하고 GitHub 병합 증거를 읽은 뒤 origin fetch·push URL을 다시 검사해 `origin/main`을 fetch한다. 이어 PR merge commit 포함 여부와 대상 worktree·local·remote·remote-tracking ref 및 branch config 원문을 모두 먼저 검사한다. worktree에는 tracked/untracked 변경이 없어야 하고, ignored 경로는 Git의 NUL 구분 literal path 그대로 판정한다. `.DS_Store`, `*.tsbuildinfo`, `node_modules/`, `.next/`, `dist/`, `coverage/`, `playwright-report/`, `test-results/`, `supabase/.temp/`, `supabase/.branches/`, `docs/temp/`, `.omx/`만 disposable generated allowlist로 허용하며 그 밖의 ignored 경로는 사용자 산출물로 간주해 실패한다.
+
+모든 preflight가 통과한 경우에만 local `main`을 fast-forward하고, target worktree를 다시 검사해 제거한다. local branch는 expected SHA와 config snapshot을 재확인한 뒤 task별 deterministic quarantine branch로 worktree-aware rename한다. 원래 ref가 재생성되지 않았고 quarantine ref가 expected SHA이며 어느 worktree도 두 ref를 사용하지 않고 config가 예상대로 이동했는지 다시 확인한 뒤, quarantine ref를 expected-SHA compare-and-swap으로 삭제한다. 삭제 직후에도 worktree를 다시 검사하며 경쟁이 보이면 ref와 원래 branch를 복구하거나 두 ref를 보존한 채 실패해 새 commit을 강제 삭제하지 않는다. 중단 뒤 재실행은 deterministic quarantine ref를 인식해 이어서 정리한다. remote branch 삭제 직전에 origin fetch·push URL을 다시 검사하고 expected SHA의 force-with-lease로 삭제한다. 이어 remote-tracking ref와 대상 branch/quarantine config를 정리해 각 자원의 부재를 즉시 확인한다. remote branch가 이미 없는 재실행은 정상이며 남은 local 자원만 계속 정리한다.
+
+Git은 worktree registry, ref, branch config, working tree 파일, remote 설정을 하나의 원자 transaction으로 묶지 않는다. 따라서 같은 이슈 branch에 대한 수동 checkout·commit·ref/config 변경, tracked·untracked·ignored 파일 생성·변경, `origin` URL 변경을 `pr`·`cleanup`과 동시에 실행하지 않는다. `merge` 중에는 PR base/body/lifecycle을 수동 편집하지 않는다. 하네스는 각 경계 재검사와 복구를 수행하지만 최종 검사와 다음 git/GitHub 명령 사이의 짧은 경쟁을 완전히 제거할 수는 없으며, 예상 밖 외부 경쟁은 성공으로 숨기지 않고 남은 상태와 함께 실패한다.
 
 ## 검토 게이트
 
 - Spec P0/P1 발견 사항이 하나라도 있으면 구현하지 않는다.
 - QA P0/P1 발견 사항이 하나라도 있으면 PR을 만들거나 병합하지 않는다.
+- Spec은 열 시작 위치의 `Status`, `Reviewer Agent`, `Review Status`, `P0/P1 Findings`가 각각 정확히 한 번이고 값이 `Reviewed`, 유효 reviewer, `PASS`, `0`이어야 한다.
+- QA는 열 시작 위치의 `Reviewer Agent`, `Status`, `P0/P1 Findings`와 full verify command/result block이 각각 정확히 한 번이고 값이 유효 reviewer, `PASS`, `0`, `PASS`여야 한다.
+- 이슈 연결 증거는 본문 첫 line 전체가 정확히 `Closes #<issue-number>`이고 그 밖의 GitHub closing keyword reference가 없어야 한다.
+- PR·merge 전체 검증 전후 QA artifact 원문이 달라지거나 QA gate가 다시 실패하면 진행하지 않는다.
 - `./scripts/run-ai-verify --mode full`이 실패하면 완료로 보고하지 않는다.
+- CI 결과가 없거나 pending·실패 결과가 하나라도 있으면 병합하지 않는다.
+- 병합된 PR과 이슈의 연결을 확인할 수 없으면 이슈를 닫거나 worktree·branch를 정리하지 않는다.
 - 제품 방향, secret, billing, destructive data, 외부 접근이 필요하면 `status:blocked`와 이유를 남긴다.
 
 ## 연결 상태 확인
