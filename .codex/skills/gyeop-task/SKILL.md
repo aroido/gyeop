@@ -10,7 +10,7 @@ Run every executable GitHub issue through one issue, one worktree, one branch, o
 ## Operating contract
 
 - Use GitHub Issue `status:*` labels as workflow truth.
-- Treat GitHub Project as an optional synchronized view.
+- Treat GitHub Project as an optional manual view. `project-add` adds only the item; status fields remain manual unless a later task explicitly implements synchronization.
 - Use REST through `gh api repos/<owner>/<repo>/...` for issue and PR state.
 - Write GitHub-facing titles, bodies, comments, and summaries in Korean.
 - Keep branch names, labels, commands, paths, env vars, and code symbols in English.
@@ -23,8 +23,10 @@ scripts/task-harness doctor
 scripts/task-harness label-sync
 scripts/task-harness project-add <issue-number>
 scripts/task-harness queue
+scripts/task-harness reconcile
 scripts/task-harness status <issue-number> <status-label>
 scripts/task-harness start <issue-number>
+scripts/task-harness resume <issue-number>
 scripts/task-harness spec <issue-number>
 scripts/task-harness spec-check <spec-path>
 scripts/task-harness qa-check <qa-path>
@@ -37,10 +39,10 @@ scripts/task-harness cleanup <issue-number> <pr-number>
 ## Required flow
 
 1. Run `scripts/task-harness doctor`.
-2. Promote a `status:backlog` issue to `status:ready` only after every referenced predecessor issue is closed; the task harness enforces this from the issue's `### 선행 이슈` section.
+2. Run `scripts/task-harness reconcile` when predecessors may have closed. Review its complete result before continuing; this is a manual operation, not Project synchronization or a scheduled job.
 3. Use the specified ready issue or choose the highest-priority item from `scripts/task-harness queue`.
-4. Run `scripts/task-harness start <issue-number>`.
-5. Change into the `worktree` path printed by `start`; run the remaining issue commands there through merge.
+4. Run `scripts/task-harness start <issue-number>` for a new task. For interrupted work, run `scripts/task-harness resume <issue-number>` and use only the returned canonical worktree; do not recreate or move its branch manually.
+5. Change into the `worktree` path printed by `start` or `resume`; run the remaining issue commands there through merge.
 6. Create the spec with `scripts/task-harness spec <issue-number>`.
 7. Use `$gyeop-spec-writer` to complete the spec.
 8. Have an independent `critic` or `architect` review the spec using only the issue, spec, and SSOT.
@@ -55,13 +57,26 @@ scripts/task-harness cleanup <issue-number> <pr-number>
 17. Merge only after required CI checks, local full verification, unchanged QA artifact, and the final PR base/head snapshot checks pass.
 18. Return to the base checkout, then run `scripts/task-harness close <issue-number> <pr-number>` and `scripts/task-harness cleanup <issue-number> <pr-number>`.
 
-Read `references/review-gates.md` before spec review or QA.
+Read `references/review-gates.md` before resuming work, changing status, reviewing a spec, starting QA, publishing a PR, or merging.
+
+## Workflow state
+
+- Every open workflow issue must have exactly one managed `status:*` label.
+- `status:blocked` must have exactly one matching `blocked-from:*` provenance label. Every other status must have none.
+- Normal progress is only `backlog -> ready -> spec -> implementing -> qa`. Any active state may enter `blocked`, but it may return only to the recorded source after that source's gate passes again.
+- A same-state non-blocked rerun still rechecks that state's gate and returns `changed: false` without a label write. A same-state blocked rerun checks only the exact status and provenance structure.
+- `status:qa` has no direct completion or rollback transition. Completion requires the existing merge and close evidence.
+- `start` may preserve a correctly created worktree when its later status write fails. Inspect the error, then rerun `start` or use `resume`; never delete the partial state automatically.
 
 ## Blocking rules
 
 - Any P0/P1 spec finding blocks implementation.
 - Any P0/P1 QA finding blocks PR creation and merge.
 - A failing full verification blocks completion.
+- Missing, duplicate, or malformed `status:*` and `blocked-from:*` labels block `status`, `start`, `resume`, `reconcile`, `pr`, and an unmerged `merge` before mutation.
+- `resume` never changes issue status, fast-forwards, rewinds, force-moves, deletes, or cleans anything. Merged PRs, dirty or conflicting worktrees, repository/path/ref/origin drift, and local/remote SHA mismatches fail closed.
+- `reconcile` fetches every backlog page before mutation. A page-fetch error produces no mutations; item errors are reported after other safe items and make the command exit nonzero. External label churn during pagination is handled by reviewing the result and rerunning `reconcile`.
+- `pr` and an unmerged `merge` require an open issue at exact `status:qa` with no blocked provenance at every delayed boundary. A previously merged PR may return `alreadyMerged: true` only after read-only relationship and SHA verification, even when its issue is closed.
 - Duplicate or missing exact spec/QA fields, a changed QA artifact, zero CI results, or a changed PR base/head snapshot blocks publication or merge.
 - Close and cleanup require the merged PR number; reruns must preserve the single completion marker and may skip only resources already absent. Local branch removal first moves the exact expected SHA to a task-specific recoverable quarantine ref, rechecks worktree/ref/config state, and deletes that quarantine ref with an expected-SHA compare-and-swap.
 - A missing GitHub remote blocks live issue execution but not local issue/spec drafting.

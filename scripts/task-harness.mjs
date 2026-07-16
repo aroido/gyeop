@@ -12,14 +12,22 @@ function repoFromUrl(input) {
     /^git@github\.com:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)$/,
     /^ssh:\/\/git@github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)$/,
     /^git:\/\/github\.com\/([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)$/,
-  ].map((pattern) => url.match(pattern)).find(Boolean);
+  ]
+    .map((pattern) => url.match(pattern))
+    .find(Boolean);
   if (!match) return "";
   const value = match[1].endsWith(".git") ? match[1].slice(0, -4) : match[1];
   return value.split("/").every(Boolean) ? value : "";
 }
 
 function originUrls({ push = false } = {}) {
-  const args = ["remote", "get-url", ...(push ? ["--push"] : []), "--all", "origin"];
+  const args = [
+    "remote",
+    "get-url",
+    ...(push ? ["--push"] : []),
+    "--all",
+    "origin",
+  ];
   const result = spawnSync("git", args, { encoding: "utf8" });
   if (result.status !== 0) return [];
   return result.stdout
@@ -36,10 +44,15 @@ function assertOriginRepo() {
   const fetchUrls = originUrls();
   const pushUrls = originUrls({ push: true });
   const remoteRepos = [...fetchUrls, ...pushUrls].map(repoFromUrl);
-  const matches = fetchUrls.length > 0 && pushUrls.length > 0 && remoteRepos.every((originRepo) => originRepo === repo);
+  const matches =
+    fetchUrls.length > 0 &&
+    pushUrls.length > 0 &&
+    remoteRepos.every((originRepo) => originRepo === repo);
   if (!repo || !matches) {
     const actual = remoteRepos.filter(Boolean).join(",") || "missing";
-    throw new Error(`configured GitHub repository ${repo || "missing"} does not match git origin ${actual}`);
+    throw new Error(
+      `configured GitHub repository ${repo || "missing"} does not match git origin ${actual}`,
+    );
   }
 }
 
@@ -50,11 +63,14 @@ function defaultWorktreeRoot(commonDir, cwd = process.cwd()) {
 
 const repo = process.env.GYEOP_GITHUB_REPO || repoFromOrigin();
 const mainBranch = process.env.GYEOP_MAIN_BRANCH || "main";
-const commonDir = spawnSync("git", ["rev-parse", "--git-common-dir"], { encoding: "utf8" });
+const commonDir = spawnSync("git", ["rev-parse", "--git-common-dir"], {
+  encoding: "utf8",
+});
 const worktreeRoot =
   process.env.GYEOP_WORKTREE_ROOT ||
   defaultWorktreeRoot(commonDir.status === 0 ? commonDir.stdout.trim() : "");
-const projectOwner = process.env.GYEOP_GITHUB_OWNER || (repo ? repo.split("/")[0] : "");
+const projectOwner =
+  process.env.GYEOP_GITHUB_OWNER || (repo ? repo.split("/")[0] : "");
 const projectNumber = process.env.GYEOP_GITHUB_PROJECT_NUMBER || "";
 
 const statusLabels = [
@@ -66,6 +82,21 @@ const statusLabels = [
   "status:blocked",
 ];
 
+const blockedFromLabels = [
+  "blocked-from:backlog",
+  "blocked-from:ready",
+  "blocked-from:spec",
+  "blocked-from:implementing",
+  "blocked-from:qa",
+];
+
+const forwardTransitions = new Map([
+  ["status:backlog", "status:ready"],
+  ["status:ready", "status:spec"],
+  ["status:spec", "status:implementing"],
+  ["status:implementing", "status:qa"],
+]);
+
 const managedLabels = [
   ["status:backlog", "d4c5f9", "Planned and waiting for predecessor issues"],
   ["status:ready", "0e8a16", "Ready for Codex task harness intake"],
@@ -73,6 +104,11 @@ const managedLabels = [
   ["status:implementing", "fbca04", "Implementation is in progress"],
   ["status:qa", "5319e7", "QA verification is in progress"],
   ["status:blocked", "d73a4a", "Blocked by missing input or external state"],
+  ["blocked-from:backlog", "fef2c0", "Blocked while waiting in backlog"],
+  ["blocked-from:ready", "fef2c0", "Blocked after becoming ready"],
+  ["blocked-from:spec", "fef2c0", "Blocked during specification"],
+  ["blocked-from:implementing", "fef2c0", "Blocked during implementation"],
+  ["blocked-from:qa", "fef2c0", "Blocked during QA"],
   ["priority:p0", "b60205", "Launch-blocking priority"],
   ["priority:p1", "d93f0b", "Important post-core priority"],
   ["priority:p2", "fbca04", "Later growth or optimization priority"],
@@ -102,7 +138,9 @@ function run(command, args = [], options = {}) {
     const cause = result.error ? `\n${result.error.message}` : "";
     const stderr = result.stderr ? `\n${result.stderr.trim()}` : "";
     const stdout = result.stdout ? `\n${result.stdout.trim()}` : "";
-    throw new Error(`${command} ${args.join(" ")} failed${cause}${stderr}${stdout}`);
+    throw new Error(
+      `${command} ${args.join(" ")} failed${cause}${stderr}${stdout}`,
+    );
   }
 
   return result.stdout || "";
@@ -110,9 +148,18 @@ function run(command, args = [], options = {}) {
 
 function ghApi(method, endpoint, payload) {
   if (!repo) {
-    throw new Error("GitHub repository is not configured. Add origin or set GYEOP_GITHUB_REPO=owner/repo.");
+    throw new Error(
+      "GitHub repository is not configured. Add origin or set GYEOP_GITHUB_REPO=owner/repo.",
+    );
   }
-  const args = ["api", "-X", method, endpoint, "-H", "Accept: application/vnd.github+json"];
+  const args = [
+    "api",
+    "-X",
+    method,
+    endpoint,
+    "-H",
+    "Accept: application/vnd.github+json",
+  ];
   const input = payload === undefined ? undefined : JSON.stringify(payload);
 
   if (payload !== undefined) {
@@ -136,23 +183,71 @@ function getIssue(number) {
 }
 
 function issueLabels(issue) {
-  return (issue.labels || []).map((label) => (typeof label === "string" ? label : label.name));
+  return (issue.labels || []).map((label) =>
+    typeof label === "string" ? label : label.name,
+  );
+}
+
+function workflowState(issue) {
+  if (issue?.state !== "open")
+    throw new Error(`issue #${issue?.number || "unknown"} must be open`);
+  const labels = issueLabels(issue);
+  const statuses = labels.filter((label) => label.startsWith("status:"));
+  const provenanceLabels = labels.filter((label) =>
+    label.startsWith("blocked-from:"),
+  );
+  if (statuses.length !== 1) {
+    throw new Error(
+      `issue #${issue.number} must have exactly one status label, got ${statuses.length}`,
+    );
+  }
+  const status = statuses[0];
+  if (!statusLabels.includes(status))
+    throw new Error(
+      `issue #${issue.number} has unknown status label ${status}`,
+    );
+  if (provenanceLabels.some((label) => !blockedFromLabels.includes(label))) {
+    throw new Error(`issue #${issue.number} has an unknown blocked-from label`);
+  }
+  if (status === "status:blocked" && provenanceLabels.length !== 1) {
+    throw new Error(
+      `issue #${issue.number} must have exactly one blocked-from label while blocked`,
+    );
+  }
+  if (status !== "status:blocked" && provenanceLabels.length !== 0) {
+    throw new Error(
+      `issue #${issue.number} must not have a blocked-from label while ${status}`,
+    );
+  }
+  const provenance = provenanceLabels[0] || null;
+  return {
+    status,
+    provenance,
+    sourceStatus: provenance
+      ? `status:${provenance.slice("blocked-from:".length)}`
+      : status,
+  };
 }
 
 function assertIssueStatus(issue, expected) {
-  if (!issueLabels(issue).includes(expected)) {
-    throw new Error(`issue #${issue.number} must be ${expected} before PR creation`);
-  }
+  const current = workflowState(issue);
+  if (current.status !== expected)
+    throw new Error(
+      `issue #${issue.number} must be ${expected}, got ${current.status}`,
+    );
+  return current;
 }
 
 function slugify(input) {
-  return String(input)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .replace(/-{2,}/g, "-")
-    .slice(0, 48)
-    .replace(/-+$/g, "") || "task";
+  return (
+    String(input)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .replace(/-{2,}/g, "-")
+      .slice(0, 48)
+      .replace(/-+$/g, "") || "task"
+  );
 }
 
 function issueSlug(issue) {
@@ -172,25 +267,159 @@ function qaPathForIssue(issue) {
 }
 
 function dependencyNumbers(body) {
-  const section = String(body || "").match(/### 선행 이슈\s*\n([\s\S]*?)(?=\n### |\n## |$)/)?.[1] || "";
-  return [...new Set([...section.matchAll(/#(\d+)\b/g)].map((match) => Number(match[1])))];
+  const section =
+    String(body || "").match(
+      /### 선행 이슈\s*\n([\s\S]*?)(?=\n### |\n## |$)/,
+    )?.[1] || "";
+  return [
+    ...new Set(
+      [...section.matchAll(/#(\d+)\b/g)].map((match) => Number(match[1])),
+    ),
+  ];
 }
 
 function assertPredecessorsClosed(issue) {
   for (const number of dependencyNumbers(issue.body)) {
     const predecessor = getIssue(number);
-    assert(predecessor.state === "closed", `predecessor issue #${number} must be closed before status:ready`);
+    assert(
+      predecessor.state === "closed",
+      `predecessor issue #${number} must be closed before status:ready`,
+    );
   }
 }
 
-function setStatus(number, nextStatus) {
-  assert(statusLabels.includes(nextStatus), `unknown status label: ${nextStatus}`);
-  const issue = getIssue(number);
-  if (nextStatus === "status:ready") assertPredecessorsClosed(issue);
-  const labels = issueLabels(issue).filter((label) => !statusLabels.includes(label));
-  labels.push(nextStatus);
-  ghApi("PUT", `${issueEndpoint(number)}/labels`, { labels });
-  return labels;
+function transitionPlan(current, nextStatus, expectedSources) {
+  assert(
+    statusLabels.includes(nextStatus),
+    `unknown status label: ${nextStatus}`,
+  );
+  if (
+    expectedSources &&
+    !expectedSources.includes(current.status) &&
+    current.status !== nextStatus
+  ) {
+    throw new Error(
+      `expected workflow source ${expectedSources.join(" or ")}, got ${current.status}`,
+    );
+  }
+  if (current.status === nextStatus)
+    return {
+      changed: false,
+      status: nextStatus,
+      provenance: current.provenance,
+    };
+  if (current.status === "status:blocked") {
+    if (nextStatus !== current.sourceStatus) {
+      throw new Error(
+        `blocked issue may only return to ${current.sourceStatus}, got ${nextStatus}`,
+      );
+    }
+    return { changed: true, status: nextStatus, provenance: null };
+  }
+  if (nextStatus === "status:blocked") {
+    if (
+      current.status === "status:qa" ||
+      forwardTransitions.has(current.status)
+    ) {
+      return {
+        changed: true,
+        status: nextStatus,
+        provenance: `blocked-from:${current.status.slice("status:".length)}`,
+      };
+    }
+  } else if (forwardTransitions.get(current.status) === nextStatus) {
+    return { changed: true, status: nextStatus, provenance: null };
+  }
+  throw new Error(
+    `workflow transition ${current.status} -> ${nextStatus} is not allowed`,
+  );
+}
+
+function assertWorkflowResult(issue, expected, label) {
+  const actual = workflowState(issue);
+  if (
+    actual.status !== expected.status ||
+    actual.provenance !== expected.provenance
+  ) {
+    throw new Error(
+      `${label} expected ${expected.status}/${expected.provenance || "none"}, got ${actual.status}/${actual.provenance || "none"}`,
+    );
+  }
+  return actual;
+}
+
+function workflowIssueFromLabelResponse(issue, response) {
+  const labels = Array.isArray(response) ? response : response?.labels;
+  if (!Array.isArray(labels))
+    throw new Error("label PUT response did not contain labels");
+  return { ...issue, labels };
+}
+
+function sameWorkflowState(left, right) {
+  return left.status === right.status && left.provenance === right.provenance;
+}
+
+function pinnedTransitionState(issue, source, target) {
+  const current = workflowState(issue);
+  if (sameWorkflowState(current, source)) return { current, atTarget: false };
+  if (sameWorkflowState(current, target)) return { current, atTarget: true };
+  throw new Error(
+    `workflow state changed from pinned ${source.status}/${source.provenance || "none"} before ${target.status}`,
+  );
+}
+
+function assertTransitionGates(issue, source, target, changed) {
+  if (!changed && source.status === "status:blocked") return;
+  assertStatusGate(issue, source.sourceStatus);
+  assertStatusGate(issue, target.status);
+}
+
+function transitionIssue(number, nextStatus, { expectedSources } = {}) {
+  assertOriginRepo();
+  const initialIssue = getIssue(number);
+  const initialState = workflowState(initialIssue);
+  const initialPlan = transitionPlan(initialState, nextStatus, expectedSources);
+  const target = {
+    status: initialPlan.status,
+    provenance: initialPlan.provenance,
+  };
+  assertTransitionGates(
+    initialIssue,
+    initialState,
+    target,
+    initialPlan.changed,
+  );
+
+  assertOriginRepo();
+  const gateIssue = getIssue(number);
+  pinnedTransitionState(gateIssue, initialState, target);
+  assertTransitionGates(gateIssue, initialState, target, initialPlan.changed);
+
+  const finalIssue = getIssue(number);
+  pinnedTransitionState(finalIssue, initialState, target);
+  assertTransitionGates(finalIssue, initialState, target, initialPlan.changed);
+
+  const writeIssue = getIssue(number);
+  const writeState = pinnedTransitionState(writeIssue, initialState, target);
+  if (writeState.atTarget || !initialPlan.changed) {
+    return { ...initialPlan, changed: false, labels: issueLabels(writeIssue) };
+  }
+
+  const labels = issueLabels(writeIssue).filter(
+    (label) =>
+      !statusLabels.includes(label) && !blockedFromLabels.includes(label),
+  );
+  labels.push(target.status);
+  if (target.provenance) labels.push(target.provenance);
+  const response = ghApi("PUT", `${issueEndpoint(number)}/labels`, { labels });
+  assertWorkflowResult(
+    workflowIssueFromLabelResponse(writeIssue, response),
+    target,
+    "label PUT response",
+  );
+  const confirmedIssue = getIssue(number);
+  assertWorkflowResult(confirmedIssue, target, "label GET confirmation");
+  return { ...initialPlan, labels: issueLabels(confirmedIssue) };
 }
 
 function createOrUpdateLabel(name, color, description) {
@@ -198,7 +427,10 @@ function createOrUpdateLabel(name, color, description) {
     ghApi("POST", `repos/${repo}/labels`, { name, color, description });
   } catch (error) {
     if (String(error.message).includes("already_exists")) {
-      ghApi("PATCH", `repos/${repo}/labels/${encodeURIComponent(name)}`, { color, description });
+      ghApi("PATCH", `repos/${repo}/labels/${encodeURIComponent(name)}`, {
+        color,
+        description,
+      });
     } else {
       throw error;
     }
@@ -206,15 +438,20 @@ function createOrUpdateLabel(name, color, description) {
 }
 
 function labelSync() {
+  assertOriginRepo();
   for (const [name, color, description] of managedLabels) {
     createOrUpdateLabel(name, color, description);
   }
-  console.log(JSON.stringify({ synced: managedLabels.map(([name]) => name) }, null, 2));
+  console.log(
+    JSON.stringify({ synced: managedLabels.map(([name]) => name) }, null, 2),
+  );
 }
 
 function status(issueNumber, nextStatus) {
-  const labels = setStatus(issueNumber, nextStatus);
-  console.log(JSON.stringify({ issue: Number(issueNumber), status: nextStatus, labels }, null, 2));
+  const result = transitionIssue(issueNumber, nextStatus);
+  console.log(
+    JSON.stringify({ issue: Number(issueNumber), ...result }, null, 2),
+  );
 }
 
 function queue() {
@@ -230,18 +467,105 @@ function queue() {
     return 2;
   };
 
-  issues.sort((a, b) => priorityRank(a) - priorityRank(b) || a.number - b.number);
+  issues.sort(
+    (a, b) => priorityRank(a) - priorityRank(b) || a.number - b.number,
+  );
   console.log(
     JSON.stringify(
       issues.map((issue) => ({
         number: issue.number,
         title: issue.title,
-        labels: issueLabels(issue).filter((label) => label.startsWith("priority:") || label.startsWith("type:")),
+        labels: issueLabels(issue).filter(
+          (label) => label.startsWith("priority:") || label.startsWith("type:"),
+        ),
       })),
       null,
       2,
     ),
   );
+}
+
+function reconcile() {
+  const result = {
+    status: "ok",
+    promoted: [],
+    waiting: [],
+    skipped: [],
+    errors: [],
+  };
+  const candidates = [];
+  try {
+    assertOriginRepo();
+    for (let page = 1; ; page += 1) {
+      if (page > 1000)
+        throw new Error("backlog pagination exceeded 1000 pages");
+      const batch = ghApi(
+        "GET",
+        `repos/${repo}/issues?state=open&per_page=100&page=${page}&labels=${encodeURIComponent("status:backlog")}`,
+      );
+      if (!Array.isArray(batch))
+        throw new Error(`backlog page ${page} did not return an array`);
+      candidates.push(...batch.filter((item) => !item.pull_request));
+      if (batch.length < 100) break;
+    }
+  } catch (error) {
+    result.status = "error";
+    result.errors.push({ issue: null, reason: error.message });
+    console.log(JSON.stringify(result, null, 2));
+    process.exitCode = 1;
+    return result;
+  }
+
+  const unique = [
+    ...new Map(candidates.map((item) => [Number(item.number), item])).values(),
+  ].sort((left, right) => Number(left.number) - Number(right.number));
+  for (const candidate of unique) {
+    const issueNumber = Number(candidate.number);
+    try {
+      const issue = getIssue(issueNumber);
+      const current = workflowState(issue);
+      if (!["status:backlog", "status:ready"].includes(current.status)) {
+        throw new Error(
+          `expected status:backlog or status:ready, got ${current.status}`,
+        );
+      }
+      const predecessors = dependencyNumbers(issue.body);
+      const predecessorSection = String(issue.body || "").match(
+        /### 선행 이슈\s*\n([\s\S]*?)(?=\n### |\n## |$)/,
+      )?.[1];
+      if (
+        predecessorSection !== undefined &&
+        predecessors.length === 0 &&
+        predecessorSection.trim() &&
+        !/^\s*-?\s*없음\s*$/m.test(predecessorSection)
+      ) {
+        throw new Error("malformed predecessor section");
+      }
+      if (predecessors.length === 0) {
+        result.skipped.push({ issue: issueNumber, reason: "no predecessors" });
+        continue;
+      }
+      const open = predecessors.filter(
+        (number) => getIssue(number).state !== "closed",
+      );
+      if (open.length) {
+        result.waiting.push({ issue: issueNumber, predecessors: open });
+        continue;
+      }
+      const transition = transitionIssue(issueNumber, "status:ready", {
+        expectedSources: ["status:backlog", "status:ready"],
+      });
+      result.promoted.push({ issue: issueNumber, changed: transition.changed });
+    } catch (error) {
+      result.errors.push({ issue: issueNumber, reason: error.message });
+    }
+  }
+  if (result.errors.length) {
+    result.status = "error";
+    process.exitCode = 1;
+  }
+  console.log(JSON.stringify(result, null, 2));
+  return result;
 }
 
 function doctor() {
@@ -251,21 +575,32 @@ function doctor() {
       fn();
       checks.push({ name, status: "ok" });
     } catch (error) {
-      checks.push({ name, status: "fail", message: error.message.split("\n")[0] });
+      checks.push({
+        name,
+        status: "fail",
+        message: error.message.split("\n")[0],
+      });
     }
   };
 
   add("gh auth", () => run("gh", ["auth", "status"]));
   add("GitHub repository", () => {
-    if (!repo) throw new Error("add origin or set GYEOP_GITHUB_REPO=owner/repo");
+    if (!repo)
+      throw new Error("add origin or set GYEOP_GITHUB_REPO=owner/repo");
     ghApi("GET", `repos/${repo}`);
   });
-  add("git worktree", () => run("git", ["status", "--porcelain=v1", "--branch"]));
+  add("git worktree", () =>
+    run("git", ["status", "--porcelain=v1", "--branch"]),
+  );
   add("verify script", () => {
-    if (!fs.existsSync("scripts/ai-verify")) throw new Error("missing scripts/ai-verify");
+    if (!fs.existsSync("scripts/ai-verify"))
+      throw new Error("missing scripts/ai-verify");
   });
   add("task templates", () => {
-    for (const file of ["docs/templates/implementation-spec.md", "docs/templates/qa-verdict.md"]) {
+    for (const file of [
+      "docs/templates/implementation-spec.md",
+      "docs/templates/qa-verdict.md",
+    ]) {
       if (!fs.existsSync(file)) throw new Error(`missing ${file}`);
     }
   });
@@ -280,8 +615,12 @@ function doctor() {
       {
         repo: repo || null,
         worktreeRoot,
-        project: projectNumber ? { owner: projectOwner, number: projectNumber } : null,
-        projectStatus: projectNumber ? "configured" : "skipped; status labels remain authoritative",
+        project: projectNumber
+          ? { owner: projectOwner, number: projectNumber }
+          : null,
+        projectStatus: projectNumber
+          ? "configured"
+          : "skipped; status labels remain authoritative",
         checks,
       },
       null,
@@ -292,7 +631,9 @@ function doctor() {
 
 function projectAdd(issueNumber) {
   if (!projectNumber || !projectOwner) {
-    throw new Error("Set GYEOP_GITHUB_PROJECT_NUMBER and GYEOP_GITHUB_OWNER before Project sync.");
+    throw new Error(
+      "Set GYEOP_GITHUB_PROJECT_NUMBER and GYEOP_GITHUB_OWNER before Project sync.",
+    );
   }
   const issue = getIssue(issueNumber);
   const output = run("gh", [
@@ -310,18 +651,124 @@ function projectAdd(issueNumber) {
 }
 
 function start(issueNumber) {
+  assertOriginRepo();
   const issue = getIssue(issueNumber);
-  assertIssueStatus(issue, "status:ready");
-  assertPredecessorsClosed(issue);
+  const state = workflowState(issue);
+  if (!["status:ready", "status:spec"].includes(state.status)) {
+    throw new Error(
+      `issue #${issue.number} must be status:ready or status:spec, got ${state.status}`,
+    );
+  }
   const branch = branchForIssue(issue);
-  const target = path.join(worktreeRoot, issueSlug(issue));
+  const target = expectedTaskPath(issue);
+  if (state.status === "status:spec") {
+    const checkout = assertStatusGate(issue, "status:spec");
+    console.log(
+      JSON.stringify(
+        {
+          issue: issue.number,
+          branch,
+          worktree: checkout.target,
+          status: state.status,
+          reused: true,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+  assertStatusGate(issue, "status:ready");
+
+  const branchRef = `refs/heads/${branch}`;
+  const worktrees = parseWorktrees(
+    run("git", ["worktree", "list", "--porcelain"]),
+  );
+  const targetEntry = worktrees.find(
+    (entry) => canonicalPath(entry.worktree) === canonicalPath(target),
+  );
+  const branchEntry = worktrees.find((entry) => entry.branch === branchRef);
+  if (targetEntry || branchEntry) {
+    if (!targetEntry || targetEntry !== branchEntry)
+      throw new Error(`task branch or worktree is already in use; run resume`);
+    const checkout = assertTaskCheckout(issue);
+    const result = transitionIssue(issueNumber, "status:spec", {
+      expectedSources: ["status:ready", "status:spec"],
+    });
+    console.log(
+      JSON.stringify(
+        {
+          issue: issue.number,
+          branch,
+          worktree: checkout.target,
+          status: result.status,
+          reused: true,
+        },
+        null,
+        2,
+      ),
+    );
+    return;
+  }
+  try {
+    fs.lstatSync(target);
+    throw new Error(`task worktree target already exists: ${target}`);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  if (optionalLocalRefSha(branchRef))
+    throw new Error(`task branch ${branch} already exists; run resume`);
 
   fs.mkdirSync(worktreeRoot, { recursive: true });
+  assertIssueStatus(getIssue(issueNumber), "status:ready");
+  assertPredecessorsClosed(getIssue(issueNumber));
   run("git", ["fetch", "origin", mainBranch], { stdio: "inherit" });
-  run("git", ["worktree", "add", "-b", branch, target, `origin/${mainBranch}`], { stdio: "inherit" });
-  setStatus(issueNumber, "status:spec");
+  assertIssueStatus(getIssue(issueNumber), "status:ready");
+  assertPredecessorsClosed(getIssue(issueNumber));
+  if (optionalLocalRefSha(branchRef))
+    throw new Error(`task branch ${branch} appeared during start; run resume`);
+  const latestWorktrees = parseWorktrees(
+    run("git", ["worktree", "list", "--porcelain"]),
+  );
+  if (
+    latestWorktrees.some(
+      (entry) =>
+        canonicalPath(entry.worktree) === canonicalPath(target) ||
+        entry.branch === branchRef,
+    )
+  ) {
+    throw new Error(
+      `task branch or worktree appeared during start; run resume`,
+    );
+  }
+  try {
+    fs.lstatSync(target);
+    throw new Error(`task worktree target appeared during start: ${target}`);
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  run(
+    "git",
+    ["worktree", "add", "-b", branch, target, `origin/${mainBranch}`],
+    { stdio: "inherit" },
+  );
+  const result = transitionIssue(issueNumber, "status:spec", {
+    expectedSources: ["status:ready", "status:spec"],
+  });
 
-  console.log(JSON.stringify({ issue: issue.number, branch, worktree: target, status: "status:spec" }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        issue: issue.number,
+        branch,
+        worktree: target,
+        status: result.status,
+        reused: false,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 function renderSpec(issue) {
@@ -454,19 +901,31 @@ function specFailures(file) {
   const { text, missing } = validateSections(file, sections);
   const failures = [...missing.map((section) => `missing section: ${section}`)];
   if (exactField(text, "Status") !== "Reviewed") {
-    failures.push("spec must contain one exact `Status: Reviewed` field before implementation");
+    failures.push(
+      "spec must contain one exact `Status: Reviewed` field before implementation",
+    );
   }
   const reviewer = exactField(text, "Reviewer Agent");
-  if (!reviewer || /^(TODO|TBD|Not run)$/i.test(reviewer)) failures.push("missing spec reviewer agent");
+  if (!reviewer || /^(TODO|TBD|Not run)$/i.test(reviewer))
+    failures.push("missing spec reviewer agent");
   if (exactField(text, "Review Status") !== "PASS") {
-    failures.push("spec review must contain one exact `Review Status: PASS` field");
+    failures.push(
+      "spec review must contain one exact `Review Status: PASS` field",
+    );
   }
   if (exactField(text, "P0/P1 Findings") !== "0") {
-    failures.push("spec review must contain one exact `P0/P1 Findings: 0` field");
+    failures.push(
+      "spec review must contain one exact `P0/P1 Findings: 0` field",
+    );
   }
-  if (/\[(P0|P1)\]/.test(text)) failures.push("P0/P1 spec findings block implementation");
-  for (const required of ["docs/product/core-feature-priority.md", "AGENTS.md"]) {
-    if (!text.includes(required)) failures.push(`missing SSOT reference: ${required}`);
+  if (/\[(P0|P1)\]/.test(text))
+    failures.push("P0/P1 spec findings block implementation");
+  for (const required of [
+    "docs/product/core-feature-priority.md",
+    "AGENTS.md",
+  ]) {
+    if (!text.includes(required))
+      failures.push(`missing SSOT reference: ${required}`);
   }
   if (/\[ \].*(작성한다|교체|Replace with)/.test(text)) {
     failures.push("template placeholders remain");
@@ -476,7 +935,9 @@ function specFailures(file) {
 
 function printCheckResult(kind, file, failures) {
   if (failures.length) {
-    console.error(JSON.stringify({ status: "fail", kind, file, failures }, null, 2));
+    console.error(
+      JSON.stringify({ status: "fail", kind, file, failures }, null, 2),
+    );
     process.exit(1);
   }
   console.log(JSON.stringify({ status: "pass", kind, file }, null, 2));
@@ -491,9 +952,11 @@ function qaFailures(file) {
   const sections = ["QA 판정", "발견 사항", "검증", "필수 수정"];
   const { text, missing } = validateSections(file, sections);
   const failures = [...missing.map((section) => `missing section: ${section}`)];
-  if (exactField(text, "Status") !== "PASS") failures.push("QA must contain one exact `Status: PASS` field");
+  if (exactField(text, "Status") !== "PASS")
+    failures.push("QA must contain one exact `Status: PASS` field");
   const reviewer = exactField(text, "Reviewer Agent");
-  if (!reviewer || /^(TODO|TBD|Not run)$/i.test(reviewer)) failures.push("missing independent QA reviewer agent");
+  if (!reviewer || /^(TODO|TBD|Not run)$/i.test(reviewer))
+    failures.push("missing independent QA reviewer agent");
   if (exactField(text, "P0/P1 Findings") !== "0") {
     failures.push("QA must contain one exact `P0/P1 Findings: 0` field");
   }
@@ -504,7 +967,9 @@ function qaFailures(file) {
     ),
   ].map((match) => match[1].trim());
   if (fullVerifyResults.length !== 1 || fullVerifyResults[0] !== "PASS") {
-    failures.push("QA must contain one exact full verification command block with `Result: PASS`");
+    failures.push(
+      "QA must contain one exact full verification command block with `Result: PASS`",
+    );
   }
   return failures;
 }
@@ -522,11 +987,15 @@ function assertGate(kind, file, failures) {
 function checkoutFailures(actual, expected) {
   const failures = [];
   if (actual.branch !== expected.branch) {
-    failures.push(`expected branch ${expected.branch}, got ${actual.branch || "detached HEAD"}`);
+    failures.push(
+      `expected branch ${expected.branch}, got ${actual.branch || "detached HEAD"}`,
+    );
   }
   if (!actual.clean) failures.push("working tree must be clean");
   if (expected.sha && actual.sha !== expected.sha) {
-    failures.push(`expected HEAD ${expected.sha}, got ${actual.sha || "unknown"}`);
+    failures.push(
+      `expected HEAD ${expected.sha}, got ${actual.sha || "unknown"}`,
+    );
   }
   return failures;
 }
@@ -542,7 +1011,13 @@ function checkoutState(cwd = process.cwd()) {
 function ignoredWorktreePaths(cwd = process.cwd()) {
   return run(
     "git",
-    ["status", "--porcelain=v1", "-z", "--ignored=matching", "--untracked-files=normal"],
+    [
+      "status",
+      "--porcelain=v1",
+      "-z",
+      "--ignored=matching",
+      "--untracked-files=normal",
+    ],
     { cwd },
   )
     .split("\0")
@@ -567,25 +1042,123 @@ function isDisposableIgnoredPath(file) {
 }
 
 function unsafeIgnoredPaths(cwd = process.cwd()) {
-  return ignoredWorktreePaths(cwd).filter((file) => !isDisposableIgnoredPath(file));
+  return ignoredWorktreePaths(cwd).filter(
+    (file) => !isDisposableIgnoredPath(file),
+  );
 }
 
 function assertCheckout(actual, expected, label = "checkout") {
   const failures = checkoutFailures(actual, expected);
-  if (failures.length) throw new Error(`${label} gate failed: ${failures.join("; ")}`);
+  if (failures.length)
+    throw new Error(`${label} gate failed: ${failures.join("; ")}`);
+}
+
+function expectedTaskPath(issue) {
+  const target = path.resolve(worktreeRoot, issueSlug(issue));
+  const canonical = canonicalPath(target);
+  if (canonical !== target)
+    throw new Error(`task worktree path must not be an alias: ${target}`);
+  return target;
+}
+
+function assertTaskCheckout(issue) {
+  const target = expectedTaskPath(issue);
+  const branch = branchForIssue(issue);
+  const branchRef = `refs/heads/${branch}`;
+  const entries = parseWorktrees(
+    run("git", ["worktree", "list", "--porcelain"]),
+  );
+  const targetEntries = entries.filter(
+    (entry) => canonicalPath(entry.worktree) === target,
+  );
+  const branchEntries = entries.filter((entry) => entry.branch === branchRef);
+  if (
+    targetEntries.length !== 1 ||
+    branchEntries.length !== 1 ||
+    targetEntries[0] !== branchEntries[0]
+  ) {
+    throw new Error(`expected exactly one ${branch} worktree at ${target}`);
+  }
+  const topLevel = canonicalPath(
+    run("git", ["rev-parse", "--show-toplevel"], { cwd: target }).trim(),
+  );
+  if (topLevel !== target)
+    throw new Error(
+      `task checkout top-level must be ${target}, got ${topLevel}`,
+    );
+  const callerCommonDir = gitCommonDir();
+  const targetCommonDir = gitCommonDir(target);
+  const commonRelative = path.relative(target, targetCommonDir);
+  const commonInsideTarget =
+    commonRelative === "" ||
+    (!path.isAbsolute(commonRelative) &&
+      commonRelative !== ".." &&
+      !commonRelative.startsWith(`..${path.sep}`));
+  if (commonInsideTarget) {
+    throw new Error(
+      `task checkout must use a linked worktree common directory outside ${target}`,
+    );
+  }
+  if (targetCommonDir !== callerCommonDir) {
+    throw new Error(
+      `task checkout common-dir must match the caller shared repository: ${targetCommonDir} != ${callerCommonDir}`,
+    );
+  }
+  const actual = checkoutState(target);
+  assertCheckout(actual, { branch }, "task checkout");
+  const localSha = optionalLocalRefSha(branchRef);
+  if (!localSha || localSha !== actual.sha) {
+    throw new Error(
+      `task branch ${branch} must point to checkout HEAD ${actual.sha}`,
+    );
+  }
+  return { target, branch, sha: actual.sha };
+}
+
+function gitCommonDir(cwd = process.cwd()) {
+  const value = run(
+    "git",
+    ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+    { cwd },
+  ).trim();
+  return canonicalPath(
+    path.isAbsolute(value) ? value : path.resolve(cwd, value),
+  );
+}
+
+function assertStatusGate(issue, status) {
+  if (status === "status:blocked" || status === "status:backlog") return null;
+  if (status === "status:ready") {
+    assertPredecessorsClosed(issue);
+    return null;
+  }
+  const checkout = assertTaskCheckout(issue);
+  if (["status:implementing", "status:qa"].includes(status)) {
+    const specFile = path.join(checkout.target, specPathForIssue(issue));
+    assertGate("spec", specFile, specFailures(specFile));
+  }
+  return checkout;
 }
 
 function checkStateFailures(checkRuns = [], statuses = []) {
   const failures = [];
-  if (checkRuns.length + statuses.length === 0) failures.push("no CI checks or commit statuses found");
+  if (checkRuns.length + statuses.length === 0)
+    failures.push("no CI checks or commit statuses found");
   for (const check of checkRuns) {
-    if (check.status !== "completed" || !["success", "neutral", "skipped"].includes(check.conclusion)) {
-      failures.push(`check ${check.name || check.id || "unknown"} is ${check.status}/${check.conclusion || "none"}`);
+    if (
+      check.status !== "completed" ||
+      !["success", "neutral", "skipped"].includes(check.conclusion)
+    ) {
+      failures.push(
+        `check ${check.name || check.id || "unknown"} is ${check.status}/${check.conclusion || "none"}`,
+      );
     }
   }
   for (const status of statuses) {
     if (status.state !== "success") {
-      failures.push(`commit status ${status.context || status.id || "unknown"} is ${status.state || "unknown"}`);
+      failures.push(
+        `commit status ${status.context || status.id || "unknown"} is ${status.state || "unknown"}`,
+      );
     }
   }
   return failures;
@@ -600,42 +1173,64 @@ function closingIssueNumbers(body) {
       /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s*:?\s+(?:[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)?#([1-9]\d*)\b/gi,
     ),
   ].map((match) => Number(match[1]));
-  if (!explicit || allClosingReferences.length !== 1 || allClosingReferences[0] !== Number(explicit)) return [];
+  if (
+    !explicit ||
+    allClosingReferences.length !== 1 ||
+    allClosingReferences[0] !== Number(explicit)
+  )
+    return [];
   return [Number(explicit)];
 }
 
 function prRelationFailures(pr, expected) {
   const failures = [];
-  if (pr.base?.ref !== expected.mainBranch) failures.push(`PR base must be ${expected.mainBranch}`);
-  if (pr.base?.repo?.full_name !== expected.repo) failures.push(`PR base repository must be ${expected.repo}`);
+  if (pr.base?.ref !== expected.mainBranch)
+    failures.push(`PR base must be ${expected.mainBranch}`);
+  if (pr.base?.repo?.full_name !== expected.repo)
+    failures.push(`PR base repository must be ${expected.repo}`);
   if (expected.baseSha && pr.base?.sha !== expected.baseSha) {
     failures.push(`PR base SHA must be ${expected.baseSha}`);
   }
-  if (pr.head?.repo?.full_name !== expected.repo) failures.push(`PR head repository must be ${expected.repo}`);
-  if (pr.head?.ref !== expected.branch) failures.push(`PR head branch must be ${expected.branch}`);
-  if (expected.sha && pr.head?.sha !== expected.sha) failures.push(`PR head SHA must be ${expected.sha}`);
+  if (pr.head?.repo?.full_name !== expected.repo)
+    failures.push(`PR head repository must be ${expected.repo}`);
+  if (pr.head?.ref !== expected.branch)
+    failures.push(`PR head branch must be ${expected.branch}`);
+  if (expected.sha && pr.head?.sha !== expected.sha)
+    failures.push(`PR head SHA must be ${expected.sha}`);
   const closingNumbers = closingIssueNumbers(pr.body);
-  if (closingNumbers.length !== 1 || closingNumbers[0] !== Number(expected.issueNumber)) {
-    failures.push(`PR body must contain exactly one closing reference: \`Closes #${Number(expected.issueNumber)}\``);
+  if (
+    closingNumbers.length !== 1 ||
+    closingNumbers[0] !== Number(expected.issueNumber)
+  ) {
+    failures.push(
+      `PR body must contain exactly one closing reference: \`Closes #${Number(expected.issueNumber)}\``,
+    );
   }
-  if (expected.requireOpenState && pr.state !== "open") failures.push("PR must be open");
-  if (expected.requireDraft && pr.draft !== true) failures.push("PR must be a draft");
+  if (expected.requireOpenState && pr.state !== "open")
+    failures.push("PR must be open");
+  if (expected.requireDraft && pr.draft !== true)
+    failures.push("PR must be a draft");
   if (expected.requireOpen) {
     if (pr.state !== "open") failures.push("PR must be open");
     if (pr.draft !== false) failures.push("PR must not be a draft");
   }
-  if (expected.requireMergeable && pr.mergeable !== true) failures.push("PR must be mergeable");
+  if (expected.requireMergeable && pr.mergeable !== true)
+    failures.push("PR must be mergeable");
   if (expected.requireMerged) {
     if (pr.state !== "closed") failures.push("merged PR must be closed");
     if (!pr.merged_at) failures.push("PR must have merged_at evidence");
-    if (!pr.merge_commit_sha) failures.push("PR must have merge_commit_sha evidence");
+    if (!pr.merge_commit_sha)
+      failures.push("PR must have merge_commit_sha evidence");
+    if (!/^[0-9a-f]{40,64}$/i.test(String(pr.head?.sha || "")))
+      failures.push("merged PR must have head SHA evidence");
   }
   return failures;
 }
 
 function assertPrRelation(pr, expected) {
   const failures = prRelationFailures(pr, expected);
-  if (failures.length) throw new Error(`PR relation gate failed: ${failures.join("; ")}`);
+  if (failures.length)
+    throw new Error(`PR relation gate failed: ${failures.join("; ")}`);
 }
 
 function parseWorktrees(porcelain) {
@@ -666,9 +1261,13 @@ function fileSnapshot(files) {
 }
 
 function assertFilesUnchanged(snapshot, label) {
-  const changed = [...snapshot].filter(([file, contents]) => !fs.existsSync(file) || readText(file) !== contents);
+  const changed = [...snapshot].filter(
+    ([file, contents]) => !fs.existsSync(file) || readText(file) !== contents,
+  );
   if (changed.length) {
-    throw new Error(`${label} changed guarded files: ${changed.map(([file]) => file).join(", ")}`);
+    throw new Error(
+      `${label} changed guarded files: ${changed.map(([file]) => file).join(", ")}`,
+    );
   }
 }
 
@@ -678,13 +1277,22 @@ function verifyCheckout(expected, label, guardedFiles = []) {
   const guardedSnapshot = fileSnapshot(guardedFiles);
   run("./scripts/run-ai-verify", ["--mode", "full"], { stdio: "inherit" });
   const after = checkoutState();
-  assertCheckout(after, { ...expected, sha: before.sha }, `${label} after verify`);
+  assertCheckout(
+    after,
+    { ...expected, sha: before.sha },
+    `${label} after verify`,
+  );
   assertFilesUnchanged(guardedSnapshot, label);
   return before.sha;
 }
 
 function remoteBranchSha(branch) {
-  const output = run("git", ["ls-remote", "--heads", "origin", `refs/heads/${branch}`]).trim();
+  const output = run("git", [
+    "ls-remote",
+    "--heads",
+    "origin",
+    `refs/heads/${branch}`,
+  ]).trim();
   return output ? output.split(/\s+/)[0] : "";
 }
 
@@ -701,7 +1309,8 @@ function openPullRequests(branch) {
 
 function reusablePrCandidate(branch, expected) {
   const candidates = openPullRequests(branch);
-  if (candidates.length > 1) throw new Error(`multiple open PRs found for ${branch}`);
+  if (candidates.length > 1)
+    throw new Error(`multiple open PRs found for ${branch}`);
   if (candidates.length === 0) return null;
   const candidate = candidates[0];
   assertReusablePr(candidate, expected);
@@ -714,14 +1323,16 @@ function reusablePrCandidate(branch, expected) {
   return candidate;
 }
 
-function markPrReady(prNumber) {
+function markPrReady(prNumber, issueNumber) {
   assertOriginRepo();
+  assertIssueStatus(getIssue(issueNumber), "status:qa");
   run("gh", ["pr", "ready", String(prNumber), "--repo", repo]);
 }
 
 function assertReusablePr(pr, expected) {
   assertPrRelation(pr, { ...expected, requireOpenState: true });
-  if (typeof pr.draft !== "boolean") throw new Error(`PR #${pr.number} draft state is missing`);
+  if (typeof pr.draft !== "boolean")
+    throw new Error(`PR #${pr.number} draft state is missing`);
 }
 
 function readyVerifiedPr(pr, expected) {
@@ -733,7 +1344,7 @@ function readyVerifiedPr(pr, expected) {
 
   let readyError = null;
   try {
-    markPrReady(pr.number);
+    markPrReady(pr.number, expected.issueNumber);
   } catch (error) {
     readyError = error;
   }
@@ -750,7 +1361,9 @@ function readyVerifiedPr(pr, expected) {
     }
   }
 
-  const commandDetail = readyError ? `; ready command: ${readyError.message}` : "";
+  const commandDetail = readyError
+    ? `; ready command: ${readyError.message}`
+    : "";
   throw new Error(
     `PR #${pr.number} readiness could not be confirmed; the PR was left open for a safe rerun: ${confirmationError?.message || "unknown error"}${commandDetail}`,
   );
@@ -788,18 +1401,27 @@ function createPr(issueNumber) {
   const existing = reusablePrCandidate(branch, expected);
 
   const guardedFiles = [specFile, qaFile];
+  assertIssueStatus(getIssue(issue.number), "status:qa");
   const verifiedSha = verifyCheckout({ branch }, "PR checkout", guardedFiles);
+  assertIssueStatus(getIssue(issue.number), "status:qa");
   assertGate("spec", specFile, specFailures(specFile));
   assertGate("qa", qaFile, qaFailures(qaFile));
   const recheckedExisting = reusablePrCandidate(branch, expected);
   if (recheckedExisting?.number !== existing?.number) {
-    throw new Error(`open PR candidate changed during verification for ${branch}`);
+    throw new Error(
+      `open PR candidate changed during verification for ${branch}`,
+    );
   }
   assertOriginRepo();
-  run("git", ["push", "origin", `${verifiedSha}:refs/heads/${branch}`], { stdio: "inherit" });
+  assertIssueStatus(getIssue(issue.number), "status:qa");
+  run("git", ["push", "origin", `${verifiedSha}:refs/heads/${branch}`], {
+    stdio: "inherit",
+  });
   const pushedSha = remoteBranchSha(branch);
   if (pushedSha !== verifiedSha) {
-    throw new Error(`remote branch ${branch} must be ${verifiedSha}, got ${pushedSha || "missing"}`);
+    throw new Error(
+      `remote branch ${branch} must be ${verifiedSha}, got ${pushedSha || "missing"}`,
+    );
   }
   run("git", ["branch", "--set-upstream-to", `origin/${branch}`, branch]);
   const verifiedExpected = { ...expected, sha: verifiedSha };
@@ -812,6 +1434,7 @@ function createPr(issueNumber) {
     reused = true;
   } else {
     assertOriginRepo();
+    assertIssueStatus(getIssue(issue.number), "status:qa");
     const draft = ghApi("POST", `repos/${repo}/pulls`, {
       title: issue.title,
       head: branch,
@@ -821,23 +1444,37 @@ function createPr(issueNumber) {
     });
     pr = readyVerifiedPr(draft, verifiedExpected);
   }
-  console.log(JSON.stringify({ pr: pr.number, url: pr.html_url, branch, verifiedSha, reused }, null, 2));
+  assertIssueStatus(getIssue(issue.number), "status:qa");
+  console.log(
+    JSON.stringify(
+      { pr: pr.number, url: pr.html_url, branch, verifiedSha, reused },
+      null,
+      2,
+    ),
+  );
 }
 
 function listCheckState(sha) {
-  const checks = ghApi("GET", `repos/${repo}/commits/${sha}/check-runs?per_page=100`);
+  const checks = ghApi(
+    "GET",
+    `repos/${repo}/commits/${sha}/check-runs?per_page=100`,
+  );
   const status = ghApi("GET", `repos/${repo}/commits/${sha}/status`);
   const checkRuns = checks.check_runs || [];
   const statuses = status.statuses || [];
   const failingChecks = checkRuns.filter(
-    (runItem) => runItem.status !== "completed" || !["success", "neutral", "skipped"].includes(runItem.conclusion),
+    (runItem) =>
+      runItem.status !== "completed" ||
+      !["success", "neutral", "skipped"].includes(runItem.conclusion),
   );
   const failingStatuses = statuses.filter((item) => item.state !== "success");
   const failures = checkStateFailures(checkRuns, statuses);
   const checksTotal = Number(checks.total_count ?? checkRuns.length);
   const statusesTotal = Number(status.total_count ?? statuses.length);
   if (checksTotal !== checkRuns.length || statusesTotal !== statuses.length) {
-    failures.push("CI result set is incomplete; more than 100 results are not supported");
+    failures.push(
+      "CI result set is incomplete; more than 100 results are not supported",
+    );
   }
   return {
     checksTotal,
@@ -866,7 +1503,10 @@ function mergePr(prNumber) {
   assertOriginRepo();
   let pr = mergeablePr(prNumber);
   const issueNumber = closingIssueNumber(pr.body);
-  if (issueNumber <= 0) throw new Error("PR body must contain exactly one `Closes #<issue-number>` reference");
+  if (issueNumber <= 0)
+    throw new Error(
+      "PR body must contain exactly one `Closes #<issue-number>` reference",
+    );
   const issue = getIssue(issueNumber);
   const branch = branchForIssue(issue);
   if (pr.merged_at) {
@@ -880,13 +1520,20 @@ function mergePr(prNumber) {
     });
     console.log(
       JSON.stringify(
-        { pr: pr.number, merged: true, sha: pr.merge_commit_sha, verifiedSha: pr.head.sha, alreadyMerged: true },
+        {
+          pr: pr.number,
+          merged: true,
+          sha: pr.merge_commit_sha,
+          verifiedSha: pr.head.sha,
+          alreadyMerged: true,
+        },
         null,
         2,
       ),
     );
     return;
   }
+  assertIssueStatus(issue, "status:qa");
   const baseSha = pr.base?.sha;
   if (!baseSha) throw new Error("PR base SHA is missing");
   assertPrRelation(pr, {
@@ -904,7 +1551,12 @@ function mergePr(prNumber) {
   assertGate("spec", specFile, specFailures(specFile));
   assertGate("qa", qaFile, qaFailures(qaFile));
   const guardedFiles = [specFile, qaFile];
-  const verifiedSha = verifyCheckout({ branch, sha: pr.head.sha }, "merge checkout", guardedFiles);
+  const verifiedSha = verifyCheckout(
+    { branch, sha: pr.head.sha },
+    "merge checkout",
+    guardedFiles,
+  );
+  assertIssueStatus(getIssue(issue.number), "status:qa");
   assertGate("spec", specFile, specFailures(specFile));
   assertGate("qa", qaFile, qaFailures(qaFile));
 
@@ -920,11 +1572,13 @@ function mergePr(prNumber) {
     requireMergeable: true,
   });
 
+  assertIssueStatus(getIssue(issue.number), "status:qa");
   const state = listCheckState(verifiedSha);
   if (state.failures.length) {
     console.error(JSON.stringify({ status: "blocked", ...state }, null, 2));
     process.exit(1);
   }
+  assertIssueStatus(getIssue(issue.number), "status:qa");
 
   pr = mergeablePr(prNumber);
   assertPrRelation(pr, {
@@ -939,13 +1593,17 @@ function mergePr(prNumber) {
   });
 
   assertOriginRepo();
+  assertIssueStatus(getIssue(issue.number), "status:qa");
   const merged = ghApi("PUT", `${prEndpoint(prNumber)}/merge`, {
     merge_method: "squash",
     commit_title: pr.title,
     commit_message: `PR #${pr.number}에서 squash merge했습니다.`,
     sha: verifiedSha,
   });
-  if (!merged.merged) throw new Error(`GitHub refused to merge PR #${pr.number}: ${merged.message || "unknown reason"}`);
+  if (!merged.merged)
+    throw new Error(
+      `GitHub refused to merge PR #${pr.number}: ${merged.message || "unknown reason"}`,
+    );
   const mergedPr = ghApi("GET", prEndpoint(prNumber));
   assertPrRelation(mergedPr, {
     repo,
@@ -957,9 +1615,23 @@ function mergePr(prNumber) {
     requireMerged: true,
   });
   if (mergedPr.merge_commit_sha !== merged.sha) {
-    throw new Error(`merged PR SHA ${mergedPr.merge_commit_sha} does not match merge response ${merged.sha}`);
+    throw new Error(
+      `merged PR SHA ${mergedPr.merge_commit_sha} does not match merge response ${merged.sha}`,
+    );
   }
-  console.log(JSON.stringify({ pr: pr.number, merged: true, sha: merged.sha, verifiedSha, alreadyMerged: false }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        pr: pr.number,
+        merged: true,
+        sha: merged.sha,
+        verifiedSha,
+        alreadyMerged: false,
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 function mergedPrForIssue(issue, prNumber) {
@@ -982,12 +1654,19 @@ function closeIssue(issueNumber, prNumber) {
   assertOriginRepo();
   const issue = getIssue(issueNumber);
   const pr = mergedPrForIssue(issue, prNumber);
-  const comments = ghApi("GET", `${issueEndpoint(issueNumber)}/comments?per_page=100`);
+  const comments = ghApi(
+    "GET",
+    `${issueEndpoint(issueNumber)}/comments?per_page=100`,
+  );
   if (Number(issue.comments || 0) > comments.length) {
-    throw new Error(`issue #${issue.number} has more than 100 comments; completion marker cannot be verified safely`);
+    throw new Error(
+      `issue #${issue.number} has more than 100 comments; completion marker cannot be verified safely`,
+    );
   }
   const marker = completionCommentMarker(issue, pr);
-  const alreadyCommented = comments.some((comment) => String(comment.body || "").includes(marker));
+  const alreadyCommented = comments.some((comment) =>
+    String(comment.body || "").includes(marker),
+  );
   if (!alreadyCommented) {
     assertOriginRepo();
     ghApi("POST", `${issueEndpoint(issueNumber)}/comments`, {
@@ -1001,7 +1680,13 @@ function closeIssue(issueNumber, prNumber) {
   }
   console.log(
     JSON.stringify(
-      { issue: issue.number, pr: pr.number, closed: true, alreadyClosed, alreadyCommented },
+      {
+        issue: issue.number,
+        pr: pr.number,
+        closed: true,
+        alreadyClosed,
+        alreadyCommented,
+      },
       null,
       2,
     ),
@@ -1012,24 +1697,49 @@ function optionalLocalRefSha(ref) {
   const result = runResult("git", ["rev-parse", "--verify", "--quiet", ref]);
   if (result.status === 0) return result.stdout.trim();
   if (result.status === 1) return "";
-  const detail = result.stderr?.trim() || result.stdout?.trim() || "unknown error";
+  const detail =
+    result.stderr?.trim() || result.stdout?.trim() || "unknown error";
   throw new Error(`git rev-parse --verify --quiet ${ref} failed\n${detail}`);
 }
 
 function isAncestor(ancestor, descendant) {
-  const result = runResult("git", ["merge-base", "--is-ancestor", ancestor, descendant]);
+  const result = runResult("git", [
+    "merge-base",
+    "--is-ancestor",
+    ancestor,
+    descendant,
+  ]);
   if (result.status === 0) return true;
   if (result.status === 1) return false;
-  const detail = result.stderr?.trim() || result.stdout?.trim() || "unknown error";
-  throw new Error(`git merge-base --is-ancestor ${ancestor} ${descendant} failed\n${detail}`);
+  const detail =
+    result.stderr?.trim() || result.stdout?.trim() || "unknown error";
+  throw new Error(
+    `git merge-base --is-ancestor ${ancestor} ${descendant} failed\n${detail}`,
+  );
 }
 
 function canonicalPath(input) {
   const resolved = path.resolve(input);
-  try {
-    return fs.realpathSync.native(resolved);
-  } catch {
-    return resolved;
+  const suffix = [];
+  let current = resolved;
+  while (true) {
+    try {
+      return path.resolve(fs.realpathSync.native(current), ...suffix);
+    } catch (error) {
+      if (!["ENOENT", "ENOTDIR"].includes(error.code)) throw error;
+      try {
+        if (fs.lstatSync(current).isSymbolicLink()) {
+          throw new Error(`cannot canonicalize broken symlink: ${current}`);
+        }
+      } catch (lstatError) {
+        if (lstatError.code !== "ENOENT" && lstatError.code !== "ENOTDIR")
+          throw lstatError;
+      }
+      const parent = path.dirname(current);
+      if (parent === current) return resolved;
+      suffix.unshift(path.basename(current));
+      current = parent;
+    }
   }
 }
 
@@ -1046,11 +1756,14 @@ function branchConfigSnapshot(branch) {
       .trim()
       .split("\n")
       .filter(Boolean)
-      .map((line) => (line.startsWith(prefix) ? line.slice(prefix.length) : line))
+      .map((line) =>
+        line.startsWith(prefix) ? line.slice(prefix.length) : line,
+      )
       .sort();
   }
   if (result.status === 1) return [];
-  const detail = result.stderr?.trim() || result.stdout?.trim() || "unknown error";
+  const detail =
+    result.stderr?.trim() || result.stdout?.trim() || "unknown error";
   throw new Error(`git config branch lookup failed\n${detail}`);
 }
 
@@ -1060,6 +1773,434 @@ function branchConfigExists(branch) {
 
 function sameSnapshot(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function resumeConfigValues(key) {
+  const result = runResult("git", ["config", "--local", "--get-all", key]);
+  if (result.status === 0) return result.stdout.split(/\r?\n/).filter(Boolean);
+  if (result.status === 1) return [];
+  const detail =
+    result.stderr?.trim() || result.stdout?.trim() || "unknown error";
+  throw new Error(`git config ${key} lookup failed\n${detail}`);
+}
+
+function resumeOriginSnapshot() {
+  const fetchUrls = originUrls();
+  const pushUrls = originUrls({ push: true });
+  const valid =
+    repo &&
+    fetchUrls.length > 0 &&
+    pushUrls.length > 0 &&
+    [...fetchUrls, ...pushUrls].every((url) => repoFromUrl(url) === repo);
+  if (!valid)
+    throw new Error(
+      `git origin fetch and push URLs must all match ${repo || "the configured repository"}`,
+    );
+  return {
+    fetchConfig: resumeConfigValues("remote.origin.url"),
+    pushConfig: resumeConfigValues("remote.origin.pushurl"),
+    fetchUrls,
+    pushUrls,
+    fetchUrl: fetchUrls[0],
+  };
+}
+
+function resumeRemoteSha(fetchUrl, branch) {
+  const ref = `refs/heads/${branch}`;
+  const lines = run("git", ["ls-remote", "--heads", fetchUrl, ref])
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean);
+  if (lines.length === 0) return "";
+  if (lines.length !== 1)
+    throw new Error(`remote branch ${branch} returned ${lines.length} refs`);
+  const [sha, actualRef, ...extra] = lines[0].split(/\s+/);
+  if (extra.length || actualRef !== ref || !/^[0-9a-f]{40,64}$/i.test(sha)) {
+    throw new Error(`remote branch ${branch} returned an invalid ref`);
+  }
+  return sha.toLowerCase();
+}
+
+function resumeRepositorySnapshot(cwd = process.cwd()) {
+  const topLevel = canonicalPath(
+    run("git", ["rev-parse", "--show-toplevel"], { cwd }).trim(),
+  );
+  const common = run(
+    "git",
+    ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+    { cwd },
+  ).trim();
+  return {
+    topLevel,
+    commonDir: canonicalPath(
+      path.isAbsolute(common) ? common : path.resolve(cwd, common),
+    ),
+  };
+}
+
+function resumeRegistrySnapshot() {
+  return parseWorktrees(run("git", ["worktree", "list", "--porcelain"]))
+    .map((entry) => ({
+      worktree: canonicalPath(entry.worktree),
+      head: entry.head || null,
+      branch: entry.branch || null,
+      detached: Boolean(entry.detached),
+    }))
+    .sort((left, right) => left.worktree.localeCompare(right.worktree));
+}
+
+function resumeLstat(target) {
+  try {
+    const stat = fs.lstatSync(target);
+    return {
+      exists: true,
+      kind: stat.isSymbolicLink()
+        ? "symlink"
+        : stat.isDirectory()
+          ? "directory"
+          : stat.isFile()
+            ? "file"
+            : "other",
+      dev: stat.dev,
+      ino: stat.ino,
+      mode: stat.mode,
+    };
+  } catch (error) {
+    if (error.code === "ENOENT") return { exists: false };
+    throw error;
+  }
+}
+
+function resumeWorkflowSnapshot(issue) {
+  const current = workflowState(issue);
+  if (
+    ![
+      "status:ready",
+      "status:spec",
+      "status:implementing",
+      "status:qa",
+      "status:blocked",
+    ].includes(current.status)
+  ) {
+    throw new Error(
+      `issue #${issue.number} cannot resume from ${current.status}`,
+    );
+  }
+  return { status: current.status, provenance: current.provenance };
+}
+
+function resumeMergedPullRequests(branch) {
+  const owner = repo.split("/")[0];
+  const merged = [];
+  for (let page = 1; ; page += 1) {
+    const query = new URLSearchParams({
+      state: "all",
+      head: `${owner}:${branch}`,
+      base: mainBranch,
+      per_page: "100",
+      page: String(page),
+    });
+    const pulls = ghApi("GET", `repos/${repo}/pulls?${query.toString()}`);
+    if (!Array.isArray(pulls))
+      throw new Error(`pull request page ${page} is not an array`);
+    merged.push(...pulls.filter((pull) => pull.merged_at));
+    if (pulls.length < 100) return merged;
+  }
+}
+
+function resumeAssertGithub(issueNumber, branch, expectedWorkflow) {
+  const assertIssue = () => {
+    const issue = getIssue(issueNumber);
+    const current = resumeWorkflowSnapshot(issue);
+    if (!sameSnapshot(current, expectedWorkflow)) {
+      throw new Error(
+        `issue #${issueNumber} workflow state changed during resume`,
+      );
+    }
+  };
+  assertIssue();
+  const merged = resumeMergedPullRequests(branch);
+  if (merged.length)
+    throw new Error(
+      `branch ${branch} already has merged PR #${merged[0].number}`,
+    );
+  assertIssue();
+}
+
+function resumeAssertOrigin(expected) {
+  const current = resumeOriginSnapshot();
+  if (!sameSnapshot(current, expected))
+    throw new Error("git origin configuration changed during resume");
+}
+
+function resumeAssertNoQuarantine(branch, registry = resumeRegistrySnapshot()) {
+  const quarantine = quarantineBranchFor(branch);
+  const quarantineRef = `refs/heads/${quarantine}`;
+  if (
+    optionalLocalRefSha(quarantineRef) ||
+    branchConfigExists(quarantine) ||
+    registry.some((entry) => entry.branch === quarantineRef)
+  ) {
+    throw new Error(`cleanup quarantine exists for ${branch}`);
+  }
+}
+
+function resumeValidateTarget({
+  target,
+  branch,
+  expectedSha,
+  expectedCommonDir,
+  registry,
+  targetLstat,
+  present,
+}) {
+  const branchRef = `refs/heads/${branch}`;
+  const targetEntries = registry.filter((entry) => entry.worktree === target);
+  const branchEntries = registry.filter((entry) => entry.branch === branchRef);
+  if (present) {
+    if (!targetLstat.exists || targetLstat.kind !== "directory") {
+      throw new Error(`registered target ${target} must be a real directory`);
+    }
+    if (targetEntries.length !== 1)
+      throw new Error(
+        `target ${target} must have exactly one worktree registry entry`,
+      );
+    if (branchEntries.length !== 1 || branchEntries[0].worktree !== target) {
+      throw new Error(`branch ${branch} must be registered only at ${target}`);
+    }
+    const entry = targetEntries[0];
+    if (
+      entry.branch !== branchRef ||
+      entry.detached ||
+      entry.head !== expectedSha
+    ) {
+      throw new Error(
+        `target ${target} registry branch or HEAD does not match ${branch}@${expectedSha}`,
+      );
+    }
+    const location = resumeRepositorySnapshot(target);
+    if (
+      location.topLevel !== target ||
+      location.commonDir !== expectedCommonDir
+    ) {
+      throw new Error(
+        `target ${target} does not belong to the expected shared repository`,
+      );
+    }
+    const commonRelative = path.relative(target, location.commonDir);
+    const commonInsideTarget =
+      commonRelative === "" ||
+      (!path.isAbsolute(commonRelative) &&
+        commonRelative !== ".." &&
+        !commonRelative.startsWith(`..${path.sep}`));
+    if (commonInsideTarget) {
+      throw new Error(
+        `target ${target} must use a linked worktree common directory outside the target`,
+      );
+    }
+    const checkout = checkoutState(target);
+    assertCheckout(
+      checkout,
+      { branch, sha: expectedSha },
+      "resume target worktree",
+    );
+  } else {
+    if (targetLstat.exists)
+      throw new Error(`unregistered target path already exists: ${target}`);
+    if (targetEntries.length)
+      throw new Error(`target ${target} is unexpectedly registered`);
+    if (branchEntries.length)
+      throw new Error(
+        `branch ${branch} is checked out at ${branchEntries[0].worktree}`,
+      );
+  }
+}
+
+function resumeAssertPhase(snapshot, phase) {
+  resumeAssertGithub(snapshot.issueNumber, snapshot.branch, snapshot.workflow);
+  resumeAssertOrigin(snapshot.origin);
+  const repository = resumeRepositorySnapshot();
+  if (!sameSnapshot(repository, snapshot.repository))
+    throw new Error("calling repository changed during resume");
+  const remoteSha = resumeRemoteSha(snapshot.origin.fetchUrl, snapshot.branch);
+  if (remoteSha !== snapshot.remoteSha)
+    throw new Error(`remote branch ${snapshot.branch} changed during resume`);
+  const localSha = optionalLocalRefSha(snapshot.branchRef);
+  if (localSha !== phase.localSha)
+    throw new Error(`local branch ${snapshot.branch} changed during resume`);
+  const registry = resumeRegistrySnapshot();
+  resumeAssertNoQuarantine(snapshot.branch, registry);
+  if (!sameSnapshot(registry, phase.registry))
+    throw new Error("worktree registry changed during resume");
+  const targetLstat = resumeLstat(snapshot.target);
+  if (!sameSnapshot(targetLstat, phase.targetLstat))
+    throw new Error(`target path ${snapshot.target} changed during resume`);
+  resumeValidateTarget({
+    target: snapshot.target,
+    branch: snapshot.branch,
+    expectedSha: snapshot.expectedSha,
+    expectedCommonDir: snapshot.repository.commonDir,
+    registry,
+    targetLstat,
+    present: phase.targetPresent,
+  });
+  resumeAssertGithub(snapshot.issueNumber, snapshot.branch, snapshot.workflow);
+}
+
+function resumePartialDiagnostics(snapshot) {
+  let localRef = "unknown";
+  let registeredWorktree = "unknown";
+  let targetExists = "unknown";
+  try {
+    localRef = optionalLocalRefSha(snapshot.branchRef) || null;
+  } catch {}
+  try {
+    registeredWorktree = resumeRegistrySnapshot().some(
+      (entry) => entry.worktree === snapshot.target,
+    );
+  } catch {}
+  try {
+    targetExists = resumeLstat(snapshot.target).exists;
+  } catch {}
+  return {
+    expectedSha: snapshot.expectedSha || null,
+    localRef,
+    registeredWorktree,
+    targetExists,
+  };
+}
+
+function resumeExpectedRegistryAfterAdd(registry, target, branch, sha) {
+  return [
+    ...registry,
+    {
+      worktree: target,
+      head: sha,
+      branch: `refs/heads/${branch}`,
+      detached: false,
+    },
+  ].sort((left, right) => left.worktree.localeCompare(right.worktree));
+}
+
+function resumeIssue(issueNumber) {
+  const issue = getIssue(issueNumber);
+  const workflow = resumeWorkflowSnapshot(issue);
+  const branch = branchForIssue(issue);
+  const branchRef = `refs/heads/${branch}`;
+  const targetPath = path.resolve(
+    canonicalPath(worktreeRoot),
+    issueSlug(issue),
+  );
+  const target = canonicalPath(targetPath);
+  if (target !== targetPath)
+    throw new Error(`task worktree path must not be an alias: ${targetPath}`);
+  const origin = resumeOriginSnapshot();
+  const repository = resumeRepositorySnapshot();
+  const localSha = optionalLocalRefSha(branchRef);
+  const remoteSha = resumeRemoteSha(origin.fetchUrl, branch);
+  const registry = resumeRegistrySnapshot();
+  const targetLstat = resumeLstat(target);
+  const targetEntries = registry.filter((entry) => entry.worktree === target);
+  const targetPresent = targetEntries.length > 0;
+  const snapshot = {
+    issueNumber: issue.number,
+    workflow,
+    branch,
+    branchRef,
+    target,
+    origin,
+    repository,
+    remoteSha,
+    expectedSha: "",
+  };
+
+  try {
+    resumeAssertGithub(issue.number, branch, workflow);
+    resumeAssertNoQuarantine(branch, registry);
+    if (targetEntries.length > 1)
+      throw new Error(
+        `target ${target} has duplicate worktree registry entries`,
+      );
+    if (localSha && remoteSha && localSha !== remoteSha) {
+      throw new Error(`local and remote branches differ for ${branch}`);
+    }
+    if (!localSha && !remoteSha)
+      throw new Error(`branch ${branch} is missing locally and remotely`);
+
+    const expectedSha = localSha || remoteSha;
+    snapshot.expectedSha = expectedSha;
+    const initialPhase = { localSha, registry, targetLstat, targetPresent };
+    resumeValidateTarget({
+      target,
+      branch,
+      expectedSha,
+      expectedCommonDir: repository.commonDir,
+      registry,
+      targetLstat,
+      present: targetPresent,
+    });
+    if (localSha) run("git", ["cat-file", "-e", `${expectedSha}^{commit}`]);
+
+    if (targetPresent) {
+      resumeAssertPhase(snapshot, initialPhase);
+      resumeAssertPhase(snapshot, initialPhase);
+      return {
+        issue: issue.number,
+        status: workflow.status,
+        mode: "reused",
+        branch,
+        worktree: target,
+        sha: expectedSha,
+      };
+    }
+
+    let mode = "restored-local";
+    let currentPhase = initialPhase;
+    if (!localSha) {
+      mode = "restored-remote";
+      resumeAssertPhase(snapshot, currentPhase);
+      run("git", ["fetch", "--no-tags", origin.fetchUrl, expectedSha]);
+      resumeAssertPhase(snapshot, currentPhase);
+      run("git", ["cat-file", "-e", `${expectedSha}^{commit}`]);
+      resumeAssertPhase(snapshot, currentPhase);
+      run("git", ["update-ref", branchRef, expectedSha, ""]);
+      currentPhase = { ...currentPhase, localSha: expectedSha };
+      resumeAssertPhase(snapshot, currentPhase);
+    }
+
+    resumeAssertPhase(snapshot, currentPhase);
+    run("git", ["worktree", "add", target, branch]);
+    const finalPhase = {
+      localSha: expectedSha,
+      registry: resumeExpectedRegistryAfterAdd(
+        registry,
+        target,
+        branch,
+        expectedSha,
+      ),
+      targetLstat: resumeLstat(target),
+      targetPresent: true,
+    };
+    resumeAssertPhase(snapshot, finalPhase);
+    resumeAssertPhase(snapshot, finalPhase);
+    return {
+      issue: issue.number,
+      status: workflow.status,
+      mode,
+      branch,
+      worktree: target,
+      sha: expectedSha,
+    };
+  } catch (error) {
+    error.resumeDiagnostics = resumePartialDiagnostics(snapshot);
+    throw error;
+  }
+}
+
+function resume(issueNumber) {
+  const result = resumeIssue(issueNumber);
+  console.log(JSON.stringify(result, null, 2));
+  return result;
 }
 
 function quarantineBranchFor(branch) {
@@ -1075,28 +2216,43 @@ function deleteLocalBranchCas(branch, expectedSha, expectedConfig) {
       (entry) => entry.branch === branchRef || entry.branch === quarantineRef,
     );
 
-  if (branchWorktree()) throw new Error(`branch ${branch} is still checked out`);
+  if (branchWorktree())
+    throw new Error(`branch ${branch} is still checked out`);
   const originalSha = optionalLocalRefSha(branchRef);
   const quarantinedSha = optionalLocalRefSha(quarantineRef);
   const renameRequired = Boolean(originalSha);
   let repairQuarantineConfig = false;
-  if (originalSha && quarantinedSha) throw new Error(`original and quarantine branches both exist for ${branch}`);
+  if (originalSha && quarantinedSha)
+    throw new Error(
+      `original and quarantine branches both exist for ${branch}`,
+    );
   if (originalSha) {
-    if (originalSha !== expectedSha) throw new Error(`local branch ${branch} changed before quarantine`);
+    if (originalSha !== expectedSha)
+      throw new Error(`local branch ${branch} changed before quarantine`);
     if (!sameSnapshot(branchConfigSnapshot(branch), expectedConfig)) {
       throw new Error(`branch config for ${branch} changed before quarantine`);
     }
-    if (branchConfigExists(quarantine)) throw new Error(`quarantine config collision: ${quarantine}`);
+    if (branchConfigExists(quarantine))
+      throw new Error(`quarantine config collision: ${quarantine}`);
   } else if (quarantinedSha) {
-    if (quarantinedSha !== expectedSha) throw new Error(`quarantine branch ${quarantine} has an unexpected SHA`);
+    if (quarantinedSha !== expectedSha)
+      throw new Error(`quarantine branch ${quarantine} has an unexpected SHA`);
     const originalConfig = branchConfigSnapshot(branch);
     const quarantineConfig = branchConfigSnapshot(quarantine);
-    if (sameSnapshot(quarantineConfig, expectedConfig) && originalConfig.length === 0) {
+    if (
+      sameSnapshot(quarantineConfig, expectedConfig) &&
+      originalConfig.length === 0
+    ) {
       // A previous run completed the branch rename.
-    } else if (quarantineConfig.length === 0 && sameSnapshot(originalConfig, expectedConfig)) {
+    } else if (
+      quarantineConfig.length === 0 &&
+      sameSnapshot(originalConfig, expectedConfig)
+    ) {
       repairQuarantineConfig = originalConfig.length > 0;
     } else {
-      throw new Error(`branch config changed for existing quarantine ${quarantine}`);
+      throw new Error(
+        `branch config changed for existing quarantine ${quarantine}`,
+      );
     }
   } else {
     throw new Error(`local branch ${branch} disappeared before quarantine`);
@@ -1105,41 +2261,74 @@ function deleteLocalBranchCas(branch, expectedSha, expectedConfig) {
   try {
     if (renameRequired) run("git", ["branch", "-m", branch, quarantine]);
     if (repairQuarantineConfig) {
-      run("git", ["config", "--local", "--rename-section", `branch.${branch}`, `branch.${quarantine}`]);
+      run("git", [
+        "config",
+        "--local",
+        "--rename-section",
+        `branch.${branch}`,
+        `branch.${quarantine}`,
+      ]);
     }
     const linked = branchWorktree();
-    if (linked) throw new Error(`quarantine branch became checked out at ${linked.worktree}`);
-    if (optionalLocalRefSha(branchRef)) throw new Error(`original branch ${branch} reappeared during quarantine`);
+    if (linked)
+      throw new Error(
+        `quarantine branch became checked out at ${linked.worktree}`,
+      );
+    if (optionalLocalRefSha(branchRef))
+      throw new Error(`original branch ${branch} reappeared during quarantine`);
     if (optionalLocalRefSha(quarantineRef) !== expectedSha) {
-      throw new Error(`quarantine branch ${quarantine} changed before compare-and-delete`);
+      throw new Error(
+        `quarantine branch ${quarantine} changed before compare-and-delete`,
+      );
     }
-    if (branchConfigExists(branch) || !sameSnapshot(branchConfigSnapshot(quarantine), expectedConfig)) {
+    if (
+      branchConfigExists(branch) ||
+      !sameSnapshot(branchConfigSnapshot(quarantine), expectedConfig)
+    ) {
       throw new Error(`branch config changed while quarantining ${branch}`);
     }
 
     const worktreePathsBeforeDelete = new Set(
-      parseWorktrees(run("git", ["worktree", "list", "--porcelain"])).map((entry) => canonicalPath(entry.worktree)),
+      parseWorktrees(run("git", ["worktree", "list", "--porcelain"])).map(
+        (entry) => canonicalPath(entry.worktree),
+      ),
     );
     run("git", ["update-ref", "-d", quarantineRef, expectedSha]);
-    if (optionalLocalRefSha(quarantineRef)) throw new Error(`quarantine ref ${quarantineRef} survived deletion`);
-    const linkedAfterDelete = parseWorktrees(run("git", ["worktree", "list", "--porcelain"])).find(
+    if (optionalLocalRefSha(quarantineRef))
+      throw new Error(`quarantine ref ${quarantineRef} survived deletion`);
+    const linkedAfterDelete = parseWorktrees(
+      run("git", ["worktree", "list", "--porcelain"]),
+    ).find(
       (entry) =>
-        [branchRef, quarantineRef].includes(entry.branch) || !worktreePathsBeforeDelete.has(canonicalPath(entry.worktree)),
+        [branchRef, quarantineRef].includes(entry.branch) ||
+        !worktreePathsBeforeDelete.has(canonicalPath(entry.worktree)),
     );
     if (linkedAfterDelete) {
       run("git", ["update-ref", quarantineRef, expectedSha, ""]);
-      throw new Error(`quarantine branch was checked out at ${linkedAfterDelete.worktree} during deletion`);
+      throw new Error(
+        `quarantine branch was checked out at ${linkedAfterDelete.worktree} during deletion`,
+      );
     }
     if (!sameSnapshot(branchConfigSnapshot(quarantine), expectedConfig)) {
-      throw new Error(`quarantine config changed before cleanup for ${quarantine}`);
+      throw new Error(
+        `quarantine config changed before cleanup for ${quarantine}`,
+      );
     }
     if (branchConfigExists(quarantine)) {
-      run("git", ["config", "--local", "--remove-section", `branch.${quarantine}`]);
+      run("git", [
+        "config",
+        "--local",
+        "--remove-section",
+        `branch.${quarantine}`,
+      ]);
     }
     if (optionalLocalRefSha(quarantineRef) || branchWorktree()) {
-      throw new Error(`quarantine branch ${quarantine} reappeared during config cleanup`);
+      throw new Error(
+        `quarantine branch ${quarantine} reappeared during config cleanup`,
+      );
     }
-    if (branchConfigExists(quarantine)) throw new Error(`quarantine config for ${quarantine} survived deletion`);
+    if (branchConfigExists(quarantine))
+      throw new Error(`quarantine config for ${quarantine} survived deletion`);
     return quarantine;
   } catch (error) {
     let recoveryError = null;
@@ -1147,7 +2336,11 @@ function deleteLocalBranchCas(branch, expectedSha, expectedConfig) {
       let recoveryOriginalSha = optionalLocalRefSha(branchRef);
       let recoveryQuarantineSha = optionalLocalRefSha(quarantineRef);
       const linked = branchWorktree();
-      if (!recoveryOriginalSha && !recoveryQuarantineSha && linked?.branch === quarantineRef) {
+      if (
+        !recoveryOriginalSha &&
+        !recoveryQuarantineSha &&
+        linked?.branch === quarantineRef
+      ) {
         run("git", ["update-ref", quarantineRef, expectedSha, ""]);
         recoveryQuarantineSha = expectedSha;
       }
@@ -1156,7 +2349,13 @@ function deleteLocalBranchCas(branch, expectedSha, expectedConfig) {
       } else if (!recoveryOriginalSha && !recoveryQuarantineSha) {
         run("git", ["update-ref", branchRef, expectedSha, ""]);
         if (branchConfigExists(quarantine) && !branchConfigExists(branch)) {
-          run("git", ["config", "--local", "--rename-section", `branch.${quarantine}`, `branch.${branch}`]);
+          run("git", [
+            "config",
+            "--local",
+            "--rename-section",
+            `branch.${quarantine}`,
+            `branch.${branch}`,
+          ]);
         }
       }
     } catch (recoveryFailure) {
@@ -1183,12 +2382,16 @@ function cleanupRemainingState(target, branch) {
   let linkedTaskWorktrees = null;
   let remoteBranch = null;
   try {
-    const worktrees = parseWorktrees(run("git", ["worktree", "list", "--porcelain"]));
+    const worktrees = parseWorktrees(
+      run("git", ["worktree", "list", "--porcelain"]),
+    );
     registeredWorktree = worktrees.some(
       (entry) => canonicalPath(entry.worktree) === canonicalPath(target),
     );
     const linked = worktrees
-      .filter((entry) => [expectedBranchRef, quarantineBranchRef].includes(entry.branch))
+      .filter((entry) =>
+        [expectedBranchRef, quarantineBranchRef].includes(entry.branch),
+      )
       .map((entry) => entry.worktree);
     linkedTaskWorktrees = linked.length ? linked : null;
   } catch {
@@ -1215,41 +2418,63 @@ function cleanupRemainingState(target, branch) {
 function cleanup(issueNumber, prNumber) {
   assertOriginRepo();
   const issue = getIssue(issueNumber);
-  if (issue.state !== "closed") throw new Error(`issue #${issue.number} must be closed before cleanup`);
+  if (issue.state !== "closed")
+    throw new Error(`issue #${issue.number} must be closed before cleanup`);
   const pr = mergedPrForIssue(issue, prNumber);
   const branch = branchForIssue(issue);
   const target = path.join(worktreeRoot, issueSlug(issue));
-  assertCheckout(checkoutState(), { branch: mainBranch }, "cleanup main checkout");
+  assertCheckout(
+    checkoutState(),
+    { branch: mainBranch },
+    "cleanup main checkout",
+  );
   assertOriginRepo();
   run("git", ["fetch", "origin", mainBranch], { stdio: "inherit" });
-  assertCheckout(checkoutState(), { branch: mainBranch }, "cleanup main checkout after fetch");
+  assertCheckout(
+    checkoutState(),
+    { branch: mainBranch },
+    "cleanup main checkout after fetch",
+  );
 
   const originMainRef = `refs/remotes/origin/${mainBranch}`;
   const originMainSha = run("git", ["rev-parse", originMainRef]).trim();
   const localMainRef = `refs/heads/${mainBranch}`;
   const localMainSha = run("git", ["rev-parse", localMainRef]).trim();
   if (!isAncestor(pr.merge_commit_sha, originMainRef)) {
-    throw new Error(`origin/${mainBranch} does not contain merge commit ${pr.merge_commit_sha}`);
+    throw new Error(
+      `origin/${mainBranch} does not contain merge commit ${pr.merge_commit_sha}`,
+    );
   }
   if (!isAncestor(localMainSha, originMainSha)) {
-    throw new Error(`local ${mainBranch} cannot fast-forward to origin/${mainBranch}`);
+    throw new Error(
+      `local ${mainBranch} cannot fast-forward to origin/${mainBranch}`,
+    );
   }
 
-  const worktrees = parseWorktrees(run("git", ["worktree", "list", "--porcelain"]));
+  const worktrees = parseWorktrees(
+    run("git", ["worktree", "list", "--porcelain"]),
+  );
   const targetPath = canonicalPath(target);
-  const targetEntry = worktrees.find((entry) => canonicalPath(entry.worktree) === targetPath);
+  const targetEntry = worktrees.find(
+    (entry) => canonicalPath(entry.worktree) === targetPath,
+  );
   const expectedBranchRef = `refs/heads/${branch}`;
   const quarantine = quarantineBranchFor(branch);
   const quarantineBranchRef = `refs/heads/${quarantine}`;
   const remoteTrackingRef = `refs/remotes/origin/${branch}`;
   const branchElsewhere = worktrees.find(
     (entry) =>
-      [expectedBranchRef, quarantineBranchRef].includes(entry.branch) && canonicalPath(entry.worktree) !== targetPath,
+      [expectedBranchRef, quarantineBranchRef].includes(entry.branch) &&
+      canonicalPath(entry.worktree) !== targetPath,
   );
   const originalBranchSha = optionalLocalRefSha(expectedBranchRef);
   const quarantinedBranchSha = optionalLocalRefSha(quarantineBranchRef);
   const localBranchSha = originalBranchSha || quarantinedBranchSha;
-  const localBranchName = originalBranchSha ? branch : quarantinedBranchSha ? quarantine : "";
+  const localBranchName = originalBranchSha
+    ? branch
+    : quarantinedBranchSha
+      ? quarantine
+      : "";
   const remoteSha = remoteBranchSha(branch);
   const remoteTrackingSha = optionalLocalRefSha(remoteTrackingRef);
   const originalBranchConfig = branchConfigSnapshot(branch);
@@ -1262,58 +2487,97 @@ function cleanup(issueNumber, prNumber) {
         : originalBranchConfig
       : [];
   const failures = [];
-  if (branchElsewhere) failures.push(`branch ${branch} is checked out at unexpected worktree ${branchElsewhere.worktree}`);
-  if (originalBranchSha && quarantinedBranchSha) failures.push(`original and quarantine branches both exist for ${branch}`);
-  if (originalBranchSha && quarantineBranchConfig.length) failures.push(`quarantine config already exists for ${branch}`);
-  if (quarantinedBranchSha && originalBranchConfig.length && quarantineBranchConfig.length) {
+  if (branchElsewhere)
+    failures.push(
+      `branch ${branch} is checked out at unexpected worktree ${branchElsewhere.worktree}`,
+    );
+  if (originalBranchSha && quarantinedBranchSha)
+    failures.push(`original and quarantine branches both exist for ${branch}`);
+  if (originalBranchSha && quarantineBranchConfig.length)
+    failures.push(`quarantine config already exists for ${branch}`);
+  if (
+    quarantinedBranchSha &&
+    originalBranchConfig.length &&
+    quarantineBranchConfig.length
+  ) {
     failures.push(`original and quarantine configs both exist for ${branch}`);
   }
   if (localBranchSha && localBranchSha !== pr.head.sha) {
-    failures.push(`local or quarantine branch ${branch} must be ${pr.head.sha}, got ${localBranchSha}`);
+    failures.push(
+      `local or quarantine branch ${branch} must be ${pr.head.sha}, got ${localBranchSha}`,
+    );
   }
   if (remoteSha && remoteSha !== pr.head.sha) {
-    failures.push(`remote branch ${branch} must be ${pr.head.sha}, got ${remoteSha}`);
+    failures.push(
+      `remote branch ${branch} must be ${pr.head.sha}, got ${remoteSha}`,
+    );
   }
   if (remoteTrackingSha && remoteTrackingSha !== pr.head.sha) {
-    failures.push(`remote-tracking branch origin/${branch} must be ${pr.head.sha}, got ${remoteTrackingSha}`);
+    failures.push(
+      `remote-tracking branch origin/${branch} must be ${pr.head.sha}, got ${remoteTrackingSha}`,
+    );
   }
   if (targetEntry) {
     failures.push(
-      ...checkoutFailures(checkoutState(target), { branch: localBranchName || branch, sha: pr.head.sha }).map(
-        (failure) => `target worktree: ${failure}`,
-      ),
+      ...checkoutFailures(checkoutState(target), {
+        branch: localBranchName || branch,
+        sha: pr.head.sha,
+      }).map((failure) => `target worktree: ${failure}`),
     );
     const unsafeIgnored = unsafeIgnoredPaths(target);
     if (unsafeIgnored.length) {
-      failures.push(`target worktree has non-disposable ignored paths: ${unsafeIgnored.join(", ")}`);
+      failures.push(
+        `target worktree has non-disposable ignored paths: ${unsafeIgnored.join(", ")}`,
+      );
     }
-    if (!localBranchSha) failures.push(`target worktree branch ref ${expectedBranchRef} is missing`);
+    if (!localBranchSha)
+      failures.push(
+        `target worktree branch ref ${expectedBranchRef} is missing`,
+      );
   }
-  if (failures.length) throw new Error(`cleanup preflight failed: ${failures.join("; ")}`);
+  if (failures.length)
+    throw new Error(`cleanup preflight failed: ${failures.join("; ")}`);
 
   try {
     if (localMainSha !== originMainSha) {
       run("git", ["merge", "--ff-only", originMainRef], { stdio: "inherit" });
-      assertCheckout(checkoutState(), { branch: mainBranch, sha: originMainSha }, "cleanup fast-forward");
+      assertCheckout(
+        checkoutState(),
+        { branch: mainBranch, sha: originMainSha },
+        "cleanup fast-forward",
+      );
     }
     if (targetEntry) {
-      assertCheckout(checkoutState(target), { branch, sha: pr.head.sha }, "cleanup target worktree recheck");
+      assertCheckout(
+        checkoutState(target),
+        { branch, sha: pr.head.sha },
+        "cleanup target worktree recheck",
+      );
       const latestUnsafeIgnored = unsafeIgnoredPaths(target);
       if (latestUnsafeIgnored.length) {
-        throw new Error(`target worktree gained non-disposable ignored paths: ${latestUnsafeIgnored.join(", ")}`);
+        throw new Error(
+          `target worktree gained non-disposable ignored paths: ${latestUnsafeIgnored.join(", ")}`,
+        );
       }
       run("git", ["worktree", "remove", target], { stdio: "inherit" });
     }
     if (localBranchSha) {
-      const latestWorktree = parseWorktrees(run("git", ["worktree", "list", "--porcelain"])).find(
-        (entry) => [expectedBranchRef, quarantineBranchRef].includes(entry.branch),
+      const latestWorktree = parseWorktrees(
+        run("git", ["worktree", "list", "--porcelain"]),
+      ).find((entry) =>
+        [expectedBranchRef, quarantineBranchRef].includes(entry.branch),
       );
       if (latestWorktree) {
-        throw new Error(`branch ${branch} became checked out at ${latestWorktree.worktree} during cleanup`);
+        throw new Error(
+          `branch ${branch} became checked out at ${latestWorktree.worktree} during cleanup`,
+        );
       }
       const latestLocalSha = optionalLocalRefSha(expectedBranchRef);
       const latestQuarantinedSha = optionalLocalRefSha(quarantineBranchRef);
-      if ((latestLocalSha || latestQuarantinedSha) !== pr.head.sha || (latestLocalSha && latestQuarantinedSha)) {
+      if (
+        (latestLocalSha || latestQuarantinedSha) !== pr.head.sha ||
+        (latestLocalSha && latestQuarantinedSha)
+      ) {
         throw new Error(
           `local branch ${branch} changed during cleanup: original=${latestLocalSha || "missing"} quarantine=${latestQuarantinedSha || "missing"}`,
         );
@@ -1332,7 +2596,9 @@ function cleanup(issueNumber, prNumber) {
     const latestRemoteTrackingSha = optionalLocalRefSha(remoteTrackingRef);
     if (latestRemoteTrackingSha) {
       if (latestRemoteTrackingSha !== pr.head.sha) {
-        throw new Error(`remote-tracking branch origin/${branch} changed during cleanup`);
+        throw new Error(
+          `remote-tracking branch origin/${branch} changed during cleanup`,
+        );
       }
       run("git", ["update-ref", "-d", remoteTrackingRef, pr.head.sha]);
     }
@@ -1343,22 +2609,37 @@ function cleanup(issueNumber, prNumber) {
       run("git", ["config", "--local", "--remove-section", `branch.${branch}`]);
     }
     if (!localBranchSha && quarantineBranchConfig.length) {
-      if (!sameSnapshot(branchConfigSnapshot(quarantine), quarantineBranchConfig)) {
-        throw new Error(`quarantine config for ${branch} changed during cleanup`);
+      if (
+        !sameSnapshot(branchConfigSnapshot(quarantine), quarantineBranchConfig)
+      ) {
+        throw new Error(
+          `quarantine config for ${branch} changed during cleanup`,
+        );
       }
-      run("git", ["config", "--local", "--remove-section", `branch.${quarantine}`]);
+      run("git", [
+        "config",
+        "--local",
+        "--remove-section",
+        `branch.${quarantine}`,
+      ]);
     }
-    if (branchConfigExists(branch)) throw new Error(`branch config for ${branch} survived cleanup`);
-    if (branchConfigExists(quarantine)) throw new Error(`quarantine config for ${branch} survived cleanup`);
+    if (branchConfigExists(branch))
+      throw new Error(`branch config for ${branch} survived cleanup`);
+    if (branchConfigExists(quarantine))
+      throw new Error(`quarantine config for ${branch} survived cleanup`);
   } catch (error) {
     throw new Error(
       `cleanup partially failed: ${error.message}; remaining=${JSON.stringify(cleanupRemainingState(target, branch))}`,
     );
   }
   const remaining = cleanupRemainingState(target, branch);
-  const remainingEntries = Object.entries(remaining).filter(([, value]) => Boolean(value));
+  const remainingEntries = Object.entries(remaining).filter(([, value]) =>
+    Boolean(value),
+  );
   if (remainingEntries.length) {
-    throw new Error(`cleanup did not remove every target resource: ${JSON.stringify(remaining)}`);
+    throw new Error(
+      `cleanup did not remove every target resource: ${JSON.stringify(remaining)}`,
+    );
   }
   console.log(
     JSON.stringify(
@@ -1387,8 +2668,10 @@ commands:
   label-sync
   project-add <issue-number>
   queue
+  reconcile
   status <issue-number> <status-label>
   start <issue-number>
+  resume <issue-number>
   spec <issue-number>
   spec-check <spec-path>
   qa-check <qa-path>
@@ -1405,19 +2688,33 @@ function main(argv = process.argv.slice(2)) {
     if (command === "label-sync") return labelSync();
     if (command === "project-add" && arg) return projectAdd(arg);
     if (command === "queue") return queue();
+    if (command === "reconcile") return reconcile();
     if (command === "status" && arg && argv[2]) return status(arg, argv[2]);
     if (command === "start" && arg) return start(arg);
+    if (command === "resume" && arg) return resume(arg);
     if (command === "spec" && arg) return spec(arg);
     if (command === "spec-check" && arg) return specCheck(arg);
     if (command === "qa-check" && arg) return qaCheck(arg);
     if (command === "pr" && arg) return createPr(arg);
     if (command === "merge" && arg) return mergePr(arg);
-    if (command === "close" && arg && secondArg) return closeIssue(arg, secondArg);
-    if (command === "cleanup" && arg && secondArg) return cleanup(arg, secondArg);
+    if (command === "close" && arg && secondArg)
+      return closeIssue(arg, secondArg);
+    if (command === "cleanup" && arg && secondArg)
+      return cleanup(arg, secondArg);
     usage();
     process.exit(2);
   } catch (error) {
-    console.error(JSON.stringify({ status: "error", message: error.message }, null, 2));
+    console.error(
+      JSON.stringify(
+        {
+          status: "error",
+          message: error.message,
+          ...(error.resumeDiagnostics || {}),
+        },
+        null,
+        2,
+      ),
+    );
     process.exit(1);
   }
 }
@@ -1428,6 +2725,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
 
 export {
   assertIssueStatus,
+  blockedFromLabels,
   branchForIssue,
   checkStateFailures,
   checkoutFailures,
@@ -1444,4 +2742,6 @@ export {
   specFailures,
   specPathForIssue,
   statusLabels,
+  transitionPlan,
+  workflowState,
 };
