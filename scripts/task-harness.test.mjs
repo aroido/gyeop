@@ -1228,6 +1228,8 @@ function makeRepoFixture(t) {
     GYEOP_MAIN_BRANCH: "main",
     GYEOP_WORKTREE_ROOT: worktreeRoot,
   };
+  delete fixture.env.GYEOP_GITHUB_OWNER;
+  delete fixture.env.GYEOP_GITHUB_PROJECT_NUMBER;
   writeGhState(fixture);
   return fixture;
 }
