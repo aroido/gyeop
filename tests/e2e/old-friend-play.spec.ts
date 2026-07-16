@@ -72,6 +72,11 @@ test("supports previous answers, reload recovery, completion, and restart", asyn
   await expect(
     page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
   ).toBeFocused();
+  await expect
+    .poll(() =>
+      page.evaluate(([key]) => localStorage.getItem(key), [storageKey]),
+    )
+    .toBeNull();
 });
 
 test("rejects invalid drafts and normalizes the current card", async ({

@@ -166,6 +166,10 @@ export default function OldFriendPlay() {
 
   useEffect(() => {
     try {
+      if (currentIndex === 0 && Object.keys(answers).length === 0) {
+        window.localStorage.removeItem(STORAGE_KEY);
+        return;
+      }
       window.localStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({ version: 1, currentIndex, answers }),
