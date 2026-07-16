@@ -19,14 +19,25 @@ flowchart LR
     E --> F["QA + Full Verify PASS"]
     F --> G["PR"]
     G --> H["Merge + Close + Cleanup"]
-    B --> X["status:blocked"]
+    A0 --> X["status:blocked + blocked-from:<source>"]
+    A --> X
+    B --> X
     D --> X
     E --> X
+    X -->|"기록된 source gate 재통과"| A0
+    X -->|"기록된 source gate 재통과"| A
+    X -->|"기록된 source gate 재통과"| B
+    X -->|"기록된 source gate 재통과"| D
+    X -->|"기록된 source gate 재통과"| E
 ```
+
+열린 workflow 이슈는 `status:backlog|ready|spec|implementing|qa|blocked` 중 정확히 하나만 가져야 한다. `status:blocked`에는 복귀할 상태를 나타내는 `blocked-from:backlog|ready|spec|implementing|qa`가 정확히 하나 있어야 하며, 다른 상태에는 `blocked-from:*`가 없어야 한다. 누락·중복·잘못된 조합은 mutation 전에 실패한다.
+
+정상 전이는 `backlog -> ready -> spec -> implementing -> qa`뿐이다. 모든 단계는 `blocked`로 갈 수 있지만 기록된 출처로만 복귀하고 그 단계의 gate를 다시 통과해야 한다. `qa`는 라벨 명령으로 완료하거나 되돌리지 않고 merge·close 증거로만 끝낸다. 같은 non-blocked 상태 요청도 해당 gate를 다시 확인한 뒤 PUT 없이 `changed: false`를 반환한다. 같은 blocked 요청은 exact status·provenance만 확인하며 출처 단계 artifact의 유효성을 뜻하지 않는다.
 
 ## 환경 설정
 
-하네스는 host가 정확히 `github.com`인 `origin` URL에서 `owner/repo`를 자동 감지한다. 환경 변수는 자동 감지 값을 명시적으로 보정할 때만 사용하며, `pr`·`merge`·`close`·`cleanup`에서는 설정값이 `origin`의 모든 fetch URL과 push URL repository에 정확히 같아야 한다. 명령 시작과 전체 검증·local cleanup처럼 긴 단계 뒤의 remote/GitHub mutation 직전에 이를 다시 검사한다. 별도 `remote.origin.pushurl`이 다른 저장소를 가리키거나 원격이 없는 상태에서는 이 네 명령이 fail-closed한다.
+하네스는 host가 정확히 `github.com`인 `origin` URL에서 `owner/repo`를 자동 감지한다. 환경 변수는 자동 감지 값을 명시적으로 보정할 때만 사용하며, `resume`·`pr`·`merge`·`close`·`cleanup`에서는 설정값이 `origin`의 모든 fetch URL과 push URL repository에 정확히 같아야 한다. `resume`은 각 Git mutation 전후와 반환 직전, 나머지 명령은 전체 검증·local cleanup처럼 긴 단계 뒤의 remote/GitHub mutation 직전에 이를 다시 검사한다. 별도 `remote.origin.pushurl`이 다른 저장소를 가리키거나 원격이 없는 상태에서는 이 다섯 명령이 fail-closed한다.
 
 ```bash
 export GYEOP_GITHUB_REPO=owner/gyeop
@@ -41,25 +52,50 @@ export GYEOP_MAIN_BRANCH=main
 
 1. `$gyeop-issue-writer`로 한 PR 크기의 이슈를 작성한다.
 2. `scripts/task-harness doctor`로 GitHub 연결을 확인한다.
-3. `scripts/task-harness label-sync`로 관리 라벨을 동기화한다.
+3. `scripts/task-harness label-sync`로 `status:*`와 `blocked-from:*` 관리 라벨을 동기화한다.
 4. REST `gh api repos/<owner>/<repo>/issues`로 이슈를 생성한다.
 5. Project가 설정되어 있으면 `scripts/task-harness project-add <issue-number>`를 실행한다.
 6. 모든 등록 이슈에 정확히 하나의 `status:*` 라벨을 부여한다.
    - 선행 이슈가 모두 닫힌 실행 가능 작업: `status:ready`
    - 선행 이슈를 기다리는 계획된 작업: `status:backlog`
-   - 외부 입력이나 제품 결정이 필요한 작업: `status:blocked`
+   - 외부 입력이나 제품 결정이 필요한 작업: `status:blocked`와 복귀할 단계의 `blocked-from:*`
 
 `status:backlog`는 요구사항 미정 상태가 아니다. 본문과 완료 기준은 실행 가능하게 작성하되, 선행 이슈가 모두 닫힌 것을 확인한 다음 `scripts/task-harness status <issue-number> status:ready`로 승격한다. 하네스도 본문의 `### 선행 이슈`에 연결된 이슈가 하나라도 열려 있으면 승격을 거부한다. `scripts/task-harness queue`는 `status:ready`만 반환한다.
+
+### 선행 이슈 수동 정합화
+
+```bash
+scripts/task-harness reconcile
+```
+
+`reconcile`은 명시적으로 실행할 때만 동작한다. 첫 mutation 전에 열린 backlog 검색의 모든 page를 수집하고, issue number로 중복 제거·오름차순 정렬하며 PR 항목은 제외한다. page 수집이 하나라도 실패하면 label write 없이 non-zero로 끝난다.
+
+결과 JSON은 항상 `promoted`, `waiting`, `skipped`, `errors` 배열을 포함한다. 선행 이슈가 하나 이상이고 모두 닫혔으면 `promoted`, 하나라도 열려 있으면 `waiting`, 선행 이슈가 없으면 `skipped`, malformed state/body나 조회·write·응답 검증 실패는 `errors`다. 개별 오류 뒤에도 나머지 안전한 항목은 처리하지만 `errors`가 하나라도 있으면 JSON을 출력한 뒤 non-zero로 끝낸다. 재실행 시 이미 ready이고 ready gate가 유효한 항목은 label을 다시 쓰지 않고 `changed: false`로 보고한다. page 수집 중 외부 actor가 backlog label을 바꾸면 GitHub offset 결과가 움직일 수 있으므로 결과를 검토하고 `reconcile`을 다시 실행해 수렴시킨다.
 
 ## 일감 가져오기와 처리
 
 ```bash
 scripts/task-harness queue
 scripts/task-harness start <issue-number>
+scripts/task-harness resume <issue-number>
 scripts/task-harness spec <issue-number>
 ```
 
-`start`가 출력한 `worktree` 경로로 이동한 뒤 `spec`과 이후 작업을 실행한다. `$gyeop-spec-writer`로 `docs/specs/issue-<number>.md`를 완성하고 독립 검토 결과를 기록한다.
+새 작업은 `start`, 중단 작업은 `resume`을 사용한다. 명령이 출력한 canonical `worktree` 경로로 이동한 뒤 `spec`과 이후 작업을 실행한다. `$gyeop-spec-writer`로 `docs/specs/issue-<number>.md`를 완성하고 독립 검토 결과를 기록한다.
+
+`start`는 첫 Git mutation 전에 열린 이슈의 exact `status:ready` 또는 재실행 가능한 exact `status:spec`, blocked provenance 부재, 예상 branch/path를 확인한다. worktree 생성 뒤 status write가 실패하면 안전한 부분 상태를 자동 삭제하지 않는다. 오류를 확인하고 같은 `start` 또는 `resume`으로 검증·재사용한다.
+
+### 중단 작업 이어받기
+
+`resume`은 이슈 status를 바꾸거나 branch를 fast-forward·rewind·force-move하지 않는다. 다음 세 경우만 허용한다.
+
+- `reused`: 등록된 exact task worktree가 같은 shared repository, branch, HEAD와 clean 상태다.
+- `restored-local`: target이 없고 exact local branch가 있어 pinned SHA로 worktree만 복원한다.
+- `restored-remote`: local branch와 target이 없고 검증된 explicit origin URL의 remote branch만 있어 pinned commit을 fetch·검증하고 compare-and-create로 local ref와 worktree를 복원한다.
+
+재개 전에는 open issue의 exact `ready|spec|implementing|qa` 또는 유효한 blocked 상태, 모든 page에서 조회한 같은 repository/base/head의 merged PR 부재, origin 설정·명시적 fetch URL, local/remote SHA-or-absent, worktree registry, canonical target과 shared Git common directory를 고정한다. 첫 mutation 전·각 mutation 후·성공 직전에 다시 검사한다.
+
+merged PR, cleanup quarantine, dirty/wrong branch·HEAD·repository worktree, 빈 directory·file·symlink를 포함한 target 충돌, local/remote SHA 불일치, origin·issue·ref·registry drift에서는 delete·reset·rollback 없이 실패한다. 부분 실패 JSON의 `expectedSha`, `localRef`, `registeredWorktree`, `targetExists`로 상태를 확인한 뒤 원인을 고치고 재실행한다.
 
 ```bash
 scripts/task-harness spec-check docs/specs/issue-<number>.md
@@ -75,11 +111,13 @@ scripts/task-harness qa-check docs/temp/qa/issue-<number>.md
 scripts/task-harness pr <issue-number>
 ```
 
-`pr`·`merge`·`close`·`cleanup`은 설정된 GitHub repository와 local `origin`의 모든 fetch·push URL에서 파싱한 repository가 정확히 같아야 시작한다. fork, 별도 push URL, 잘못된 환경 변수로 GitHub 증거와 git mutation 대상이 갈리면 fail-closed한다.
+`resume`·`pr`·`merge`·`close`·`cleanup`은 설정된 GitHub repository와 local `origin`의 모든 fetch·push URL에서 파싱한 repository가 정확히 같아야 시작한다. fork, 별도 push URL, 잘못된 환경 변수로 GitHub 증거와 git mutation 대상이 갈리면 fail-closed한다.
 
-`pr`은 이슈가 `status:qa`인지 확인한 뒤 예상 branch, clean working tree, spec·QA gate를 검사한다. 전체 검증 전후의 branch, working tree, HEAD와 QA artifact 원문이 같아야 한다. 전체 검증 전과 직후 push 전에 예상 base/head의 기존 open PR 후보를 각각 조회해 0건 또는 정확히 한 건인지, 후보가 있으면 같은 PR인지와 repository·base/head·현재 remote SHA를 검사한다. PR 본문은 첫 line 전체가 exact `Closes #<issue>`이고 colon 형식을 포함한 그 밖의 GitHub closing keyword reference가 없어야 한다. 후보가 추가·교체되거나 둘 이상이거나 어느 조건이라도 다르면 local upstream과 원격을 변경하지 않고 실패한다. origin fetch·push URL도 push 직전에 다시 검사한다. 통과한 SHA만 push하고 remote head를 대조한 뒤 기존 PR을 재조회하거나 새 draft PR을 만든다. 검증된 draft만 ready로 전환하고 다시 조회해 non-draft 상태를 확인한다. ready 전환 성공 여부를 네트워크 오류로 확정할 수 없으면 PR을 닫지 않고 실패해 다음 재실행에서 복구한다. 유효한 기존 non-draft PR은 재실행 성공으로 반환한다.
+`pr`은 열린 이슈에 정확히 `status:qa` 하나가 있고 blocked provenance가 없는지 full verify 전·후, push 직전, PR 생성 직전, ready-for-review write 직전에 다시 확인한다. 최초 검사가 실패하면 verify·push·GitHub write를 실행하지 않고, ready 직전 drift면 draft를 닫지 않고 남겨 재실행으로 복구한다. 이어 예상 branch, clean working tree, spec·QA gate를 검사한다. 전체 검증 전후의 branch, working tree, HEAD와 QA artifact 원문이 같아야 한다. 전체 검증 전과 직후 push 전에 예상 base/head의 기존 open PR 후보를 각각 조회해 0건 또는 정확히 한 건인지, 후보가 있으면 같은 PR인지와 repository·base/head·현재 remote SHA를 검사한다. PR 본문은 첫 line 전체가 exact `Closes #<issue>`이고 colon 형식을 포함한 그 밖의 GitHub closing keyword reference가 없어야 한다. 후보가 추가·교체되거나 둘 이상이거나 어느 조건이라도 다르면 local upstream과 원격을 변경하지 않고 실패한다. origin fetch·push URL도 push 직전에 다시 검사한다. 통과한 SHA만 push하고 remote head를 대조한 뒤 기존 PR을 재조회하거나 새 draft PR을 만든다. 검증된 draft만 ready로 전환하고 다시 조회해 non-draft 상태를 확인한다. ready 전환 성공 여부를 네트워크 오류로 확정할 수 없으면 PR을 닫지 않고 실패해 다음 재실행에서 복구한다. 유효한 기존 non-draft PR은 재실행 성공으로 반환한다.
 
-이슈 worktree에서 다음 명령을 실행한다. `merge`는 open·non-draft·mergeable PR, `main` base, 현재 저장소와 예상 branch의 head, clean working tree와 PR head SHA가 일치하는지 먼저 검사하고 `base.sha`와 QA artifact 원문을 고정한다. 전체 검증 뒤 checkout·QA gate와 고정한 원문을 다시 확인하고 PR을 재조회해 `base.sha`, head SHA, repository·branch·lifecycle이 그대로인지 검사한다. check run과 commit status가 한 건 이상 존재하며 모두 성공하면 merge API 직전에 PR을 한 번 더 조회해 같은 snapshot을 검증하고, 검증한 head SHA를 지정해 병합한다. GitHub API는 expected `base.sha`를 조건부 인자로 받지 않으므로 마지막 조회 뒤 base 갱신 경쟁은 branch protection과 GitHub mergeability 판정에 의존하는 잔여 위험이다.
+이슈 worktree에서 다음 명령을 실행한다. 아직 병합되지 않은 PR의 `merge`는 CI 대기 전·CI 통과 후·merge write 직전에 열린 이슈의 exact `status:qa`와 blocked provenance 부재를 확인한다. 이미 병합된 PR 재실행만 repository·issue 관계, head SHA, merge SHA를 읽어 검증한 뒤 이슈가 닫혀 있어도 write 없이 `alreadyMerged: true`로 성공할 수 있다. 이 예외로 branch를 복원하거나 다른 gate를 건너뛰지 않는다.
+
+`merge`는 open·non-draft·mergeable PR, `main` base, 현재 저장소와 예상 branch의 head, clean working tree와 PR head SHA가 일치하는지 먼저 검사하고 `base.sha`와 QA artifact 원문을 고정한다. 전체 검증 뒤 checkout·QA gate와 고정한 원문을 다시 확인하고 PR을 재조회해 `base.sha`, head SHA, repository·branch·lifecycle이 그대로인지 검사한다. check run과 commit status가 한 건 이상 존재하며 모두 성공하면 merge API 직전에 PR을 한 번 더 조회해 같은 snapshot을 검증하고, 검증한 head SHA를 지정해 병합한다. GitHub API는 expected `base.sha`를 조건부 인자로 받지 않으므로 마지막 조회 뒤 base 갱신 경쟁은 branch protection과 GitHub mergeability 판정에 의존하는 잔여 위험이다.
 
 ```bash
 scripts/task-harness merge <pr-number>
@@ -111,8 +149,8 @@ Git은 worktree registry, ref, branch config, working tree 파일, remote 설정
 - `./scripts/run-ai-verify --mode full`이 실패하면 완료로 보고하지 않는다.
 - CI 결과가 없거나 pending·실패 결과가 하나라도 있으면 병합하지 않는다.
 - 병합된 PR과 이슈의 연결을 확인할 수 없으면 이슈를 닫거나 worktree·branch를 정리하지 않는다.
-- 제품 방향, secret, billing, destructive data, 외부 접근이 필요하면 `status:blocked`와 이유를 남긴다.
+- 제품 방향, secret, billing, destructive data, 외부 접근이 필요하면 `scripts/task-harness status <issue-number> status:blocked`로 현재 출처 provenance를 함께 기록하고 차단 이유를 별도로 남긴다.
 
 ## 연결 상태 확인
 
-`scripts/task-harness doctor`로 현재 checkout의 `origin`, GitHub 인증, worktree, 템플릿, 검증 스크립트를 확인한다. Project 환경 변수가 없으면 Project 동기화만 건너뛰고 `status:*` 라벨을 작업 상태의 기준으로 사용한다.
+`scripts/task-harness doctor`로 현재 checkout의 `origin`, GitHub 인증, worktree, 템플릿, 검증 스크립트를 확인한다. Project 환경 변수가 없으면 Project 추가만 건너뛰고 `status:*` 라벨을 작업 상태의 기준으로 사용한다. `project-add`는 항목만 추가하며 Project 상태 field는 수동으로 관리한다. `status`, `start`, `resume`, `reconcile`은 GitHub Project field를 자동 동기화하지 않으므로 동기화됐다고 보고하지 않는다.
