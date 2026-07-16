@@ -30,8 +30,8 @@ scripts/task-harness spec-check <spec-path>
 scripts/task-harness qa-check <qa-path>
 scripts/task-harness pr <issue-number>
 scripts/task-harness merge <pr-number>
-scripts/task-harness close <issue-number>
-scripts/task-harness cleanup <issue-number>
+scripts/task-harness close <issue-number> <pr-number>
+scripts/task-harness cleanup <issue-number> <pr-number>
 ```
 
 ## Required flow
@@ -51,9 +51,9 @@ scripts/task-harness cleanup <issue-number>
 13. Write QA to `docs/temp/qa/issue-<number>.md` using the QA template.
 14. Fix all P0/P1 QA findings and run `scripts/task-harness qa-check <qa-path>`.
 15. Run `./scripts/run-ai-verify --mode full`.
-16. Create the PR with `scripts/task-harness pr <issue-number>`.
-17. Merge only after required CI checks and local full verification pass.
-18. Return to the base checkout, then close the issue and remove its worktree.
+16. Create or recover the PR with `scripts/task-harness pr <issue-number>`; the harness rejects ambiguous or mismatched open PRs before and after full verification, verifies a draft before making it ready, preserves uncertain ready transitions for rerun recovery, and requires `Closes #<issue>` as the first line with no other GitHub closing keyword reference.
+17. Merge only after required CI checks, local full verification, unchanged QA artifact, and the final PR base/head snapshot checks pass.
+18. Return to the base checkout, then run `scripts/task-harness close <issue-number> <pr-number>` and `scripts/task-harness cleanup <issue-number> <pr-number>`.
 
 Read `references/review-gates.md` before spec review or QA.
 
@@ -62,6 +62,8 @@ Read `references/review-gates.md` before spec review or QA.
 - Any P0/P1 spec finding blocks implementation.
 - Any P0/P1 QA finding blocks PR creation and merge.
 - A failing full verification blocks completion.
+- Duplicate or missing exact spec/QA fields, a changed QA artifact, zero CI results, or a changed PR base/head snapshot blocks publication or merge.
+- Close and cleanup require the merged PR number; reruns must preserve the single completion marker and may skip only resources already absent. Local branch removal first moves the exact expected SHA to a task-specific recoverable quarantine ref, rechecks worktree/ref/config state, and deletes that quarantine ref with an expected-SHA compare-and-swap.
 - A missing GitHub remote blocks live issue execution but not local issue/spec drafting.
 - Do not mark a task blocked merely because it is difficult or incomplete.
 
