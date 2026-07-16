@@ -1,0 +1,234 @@
+.shell {
+  display: grid;
+  min-height: 100svh;
+  width: min(100%, 30rem);
+  margin: 0 auto;
+  padding: 1.25rem 1rem 1.5rem;
+  grid-template-rows: auto 19rem auto 1fr auto;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.brand span {
+  position: relative;
+  display: block;
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.brand span::before,
+.brand span::after {
+  position: absolute;
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 0.55rem;
+  background: var(--accent);
+  box-shadow: 0 0.45rem 1rem rgb(95 75 182 / 18%);
+  content: "";
+}
+
+.brand span::before {
+  top: 0.05rem;
+  left: 0.05rem;
+}
+
+.brand span::after {
+  right: 0.05rem;
+  bottom: 0.05rem;
+  background: #c9bff0;
+}
+
+.brand strong {
+  font-size: 1rem;
+  letter-spacing: -0.04em;
+}
+
+.hero {
+  position: relative;
+  min-height: 0;
+}
+
+.card {
+  position: absolute;
+  top: 50%;
+  width: 10.75rem;
+  height: 12.5rem;
+  padding: 1.05rem;
+  border: 1px solid var(--line);
+  border-radius: 1.6rem;
+  box-shadow: var(--shadow);
+}
+
+.selfCard {
+  left: 50%;
+  background: var(--surface);
+  transform: translate(-92%, -50%) rotate(-7deg);
+}
+
+.friendCard {
+  right: 50%;
+  background: var(--surface-muted);
+  transform: translate(92%, -50%) rotate(7deg);
+}
+
+.avatar {
+  display: grid;
+  width: 3.2rem;
+  height: 3.2rem;
+  place-items: center;
+  border-radius: 1rem;
+  background: #eee9f7;
+  color: var(--accent-strong);
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.friendCard .avatar {
+  margin-left: auto;
+  background: #f8e9ef;
+  color: #8e4765;
+}
+
+.card p {
+  margin: 1.1rem 0 1.25rem;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+}
+
+.friendCard p {
+  text-align: right;
+}
+
+.card i {
+  display: block;
+  width: 100%;
+  height: 0.65rem;
+  border-radius: 999px;
+  background: rgb(95 75 182 / 10%);
+}
+
+.card i + i {
+  width: 68%;
+  margin-top: 0.65rem;
+}
+
+.friendCard i {
+  margin-left: auto;
+  background: rgb(142 71 101 / 10%);
+}
+
+.overlap {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: 3.6rem;
+  height: 3.6rem;
+  place-items: center;
+  border: 0.35rem solid var(--background);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0.75rem 1.75rem rgb(72 54 144 / 28%);
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 850;
+  transform: translate(-50%, -50%);
+}
+
+.copy {
+  text-align: center;
+}
+
+.copy h1 {
+  margin: 0;
+  font-size: clamp(2rem, 9.5vw, 2.7rem);
+  line-height: 1.16;
+  letter-spacing: -0.06em;
+  word-break: keep-all;
+}
+
+.copy p {
+  margin: 0.75rem 0 0;
+  color: var(--ink-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.cta {
+  display: flex;
+  min-height: 3.35rem;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 1rem;
+  background: var(--accent);
+  box-shadow: 0 0.7rem 1.5rem rgb(95 75 182 / 24%);
+  color: white;
+  font: inherit;
+  font-weight: 800;
+  text-decoration: none;
+  grid-row: 5;
+}
+
+.cta:focus-visible {
+  outline: 3px solid #bdacef;
+  outline-offset: 3px;
+}
+
+.cta:disabled {
+  background: #aaa3b8;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+@media (max-width: 21rem) {
+  .shell {
+    padding-inline: 0.8rem;
+  }
+
+  .card {
+    width: 9.7rem;
+    height: 11.5rem;
+  }
+
+  .copy h1 {
+    font-size: 1.85rem;
+  }
+}
+
+@media (min-width: 48rem) {
+  .shell {
+    width: min(100%, 60rem);
+    padding: 2rem;
+    grid-template-columns: 1.15fr 1fr;
+    grid-template-rows: auto 1fr auto;
+    column-gap: 3rem;
+  }
+
+  .brand {
+    grid-column: 1 / -1;
+  }
+
+  .hero {
+    grid-row: 2 / 4;
+  }
+
+  .copy {
+    align-self: end;
+    text-align: left;
+  }
+
+  .cta {
+    align-self: start;
+    grid-row: auto;
+  }
+}
