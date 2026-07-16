@@ -4,37 +4,40 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
-test("explains the first pack and starts the local owner flow", async ({
-  page,
-}) => {
+test("starts with the first real question", async ({ page }) => {
   await page.goto("/");
 
   await expect(
     page.getByRole("heading", {
       level: 1,
-      name: "오래 본 친구는 나를 어떻게 기억할까?",
+      name: "서운한 일이 생기면 나는?",
     }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { level: 2, name: "오래된 친구팩" }),
-  ).toBeVisible();
+  await expect(page.getByText("겹 · 오래된 친구팩")).toBeVisible();
+  await expect(page.getByText("1 / 10", { exact: true })).toBeVisible();
+  await expect(page.getByRole("progressbar")).toHaveAttribute("value", "1");
+  await expect(page.getByText("내가 먼저 답하면")).toHaveCount(0);
+  await expect(page.getByText("추천 관계")).toHaveCount(0);
+  await expect(page.getByRole("link")).toHaveCount(0);
 
-  for (const fact of [
-    "오래된 친구",
-    "A/B 10장 · 약 2분",
-    "따뜻한 회상",
-    "낮은 민감도 · 공개 추천",
-  ]) {
-    await expect(page.getByText(fact, { exact: true })).toBeVisible();
-  }
+  const firstChoice = page.getByRole("button", {
+    name: "A 바로 이야기한다",
+  });
+  await expect(firstChoice).toBeEnabled();
+  await firstChoice.click();
 
-  const cta = page.getByRole("link", { name: "팩 열어보기" });
-  await expect(cta).toBeVisible();
-  await cta.click();
-  await expect(page).toHaveURL(/\/play\/old-friend$/);
+  await expect(page).toHaveURL(/\/$/);
   await expect(
-    page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
+    page.getByRole("heading", { name: "오랜만에 친구를 만나면 나는?" }),
   ).toBeVisible();
+  await expect(page.getByText("2 / 10", { exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.localStorage.getItem("gyeop:old-friend-play:v1"),
+      ),
+    )
+    .toContain('"conflict":"a"');
 });
 
 test("keeps the first action inside a 320px viewport", async ({ page }) => {
@@ -54,18 +57,15 @@ test("keeps the first action inside a 320px viewport", async ({ page }) => {
     verticalOverflow: false,
   });
 
-  const intro = await page.getByTestId("home-intro").boundingBox();
-  const pack = await page.getByTestId("pack-card").boundingBox();
-  expect(intro).not.toBeNull();
-  expect(pack).not.toBeNull();
-  expect(pack!.y - (intro!.y + intro!.height)).toBeLessThanOrEqual(48);
-
-  const cta = page.getByRole("link", { name: "팩 열어보기" });
-  const box = await cta.boundingBox();
-  expect(box?.height).toBeGreaterThanOrEqual(44);
-  expect(box!.y + box!.height).toBeLessThanOrEqual(800);
+  const choices = page.locator("[data-choice]");
+  await expect(choices).toHaveCount(2);
+  for (const choice of await choices.all()) {
+    const box = await choice.boundingBox();
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(800);
+  }
 
   await page.keyboard.press("Tab");
-  await expect(cta).toBeFocused();
-  await expect(cta).toHaveCSS("outline-style", /^(?!none$).+/);
+  await expect(choices.first()).toBeFocused();
+  await expect(choices.first()).toHaveCSS("outline-style", /^(?!none$).+/);
 });

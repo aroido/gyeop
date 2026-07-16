@@ -143,28 +143,41 @@ function readDraft(raw: string | null): Draft {
   }
 }
 
-export default function OldFriendPlay() {
+type OldFriendPlayProps = {
+  disabled?: boolean;
+  skipOpening?: boolean;
+};
+
+export default function OldFriendPlay({
+  disabled = false,
+  skipOpening = false,
+}: OldFriendPlayProps = {}) {
   const [draft, setDraft] = useState<Draft>(() => {
-    if (typeof window === "undefined") return emptyDraft;
+    if (disabled || typeof window === "undefined") return emptyDraft;
     try {
       return readDraft(window.localStorage.getItem(STORAGE_KEY));
     } catch {
       return emptyDraft;
     }
   });
-  const [opening, setOpening] = useState(true);
+  const [opening, setOpening] = useState(!skipOpening);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { answers, completed, currentIndex } = draft;
+  const shellClassName = skipOpening
+    ? `${styles.shell} ${styles.top}`
+    : styles.shell;
 
   useEffect(() => {
+    if (skipOpening) return;
     const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
       ? 0
       : OPENING_MS;
     const timer = window.setTimeout(() => setOpening(false), delay);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [skipOpening]);
 
   useEffect(() => {
+    if (disabled) return;
     try {
       if (currentIndex === 0 && Object.keys(answers).length === 0) {
         window.localStorage.removeItem(STORAGE_KEY);
@@ -177,7 +190,7 @@ export default function OldFriendPlay() {
     } catch {
       // ponytail: storage can be unavailable; React state is the fallback.
     }
-  }, [answers, currentIndex]);
+  }, [answers, currentIndex, disabled]);
 
   useEffect(() => {
     if (opening) return;
@@ -210,7 +223,7 @@ export default function OldFriendPlay() {
 
   if (opening) {
     return (
-      <main className={styles.shell}>
+      <main className={shellClassName}>
         <section className={styles.opening} aria-labelledby="opening-title">
           <div className={styles.openingCard} aria-hidden="true">
             <span>겹</span>
@@ -224,7 +237,7 @@ export default function OldFriendPlay() {
 
   if (completed) {
     return (
-      <main className={styles.shell}>
+      <main className={shellClassName}>
         <section className={styles.complete} aria-labelledby="complete-title">
           <p className={styles.brand}>겹 · 오래된 친구팩</p>
           <h1 id="complete-title" ref={headingRef} tabIndex={-1}>
@@ -259,12 +272,12 @@ export default function OldFriendPlay() {
   }
 
   return (
-    <main className={styles.shell}>
+    <main className={shellClassName}>
       <section className={styles.play} aria-labelledby="question-title">
         <header className={styles.progressHeader}>
           <p className={styles.brand}>겹 · 오래된 친구팩</p>
           <span aria-hidden="true">
-            {currentIndex + 1} / {cards.length}
+            {disabled ? "준비 중" : `${currentIndex + 1} / ${cards.length}`}
           </span>
         </header>
 
@@ -276,9 +289,6 @@ export default function OldFriendPlay() {
         />
 
         <div className={styles.questionCard}>
-          {card.signature ? (
-            <p className={styles.signature}>모든 친구에게 묻는 대표 질문</p>
-          ) : null}
           <h1 id="question-title" ref={headingRef} tabIndex={-1}>
             {card.question}
           </h1>
@@ -288,6 +298,7 @@ export default function OldFriendPlay() {
               type="button"
               data-choice="a"
               aria-pressed={selected === "a"}
+              disabled={disabled}
               onClick={() => choose("a")}
             >
               <span>A</span>
@@ -297,6 +308,7 @@ export default function OldFriendPlay() {
               type="button"
               data-choice="b"
               aria-pressed={selected === "b"}
+              disabled={disabled}
               onClick={() => choose("b")}
             >
               <span>B</span>
