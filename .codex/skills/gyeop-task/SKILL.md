@@ -10,7 +10,7 @@ Run every executable GitHub issue through one issue, one worktree, one branch, o
 ## Operating contract
 
 - Use GitHub Issue `status:*` labels as workflow truth.
-- Treat GitHub Project as an optional manual view. `project-add` adds only the item; status fields remain manual unless a later task explicitly implements synchronization.
+- Treat GitHub Project as an optional synchronized view. Issue labels remain authoritative; Project fields never approve workflow transitions.
 - Use REST through `gh api repos/<owner>/<repo>/...` for issue and PR state.
 - Write GitHub-facing titles, bodies, comments, and summaries in Korean.
 - Keep branch names, labels, commands, paths, env vars, and code symbols in English.
@@ -22,6 +22,7 @@ Run every executable GitHub issue through one issue, one worktree, one branch, o
 scripts/task-harness doctor
 scripts/task-harness label-sync
 scripts/task-harness project-add <issue-number>
+scripts/task-harness project-sync <issue-number>
 scripts/task-harness queue
 scripts/task-harness reconcile
 scripts/task-harness status <issue-number> <status-label>
@@ -39,7 +40,7 @@ scripts/task-harness cleanup <issue-number> <pr-number>
 ## Required flow
 
 1. Run `scripts/task-harness doctor`.
-2. Run `scripts/task-harness reconcile` when predecessors may have closed. Review its complete result before continuing; this is a manual operation, not Project synchronization or a scheduled job.
+2. Run `scripts/task-harness reconcile` when predecessors may have closed. Review its complete result before continuing; this is an explicit operation, not a scheduler. When Project is configured, successful promotions also synchronize its Korean fields.
 3. Use the specified ready issue or choose the highest-priority item from `scripts/task-harness queue`.
 4. Run `scripts/task-harness start <issue-number>` for a new task. For interrupted work, run `scripts/task-harness resume <issue-number>` and use only the returned canonical worktree; do not recreate or move its branch manually.
 5. Change into the `worktree` path printed by `start` or `resume`; run the remaining issue commands there through merge.
@@ -68,6 +69,15 @@ Read `references/review-gates.md` before resuming work, changing status, reviewi
 - `status:qa` has no direct completion or rollback transition. Completion requires the existing merge and close evidence.
 - `start` may preserve a correctly created worktree when its later status write fails. Inspect the error, then rerun `start` or use `resume`; never delete the partial state automatically.
 
+## Project synchronization
+
+- The configured Project is organization Project #5 for `aroido/gyeop`. `doctor` verifies its owner, number, update permission, field types, and required options without mutation.
+- `project-add` is the only command that adds missing membership. For an open issue it also synchronizes `Status`, `작업 상태`, `우선순위`, and `작업 유형`; for a closed issue it adds membership only.
+- `project-sync` repairs an existing item for an open exact workflow issue. It rejects closed issues and missing membership without field writes.
+- Configured `status`, `start`, `resume`, and `reconcile` hooks synchronize current labels. Verified `close` alone writes `Done` and `완료`. Every transition reruns its source and target gate after Project I/O; `start` and `resume` also rerun their exact Git and issue snapshots.
+- Without `GYEOP_GITHUB_PROJECT_NUMBER`, automatic hooks report `skipped` and do not call Project or GraphQL. Explicit `project-add` and `project-sync` fail nonzero because their requested work cannot run.
+- Project writes are not transactional. Never roll back authoritative labels or Git state after a partial Project failure. Follow the ordered recovery in the JSON: existing open item=`project-sync`, missing open item=`project-add`, existing completed item=`close`, missing completed item=`project-add` then the same verified `close`.
+
 ## Blocking rules
 
 - Any P0/P1 spec finding blocks implementation.
@@ -76,9 +86,10 @@ Read `references/review-gates.md` before resuming work, changing status, reviewi
 - Missing, duplicate, or malformed `status:*` and `blocked-from:*` labels block `status`, `start`, `resume`, `reconcile`, `pr`, and an unmerged `merge` before mutation.
 - `resume` never changes issue status, fast-forwards, rewinds, force-moves, deletes, or cleans anything. Merged PRs, dirty or conflicting worktrees, repository/path/ref/origin drift, and local/remote SHA mismatches fail closed.
 - `reconcile` fetches every backlog page before mutation. A page-fetch error produces no mutations; item errors are reported after other safe items and make the command exit nonzero. External label churn during pagination is handled by reviewing the result and rerunning `reconcile`.
+- A configured Project schema, permission, membership, source snapshot, field write, or final readback failure must exit nonzero and report `projectSynced: false`, confirmed partial changes, and a cause-specific recovery command. Missing membership and an existing-item field failure are different recovery cases.
 - `pr` and an unmerged `merge` require an open issue at exact `status:qa` with no blocked provenance at every delayed boundary. A previously merged PR may return `alreadyMerged: true` only after read-only relationship and SHA verification, even when its issue is closed.
 - Duplicate or missing exact spec/QA fields, a changed QA artifact, zero CI results, or a changed PR base/head snapshot blocks publication or merge.
-- Close and cleanup require the merged PR number; reruns must preserve the single completion marker and may skip only resources already absent. Local branch removal first moves the exact expected SHA to a task-specific recoverable quarantine ref, rechecks worktree/ref/config state, and deletes that quarantine ref with an expected-SHA compare-and-swap.
+- Close and cleanup require the merged PR number; reruns must preserve the single completion marker and may skip only resources already absent. `close` writes Project completion only after merged-PR evidence and a closed issue GET. If completed membership is missing, run `project-add` for membership only and then rerun the same `close`. Local branch removal first moves the exact expected SHA to a task-specific recoverable quarantine ref, rechecks worktree/ref/config state, and deletes that quarantine ref with an expected-SHA compare-and-swap.
 - A missing GitHub remote blocks live issue execution but not local issue/spec drafting.
 - Do not mark a task blocked merely because it is difficult or incomplete.
 

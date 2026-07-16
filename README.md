@@ -46,10 +46,12 @@
 ```bash
 scripts/task-harness doctor
 scripts/task-harness label-sync
+scripts/task-harness project-add <issue-number>
+scripts/task-harness project-sync <issue-number>
 scripts/task-harness queue
 ```
 
-저장소는 `origin`에서 자동 감지하거나 `GYEOP_GITHUB_REPO=owner/repo`로 설정한다. GitHub Project 연결은 `GYEOP_GITHUB_PROJECT_NUMBER`와 `GYEOP_GITHUB_OWNER`를 설정한 뒤 `scripts/task-harness project-add <issue-number>`로 사용한다. 작업 상태의 기준은 Project 보드가 아니라 `status:*` 이슈 라벨이다.
+저장소는 `origin`에서 자동 감지하며 `.env.example`의 기본 연결 대상은 `aroido/gyeop`과 organization Project #5다. `status:*` 이슈 라벨이 작업 상태의 기준이고 Project는 설정된 경우에만 동기화되는 한국어 가시화 화면이다. `doctor`는 Project update 권한과 field schema를 점검하고, `project-add`만 누락 item을 추가한다. 열린 기존 item은 `project-sync`로 현재 label을 다시 반영한다. 닫힌 이슈의 누락 item은 `project-add`로 membership만 복구한 뒤 검증된 `close <issue-number> <pr-number>`를 재실행한다.
 
 ## 로컬 개발
 
