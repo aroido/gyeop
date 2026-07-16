@@ -1,0 +1,317 @@
+.shell {
+  display: grid;
+  min-height: 100svh;
+  width: min(100%, 32rem);
+  margin: 0 auto;
+  padding: 1.25rem 1rem 1.5rem;
+  place-items: center;
+}
+
+.opening {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+
+.openingCard {
+  position: relative;
+  display: grid;
+  width: 8.5rem;
+  aspect-ratio: 0.78;
+  margin-bottom: 1.5rem;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 1.5rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  color: var(--accent);
+  font-size: 2rem;
+  font-weight: 850;
+  transform: rotate(-2deg);
+}
+
+.openingCard::before,
+.openingCard::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border: 1px solid var(--line);
+  border-radius: inherit;
+  background: #f8e9ef;
+  content: "";
+  transform: translate(0.55rem, 0.55rem) rotate(4deg);
+}
+
+.openingCard::after {
+  z-index: -2;
+  background: var(--surface-muted);
+  transform: translate(0.9rem, 0.9rem) rotate(7deg);
+}
+
+.opening p,
+.brand {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.opening h1 {
+  margin: 0.45rem 0 0;
+  font-size: 1.35rem;
+  letter-spacing: -0.04em;
+}
+
+.play,
+.complete {
+  width: 100%;
+}
+
+.progressHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.progressHeader > span {
+  color: var(--ink-muted);
+  font-size: 0.8rem;
+  font-weight: 750;
+}
+
+.progress {
+  width: 100%;
+  height: 0.45rem;
+  margin: 0.8rem 0 2rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  appearance: none;
+}
+
+.progress::-webkit-progress-bar {
+  background: #e5dfeb;
+}
+
+.progress::-webkit-progress-value {
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.progress::-moz-progress-bar {
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.questionCard {
+  position: relative;
+  padding: 1.35rem;
+  border: 1px solid var(--line);
+  border-radius: 1.65rem;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.questionCard::before,
+.questionCard::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0.55rem 0.5rem -0.55rem;
+  border: 1px solid var(--line);
+  border-radius: inherit;
+  background: #f8e9ef;
+  content: "";
+  transform: rotate(-1.5deg);
+}
+
+.questionCard::after {
+  z-index: -2;
+  background: var(--surface-muted);
+  transform: rotate(2deg);
+}
+
+.signature {
+  margin: 0 0 0.75rem;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.questionCard h1,
+.complete h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 8vw, 2.35rem);
+  line-height: 1.22;
+  letter-spacing: -0.055em;
+  word-break: keep-all;
+}
+
+.questionCard h1:focus,
+.complete h1:focus {
+  outline: none;
+}
+
+.choices {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.choices button {
+  display: flex;
+  min-height: 4rem;
+  width: 100%;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.93rem;
+  font-weight: 720;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.choices button span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 1.85rem;
+  height: 1.85rem;
+  place-items: center;
+  border-radius: 0.6rem;
+  background: #f0ecf8;
+  color: var(--accent-strong);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.choices button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: #f5f1ff;
+  box-shadow: 0 0 0 2px rgb(95 75 182 / 12%);
+}
+
+.choices button:focus-visible,
+.previous:focus-visible,
+.restart:focus-visible {
+  outline: 3px solid #bdacef;
+  outline-offset: 3px;
+}
+
+.previous {
+  display: block;
+  min-height: 2.75rem;
+  margin: 1.45rem auto 0;
+  padding: 0 1rem;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
+.complete {
+  padding-block: 0.5rem;
+}
+
+.complete h1 {
+  margin-top: 0.55rem;
+}
+
+.completeCopy {
+  margin: 0.85rem 0 1.25rem;
+  color: var(--ink-muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.summary {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.summary li {
+  display: grid;
+  grid-template-columns: 1.75rem 1fr;
+  gap: 0.65rem;
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  background: var(--surface);
+}
+
+.summary li > span {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border-radius: 0.55rem;
+  background: #eee9f7;
+  color: var(--accent-strong);
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.summary p,
+.summary strong {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.summary strong {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--accent-strong);
+}
+
+.restart {
+  min-height: 3.25rem;
+  width: 100%;
+  margin-top: 1rem;
+  border: 0;
+  border-radius: 0.95rem;
+  background: var(--accent);
+  color: white;
+  font: inherit;
+  font-weight: 800;
+}
+
+.live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 21rem) {
+  .shell {
+    padding-inline: 0.8rem;
+  }
+
+  .questionCard {
+    padding: 1.1rem;
+  }
+
+  .questionCard h1 {
+    font-size: 1.65rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .openingCard {
+    transform: none;
+  }
+}
