@@ -88,10 +88,17 @@ function importsOf(file, source) {
 }
 
 function resolveImport(from, specifier, files) {
-  if (!specifier.startsWith(".")) return undefined;
-  const base = path.posix.normalize(
-    path.posix.join(path.posix.dirname(from), specifier),
-  );
+  let base;
+  if (specifier.startsWith("@/")) {
+    base = path.posix.normalize(specifier.slice(2));
+    if (base === ".." || base.startsWith("../")) return undefined;
+  } else if (specifier.startsWith(".")) {
+    base = path.posix.normalize(
+      path.posix.join(path.posix.dirname(from), specifier),
+    );
+  } else {
+    return undefined;
+  }
   for (const candidate of [
     base,
     `${base}.ts`,
@@ -126,13 +133,13 @@ function unwrapExpression(expression) {
   return current;
 }
 
-function isReviewedBoundaryCall(expression, aliases) {
+function reviewedBoundaryCall(expression, aliases) {
   const unwrapped = unwrapExpression(expression);
-  return (
-    ts.isCallExpression(unwrapped) &&
+  return ts.isCallExpression(unwrapped) &&
     ts.isIdentifier(unwrapped.expression) &&
     aliases.has(unwrapped.expression.text)
-  );
+    ? unwrapped
+    : undefined;
 }
 
 function bindingShadowsAlias(name, aliases) {
@@ -149,6 +156,11 @@ function bindingShadowsAlias(name, aliases) {
 
 function handlerReturnsReviewedBoundary(handler, aliases) {
   if (
+    handler.parameters.length === 0 ||
+    !ts.isIdentifier(handler.parameters[0].name) ||
+    handler.parameters.some(
+      (parameter) => parameter.initializer || parameter.dotDotDotToken,
+    ) ||
     handler.parameters.some((parameter) =>
       bindingShadowsAlias(parameter.name, aliases),
     )
@@ -157,12 +169,24 @@ function handlerReturnsReviewedBoundary(handler, aliases) {
   }
   const body = handler.body;
   if (!body) return false;
-  if (!ts.isBlock(body)) return isReviewedBoundaryCall(body, aliases);
-  return (
+  let expression;
+  if (!ts.isBlock(body)) {
+    expression = body;
+  } else if (
     body.statements.length === 1 &&
     ts.isReturnStatement(body.statements[0]) &&
-    body.statements[0].expression !== undefined &&
-    isReviewedBoundaryCall(body.statements[0].expression, aliases)
+    body.statements[0].expression !== undefined
+  ) {
+    expression = body.statements[0].expression;
+  } else {
+    return false;
+  }
+  const call = reviewedBoundaryCall(expression, aliases);
+  if (!call || call.arguments.length === 0) return false;
+  const requestArgument = unwrapExpression(call.arguments[0]);
+  return (
+    ts.isIdentifier(requestArgument) &&
+    requestArgument.text === handler.parameters[0].name.text
   );
 }
 

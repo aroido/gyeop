@@ -113,7 +113,7 @@ boot_and_snapshot() {
 
 assert_proxy_guards() {
   before=$(docker exec "$CONTAINER" sha256sum /run/gyeop/capture.json | awk '{print $1}')
-  docker exec "$CONTAINER" python3 - <<'PY'
+  docker exec -i "$CONTAINER" python3 - <<'PY'
 import socket
 import time
 
@@ -172,9 +172,8 @@ PY
   test "$before" = "$after"
 }
 
-boot_and_snapshot "$TMP/first-boot"
-
-if ! docker exec "$CONTAINER" curl -fsS \
+assert_canonical_proxy() {
+  if ! docker exec "$CONTAINER" curl -fsS \
   -H 'Forwarded: for=198.51.100.1' \
   -H 'X-Forwarded-For: 198.51.100.2' \
   -H 'X-Forwarded-For: 198.51.100.3' \
@@ -189,9 +188,9 @@ if ! docker exec "$CONTAINER" curl -fsS \
   docker exec "$CONTAINER" journalctl --no-pager -u gyeop-proxy.service >&2 || true
   docker exec "$CONTAINER" ss -lntp >&2 || true
   exit 1
-fi
+  fi
 
-docker exec "$CONTAINER" python3 - <<'PY'
+  docker exec -i "$CONTAINER" python3 - <<'PY'
 import json
 
 with open("/run/gyeop/capture.json", encoding="utf-8") as source:
@@ -213,12 +212,16 @@ for forbidden in ["forwarded", "x-real-ip", "x-forwarded-prefix"]:
     if forbidden in headers:
         raise SystemExit(1)
 PY
+}
 
+boot_and_snapshot "$TMP/first-boot"
+assert_canonical_proxy
 assert_proxy_guards
 
 docker stop -t 20 "$CONTAINER" >/dev/null
 docker run -d --name "$NAMESPACE_HOLDER" --network none "$IMAGE" /bin/sleep infinity >/dev/null
 boot_and_snapshot "$TMP/second-boot"
+assert_canonical_proxy
 assert_proxy_guards
 
 first_namespace=$(sed -n '1p' "$TMP/first-boot")
