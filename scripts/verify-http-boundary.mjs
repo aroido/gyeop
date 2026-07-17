@@ -306,41 +306,98 @@ function handlerReturnsReviewedBoundary(handler, aliases) {
   return reviewedBoundaryCallFromHandler(handler, aliases) !== undefined;
 }
 
-function importedNamedAliases(parsed, route, files, target, importedName) {
-  const aliases = new Set();
-  for (const statement of parsed.statements) {
-    if (
-      !ts.isImportDeclaration(statement) ||
-      !ts.isStringLiteral(statement.moduleSpecifier) ||
-      resolveImport(route, statement.moduleSpecifier.text, files) !== target
-    ) {
-      continue;
-    }
-    const bindings = statement.importClause?.namedBindings;
-    if (!bindings || !ts.isNamedImports(bindings)) continue;
-    for (const binding of bindings.elements) {
-      if ((binding.propertyName ?? binding.name).text === importedName) {
-        aliases.add(binding.name.text);
-      }
-    }
+function moduleLoadsTarget(parsed, route, files, target) {
+  const loads = [];
+  function record(node, specifier) {
+    if (resolveImport(route, specifier, files) === target) loads.push(node);
   }
+  function visit(node) {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      record(node, node.moduleSpecifier.text);
+    } else if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference) &&
+      node.moduleReference.expression &&
+      ts.isStringLiteral(node.moduleReference.expression)
+    ) {
+      record(node, node.moduleReference.expression.text);
+    } else if (
+      ts.isCallExpression(node) &&
+      node.arguments.length >= 1 &&
+      ts.isStringLiteral(node.arguments[0]) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) &&
+          node.expression.text === "require"))
+    ) {
+      record(node, node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(parsed);
+  return loads;
+}
+
+function exactNamedImportAliases(parsed, route, files, target, importedName) {
+  const aliases = new Set();
+  const loads = moduleLoadsTarget(parsed, route, files, target);
+  if (loads.length !== 1 || !ts.isImportDeclaration(loads[0])) {
+    return undefined;
+  }
+  const importClause = loads[0].importClause;
+  if (
+    !importClause ||
+    importClause.isTypeOnly ||
+    importClause.name ||
+    !importClause.namedBindings ||
+    !ts.isNamedImports(importClause.namedBindings) ||
+    importClause.namedBindings.elements.length !== 1
+  ) {
+    return undefined;
+  }
+  const [binding] = importClause.namedBindings.elements;
+  if (
+    binding.isTypeOnly ||
+    (binding.propertyName ?? binding.name).text !== importedName
+  ) {
+    return undefined;
+  }
+  aliases.add(binding.name.text);
   return aliases;
 }
 
-function callsToAliases(node, aliases) {
-  const calls = [];
+function identifierUses(node, aliases) {
+  const uses = [];
   function visit(current) {
-    if (
-      ts.isCallExpression(current) &&
-      ts.isIdentifier(current.expression) &&
-      aliases.has(current.expression.text)
-    ) {
-      calls.push(current);
+    if (ts.isImportDeclaration(current)) return;
+    if (ts.isIdentifier(current) && aliases.has(current.text)) {
+      const parent = current.parent;
+      const isPropertyName =
+        (ts.isPropertyAccessExpression(parent) && parent.name === current) ||
+        (ts.isPropertyAssignment(parent) && parent.name === current) ||
+        (ts.isMethodDeclaration(parent) && parent.name === current) ||
+        (ts.isPropertyDeclaration(parent) && parent.name === current);
+      if (!isPropertyName) uses.push(current);
     }
     ts.forEachChild(current, visit);
   }
   visit(node);
-  return calls;
+  return uses;
+}
+
+function singleDirectImportedCall(parsed, aliases) {
+  const uses = identifierUses(parsed, aliases);
+  if (uses.length !== 1) return undefined;
+  const [use] = uses;
+  const parent = use.parent;
+  return ts.isCallExpression(parent) &&
+    parent.expression === use &&
+    !parent.questionDotToken
+    ? parent
+    : undefined;
 }
 
 function directlyReturnedCall(handler, aliases) {
@@ -398,31 +455,75 @@ function isFixedPackCatalogPolicy(expression) {
   );
 }
 
-function hasSafePackCatalogOrder(route, files, contract) {
-  const rateAliases = importedNamedAliases(
+function isNonRepeatedCallbackCall(call, callback) {
+  let current = call.parent;
+  while (current && current !== callback) {
+    if (
+      ts.isFunctionLike(current) ||
+      ts.isForStatement(current) ||
+      ts.isForInStatement(current) ||
+      ts.isForOfStatement(current) ||
+      ts.isWhileStatement(current) ||
+      ts.isDoStatement(current) ||
+      ts.isIfStatement(current) ||
+      ts.isConditionalExpression(current) ||
+      ts.isSwitchStatement(current) ||
+      ts.isCaseClause(current) ||
+      ts.isDefaultClause(current) ||
+      ts.isCatchClause(current)
+    ) {
+      return false;
+    }
+    if (
+      ts.isBinaryExpression(current) &&
+      [
+        ts.SyntaxKind.AmpersandAmpersandToken,
+        ts.SyntaxKind.BarBarToken,
+        ts.SyntaxKind.QuestionQuestionToken,
+      ].includes(current.operatorToken.kind)
+    ) {
+      return false;
+    }
+    current = current.parent;
+  }
+  return current === callback;
+}
+
+function hasSafePackCatalogOrder(route, files, contract, graph, reachable) {
+  const rateAliases = exactNamedImportAliases(
     contract.parsed,
     route,
     files,
     "lib/http/rate-limit.ts",
     "runRateLimitedDomain",
   );
-  const catalogAliases = importedNamedAliases(
+  const catalogAliases = exactNamedImportAliases(
     contract.parsed,
     route,
     files,
     "lib/http/published-pack.ts",
     "readPublishedPack",
   );
-  if (rateAliases.size === 0 || catalogAliases.size === 0) return false;
+  if (!rateAliases || !catalogAliases) return false;
 
-  const rateCalls = callsToAliases(contract.parsed, rateAliases);
-  const catalogCalls = callsToAliases(contract.parsed, catalogAliases);
-  const getHandlers = contract.handlers.filter(({ name }) => name === "GET");
   if (
-    rateCalls.length !== 1 ||
-    catalogCalls.length !== 1 ||
-    getHandlers.length !== 1
+    [...reachable].some(
+      (file) =>
+        file !== route &&
+        (graph.get(file) ?? []).some(
+          (edge) =>
+            edge.target === "lib/http/published-pack.ts" ||
+            edge.target === "lib/http/rate-limit.ts",
+        ),
+    )
   ) {
+    return false;
+  }
+
+  const rateCall = singleDirectImportedCall(contract.parsed, rateAliases);
+  const catalogCall = singleDirectImportedCall(contract.parsed, catalogAliases);
+  const getHandlers = contract.handlers.filter(({ name }) => name === "GET");
+  if (!rateCall || !catalogCall || getHandlers.length !== 1) {
     return false;
   }
 
@@ -432,9 +533,8 @@ function hasSafePackCatalogOrder(route, files, contract) {
   );
   if (!boundaryCall) return false;
   const boundaryCallback = unwrapExpression(boundaryCall.arguments[2]);
-  const rateCall = directlyReturnedCall(boundaryCallback, rateAliases);
   if (
-    rateCall !== rateCalls[0] ||
+    directlyReturnedCall(boundaryCallback, rateAliases) !== rateCall ||
     rateCall.arguments.length !== 2 ||
     !isFixedPackCatalogPolicy(rateCall.arguments[0])
   ) {
@@ -449,11 +549,7 @@ function hasSafePackCatalogOrder(route, files, contract) {
   ) {
     return false;
   }
-  const deferredCatalogCalls = callsToAliases(catalogCallback, catalogAliases);
-  return (
-    deferredCatalogCalls.length === 1 &&
-    deferredCatalogCalls[0] === catalogCalls[0]
-  );
+  return isNonRepeatedCallbackCall(catalogCall, catalogCallback);
 }
 
 function routeBoundaryContract(route, source, files) {
@@ -584,7 +680,7 @@ export function verifyHttpBoundarySources(inputFiles) {
     }
 
     if (route === "app/api/packs/[slug]/route.ts") {
-      if (!hasSafePackCatalogOrder(route, files, contract)) {
+      if (!hasSafePackCatalogOrder(route, files, contract, graph, reachable)) {
         findings.push(
           `${route}: published pack read must run once behind the fixed pack_catalog_read rate limit`,
         );
