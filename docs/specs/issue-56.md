@@ -29,7 +29,7 @@ Issue: https://github.com/aroido/gyeop/issues/56
 - `docs/product/question-pack-spec.md` 5. 주인 응답
 - `docs/product/decision-log.md`
 - `app/(public)/page.tsx` 5~40행의 팩별 스타일 매핑
-- `app/(public)/page.module.css` 178~213행, 277~313행의 팩 카드·CTA 색상
+- `app/(public)/page.module.css` 178-213행, 277-313행의 팩 카드·CTA 색상
 - `app/play/packs.ts`의 네 개발용 팩 slug
 - `app/play/[slug]/page.tsx`의 production 잠금
 - `AGENTS.md`
@@ -105,6 +105,7 @@ for slug in old-friend first-impression coworker honest-self not-a-pack; do
   test "$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:3101/play/$slug")" = 404
 done
 ```
+
 - [x] `./scripts/run-ai-verify --mode full`
 
 ## 분석과 관측성

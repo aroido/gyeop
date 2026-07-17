@@ -8,6 +8,10 @@ const packCases = [
     first: "처음 만난 자리에서 나는?",
     second: "처음 대화를 시작할 때 나는?",
     third: "낯선 사람들이 모인 자리에 가면 나는?",
+    surface: "rgb(49, 92, 255)",
+    ink: "rgb(255, 255, 255)",
+    completeBorder: "rgb(49, 92, 255)",
+    restart: "rgb(5, 5, 5)",
   },
   {
     slug: "coworker",
@@ -16,6 +20,10 @@ const packCases = [
     first: "업무가 애매하게 주어지면 나는?",
     second: "회의에서 의견이 생기면 나는?",
     third: "집중이 필요할 때 나는?",
+    surface: "rgb(255, 77, 66)",
+    ink: "rgb(5, 5, 5)",
+    completeBorder: "rgb(255, 77, 66)",
+    restart: "rgb(5, 5, 5)",
   },
   {
     slug: "honest-self",
@@ -24,6 +32,10 @@ const packCases = [
     first: "마음이 복잡한 날 나는?",
     second: "칭찬을 들으면 나는?",
     third: "중요한 선택 앞에서 나는?",
+    surface: "rgb(10, 10, 10)",
+    ink: "rgb(255, 255, 255)",
+    completeBorder: "rgb(255, 255, 255)",
+    restart: "rgb(223, 255, 0)",
   },
 ] as const;
 
@@ -37,8 +49,17 @@ for (const pack of packCases) {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(`/play/${pack.slug}`);
 
+    await expect(page.locator(`main[data-pack="${pack.slug}"]`)).toHaveCount(1);
     await expect(page.getByText(`겹 · ${pack.title}`)).toBeVisible();
     await expect(page.getByRole("heading", { name: pack.first })).toBeFocused();
+    await expect(page.getByTestId("question-card")).toHaveCSS(
+      "background-color",
+      pack.surface,
+    );
+    await expect(page.getByTestId("question-card")).toHaveCSS(
+      "color",
+      pack.ink,
+    );
 
     await page.locator('button[data-choice="a"]').click();
     await expect(
@@ -71,6 +92,14 @@ for (const pack of packCases) {
     await expect(
       page.getByRole("list", { name: "내 선택 10장" }).getByRole("listitem"),
     ).toHaveCount(10);
+    await expect(page.getByTestId("complete-screen")).toHaveCSS(
+      "border-top-color",
+      pack.completeBorder,
+    );
+    const restart = page.getByRole("button", {
+      name: "처음부터 다시 하기",
+    });
+    await expect(restart).toHaveCSS("background-color", pack.restart);
     await expect
       .poll(() =>
         page.evaluate((key) => {
@@ -88,7 +117,7 @@ for (const pack of packCases) {
       ).toBeNull();
     }
 
-    await page.getByRole("button", { name: "처음부터 다시 하기" }).click();
+    await restart.click();
     await expect(page.getByRole("heading", { name: pack.first })).toBeFocused();
     expect(
       await page.evaluate((key) => localStorage.getItem(key), pack.storageKey),
