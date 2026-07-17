@@ -4,6 +4,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 // Test-only deterministic fixture. Never use this key outside local/CI tests.
 const testKey = Buffer.alloc(32, 7).toString("base64url");
+const proxyKey = Buffer.alloc(32, 8).toString("base64url");
+const rateLimitKey = Buffer.alloc(32, 9).toString("base64url");
 
 export default defineConfig({
   testDir: "tests/e2e",
@@ -32,6 +34,9 @@ export default defineConfig({
     env: {
       ACCOUNT_DELETE_REAUTH_KEYRING: JSON.stringify({ v1: testKey }),
       ACCOUNT_DELETE_REAUTH_ACTIVE_VERSION: "v1",
+      APP_URL: "http://127.0.0.1:3000",
+      ORIGIN_PROXY_SECRET: proxyKey,
+      RATE_LIMIT_SECRET: rateLimitKey,
     },
   },
 });

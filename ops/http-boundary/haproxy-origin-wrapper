@@ -1,0 +1,43 @@
+#!/bin/sh
+
+set -eu
+
+: "${ORIGIN_PROXY_SECRET:?ORIGIN_PROXY_SECRET is required}"
+
+case "$ORIGIN_PROXY_SECRET" in
+  *.*.*|.*|*.|*[!A-Za-z0-9_.-]*)
+    echo "Invalid proxy origin credential configuration." >&2
+    exit 1
+    ;;
+esac
+
+ORIGIN_PROXY_WRITER_SECRET=${ORIGIN_PROXY_SECRET%%.*}
+case "$ORIGIN_PROXY_WRITER_SECRET" in
+  ???????????????????????????????????????????) ;;
+  *)
+    echo "Invalid proxy origin credential configuration." >&2
+    exit 1
+    ;;
+esac
+
+case "$ORIGIN_PROXY_SECRET" in
+  *.*)
+    ORIGIN_PROXY_SECONDARY_SECRET=${ORIGIN_PROXY_SECRET#*.}
+    case "$ORIGIN_PROXY_SECONDARY_SECRET" in
+      ???????????????????????????????????????????) ;;
+      *)
+        echo "Invalid proxy origin credential configuration." >&2
+        exit 1
+        ;;
+    esac
+    if [ "$ORIGIN_PROXY_WRITER_SECRET" = "$ORIGIN_PROXY_SECONDARY_SECRET" ]; then
+      echo "Invalid proxy origin credential configuration." >&2
+      exit 1
+    fi
+    unset ORIGIN_PROXY_SECONDARY_SECRET
+    ;;
+esac
+
+export ORIGIN_PROXY_WRITER_SECRET
+unset ORIGIN_PROXY_SECRET
+exec /usr/sbin/haproxy "$@"

@@ -4,6 +4,8 @@ import { Buffer } from "node:buffer";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { decodeRateLimitRow } from "./rate-limit-result.mjs";
+
 let internalClient: SupabaseClient | undefined;
 
 function requiredServerEnv(name: string) {
@@ -69,12 +71,5 @@ export async function consumeRateLimit(
     throw new Error("Internal rate limit RPC failed");
   }
 
-  return Object.freeze({
-    allowed: Boolean(row.allowed),
-    currentCount: Number(row.current_count),
-    limitCount: Number(row.limit_count),
-    retryAfterSeconds: Number(row.retry_after_seconds),
-    windowStart: String(row.window_start),
-    expiresAt: String(row.expires_at),
-  });
+  return decodeRateLimitRow(row);
 }

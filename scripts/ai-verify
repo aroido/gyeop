@@ -53,6 +53,10 @@ node --check "$ROOT/scripts/task-harness.mjs"
 node --test "$ROOT/scripts/task-harness.test.mjs"
 sh -n "$ROOT/scripts/task-harness"
 sh -n "$ROOT/scripts/install-codex-skills"
+sh -n "$ROOT/ops/http-boundary/haproxy-origin-wrapper"
+sh -n "$ROOT/ops/http-boundary/gyeop-loopback-firewall-restore"
+sh -n "$ROOT/ops/http-boundary/gyeop-loopback-firewall-probe"
+sh -n "$ROOT/tests/integration/http-boundary-host.test.sh"
 
 VALIDATOR="${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py"
 if [[ -f "$VALIDATOR" ]]; then
@@ -83,6 +87,9 @@ pnpm typecheck
 pnpm test
 pnpm test:secrets
 node scripts/verify-data-access.mjs
+node scripts/verify-http-boundary.mjs
+node --test tests/integration/http-boundary.test.mjs
+tests/integration/http-boundary-host.test.sh
 
 if ! pnpm exec supabase status --output json >/dev/null 2>&1; then
   SUPABASE_STARTED_BY_VERIFY=1

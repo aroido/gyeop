@@ -1,0 +1,7 @@
+[Unit]
+Description=Verified GYEOP %i HTTP boundary
+Requires=gyeop-app@%i.service gyeop-loopback-firewall-probe@%i.service
+After=gyeop-loopback-firewall-probe@%i.service
+
+[Install]
+WantedBy=multi-user.target

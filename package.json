@@ -2,6 +2,7 @@
   "name": "gyeop",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "engines": {
     "node": "24.16.0"
   },
@@ -10,15 +11,16 @@
     "predev": "node --env-file-if-exists=.env.local scripts/validate-env.mjs",
     "dev": "next dev",
     "prestart": "node --env-file-if-exists=.env.local scripts/validate-env.mjs",
-    "start": "next start",
+    "start": "next start --hostname 127.0.0.1",
     "build": "next build",
-    "format": "prettier --write app lib tests scripts/validate-env.mjs scripts/verify-data-access.mjs playwright.config.ts next.config.ts eslint.config.mjs package.json .github/workflows/ci.yml",
-    "format:check": "prettier --check app lib tests scripts/validate-env.mjs scripts/verify-data-access.mjs playwright.config.ts next.config.ts eslint.config.mjs package.json .github/workflows/ci.yml",
+    "format": "prettier --write app lib tests scripts/validate-env.mjs scripts/verify-data-access.mjs scripts/render-http-boundary-ops.mjs scripts/verify-http-boundary.mjs playwright.config.ts next.config.ts eslint.config.mjs package.json .github/workflows/ci.yml",
+    "format:check": "prettier --check app lib tests scripts/validate-env.mjs scripts/verify-data-access.mjs scripts/render-http-boundary-ops.mjs scripts/verify-http-boundary.mjs playwright.config.ts next.config.ts eslint.config.mjs package.json .github/workflows/ci.yml",
     "lint": "eslint app lib tests/e2e playwright.config.ts next.config.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/unit/validate-env.test.mjs tests/unit/packs.test.mjs tests/unit/data-access-policy.test.mjs tests/unit/owner-mutation-actor.test.mjs",
+    "test": "node --test tests/unit/validate-env.test.mjs tests/unit/packs.test.mjs tests/unit/data-access-policy.test.mjs tests/unit/owner-mutation-actor.test.mjs tests/unit/http-boundary.test.mjs tests/unit/rate-limit-http.test.mjs tests/unit/http-boundary-policy.test.mjs",
     "test:secrets": "node --test tests/unit/repository-secrets.test.mjs",
     "test:data-access": "node scripts/verify-data-access.mjs && node --test tests/integration/data-access.test.mjs",
+    "test:http-boundary": "node scripts/verify-http-boundary.mjs && node --test tests/integration/http-boundary.test.mjs && tests/integration/http-boundary-host.test.sh",
     "supabase:start": "supabase start --exclude studio,imgproxy,edge-runtime,logflare,vector,storage-api,realtime,supavisor",
     "supabase:stop": "supabase stop --no-backup",
     "supabase:reset": "supabase db reset",
@@ -32,7 +34,8 @@
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "server-only": "0.0.1"
+    "server-only": "0.0.1",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "1.61.1",

@@ -1,0 +1,15 @@
+[Unit]
+Description=Restore GYEOP loopback owner boundary
+DefaultDependencies=no
+Wants=network-pre.target
+After=local-fs.target
+Before=network-pre.target gyeop-app@staging.service gyeop-app@production.service
+RequiresMountsFor=/etc/gyeop/http-boundary.nft /usr/sbin/nft
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/gyeop-loopback-firewall-restore
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
