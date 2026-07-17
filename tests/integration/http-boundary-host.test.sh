@@ -33,18 +33,13 @@ cat >"$TMP/haproxy.cfg" <<'CFG'
 global
   user gyeop-proxy
   group gyeop-proxy
-
-defaults
-  mode http
-  timeout client 5s
-  timeout connect 3s
-  timeout server 5s
-
+CFG
+cat "$TMP/backend.cfg" >>"$TMP/haproxy.cfg"
+cat >>"$TMP/haproxy.cfg" <<'CFG'
 frontend fixture
   bind 127.0.0.1:8443
   default_backend gyeop_staging
 CFG
-cat "$TMP/backend.cfg" >>"$TMP/haproxy.cfg"
 
 docker build -q -t "$IMAGE" "$ROOT/tests/fixtures/http-boundary-host" >/dev/null
 docker create \
@@ -116,9 +111,70 @@ boot_and_snapshot() {
   ' >"$output"
 }
 
+assert_proxy_guards() {
+  before=$(docker exec "$CONTAINER" sha256sum /run/gyeop/capture.json | awk '{print $1}')
+  docker exec "$CONTAINER" python3 - <<'PY'
+import socket
+import time
+
+
+def exchange(payload):
+    client = socket.create_connection(("127.0.0.1", 8443), timeout=2)
+    client.settimeout(15)
+    started = time.monotonic()
+    client.sendall(payload)
+    response = b""
+    while True:
+        chunk = client.recv(4096)
+        if not chunk:
+            break
+        response += chunk
+    client.close()
+    return response, time.monotonic() - started
+
+
+oversized, oversized_elapsed = exchange(
+    b"POST /oversized HTTP/1.1\r\n"
+    b"Host: gyeop.test\r\n"
+    b"Content-Type: application/json\r\n"
+    b"Content-Length: 65537\r\n"
+    b"Connection: close\r\n\r\n"
+)
+head, body = oversized.split(b"\r\n\r\n", 1)
+lines = head.split(b"\r\n")
+if not lines[0].startswith(b"HTTP/1.1 413"):
+    raise SystemExit(1)
+headers = {}
+for line in lines[1:]:
+    name, value = line.split(b":", 1)
+    headers[name.decode("ascii").lower()] = value.decode("utf-8").strip()
+expected_headers = {
+    "content-security-policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'",
+    "strict-transport-security": "max-age=31536000",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff",
+}
+for name, value in expected_headers.items():
+    if headers.get(name) != value:
+        raise SystemExit(1)
+if body != '{"code":"PAYLOAD_TOO_LARGE","message":"요청 내용이 너무 큽니다."}'.encode():
+    raise SystemExit(1)
+if oversized_elapsed >= 2:
+    raise SystemExit(1)
+
+slow, slow_elapsed = exchange(b"POST /slow HTTP/1.1\r\nHost: gyeop.test")
+if not slow.startswith(b"HTTP/1.1 408"):
+    raise SystemExit(1)
+if not 8 <= slow_elapsed <= 15:
+    raise SystemExit(1)
+PY
+  after=$(docker exec "$CONTAINER" sha256sum /run/gyeop/capture.json | awk '{print $1}')
+  test "$before" = "$after"
+}
+
 boot_and_snapshot "$TMP/first-boot"
 
-docker exec "$CONTAINER" curl -fsS \
+if ! docker exec "$CONTAINER" curl -fsS \
   -H 'Forwarded: for=198.51.100.1' \
   -H 'X-Forwarded-For: 198.51.100.2' \
   -H 'X-Forwarded-For: 198.51.100.3' \
@@ -128,7 +184,12 @@ docker exec "$CONTAINER" curl -fsS \
   -H 'X-Forwarded-Prefix: /spoofed' \
   -H 'X-Real-IP: 198.51.100.4' \
   -H 'X-Gyeop-Origin-Verify: attacker' \
-  http://127.0.0.1:8443/probe >/dev/null
+  http://127.0.0.1:8443/probe >/dev/null; then
+  docker exec "$CONTAINER" systemctl --no-pager status gyeop-proxy.service >&2 || true
+  docker exec "$CONTAINER" journalctl --no-pager -u gyeop-proxy.service >&2 || true
+  docker exec "$CONTAINER" ss -lntp >&2 || true
+  exit 1
+fi
 
 docker exec "$CONTAINER" python3 - <<'PY'
 import json
@@ -153,9 +214,12 @@ for forbidden in ["forwarded", "x-real-ip", "x-forwarded-prefix"]:
         raise SystemExit(1)
 PY
 
+assert_proxy_guards
+
 docker stop -t 20 "$CONTAINER" >/dev/null
 docker run -d --name "$NAMESPACE_HOLDER" --network none "$IMAGE" /bin/sleep infinity >/dev/null
 boot_and_snapshot "$TMP/second-boot"
+assert_proxy_guards
 
 first_namespace=$(sed -n '1p' "$TMP/first-boot")
 second_namespace=$(sed -n '1p' "$TMP/second-boot")

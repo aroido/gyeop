@@ -20,6 +20,12 @@ def serve(connection):
                 break
             data += chunk
         lines = data.split(b"\r\n")
+        request_line = lines[0].split(b" ")
+        valid_request = (
+            b"\r\n\r\n" in data
+            and len(request_line) == 3
+            and request_line[2].startswith(b"HTTP/")
+        )
         headers = {}
         for line in lines[1:]:
             if b":" not in line:
@@ -27,10 +33,11 @@ def serve(connection):
             name, value = line.split(b":", 1)
             key = name.decode("ascii", "ignore").lower()
             headers.setdefault(key, []).append(value.decode("ascii", "ignore").strip())
-        temporary = f"{capture_path}.tmp"
-        with open(temporary, "w", encoding="utf-8") as capture:
-            json.dump(headers, capture, sort_keys=True)
-        os.replace(temporary, capture_path)
+        if valid_request:
+            temporary = f"{capture_path}.tmp"
+            with open(temporary, "w", encoding="utf-8") as capture:
+                json.dump(headers, capture, sort_keys=True)
+            os.replace(temporary, capture_path)
         connection.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nOK")
     except OSError:
         pass

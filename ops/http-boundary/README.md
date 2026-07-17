@@ -4,7 +4,7 @@
 
 1. 환경별 app UID·port·hostname과 shared HAProxy UID를 JSON inventory에 기록한다.
 2. `node scripts/render-http-boundary-ops.mjs nftables <inventory>` 출력은 root-owned `0640` `/etc/gyeop/http-boundary.nft`로 설치한다.
-3. 환경별 HAProxy backend 출력은 외부 forwarding header를 지운 뒤 canonical 다섯 header를 쓰는 순서를 유지한다. `haproxy-origin-wrapper`는 root-owned `0640` 전용 credential file에서 첫 reader만 writer로 export하고 값을 command line이나 log에 넣지 않는다.
+3. 환경별 HAProxy 출력은 해당 frontend 바로 앞에 include해 출력의 named `defaults`가 request-header 10초 timeout을 적용하게 한다. 선언된 `Content-Length`가 64 KiB를 넘으면 보안 header가 있는 표준 413으로 backend 전에 거절하고, 그 외 요청은 buffering하지 않는다. backend는 외부 forwarding header를 지운 뒤 canonical 다섯 header를 쓰는 순서를 유지한다. `haproxy-origin-wrapper`는 root-owned `0640` 전용 credential file에서 첫 reader만 writer로 export하고 값을 command line이나 log에 넣지 않는다.
 4. restore script와 probe는 root-owned `0755`, unit/drop-in은 root-owned `0644`로 설치한다. app은 `gyeop-http-boundary@<env>.target`을 통해서만 boot target에 연결한다.
 5. credential 회전은 app secondary 추가·재시작 → credential 순서를 `new.old`로 바꾸고 HAProxy reload → new smoke → old 제거·app 재시작 → old 거절/new 정상 smoke 순서다. 마지막 app 재시작 전 실패는 old writer로, 이후 실패는 old/new reader를 함께 복구한다.
 6. 방화벽 probe 실패 시 app 공개를 중단하고 직전 root-owned ruleset과 unit을 복구한다. 모든 local UID에 app port를 여는 임시 rollback은 금지한다.

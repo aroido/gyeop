@@ -93,10 +93,17 @@ export function renderHaproxyBackend(input, environmentName) {
   );
   if (!environment) throw new Error("Unknown HTTP boundary environment");
   return [
-    `backend gyeop_${environment.name}`,
+    `defaults gyeop_${environment.name}_http`,
     "  mode http",
+    "  timeout client 30s",
     "  timeout connect 3s",
     "  timeout server 30s",
+    "  timeout http-request 10s",
+    "",
+    `backend gyeop_${environment.name}`,
+    "  mode http",
+    "  acl declared_body_too_large req.hdr(content-length) -m int gt 65536",
+    "  http-request return status 413 content-type application/json hdr Content-Security-Policy \"default-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'\" hdr Strict-Transport-Security max-age=31536000 hdr Referrer-Policy no-referrer hdr X-Content-Type-Options nosniff string '{\"code\":\"PAYLOAD_TOO_LARGE\",\"message\":\"요청 내용이 너무 큽니다.\"}' if declared_body_too_large",
     "  http-request del-header x-forwarded- -m beg",
     "  http-request del-header Forwarded",
     "  http-request del-header X-Real-IP",

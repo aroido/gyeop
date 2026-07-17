@@ -6,6 +6,7 @@ import test from "node:test";
 import { verifyHttpBoundarySources } from "../../scripts/verify-http-boundary.mjs";
 import { securityHeaders } from "../../lib/http/security-headers.mjs";
 import {
+  renderHaproxyBackend,
   renderNftables,
   validateHttpBoundaryInventory,
 } from "../../scripts/render-http-boundary-ops.mjs";
@@ -61,7 +62,9 @@ test("rejects direct body parsing, internal RPC access, loose schemas, casts, an
     "lib/db/internal-rpc.ts": "export function consumeRateLimit() {}",
   });
   assert.ok(
-    findings.some((finding) => finding.includes("must call withPublicRequest")),
+    findings.some((finding) =>
+      finding.includes("must import the reviewed withPublicRequest"),
+    ),
   );
   assert.ok(
     findings.some((finding) => finding.includes("raw internal boundary")),
@@ -73,6 +76,83 @@ test("rejects direct body parsing, internal RPC access, loose schemas, casts, an
     findings.some((finding) => finding.includes("casts are forbidden")),
   );
   assert.ok(findings.some((finding) => finding.includes("raw HTTP parsing")));
+});
+
+test("rejects a lookalike boundary and transitive direct rate-limit access", () => {
+  const findings = verifyHttpBoundarySources({
+    "app/api/example/route.ts": `
+      import { withPublicRequest } from "../../../lib/example/fake-boundary";
+      import { helper } from "../../../lib/example/helper";
+      export function POST(request: Request) {
+        return withPublicRequest(request, {}, () => helper());
+      }
+    `,
+    "lib/example/fake-boundary.ts":
+      "export function withPublicRequest(...args: unknown[]) { return args[2](); }",
+    "lib/example/helper.ts": `
+      import { consumeRateLimit } from "../db/internal-rpc";
+      export function helper() { return consumeRateLimit({}); }
+    `,
+    "lib/db/internal-rpc.ts": "export function consumeRateLimit() {}",
+    "lib/http/request-boundary.ts": "export function withPublicRequest() {}",
+  });
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("must import the reviewed withPublicRequest"),
+    ),
+  );
+  assert.ok(
+    findings.some((finding) => finding.includes("raw internal boundary")),
+  );
+});
+
+test("requires every public handler to return the reviewed boundary directly", () => {
+  const findings = verifyHttpBoundarySources({
+    "app/api/example/route.ts": `
+      import { withPublicRequest } from "../../../lib/http/request-boundary";
+      import { mutate } from "../../../lib/example/domain";
+      export async function POST(request: Request) {
+        await mutate();
+        return withPublicRequest(request, {}, () => new Response());
+      }
+      export function PUT(withPublicRequest: (...args: unknown[]) => Response) {
+        return withPublicRequest(new Request("http://local"), {}, () => new Response());
+      }
+    `,
+    "lib/example/domain.ts": "export async function mutate() {}",
+    "lib/http/request-boundary.ts": "export function withPublicRequest() {}",
+  });
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes(
+        "exported POST must directly return the reviewed withPublicRequest",
+      ),
+    ),
+  );
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes(
+        "exported PUT must directly return the reviewed withPublicRequest",
+      ),
+    ),
+  );
+});
+
+test("rejects the public request boundary from cron routes", () => {
+  const findings = verifyHttpBoundarySources({
+    "app/api/internal/cron/example/route.ts": `
+      import { withPublicRequest } from "../../../../../lib/http/request-boundary";
+      export function POST(request: Request) {
+        return withPublicRequest(request, {}, () => new Response());
+      }
+    `,
+    "lib/http/request-boundary.ts": "export function withPublicRequest() {}",
+  });
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("cron Route cannot use the public request boundary"),
+    ),
+  );
 });
 
 test("allows one shared proxy UID but rejects unsafe app UID and port inventories", () => {
@@ -115,6 +195,14 @@ test("allows one shared proxy UID but rejects unsafe app UID and port inventorie
       }),
     /ports/,
   );
+
+  const haproxy = renderHaproxyBackend(inventory, "staging");
+  assert.match(haproxy, /timeout http-request 10s/);
+  assert.match(
+    haproxy,
+    /acl declared_body_too_large req\.hdr\(content-length\) -m int gt 65536/,
+  );
+  assert.match(haproxy, /http-request return status 413/);
 });
 
 test("keeps unsafe-eval out of production while allowing the Next development runtime", () => {

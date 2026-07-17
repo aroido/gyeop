@@ -40,22 +40,51 @@ function sourceFiles(directory) {
   return files;
 }
 
-function importsOf(file, source) {
-  const parsed = ts.createSourceFile(
+const HTTP_METHODS = new Set([
+  "GET",
+  "HEAD",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "OPTIONS",
+]);
+const PUBLIC_BOUNDARY_FILE = "lib/http/request-boundary.ts";
+
+function parseSource(file, source) {
+  return ts.createSourceFile(
     file,
     source,
     ts.ScriptTarget.Latest,
     true,
     file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
-  return parsed.statements
-    .filter(ts.isImportDeclaration)
-    .map((statement) =>
-      ts.isStringLiteral(statement.moduleSpecifier)
-        ? statement.moduleSpecifier.text
-        : undefined,
-    )
-    .filter(Boolean);
+}
+
+function importsOf(file, source) {
+  const specifiers = new Set();
+  function visit(node) {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      specifiers.add(node.moduleSpecifier.text);
+    }
+    if (
+      ts.isCallExpression(node) &&
+      node.arguments.length === 1 &&
+      ts.isStringLiteral(node.arguments[0]) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) &&
+          node.expression.text === "require"))
+    ) {
+      specifiers.add(node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(parseSource(file, source));
+  return [...specifiers];
 }
 
 function resolveImport(from, specifier, files) {
@@ -75,6 +104,119 @@ function resolveImport(from, specifier, files) {
     if (files.has(candidate)) return candidate;
   }
   return undefined;
+}
+
+function hasExportModifier(node) {
+  return node.modifiers?.some(
+    (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+  );
+}
+
+function unwrapExpression(expression) {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAwaitExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isNonNullExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function isReviewedBoundaryCall(expression, aliases) {
+  const unwrapped = unwrapExpression(expression);
+  return (
+    ts.isCallExpression(unwrapped) &&
+    ts.isIdentifier(unwrapped.expression) &&
+    aliases.has(unwrapped.expression.text)
+  );
+}
+
+function bindingShadowsAlias(name, aliases) {
+  if (ts.isIdentifier(name)) return aliases.has(name.text);
+  if (ts.isObjectBindingPattern(name) || ts.isArrayBindingPattern(name)) {
+    return name.elements.some(
+      (element) =>
+        ts.isBindingElement(element) &&
+        bindingShadowsAlias(element.name, aliases),
+    );
+  }
+  return false;
+}
+
+function handlerReturnsReviewedBoundary(handler, aliases) {
+  if (
+    handler.parameters.some((parameter) =>
+      bindingShadowsAlias(parameter.name, aliases),
+    )
+  ) {
+    return false;
+  }
+  const body = handler.body;
+  if (!body) return false;
+  if (!ts.isBlock(body)) return isReviewedBoundaryCall(body, aliases);
+  return (
+    body.statements.length === 1 &&
+    ts.isReturnStatement(body.statements[0]) &&
+    body.statements[0].expression !== undefined &&
+    isReviewedBoundaryCall(body.statements[0].expression, aliases)
+  );
+}
+
+function routeBoundaryContract(route, source, files) {
+  const parsed = parseSource(route, source);
+  const aliases = new Set();
+  let importsReviewedBoundary = false;
+  for (const statement of parsed.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !ts.isStringLiteral(statement.moduleSpecifier) ||
+      resolveImport(route, statement.moduleSpecifier.text, files) !==
+        PUBLIC_BOUNDARY_FILE
+    ) {
+      continue;
+    }
+    importsReviewedBoundary = true;
+    const bindings = statement.importClause?.namedBindings;
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    for (const binding of bindings.elements) {
+      if ((binding.propertyName ?? binding.name).text === "withPublicRequest") {
+        aliases.add(binding.name.text);
+      }
+    }
+  }
+
+  const handlers = [];
+  for (const statement of parsed.statements) {
+    if (!hasExportModifier(statement)) continue;
+    if (
+      ts.isFunctionDeclaration(statement) &&
+      statement.name &&
+      HTTP_METHODS.has(statement.name.text)
+    ) {
+      handlers.push({ name: statement.name.text, node: statement });
+    }
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (
+          ts.isIdentifier(declaration.name) &&
+          HTTP_METHODS.has(declaration.name.text) &&
+          declaration.initializer &&
+          (ts.isArrowFunction(declaration.initializer) ||
+            ts.isFunctionExpression(declaration.initializer))
+        ) {
+          handlers.push({
+            name: declaration.name.text,
+            node: declaration.initializer,
+          });
+        }
+      }
+    }
+  }
+  return { aliases, handlers, importsReviewedBoundary };
 }
 
 export function verifyHttpBoundarySources(inputFiles) {
@@ -97,16 +239,8 @@ export function verifyHttpBoundarySources(inputFiles) {
     /(?:^|\/)app\/.*\/route\.ts$/.test(file),
   );
   for (const route of routes) {
-    if (route.includes("app/api/internal/cron/")) continue;
     const source = files.get(route);
-    if (!/\bwithPublicRequest\s*\(/.test(source)) {
-      findings.push(`${route}: public Route must call withPublicRequest`);
-    }
-    if (/internal-rpc|rate-limit-core/.test(source)) {
-      findings.push(
-        `${route}: public Route cannot import a raw internal boundary`,
-      );
-    }
+    const contract = routeBoundaryContract(route, source, files);
 
     const reachable = new Set();
     const queue = [route];
@@ -116,8 +250,52 @@ export function verifyHttpBoundarySources(inputFiles) {
       reachable.add(current);
       for (const edge of graph.get(current) ?? []) queue.push(edge.target);
     }
+
+    if (route.includes("app/api/internal/cron/")) {
+      if (
+        [...reachable].some((file) =>
+          (graph.get(file) ?? []).some(
+            (edge) => edge.target === PUBLIC_BOUNDARY_FILE,
+          ),
+        )
+      ) {
+        findings.push(
+          `${route}: cron Route cannot use the public request boundary`,
+        );
+      }
+      continue;
+    }
+
+    if (!contract.importsReviewedBoundary || contract.aliases.size === 0) {
+      findings.push(
+        `${route}: public Route must import the reviewed withPublicRequest boundary`,
+      );
+    }
+    if (contract.handlers.length === 0) {
+      findings.push(
+        `${route}: public Route must export an HTTP method handler`,
+      );
+    }
+    for (const handler of contract.handlers) {
+      if (!handlerReturnsReviewedBoundary(handler.node, contract.aliases)) {
+        findings.push(
+          `${route}: exported ${handler.name} must directly return the reviewed withPublicRequest boundary`,
+        );
+      }
+    }
+
     for (const file of reachable) {
       const reachableSource = files.get(file);
+      for (const edge of graph.get(file) ?? []) {
+        const rawInternalBoundary =
+          edge.target === "lib/db/internal-rpc.ts" ||
+          edge.target === "lib/http/rate-limit-core.mjs";
+        if (rawInternalBoundary && file !== "lib/http/rate-limit.ts") {
+          findings.push(
+            `${file}: reachable helper cannot import a raw internal boundary`,
+          );
+        }
+      }
       if (file !== "lib/http/strict-json-schema.ts") {
         if (
           /\bz\.object\s*\(|\.passthrough\s*\(|\.catchall\s*\(/.test(
@@ -264,6 +442,28 @@ export function verifyRepository() {
   }
   if (!/server app 127\.0\.0\.1:3100/.test(haproxy))
     findings.push("HAProxy: app upstream must be loopback");
+  if (!/timeout http-request 10s/.test(haproxy))
+    findings.push("HAProxy: request header timeout is required");
+  if (
+    !/acl declared_body_too_large req\.hdr\(content-length\) -m int gt 65536/.test(
+      haproxy,
+    ) ||
+    !/http-request return status 413[^\n]+if declared_body_too_large/.test(
+      haproxy,
+    )
+  ) {
+    findings.push("HAProxy: declared body size must fail early with 413");
+  }
+  for (const header of [
+    "Content-Security-Policy",
+    "Strict-Transport-Security",
+    "Referrer-Policy",
+    "X-Content-Type-Options",
+  ]) {
+    if (!new RegExp(`return status 413[^\\n]+hdr ${header}\\b`).test(haproxy)) {
+      findings.push(`HAProxy: 413 response misses ${header}`);
+    }
+  }
 
   const nftables = renderNftables(inventory);
   for (const environment of inventory.environments) {
