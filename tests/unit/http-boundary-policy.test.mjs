@@ -127,6 +127,40 @@ test("requires the published pack RPC behind the fixed catalog limiter", () => {
   );
 });
 
+test("rejects an eager pack read disguised as a deferred limiter callback", () => {
+  const findings = verifyHttpBoundarySources({
+    "app/api/packs/[slug]/route.ts": `
+      import { withPublicRequest } from "@/lib/http/request-boundary";
+      import { runRateLimitedDomain } from "@/lib/http/rate-limit";
+      import { readPublishedPack } from "@/lib/http/published-pack";
+      export function GET(request: Request) {
+        return withPublicRequest(request, {}, ({ networkKey, signal }) =>
+          runRateLimitedDomain(
+            {
+              keyHash: networkKey,
+              action: "pack_catalog_read",
+              windowSeconds: 60,
+              limit: 60,
+              signal,
+            },
+            (readPublishedPack("old-friend", signal), async () => Response.json({ ok: true })),
+          ),
+        );
+      }
+    `,
+    "lib/http/request-boundary.ts": "export function withPublicRequest() {}",
+    "lib/http/rate-limit.ts": "export function runRateLimitedDomain() {}",
+    "lib/http/published-pack.ts":
+      'import { getPublishedPack } from "../db/internal-rpc"; export function readPublishedPack() { return getPublishedPack({}); }',
+    "lib/db/internal-rpc.ts": "export function getPublishedPack() {}",
+  });
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("fixed pack_catalog_read rate limit"),
+    ),
+  );
+});
+
 test("resolves root aliases before checking transitive internal access", () => {
   const findings = verifyHttpBoundarySources({
     "app/api/example/route.js": `
