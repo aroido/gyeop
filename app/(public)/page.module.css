@@ -287,7 +287,7 @@
 }
 
 .cta:focus-visible {
-  outline: 3px solid #fff;
+  outline: 3px solid #315cff;
   outline-offset: 3px;
 }
 
