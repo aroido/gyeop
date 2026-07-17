@@ -543,8 +543,7 @@ function hasSafePackCatalogOrder(route, files, contract, graph, reachable) {
 
   const catalogCallback = unwrapExpression(rateCall.arguments[1]);
   if (
-    (!ts.isArrowFunction(catalogCallback) &&
-      !ts.isFunctionExpression(catalogCallback)) ||
+    !ts.isArrowFunction(catalogCallback) ||
     catalogCallback.parameters.length !== 0
   ) {
     return false;

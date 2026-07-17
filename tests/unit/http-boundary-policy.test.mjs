@@ -14,10 +14,16 @@ import {
 const root = path.resolve(new URL("../../", import.meta.url).pathname);
 
 function packCatalogFindings({
-  catalogBody,
+  catalogBody = "",
+  catalogCallback,
   extraRouteImports = "",
   extraFiles = {},
 }) {
+  const callback =
+    catalogCallback ??
+    `async () => {
+      ${catalogBody}
+    }`;
   return verifyHttpBoundarySources({
     "app/api/packs/[slug]/route.ts": `
       import { withPublicRequest } from "@/lib/http/request-boundary";
@@ -34,9 +40,7 @@ function packCatalogFindings({
               limit: 60,
               signal,
             },
-            async () => {
-              ${catalogBody}
-            },
+            ${callback},
           ),
         );
       }
@@ -239,6 +243,21 @@ test("rejects a syntactically single pack read inside a repeated branch", () => 
       }
       return Response.json({ ok: true });
     `,
+  });
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("fixed pack_catalog_read rate limit"),
+    ),
+  );
+});
+
+test("rejects a named limiter callback that can recursively read the pack", () => {
+  const findings = packCatalogFindings({
+    catalogCallback: `async function loadAgain() {
+      const pack = await readPublishedPack("old-friend", signal);
+      if (!pack) return loadAgain();
+      return Response.json(pack);
+    }`,
   });
   assert.ok(
     findings.some((finding) =>
