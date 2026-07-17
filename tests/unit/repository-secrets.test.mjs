@@ -12,8 +12,9 @@ test("keeps account-delete values out of committed env and CI files", async () =
 
   assert.match(envExample, /^ACCOUNT_DELETE_REAUTH_KEYRING=$/m);
   assert.match(envExample, /^ACCOUNT_DELETE_REAUTH_ACTIVE_VERSION=$/m);
+  assert.match(envExample, /^SUPABASE_SECRET_KEY=$/m);
   assert.doesNotMatch(
     workflow,
-    /ACCOUNT_DELETE_REAUTH_(?:KEYRING|ACTIVE_VERSION)\s*:/,
+    /(?:ACCOUNT_DELETE_REAUTH_(?:KEYRING|ACTIVE_VERSION)|SUPABASE_SECRET_KEY)\s*:/,
   );
 });
