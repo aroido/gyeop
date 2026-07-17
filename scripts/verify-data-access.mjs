@@ -85,6 +85,15 @@ function hasDirectTableCall(filePath, source) {
         return parts.join(separator);
       }
     }
+    if (ts.isTemplateExpression(expression)) {
+      let value = expression.head.text;
+      for (const span of expression.templateSpans) {
+        const substitution = staticString(span.expression);
+        if (substitution === undefined) return undefined;
+        value += substitution + span.literal.text;
+      }
+      return value;
+    }
     return undefined;
   }
 
@@ -123,6 +132,13 @@ function hasDirectTableCall(filePath, source) {
       ) {
         found = true;
       }
+      if (
+        ts.isElementAccessExpression(node) &&
+        ts.isCallExpression(node.parent) &&
+        node.parent.expression === node
+      ) {
+        found = true;
+      }
     }
     if (
       ts.isCallExpression(node) &&
@@ -141,6 +157,9 @@ function hasDirectTableCall(filePath, source) {
         (resolvedName === undefined &&
           /(?:db|client|supabase)$/i.test(receiver))
       ) {
+        found = true;
+      }
+      if (ts.isCallExpression(node.parent) && node.parent.expression === node) {
         found = true;
       }
     }
@@ -773,7 +792,11 @@ function verifyOwnerMutationFunction(statement, name, findings) {
   }
 
   const callback = callbacks.length === 1 ? callbacks[0] : undefined;
-  if (callbacks.length !== 1 || wrapperCalls.length !== 1) {
+  if (
+    callbacks.length !== 1 ||
+    wrapperCalls.length !== 1 ||
+    wrapperCalls.some((call) => enclosingFunction(call) !== statement)
+  ) {
     findings.push(
       `${INTERNAL_RPC_PATH}: ${name} must use exactly one fresh actor callback`,
     );
@@ -876,6 +899,24 @@ function verifyInternalRpc(source, findings) {
   const file = sourceFile(INTERNAL_RPC_PATH, source);
   const rpcCalls = [];
   function collectRpcAccess(node) {
+    if (
+      (isMemberAccess(node) &&
+        ((ts.isIdentifier(node.expression) &&
+          node.expression.text === "module" &&
+          memberName(node) === "exports") ||
+          (ts.isIdentifier(node.expression) &&
+            node.expression.text === "exports"))) ||
+      (ts.isIdentifier(node) &&
+        ["exports", "module"].includes(node.text) &&
+        !(
+          ts.isPropertyAccessExpression(node.parent) &&
+          node.parent.name === node
+        ))
+    ) {
+      findings.push(
+        `${INTERNAL_RPC_PATH}: CommonJS runtime exports are forbidden`,
+      );
+    }
     if (
       ts.isCallExpression(node) &&
       node.expression.getText() === "getInternalClient"
@@ -1220,6 +1261,15 @@ function importsOwnerActorModule(filePath, source) {
       return left !== undefined && right !== undefined
         ? left + right
         : undefined;
+    }
+    if (ts.isTemplateExpression(expression)) {
+      let value = expression.head.text;
+      for (const span of expression.templateSpans) {
+        const substitution = staticString(span.expression);
+        if (substitution === undefined) return undefined;
+        value += substitution + span.literal.text;
+      }
+      return value;
     }
     return undefined;
   }

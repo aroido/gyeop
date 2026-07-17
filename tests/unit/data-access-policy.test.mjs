@@ -47,6 +47,17 @@ export default getInternalClient;
   );
 });
 
+test("rejects CommonJS internal client exports", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+module.exports = { getInternalClient };
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /CommonJS runtime exports are forbidden/,
+  );
+});
+
 test("checks executable source outside app and lib", async () => {
   const files = await fixtureFiles();
   files["components/leak.tsx"] =
@@ -410,6 +421,19 @@ export const leaked = publicDb[["fr", "om"].join("")]("analytics_events");
   );
 });
 
+test("rejects template-computed table methods", async () => {
+  const files = await fixtureFiles();
+  files["components/template-leak.tsx"] = `
+const suffix = "rom";
+const operation = \`f\${suffix}\`;
+export const leaked = store[operation]("analytics_events");
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /components\/template-leak\.tsx: direct table access/,
+  );
+});
+
 test("rejects denied delete branches and arbitrary resolved identities", async () => {
   const files = await fixtureFiles();
   files[internalPath] += `
@@ -595,6 +619,26 @@ export async function createShareLink() {
       p_actor_id: actor.uid,
       p_recovery_actor_candidates: actor.recoveryActorCandidates,
     }).abortSignal(signal),
+  );
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /must use exactly one fresh actor callback/,
+  );
+});
+
+test("requires owner actor wrappers at direct function scope", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function createShareLink() {
+  return [1, 2].map(() =>
+    withOwnerMutationActor(async ({ actor, signal }) =>
+      getInternalClient().rpc("create_share_link", {
+        p_actor_id: actor.uid,
+        p_recovery_actor_candidates: actor.recoveryActorCandidates,
+      }).abortSignal(signal),
+    ),
   );
 }
 `;
