@@ -116,7 +116,7 @@ test("resolves root aliases before checking transitive internal access", () => {
       }
     `,
     "lib/example/helper.ts": `
-      import { consumeRateLimit } from "@/lib/db/internal-rpc";
+      import { consumeRateLimit } from "@/lib/db/internal-rpc.js";
       export function helper() { return consumeRateLimit({}); }
     `,
     "lib/db/internal-rpc.ts": "export function consumeRateLimit() {}",
@@ -148,6 +148,12 @@ test("requires every public handler to return the reviewed boundary directly", (
       export function DELETE(request: Request) {
         return withPublicRequest(new Request(request.url), {}, () => new Response());
       }
+      export function OPTIONS(request: Request) {
+        return withPublicRequest(request, {}, mutate());
+      }
+      export function PATCH(request: Request) {
+        return withPublicRequest(request, mutate(), () => new Response());
+      }
     `,
     "lib/example/domain.ts": "export async function mutate() {}",
     "lib/http/request-boundary.ts": "export function withPublicRequest() {}",
@@ -173,12 +179,21 @@ test("requires every public handler to return the reviewed boundary directly", (
       ),
     ),
   );
+  for (const method of ["OPTIONS", "PATCH"]) {
+    assert.ok(
+      findings.some((finding) =>
+        finding.includes(
+          `exported ${method} must directly return the reviewed withPublicRequest`,
+        ),
+      ),
+    );
+  }
 });
 
 test("rejects the public request boundary from cron routes", () => {
   const findings = verifyHttpBoundarySources({
     "app/api/internal/cron/example/route.ts": `
-      import { withPublicRequest } from "@/lib/http/request-boundary";
+      import { withPublicRequest } from "@/lib/http/request-boundary.js";
       export function POST(request: Request) {
         return withPublicRequest(request, {}, () => new Response());
       }

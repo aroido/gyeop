@@ -72,6 +72,14 @@ function importsOf(file, source) {
       specifiers.add(node.moduleSpecifier.text);
     }
     if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference) &&
+      node.moduleReference.expression &&
+      ts.isStringLiteral(node.moduleReference.expression)
+    ) {
+      specifiers.add(node.moduleReference.expression.text);
+    }
+    if (
       ts.isCallExpression(node) &&
       node.arguments.length === 1 &&
       ts.isStringLiteral(node.arguments[0]) &&
@@ -99,15 +107,24 @@ function resolveImport(from, specifier, files) {
   } else {
     return undefined;
   }
-  for (const candidate of [
-    base,
-    `${base}.ts`,
-    `${base}.tsx`,
-    `${base}.mjs`,
-    `${base}/index.ts`,
-    `${base}/index.tsx`,
-    `${base}/index.mjs`,
-  ]) {
+  const extension = path.posix.extname(base);
+  const stem = extension ? base.slice(0, -extension.length) : base;
+  const candidates = [base];
+  if (extension === ".js") candidates.push(`${stem}.ts`, `${stem}.tsx`);
+  else if (extension === ".jsx") candidates.push(`${stem}.tsx`);
+  else if (extension === ".mjs") candidates.push(`${stem}.mts`);
+  else if (extension === ".cjs") candidates.push(`${stem}.cts`);
+  else if (!extension) {
+    candidates.push(
+      `${base}.ts`,
+      `${base}.tsx`,
+      `${base}.mjs`,
+      `${base}/index.ts`,
+      `${base}/index.tsx`,
+      `${base}/index.mjs`,
+    );
+  }
+  for (const candidate of candidates) {
     if (files.has(candidate)) return candidate;
   }
   return undefined;
@@ -154,6 +171,48 @@ function bindingShadowsAlias(name, aliases) {
   return false;
 }
 
+function propertyNameText(name) {
+  if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text;
+  return undefined;
+}
+
+function isSafeBoundaryOptionValue(expression) {
+  const value = unwrapExpression(expression);
+  return (
+    ts.isIdentifier(value) ||
+    ts.isStringLiteral(value) ||
+    ts.isNumericLiteral(value) ||
+    value.kind === ts.SyntaxKind.TrueKeyword ||
+    value.kind === ts.SyntaxKind.FalseKeyword ||
+    value.kind === ts.SyntaxKind.NullKeyword
+  );
+}
+
+function isSafeBoundaryOptions(expression) {
+  const options = unwrapExpression(expression);
+  if (!ts.isObjectLiteralExpression(options)) return false;
+  const allowed = new Set(["schema", "maximumBodyBytes"]);
+  const seen = new Set();
+  return options.properties.every((property) => {
+    if (ts.isShorthandPropertyAssignment(property)) {
+      const name = property.name.text;
+      if (!allowed.has(name) || seen.has(name)) return false;
+      seen.add(name);
+      return !property.objectAssignmentInitializer;
+    }
+    if (!ts.isPropertyAssignment(property)) return false;
+    const name = propertyNameText(property.name);
+    if (!allowed.has(name) || seen.has(name)) return false;
+    seen.add(name);
+    return isSafeBoundaryOptionValue(property.initializer);
+  });
+}
+
+function isDeferredBoundaryCallback(expression) {
+  const callback = unwrapExpression(expression);
+  return ts.isArrowFunction(callback) || ts.isFunctionExpression(callback);
+}
+
 function handlerReturnsReviewedBoundary(handler, aliases) {
   if (
     handler.parameters.length === 0 ||
@@ -182,11 +241,13 @@ function handlerReturnsReviewedBoundary(handler, aliases) {
     return false;
   }
   const call = reviewedBoundaryCall(expression, aliases);
-  if (!call || call.arguments.length === 0) return false;
+  if (!call || call.arguments.length !== 3) return false;
   const requestArgument = unwrapExpression(call.arguments[0]);
   return (
     ts.isIdentifier(requestArgument) &&
-    requestArgument.text === handler.parameters[0].name.text
+    requestArgument.text === handler.parameters[0].name.text &&
+    isSafeBoundaryOptions(call.arguments[1]) &&
+    isDeferredBoundaryCallback(call.arguments[2])
   );
 }
 
