@@ -1,0 +1,80 @@
+#!/bin/sh
+
+set -eu
+
+ENVIRONMENT=${1:?environment is required}
+: "${GYEOP_APP_PORT:?GYEOP_APP_PORT is required}"
+: "${GYEOP_PROXY_UID:?GYEOP_PROXY_UID is required}"
+: "${GYEOP_APP_UID:?GYEOP_APP_UID is required}"
+: "${GYEOP_DENIED_UID:?GYEOP_DENIED_UID is required}"
+
+counter() {
+  marker=$1
+  /usr/sbin/nft list chain inet gyeop_http_boundary output | awk -v marker="$marker" '
+    index($0, marker) {
+      for (field = 1; field <= NF; field += 1) {
+        if ($field == "packets") { print $(field + 1); exit }
+      }
+    }
+  '
+}
+
+connect_as() {
+  uid=$1
+  family=$2
+  expected=$3
+  mode=$4
+  /usr/bin/setpriv --reuid "$uid" --regid "$uid" --clear-groups \
+    /usr/bin/python3 - "$family" "$GYEOP_APP_PORT" "$expected" "$mode" <<'PY'
+import socket
+import sys
+import time
+
+family_name, port, expected, mode = sys.argv[1:]
+family = socket.AF_INET6 if family_name == "ipv6" else socket.AF_INET
+address = ("::1", int(port), 0, 0) if family == socket.AF_INET6 else ("127.0.0.1", int(port))
+sock = socket.socket(family, socket.SOCK_STREAM)
+sock.settimeout(0.8)
+connected = False
+try:
+    sock.connect(address)
+    connected = True
+    if mode == "slow":
+        time.sleep(0.1)
+        sock.sendall(b"G")
+    elif mode == "malformed":
+        sock.sendall(b"\x00\xffINVALID\r\n\r\n")
+    else:
+        sock.sendall(b"GET /probe HTTP/1.0\r\n\r\n")
+except OSError:
+    connected = False
+finally:
+    sock.close()
+
+if expected == "allowed" and not connected:
+    raise SystemExit(1)
+if expected == "denied" and connected:
+    raise SystemExit(1)
+PY
+}
+
+before_v4=$(counter "gyeop-deny-${ENVIRONMENT}-ipv4")
+before_v6=$(counter "gyeop-deny-${ENVIRONMENT}-ipv6")
+test -n "$before_v4" && test -n "$before_v6"
+
+for uid in "$GYEOP_PROXY_UID" "$GYEOP_APP_UID"; do
+  connect_as "$uid" ipv4 allowed direct
+  connect_as "$uid" ipv6 allowed direct
+done
+
+for family in ipv4 ipv6; do
+  for mode in direct slow malformed; do
+    connect_as "$GYEOP_DENIED_UID" "$family" denied "$mode"
+  done
+done
+
+after_v4=$(counter "gyeop-deny-${ENVIRONMENT}-ipv4")
+after_v6=$(counter "gyeop-deny-${ENVIRONMENT}-ipv6")
+
+test $((after_v4 - before_v4)) -ge 3
+test $((after_v6 - before_v6)) -ge 3

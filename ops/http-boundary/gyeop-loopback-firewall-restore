@@ -1,0 +1,23 @@
+#!/bin/sh
+
+set -eu
+
+RULESET=${GYEOP_HTTP_BOUNDARY_RULESET:-/etc/gyeop/http-boundary.nft}
+
+if /usr/sbin/nft list table inet gyeop_http_boundary >/dev/null 2>&1; then
+  /usr/sbin/nft delete table inet gyeop_http_boundary
+fi
+/usr/sbin/nft -f "$RULESET"
+
+/usr/sbin/nft list chain inet gyeop_http_boundary output | awk '
+  /gyeop-deny-/ {
+    found += 1
+    for (field = 1; field <= NF; field += 1) {
+      if ($field == "packets" && $(field + 1) != 0) bad = 1
+    }
+  }
+  END { exit(found < 2 || bad) }
+'
+
+mkdir -p /run/gyeop-http-boundary
+readlink /proc/1/ns/net > /run/gyeop-http-boundary/restored-network-namespace

@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { Buffer } from "node:buffer";
 import test from "node:test";
 
-import { validateAccountDeleteEnv } from "../../scripts/validate-env.mjs";
+import {
+  validateAccountDeleteEnv,
+  validateHttpBoundaryEnv,
+} from "../../scripts/validate-env.mjs";
 
 function fixture(overrides = {}) {
   const key = Buffer.alloc(32, 7).toString("base64url");
@@ -49,5 +52,29 @@ test("rejects an unknown active version without exposing key material", () => {
       assert.doesNotMatch(error.message, new RegExp(rawKey));
       return true;
     },
+  );
+});
+
+test("validates HTTP boundary origins and secrets without returning key material", () => {
+  const proxy = Buffer.alloc(32, 8).toString("base64url");
+  const rate = Buffer.alloc(32, 9).toString("base64url");
+  assert.deepEqual(
+    validateHttpBoundaryEnv({
+      NODE_ENV: "test",
+      APP_URL: "http://127.0.0.1:3000",
+      ORIGIN_PROXY_SECRET: proxy,
+      RATE_LIMIT_SECRET: rate,
+    }),
+    { appOrigin: "http://127.0.0.1:3000", proxyReaderCount: 1 },
+  );
+  assert.throws(
+    () =>
+      validateHttpBoundaryEnv({
+        NODE_ENV: "production",
+        APP_URL: "http://gyeop.example",
+        ORIGIN_PROXY_SECRET: proxy,
+        RATE_LIMIT_SECRET: rate,
+      }),
+    /HTTPS/,
   );
 });
