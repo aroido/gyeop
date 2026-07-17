@@ -46,11 +46,54 @@ function sourceFile(filePath, source) {
 
 function hasDirectTableCall(filePath, source) {
   const file = sourceFile(filePath, source);
+  const stringBindings = new Map();
   let found = false;
+
+  function staticString(expression) {
+    if (
+      ts.isStringLiteral(expression) ||
+      ts.isNoSubstitutionTemplateLiteral(expression)
+    ) {
+      return expression.text;
+    }
+    if (ts.isIdentifier(expression)) return stringBindings.get(expression.text);
+    if (
+      ts.isBinaryExpression(expression) &&
+      expression.operatorToken.kind === ts.SyntaxKind.PlusToken
+    ) {
+      const left = staticString(expression.left);
+      const right = staticString(expression.right);
+      return left !== undefined && right !== undefined
+        ? left + right
+        : undefined;
+    }
+    return undefined;
+  }
+
   function visit(node) {
-    if (isMemberAccess(node) && memberName(node) === "from") {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer
+    ) {
+      const value = staticString(node.initializer);
+      if (value !== undefined) stringBindings.set(node.name.text, value);
+    }
+    if (isMemberAccess(node)) {
+      const resolvedName =
+        memberName(node) ??
+        (ts.isElementAccessExpression(node)
+          ? staticString(node.argumentExpression)
+          : undefined);
       const receiver = node.expression.getText();
-      if (!["Array", "Buffer", "Object"].includes(receiver)) {
+      const suspiciousDynamicReceiver =
+        ts.isElementAccessExpression(node) &&
+        resolvedName === undefined &&
+        /(?:^|\.)(?:db|client|supabase)$/i.test(receiver);
+      if (
+        (resolvedName === "from" || suspiciousDynamicReceiver) &&
+        !["Array", "Buffer", "Object"].includes(receiver)
+      ) {
         found = true;
       }
     }
@@ -185,11 +228,31 @@ function assignedRootName(expression) {
   return ts.isIdentifier(current) ? current.text : undefined;
 }
 
-function hasUnsafeRebinding(root, names, beforeNode, ignoredDeclaration) {
+function hasUnsafeRebinding(
+  root,
+  names,
+  beforeNode,
+  ignoredDeclaration,
+  rejectCallArguments = true,
+  ignoredCall,
+) {
   const restricted = new Set(names);
   let found = false;
+  function containsRestrictedIdentifier(node) {
+    let contains = false;
+    function inspect(candidate) {
+      if (contains) return;
+      if (ts.isIdentifier(candidate) && restricted.has(candidate.text)) {
+        contains = true;
+        return;
+      }
+      ts.forEachChild(candidate, inspect);
+    }
+    inspect(node);
+    return contains;
+  }
   function visit(node) {
-    if (found || node.pos >= beforeNode.pos) return;
+    if (found || node === ignoredCall || node.pos >= beforeNode.pos) return;
     if (
       ts.isVariableDeclaration(node) &&
       node !== ignoredDeclaration &&
@@ -199,9 +262,26 @@ function hasUnsafeRebinding(root, names, beforeNode, ignoredDeclaration) {
       return;
     }
     if (
+      ts.isVariableDeclaration(node) &&
+      node !== ignoredDeclaration &&
+      node.initializer &&
+      containsRestrictedIdentifier(node.initializer)
+    ) {
+      found = true;
+      return;
+    }
+    if (
       (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) &&
       node.name &&
       restricted.has(node.name.text)
+    ) {
+      found = true;
+      return;
+    }
+    if (
+      rejectCallArguments &&
+      ts.isCallExpression(node) &&
+      node.arguments.some(containsRestrictedIdentifier)
     ) {
       found = true;
       return;
@@ -271,7 +351,14 @@ function boundRpcResults(ownerFunction, rpcName, beforeNode) {
         }
         const data = bindings.get("data");
         const error = bindings.get("error");
-        if (data && error) matches.push({ data, error, declaration: node });
+        if (data && error) {
+          matches.push({
+            data,
+            error,
+            declaration: node,
+            call: initializer,
+          });
+        }
       }
     }
     ts.forEachChild(node, visit);
@@ -434,6 +521,8 @@ function verifyAdminCalls(filePath, source, findings) {
               ],
               node,
               bindings[0].declaration,
+              true,
+              bindings[0].call,
             )
           ) {
             findings.push(
@@ -498,6 +587,8 @@ function verifyAdminCalls(filePath, source, findings) {
               [identity, identityError, "jobId", "proof", "getInternalClient"],
               node,
               bindings[0].declaration,
+              true,
+              bindings[0].call,
             )
           ) {
             findings.push(
@@ -552,6 +643,22 @@ function objectPropertyValue(objectLiteral, name) {
   return property && ts.isPropertyAssignment(property)
     ? property.initializer.getText()
     : undefined;
+}
+
+function directAdminMethods(root) {
+  const methods = [];
+  function visit(node) {
+    if (
+      ts.isCallExpression(node) &&
+      isMemberAccess(node.expression) &&
+      isAuthAdminReference(node.expression.expression)
+    ) {
+      methods.push(memberName(node.expression));
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(root);
+  return methods;
 }
 
 function verifyOwnerMutationFunction(statement, name, findings) {
@@ -619,9 +726,16 @@ function verifyOwnerMutationFunction(statement, name, findings) {
 
   if (
     hasUnsafeRebinding(
-      statement,
-      ["actor", "signal", "getInternalClient", "withOwnerMutationActor"],
+      callback.body,
+      ["actor", "signal", "getInternalClient"],
       rpcCall,
+    ) ||
+    hasUnsafeRebinding(
+      statement,
+      ["getInternalClient", "withOwnerMutationActor"],
+      rpcCall,
+      undefined,
+      false,
     )
   ) {
     findings.push(
@@ -731,6 +845,23 @@ function verifyInternalRpc(source, findings) {
       findings.push(
         `${INTERNAL_RPC_PATH}: exported function ${name} is not allowlisted`,
       );
+    }
+    const expectedAdminMethod =
+      name === "deleteAuthUser"
+        ? "deleteUser"
+        : name === "resolveNotificationRecipient"
+          ? "getUserById"
+          : undefined;
+    if (expectedAdminMethod) {
+      const adminMethods = directAdminMethods(statement);
+      if (
+        adminMethods.length !== 1 ||
+        adminMethods[0] !== expectedAdminMethod
+      ) {
+        findings.push(
+          `${INTERNAL_RPC_PATH}: ${name} must make exactly one ${expectedAdminMethod} provider call`,
+        );
+      }
     }
     if (OWNER_MUTATION_EXPORTS.has(name)) {
       const body = statement.body?.getText() ?? "";
@@ -858,6 +989,33 @@ export function verifyOwnerMutationSql(sql, filePath = "migration.sql") {
     ) {
       findings.push(
         `${filePath}: ${name} must call the owner guard as its first statement`,
+      );
+    }
+    const actorInput = "(?:p_actor_id|p_recovery_actor_candidates)";
+    const directAssignment = new RegExp(
+      `(?:^|[;\\n]|\\bthen\\b|\\belse\\b|\\bloop\\b)\\s*${actorInput}\\s*(?::=|=(?!=))`,
+      "i",
+    );
+    const intoAssignment = new RegExp(
+      `\\binto\\s+(?:strict\\s+)?${actorInput}\\b`,
+      "i",
+    );
+    const loopAssignment = new RegExp(
+      `\\bfor(?:each)?\\s+${actorInput}\\b`,
+      "i",
+    );
+    const diagnosticsAssignment = new RegExp(
+      `\\bget\\s+(?:current\\s+)?diagnostics\\s+${actorInput}\\s*=`,
+      "i",
+    );
+    if (
+      directAssignment.test(executable) ||
+      intoAssignment.test(executable) ||
+      loopAssignment.test(executable) ||
+      diagnosticsAssignment.test(executable)
+    ) {
+      findings.push(
+        `${filePath}: ${name} cannot mutate guarded owner actor inputs`,
       );
     }
   }

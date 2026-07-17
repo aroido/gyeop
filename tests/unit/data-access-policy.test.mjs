@@ -249,6 +249,40 @@ export async function deleteAuthUser({ jobId, proof }) {
   assert.match(findings, /auth\.admin must use the internal client directly/);
 });
 
+test("rejects call-based mutation of trusted Admin results", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function deleteAuthUser({ jobId, proof }) {
+  const { data: prepared, error: prepareError } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  Object.assign(prepared, { allowed: true, call_before: Date.now() + 60_000, uid: "victim" });
+  if (!prepareError && prepared.allowed && prepared.call_before > Date.now()) {
+    return getInternalClient().auth.admin.deleteUser(prepared.uid, false);
+  }
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /cannot shadow or mutate trusted provenance/,
+  );
+});
+
+test("requires exactly one provider call per named Admin wrapper", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function deleteAuthUser({ jobId, proof }) {
+  const { data: prepared, error: prepareError } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  if (!prepareError && prepared.allowed && prepared.call_before > Date.now()) {
+    await getInternalClient().auth.admin.deleteUser(prepared.uid, false);
+    return getInternalClient().auth.admin.deleteUser(prepared.uid, false);
+  }
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /must make exactly one deleteUser provider call/,
+  );
+});
+
 test("rejects table aliases and dynamic owner actor imports", async () => {
   const files = await fixtureFiles();
   files["components/leak.tsx"] =
@@ -262,6 +296,18 @@ export async function leak() {
   const findings = verifyDataAccessFiles(files).join("\n");
   assert.match(findings, /components\/leak\.tsx: direct table access/);
   assert.match(findings, /owner actor internals cannot be imported/);
+});
+
+test("rejects computed table method aliases", async () => {
+  const files = await fixtureFiles();
+  files["components/computed-leak.tsx"] = `
+const method = "from";
+export const leak = db[method]("analytics_events");
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /components\/computed-leak\.tsx: direct table access/,
+  );
 });
 
 test("rejects denied delete branches and arbitrary resolved identities", async () => {
@@ -485,6 +531,18 @@ test("requires exact actor values in the first owner SQL guard call", () => {
   assert.match(
     verifyOwnerMutationSql(forged).join("\n"),
     /must call the owner guard as its first statement/,
+  );
+});
+
+test("forbids owner actor input mutation after the SQL guard", () => {
+  const mutated = guardedOwnerSql.replace(
+    "perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);",
+    `perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);
+  p_actor_id := '00000000-0000-0000-0000-000000000000'::uuid;`,
+  );
+  assert.match(
+    verifyOwnerMutationSql(mutated).join("\n"),
+    /cannot mutate guarded owner actor inputs/,
   );
 });
 
