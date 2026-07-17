@@ -160,6 +160,22 @@ export async function resolveNotificationRecipient({ jobId, proof }) {
   assert.match(findings, /getUserById must be dominated/);
 });
 
+test("rejects rest input on named Admin wrappers", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function deleteAuthUser({ jobId, proof, ...rawInput }) {
+  const { data: prepared, error: prepareError } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  if (!prepareError && prepared.allowed && prepared.call_before > Date.now()) {
+    return getInternalClient().auth.admin.deleteUser(prepared.uid, false);
+  }
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /must accept only \{ jobId, proof \}/,
+  );
+});
+
 test("accepts structurally guarded named Auth Admin wrappers", async () => {
   const files = await fixtureFiles();
   files[internalPath] += `
@@ -530,6 +546,25 @@ export async function createShareLink() {
   );
 });
 
+test("rejects indirect owner actor returns", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function createShareLink() {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    await getInternalClient().rpc("create_share_link", {
+      p_actor_id: actor.uid,
+      p_recovery_actor_candidates: actor.recoveryActorCandidates,
+    }).abortSignal(signal);
+    return Promise.resolve(actor);
+  });
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /cannot expose or use owner actor material outside RPC arguments/,
+  );
+});
+
 test("rejects injected actor sources and owner RPCs without the deadline signal", async () => {
   const files = await fixtureFiles();
   files["lib/db/owner-mutation-actor.ts"] = files[
@@ -770,6 +805,18 @@ test("requires exact actor values in the first owner SQL guard call", () => {
   assert.match(
     verifyOwnerMutationSql(forged).join("\n"),
     /must call the owner guard as its first statement/,
+  );
+});
+
+test("requires exactly one owner SQL guard call", () => {
+  const duplicated = guardedOwnerSql.replace(
+    "perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);",
+    `perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);
+  perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);`,
+  );
+  assert.match(
+    verifyOwnerMutationSql(duplicated).join("\n"),
+    /must call the owner guard exactly once/,
   );
 });
 

@@ -271,9 +271,27 @@ function enclosingFunction(node) {
 function bindingNames(parameter) {
   if (!ts.isObjectBindingPattern(parameter.name)) return [];
   return parameter.name.elements
-    .filter((element) => !element.dotDotDotToken)
     .map((element) => element.name.getText())
     .sort();
+}
+
+function actorUseOutsideRpc(callback, rpcCall) {
+  const args = rpcCall.arguments[1];
+  let found = false;
+  function visit(node) {
+    if (found) return;
+    if (
+      ts.isIdentifier(node) &&
+      node.text === "actor" &&
+      (!args || !isDescendantOf(node, args))
+    ) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(callback.body);
+  return found;
 }
 
 function namesBoundBy(node) {
@@ -859,6 +877,11 @@ function verifyOwnerMutationFunction(statement, name, findings) {
       `${INTERNAL_RPC_PATH}: ${name} cannot shadow or mutate trusted owner sources`,
     );
   }
+  if (actorUseOutsideRpc(callback, rpcCall)) {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} cannot expose or use owner actor material outside RPC arguments`,
+    );
+  }
 
   const args = rpcCall.arguments[1];
   if (objectPropertyValue(args, "p_actor_id") !== "actor.uid") {
@@ -1175,6 +1198,14 @@ export function verifyOwnerMutationSql(sql, filePath = "migration.sql") {
     ) {
       findings.push(
         `${filePath}: ${name} must call the owner guard as its first statement`,
+      );
+    }
+    const guardCallCount = [
+      ...body.matchAll(/private\.assert_owner_mutation_actor\s*\(/gi),
+    ].length;
+    if (guardCallCount !== 1) {
+      findings.push(
+        `${filePath}: ${name} must call the owner guard exactly once`,
       );
     }
     const actorInput = "(?:p_actor_id|p_recovery_actor_candidates)";
