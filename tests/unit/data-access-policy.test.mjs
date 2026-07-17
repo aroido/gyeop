@@ -47,6 +47,19 @@ export default getInternalClient;
   );
 });
 
+test("rejects raw internal client factory returns from allowlisted exports", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function consumeRateLimit() {
+  return getInternalClient;
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /raw internal client factory references are forbidden/,
+  );
+});
+
 test("rejects CommonJS internal client exports", async () => {
   const files = await fixtureFiles();
   files[internalPath] += `
@@ -640,6 +653,30 @@ export async function createShareLink() {
       }).abortSignal(signal),
     ),
   );
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /must use exactly one fresh actor callback/,
+  );
+});
+
+test("treats class methods as nested owner execution scopes", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function createShareLink() {
+  class Runner {
+    run(remaining) {
+      if (remaining > 0) return this.run(remaining - 1);
+      return withOwnerMutationActor(async ({ actor, signal }) =>
+        getInternalClient().rpc("create_share_link", {
+          p_actor_id: actor.uid,
+          p_recovery_actor_candidates: actor.recoveryActorCandidates,
+        }).abortSignal(signal),
+      );
+    }
+  }
+  return new Runner().run(2);
 }
 `;
   assert.match(

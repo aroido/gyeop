@@ -255,7 +255,11 @@ function enclosingFunction(node) {
     if (
       ts.isFunctionDeclaration(current) ||
       ts.isArrowFunction(current) ||
-      ts.isFunctionExpression(current)
+      ts.isFunctionExpression(current) ||
+      ts.isMethodDeclaration(current) ||
+      ts.isGetAccessorDeclaration(current) ||
+      ts.isSetAccessorDeclaration(current) ||
+      ts.isConstructorDeclaration(current)
     ) {
       return current;
     }
@@ -899,6 +903,16 @@ function verifyInternalRpc(source, findings) {
   const file = sourceFile(INTERNAL_RPC_PATH, source);
   const rpcCalls = [];
   function collectRpcAccess(node) {
+    if (
+      ts.isIdentifier(node) &&
+      node.text === "getInternalClient" &&
+      !(ts.isFunctionDeclaration(node.parent) && node.parent.name === node) &&
+      !(ts.isCallExpression(node.parent) && node.parent.expression === node)
+    ) {
+      findings.push(
+        `${INTERNAL_RPC_PATH}: raw internal client factory references are forbidden`,
+      );
+    }
     if (
       (isMemberAccess(node) &&
         ((ts.isIdentifier(node.expression) &&
