@@ -84,6 +84,29 @@ test("supports keyboard pack preview navigation", async ({ page }) => {
   await expect(cta).toBeFocused();
 });
 
+test("renders the approved old-friend CSS cover recipe", async ({ page }) => {
+  await page.goto("/");
+  const card = page.locator('[data-cover-variant="old-friend-card-v1"]');
+  await expect(card).toHaveCount(1);
+  const computed = await card.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const matrix = new DOMMatrix(style.transform);
+    return {
+      background: style.backgroundColor,
+      color: style.color,
+      boxShadow: style.boxShadow,
+      rotation: Math.atan2(matrix.b, matrix.a) * (180 / Math.PI),
+    };
+  });
+  expect({ ...computed, rotation: undefined }).toEqual({
+    background: "rgb(223, 255, 0)",
+    color: "rgb(5, 5, 5)",
+    boxShadow: "rgb(49, 92, 255) 5.6px 5.6px 0px 0px",
+    rotation: undefined,
+  });
+  expect(computed.rotation).toBeCloseTo(-0.7, 5);
+});
+
 test("preserves an existing owner draft", async ({ page }) => {
   const draft = JSON.stringify({
     version: 1,

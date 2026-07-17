@@ -106,6 +106,27 @@ test("rejects a lookalike boundary and transitive direct rate-limit access", () 
   );
 });
 
+test("requires the published pack RPC behind the fixed catalog limiter", () => {
+  const findings = verifyHttpBoundarySources({
+    "app/api/packs/[slug]/route.ts": `
+      import { withPublicRequest } from "@/lib/http/request-boundary";
+      import { readPublishedPack } from "@/lib/http/published-pack";
+      export function GET(request: Request) {
+        return withPublicRequest(request, {}, () => readPublishedPack("old-friend"));
+      }
+    `,
+    "lib/http/request-boundary.ts": "export function withPublicRequest() {}",
+    "lib/http/published-pack.ts":
+      'import { getPublishedPack } from "../db/internal-rpc"; export function readPublishedPack() { return getPublishedPack({}); }',
+    "lib/db/internal-rpc.ts": "export function getPublishedPack() {}",
+  });
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("fixed pack_catalog_read rate limit"),
+    ),
+  );
+});
+
 test("resolves root aliases before checking transitive internal access", () => {
   const findings = verifyHttpBoundarySources({
     "app/api/example/route.js": `

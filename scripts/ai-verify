@@ -88,6 +88,7 @@ pnpm test
 pnpm test:secrets
 node scripts/verify-data-access.mjs
 node scripts/verify-http-boundary.mjs
+node scripts/verify-pack-catalog.mjs
 node --test tests/integration/http-boundary.test.mjs
 tests/integration/http-boundary-host.test.sh
 
@@ -101,8 +102,12 @@ fi
 pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
 pnpm test:db
 pnpm supabase:lint
+node scripts/verify-supabase-types.mjs
 node --test tests/integration/data-access.test.mjs
-pnpm build
+node --test tests/integration/pack-catalog.test.mjs
+node --test tests/integration/pack-publication-concurrency.test.mjs
+env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SECRET_KEY pnpm build
+node --test tests/integration/pack-runtime.test.mjs
 pnpm test:e2e --project=mobile-chromium
 
 echo "GYEOP full verification passed."

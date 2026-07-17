@@ -97,6 +97,11 @@ select is(
       and grantee.rolname = 'gyeop_internal_rpc'
   ),
   array[
+    'pack_cards:SELECT',
+    'pack_templates:SELECT',
+    'pack_templates:UPDATE',
+    'pack_versions:SELECT',
+    'pack_versions:UPDATE',
     'rate_limit_buckets:INSERT',
     'rate_limit_buckets:SELECT',
     'rate_limit_buckets:UPDATE'
@@ -228,7 +233,11 @@ select is(
           and dependency.deptype = 'e'
       )
   ),
-  array['consume_rate_limit(bytea,text,integer,integer)']::text[],
+  array[
+    'consume_rate_limit(bytea,text,integer,integer)',
+    'get_published_pack(text)',
+    'publish_pack_version(uuid)'
+  ]::text[],
   'service_role function grants match the exact RPC allowlist'
 );
 

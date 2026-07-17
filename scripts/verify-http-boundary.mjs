@@ -16,6 +16,7 @@ const REQUIRED_FILES = [
   "lib/http/http-boundary-core.mjs",
   "lib/http/request-boundary.ts",
   "lib/http/rate-limit.ts",
+  "lib/http/published-pack.ts",
   "lib/http/strict-json-schema.ts",
   "lib/security/network-key.mjs",
   "lib/security/proxy-origin-secret.mjs",
@@ -50,6 +51,10 @@ const HTTP_METHODS = new Set([
   "OPTIONS",
 ]);
 const PUBLIC_BOUNDARY_FILE = "lib/http/request-boundary.ts";
+const REVIEWED_INTERNAL_ADAPTERS = new Set([
+  "lib/http/rate-limit.ts",
+  "lib/http/published-pack.ts",
+]);
 
 function parseSource(file, source) {
   let scriptKind = ts.ScriptKind.TS;
@@ -419,6 +424,30 @@ export function verifyHttpBoundarySources(inputFiles) {
       }
     }
 
+    if (route === "app/api/packs/[slug]/route.ts") {
+      const callsRateLimit =
+        (source.match(/\brunRateLimitedDomain\s*\(/g) ?? []).length === 1;
+      const callsCatalog =
+        (source.match(/\breadPublishedPack\s*\(/g) ?? []).length === 1;
+      const hasFixedCatalogPolicy =
+        /keyHash\s*:\s*networkKey[\s\S]*action\s*:\s*["']pack_catalog_read["'][\s\S]*windowSeconds\s*:\s*60[\s\S]*limit\s*:\s*60[\s\S]*signal\s*[,}]/.test(
+          source,
+        );
+      const rateCall = source.indexOf("runRateLimitedDomain(");
+      const catalogCall = source.lastIndexOf("readPublishedPack(");
+      if (
+        !callsRateLimit ||
+        !callsCatalog ||
+        !hasFixedCatalogPolicy ||
+        rateCall < 0 ||
+        catalogCall < rateCall
+      ) {
+        findings.push(
+          `${route}: published pack read must run once behind the fixed pack_catalog_read rate limit`,
+        );
+      }
+    }
+
     for (const file of reachable) {
       const reachableSource = files.get(file);
       if (hasNonLiteralModuleLoad(file, reachableSource)) {
@@ -430,7 +459,7 @@ export function verifyHttpBoundarySources(inputFiles) {
         const rawInternalBoundary =
           edge.target === "lib/db/internal-rpc.ts" ||
           edge.target === "lib/http/rate-limit-core.mjs";
-        if (rawInternalBoundary && file !== "lib/http/rate-limit.ts") {
+        if (rawInternalBoundary && !REVIEWED_INTERNAL_ADAPTERS.has(file)) {
           findings.push(
             `${file}: reachable helper cannot import a raw internal boundary`,
           );

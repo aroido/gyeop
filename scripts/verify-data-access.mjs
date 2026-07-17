@@ -10,6 +10,7 @@ const OWNER_ACTOR_CORE_PATH = "lib/db/owner-mutation-actor-core.mjs";
 
 const ALLOWED_RPC_EXPORTS = new Map([
   ["consumeRateLimit", "consume_rate_limit"],
+  ["getPublishedPack", "get_published_pack"],
   ["deleteAuthUser", "prepare_auth_deletion_call"],
   ["resolveNotificationRecipient", "resolve_notification_recipient_identity"],
 ]);
