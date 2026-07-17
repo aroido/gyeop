@@ -31,6 +31,31 @@ test("shows the first question without an artificial opening delay", async ({
   );
 });
 
+test("keeps the first answer when draft restoration finishes later", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const queue = window.queueMicrotask.bind(window);
+    window.queueMicrotask = (callback) => {
+      if (callback.name === "restoreDraft") {
+        window.setTimeout(callback, 750);
+        return;
+      }
+      queue(callback);
+    };
+  });
+
+  await page.goto("/play/old-friend");
+  await page.locator('button[data-choice="a"]').click();
+  const secondQuestion = page.getByRole("heading", {
+    name: "오랜만에 친구를 만나면 나는?",
+  });
+
+  await expect(secondQuestion).toBeVisible();
+  await page.waitForTimeout(900);
+  await expect(secondQuestion).toBeVisible();
+});
+
 test("supports previous answers, reload recovery, completion, and restart", async ({
   page,
 }) => {
