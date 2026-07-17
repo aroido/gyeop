@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { Buffer } from "node:buffer";
+import { randomBytes } from "node:crypto";
 import path from "node:path";
 import test, { after, before } from "node:test";
 
@@ -25,7 +26,7 @@ function localSupabase() {
 
 const local = localSupabase();
 const proxySecret = Buffer.alloc(32, 18).toString("base64url");
-const rateSecret = Buffer.alloc(32, 19).toString("base64url");
+const rateSecret = randomBytes(32).toString("base64url");
 const serverEnv = {
   ...process.env,
   APP_URL: "http://127.0.0.1:3105",

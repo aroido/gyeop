@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
+import { randomInt, randomUUID } from "node:crypto";
 import test from "node:test";
 
 function psqlArgs(sql) {
@@ -56,9 +57,11 @@ function waitForExit(child) {
   return child.done;
 }
 
-function createFixture(suffix) {
-  const templateId = `30000000-0000-4000-8000-0000000000${suffix}`;
-  const versionId = `31000000-0000-4000-8000-0000000000${suffix}`;
+function createFixture() {
+  const templateId = randomUUID();
+  const versionId = randomUUID();
+  const suffix = randomUUID().slice(0, 12);
+  const barrierKey = randomInt(1_000_000, 2_000_000);
   sql(`
     insert into public.pack_templates (id, slug, title, target_relationship, sensitivity)
     values ('${templateId}', 'concurrency-${suffix}', 'Concurrency ${suffix}', 'old_friend', 'low');
@@ -68,20 +71,20 @@ function createFixture(suffix) {
     select '${versionId}', 'card-' || value, value, 'Owner ' || value, 'Visitor ' || value, 'A ' || value, 'B ' || value, value = 1
     from generate_series(1, 10) value;
   `);
-  return { templateId, versionId };
+  return { templateId, versionId, barrierKey };
 }
 
 test("mutate-first publication waits and freezes the committed card", async () => {
-  const { versionId } = createFixture("01");
+  const { versionId, barrierKey } = createFixture();
   const mutation = sqlProcess(`
     begin;
     update public.pack_cards set owner_prompt = 'Committed before publish'
     where pack_version_id = '${versionId}' and id = 'card-1';
-    select pg_advisory_lock(1501);
+    select pg_advisory_lock(${barrierKey});
     select pg_sleep(1.5);
     commit;
   `);
-  await waitForAdvisoryHeld(1501);
+  await waitForAdvisoryHeld(barrierKey);
 
   const publication = sqlProcess(
     `select public.publish_pack_version('${versionId}')`,
@@ -109,16 +112,16 @@ test("mutate-first publication waits and freezes the committed card", async () =
 });
 
 test("publish-first card mutation waits then rejects the published version", async () => {
-  const { versionId } = createFixture("02");
+  const { versionId, barrierKey } = createFixture();
   const publication = sqlProcess(`
     begin;
     select id from public.pack_versions where id = '${versionId}' for update;
-    select pg_advisory_lock(1502);
+    select pg_advisory_lock(${barrierKey});
     select pg_sleep(1.5);
     select public.publish_pack_version('${versionId}');
     commit;
   `);
-  await waitForAdvisoryHeld(1502);
+  await waitForAdvisoryHeld(barrierKey);
 
   const mutation = sqlProcess(`
     update public.pack_cards set owner_prompt = 'Late mutation'
