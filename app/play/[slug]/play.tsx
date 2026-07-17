@@ -5,8 +5,6 @@ import { useEffect, useRef, useState } from "react";
 import type { Pack, PackCard } from "../packs";
 import styles from "./page.module.css";
 
-const OPENING_MS = 1200;
-
 type Answer = "a" | "b";
 type Answers = Record<string, Answer>;
 
@@ -73,27 +71,29 @@ function readDraft(raw: string | null, cards: readonly PackCard[]): Draft {
 
 export default function PackPlay({ pack }: { pack: Pack }) {
   const { cards, storageKey, title } = pack;
-  const [draft, setDraft] = useState<Draft>(() => {
-    if (typeof window === "undefined") return emptyDraft;
-    try {
-      return readDraft(window.localStorage.getItem(storageKey), cards);
-    } catch {
-      return emptyDraft;
-    }
-  });
-  const [opening, setOpening] = useState(true);
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [restored, setRestored] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { answers, completed, currentIndex } = draft;
 
   useEffect(() => {
-    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ? 0
-      : OPENING_MS;
-    const timer = window.setTimeout(() => setOpening(false), delay);
-    return () => window.clearTimeout(timer);
-  }, []);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        setDraft(readDraft(window.localStorage.getItem(storageKey), cards));
+      } catch {
+        setDraft(emptyDraft);
+      }
+      setRestored(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [cards, storageKey]);
 
   useEffect(() => {
+    if (!restored) return;
     try {
       if (currentIndex === 0 && Object.keys(answers).length === 0) {
         window.localStorage.removeItem(storageKey);
@@ -106,15 +106,15 @@ export default function PackPlay({ pack }: { pack: Pack }) {
     } catch {
       // ponytail: storage can be unavailable; React state is the fallback.
     }
-  }, [answers, currentIndex, storageKey]);
+  }, [answers, currentIndex, restored, storageKey]);
 
   useEffect(() => {
-    if (opening) return;
+    if (!restored) return;
     const frame = window.requestAnimationFrame(() =>
       headingRef.current?.focus(),
     );
     return () => window.cancelAnimationFrame(frame);
-  }, [completed, currentIndex, opening]);
+  }, [completed, currentIndex, restored]);
 
   const card = cards[currentIndex];
   const selected = answers[card.id];
@@ -137,24 +137,14 @@ export default function PackPlay({ pack }: { pack: Pack }) {
     setDraft(emptyDraft);
   }
 
-  if (opening) {
-    return (
-      <main className={styles.shell}>
-        <section className={styles.opening} aria-labelledby="opening-title">
-          <div className={styles.openingCard} aria-hidden="true">
-            <span>겹</span>
-          </div>
-          <p>{title}</p>
-          <h1 id="opening-title">질문 카드를 여는 중이에요</h1>
-        </section>
-      </main>
-    );
-  }
-
   if (completed) {
     return (
-      <main className={styles.shell}>
-        <section className={styles.complete} aria-labelledby="complete-title">
+      <main className={styles.shell} data-pack={pack.slug}>
+        <section
+          className={styles.complete}
+          aria-labelledby="complete-title"
+          data-testid="complete-screen"
+        >
           <p className={styles.brand}>겹 · {title}</p>
           <h1 id="complete-title" ref={headingRef} tabIndex={-1}>
             나의 10장을 모두 골랐어요
@@ -188,7 +178,7 @@ export default function PackPlay({ pack }: { pack: Pack }) {
   }
 
   return (
-    <main className={styles.shell}>
+    <main className={styles.shell} data-pack={pack.slug}>
       <section className={styles.play} aria-labelledby="question-title">
         <header className={styles.progressHeader}>
           <p className={styles.brand}>겹 · {title}</p>
@@ -204,7 +194,7 @@ export default function PackPlay({ pack }: { pack: Pack }) {
           max={cards.length}
         />
 
-        <div className={styles.questionCard}>
+        <div className={styles.questionCard} data-testid="question-card">
           <h1 id="question-title" ref={headingRef} tabIndex={-1}>
             {card.question}
           </h1>
