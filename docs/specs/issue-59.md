@@ -41,7 +41,7 @@ Issue: https://github.com/aroido/gyeop/issues/59
 ## 구현 계획
 
 - [x] `app/play/[slug]/play.tsx`에서 초기 복구가 이미 발생한 사용자 선택을 덮지 않도록 한다.
-- [x] 선택 갱신을 최신 draft 기준의 함수형 갱신으로 바꾼다.
+- [x] 선택 발생 팩 키를 기록해 그 입력보다 늦은 초기 복구만 무시한다.
 - [x] `tests/e2e/old-friend-play.spec.ts`에서 초기 복구 콜백을 지연하고 그 전에 첫 선택을 삽입해 경쟁 상태를 결정적으로 재현한다.
 
 ## 완료 기준

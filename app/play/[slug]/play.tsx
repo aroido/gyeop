@@ -74,16 +74,21 @@ export default function PackPlay({ pack }: { pack: Pack }) {
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [restored, setRestored] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const answeredStorageKeyRef = useRef<string | null>(null);
   const { answers, completed, currentIndex } = draft;
 
   useEffect(() => {
     let cancelled = false;
-    queueMicrotask(() => {
+    queueMicrotask(function restoreDraft() {
       if (cancelled) return;
       try {
-        setDraft(readDraft(window.localStorage.getItem(storageKey), cards));
+        const savedDraft = readDraft(
+          window.localStorage.getItem(storageKey),
+          cards,
+        );
+        if (answeredStorageKeyRef.current !== storageKey) setDraft(savedDraft);
       } catch {
-        setDraft(emptyDraft);
+        if (answeredStorageKeyRef.current !== storageKey) setDraft(emptyDraft);
       }
       setRestored(true);
     });
@@ -120,6 +125,7 @@ export default function PackPlay({ pack }: { pack: Pack }) {
   const selected = answers[card.id];
 
   function choose(answer: Answer) {
+    answeredStorageKeyRef.current = storageKey;
     const nextAnswers = { ...answers, [card.id]: answer };
     setDraft({
       answers: nextAnswers,
