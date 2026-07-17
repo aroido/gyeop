@@ -100,48 +100,57 @@ function importsOf(file, source) {
 }
 
 function resolveImport(from, specifier, files) {
-  let base;
-  if (specifier.startsWith("@/")) {
-    base = path.posix.normalize(specifier.slice(2));
-    if (base === ".." || base.startsWith("../")) return undefined;
-  } else if (specifier.startsWith(".")) {
-    base = path.posix.normalize(
-      path.posix.join(path.posix.dirname(from), specifier),
-    );
-  } else {
-    return undefined;
+  const virtualRoot = "/__gyeop_http_boundary__";
+  const relativeName = (fileName) => {
+    const normalized = path.posix.normalize(fileName);
+    const prefix = `${virtualRoot}/`;
+    return normalized.startsWith(prefix) ? normalized.slice(prefix.length) : "";
+  };
+  const directories = new Set([virtualRoot]);
+  for (const file of files.keys()) {
+    let directory = path.posix.dirname(`${virtualRoot}/${file}`);
+    while (directory.startsWith(virtualRoot)) {
+      directories.add(directory);
+      if (directory === virtualRoot) break;
+      directory = path.posix.dirname(directory);
+    }
   }
-  const extension = path.posix.extname(base);
-  const stem = extension ? base.slice(0, -extension.length) : base;
-  let candidates;
-  if (extension === ".js") candidates = [`${stem}.ts`, `${stem}.tsx`, base];
-  else if (extension === ".jsx") candidates = [`${stem}.tsx`, base];
-  else if (extension === ".mjs") candidates = [`${stem}.mts`, base];
-  else if (extension === ".cjs") candidates = [`${stem}.cts`, base];
-  else if (!extension) {
-    candidates = [
-      `${base}.ts`,
-      `${base}.tsx`,
-      `${base}.mjs`,
-      `${base}.js`,
-      `${base}.jsx`,
-      `${base}.cjs`,
-      `${base}.mts`,
-      `${base}.cts`,
-      `${base}/index.ts`,
-      `${base}/index.tsx`,
-      `${base}/index.mjs`,
-      `${base}/index.js`,
-      `${base}/index.jsx`,
-      `${base}/index.cjs`,
-      `${base}/index.mts`,
-      `${base}/index.cts`,
-    ];
-  } else candidates = [base];
-  for (const candidate of candidates) {
-    if (files.has(candidate)) return candidate;
-  }
-  return undefined;
+  const host = {
+    fileExists(fileName) {
+      const relative = relativeName(fileName);
+      return relative.length > 0 && files.has(relative);
+    },
+    readFile(fileName) {
+      const relative = relativeName(fileName);
+      return relative.length > 0 ? files.get(relative) : undefined;
+    },
+    directoryExists(directoryName) {
+      return directories.has(path.posix.normalize(directoryName));
+    },
+    getCurrentDirectory() {
+      return virtualRoot;
+    },
+    realpath(fileName) {
+      return path.posix.normalize(fileName);
+    },
+    useCaseSensitiveFileNames: true,
+  };
+  const result = ts.resolveModuleName(
+    specifier,
+    `${virtualRoot}/${from}`,
+    {
+      allowJs: true,
+      allowImportingTsExtensions: true,
+      baseUrl: virtualRoot,
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      paths: { "@/*": ["./*"] },
+    },
+    host,
+  ).resolvedModule;
+  if (!result) return undefined;
+  const relative = relativeName(result.resolvedFileName);
+  return relative.length > 0 && files.has(relative) ? relative : undefined;
 }
 
 function hasNonLiteralModuleLoad(file, source) {
@@ -369,6 +378,15 @@ export function verifyHttpBoundarySources(inputFiles) {
     }
 
     if (route.includes("app/api/internal/cron/")) {
+      if (
+        [...reachable].some((file) =>
+          hasNonLiteralModuleLoad(file, files.get(file)),
+        )
+      ) {
+        findings.push(
+          `${route}: cron Route cannot use a non-literal module load`,
+        );
+      }
       if (
         [...reachable].some((file) =>
           (graph.get(file) ?? []).some(

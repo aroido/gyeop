@@ -116,7 +116,7 @@ test("resolves root aliases before checking transitive internal access", () => {
       }
     `,
     "lib/example/helper.ts": `
-      import { consumeRateLimit } from "@/lib/db/internal-rpc.js";
+      import { consumeRateLimit } from "@//lib/db/internal-rpc.jsx";
       export function helper() { return consumeRateLimit({}); }
       export function loadWithAttributes() {
         return import("@/lib/db/internal-rpc.js", { with: {} });
@@ -133,7 +133,8 @@ test("resolves root aliases before checking transitive internal access", () => {
     false,
   );
   assert.ok(
-    findings.some((finding) => finding.includes("raw internal boundary")),
+    findings.filter((finding) => finding.includes("raw internal boundary"))
+      .length >= 2,
   );
   assert.ok(
     findings.some((finding) => finding.includes("non-literal module load")),
@@ -200,7 +201,8 @@ test("requires every public handler to return the reviewed boundary directly", (
 test("rejects the public request boundary from cron routes", () => {
   const findings = verifyHttpBoundarySources({
     "app/api/internal/cron/example/route.js": `
-      import { withPublicRequest } from "@/lib/http/request-boundary.js";
+      import { withPublicRequest } from "@//lib/http/request-boundary.jsx";
+      const loadBoundary = () => import("@/lib/http/" + "request-boundary.js");
       export function POST(request) {
         return withPublicRequest(request, {}, () => new Response());
       }
@@ -210,6 +212,11 @@ test("rejects the public request boundary from cron routes", () => {
   assert.ok(
     findings.some((finding) =>
       finding.includes("cron Route cannot use the public request boundary"),
+    ),
+  );
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("cron Route cannot use a non-literal module load"),
     ),
   );
 });
