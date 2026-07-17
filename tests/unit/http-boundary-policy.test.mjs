@@ -108,16 +108,20 @@ test("rejects a lookalike boundary and transitive direct rate-limit access", () 
 
 test("resolves root aliases before checking transitive internal access", () => {
   const findings = verifyHttpBoundarySources({
-    "app/api/example/route.ts": `
+    "app/api/example/route.js": `
       import { withPublicRequest } from "@/lib/http/request-boundary";
       import { helper } from "@/lib/example/helper";
-      export function POST(request: Request) {
+      export function POST(request) {
         return withPublicRequest(request, {}, () => helper());
       }
     `,
     "lib/example/helper.ts": `
       import { consumeRateLimit } from "@/lib/db/internal-rpc.js";
       export function helper() { return consumeRateLimit({}); }
+      export function loadWithAttributes() {
+        return import("@/lib/db/internal-rpc.js", { with: {} });
+      }
+      export function loadUnknown(name: string) { return import(name); }
     `,
     "lib/db/internal-rpc.ts": "export function consumeRateLimit() {}",
     "lib/http/request-boundary.ts": "export function withPublicRequest() {}",
@@ -130,6 +134,9 @@ test("resolves root aliases before checking transitive internal access", () => {
   );
   assert.ok(
     findings.some((finding) => finding.includes("raw internal boundary")),
+  );
+  assert.ok(
+    findings.some((finding) => finding.includes("non-literal module load")),
   );
 });
 
@@ -192,9 +199,9 @@ test("requires every public handler to return the reviewed boundary directly", (
 
 test("rejects the public request boundary from cron routes", () => {
   const findings = verifyHttpBoundarySources({
-    "app/api/internal/cron/example/route.ts": `
+    "app/api/internal/cron/example/route.js": `
       import { withPublicRequest } from "@/lib/http/request-boundary.js";
-      export function POST(request: Request) {
+      export function POST(request) {
         return withPublicRequest(request, {}, () => new Response());
       }
     `,

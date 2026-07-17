@@ -35,7 +35,7 @@ function sourceFiles(directory) {
   for (const entry of readdirSync(absolute, { withFileTypes: true })) {
     const relative = path.posix.join(directory, entry.name);
     if (entry.isDirectory()) files.push(...sourceFiles(relative));
-    else if (/\.(?:ts|tsx|mjs)$/.test(entry.name)) files.push(relative);
+    else if (/\.(?:[cm]?[jt]s|[jt]sx)$/.test(entry.name)) files.push(relative);
   }
   return files;
 }
@@ -52,12 +52,16 @@ const HTTP_METHODS = new Set([
 const PUBLIC_BOUNDARY_FILE = "lib/http/request-boundary.ts";
 
 function parseSource(file, source) {
+  let scriptKind = ts.ScriptKind.TS;
+  if (file.endsWith(".tsx")) scriptKind = ts.ScriptKind.TSX;
+  else if (file.endsWith(".jsx")) scriptKind = ts.ScriptKind.JSX;
+  else if (/\.(?:js|mjs|cjs)$/.test(file)) scriptKind = ts.ScriptKind.JS;
   return ts.createSourceFile(
     file,
     source,
     ts.ScriptTarget.Latest,
     true,
-    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    scriptKind,
   );
 }
 
@@ -81,7 +85,7 @@ function importsOf(file, source) {
     }
     if (
       ts.isCallExpression(node) &&
-      node.arguments.length === 1 &&
+      node.arguments.length >= 1 &&
       ts.isStringLiteral(node.arguments[0]) &&
       (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
         (ts.isIdentifier(node.expression) &&
@@ -109,25 +113,53 @@ function resolveImport(from, specifier, files) {
   }
   const extension = path.posix.extname(base);
   const stem = extension ? base.slice(0, -extension.length) : base;
-  const candidates = [base];
-  if (extension === ".js") candidates.push(`${stem}.ts`, `${stem}.tsx`);
-  else if (extension === ".jsx") candidates.push(`${stem}.tsx`);
-  else if (extension === ".mjs") candidates.push(`${stem}.mts`);
-  else if (extension === ".cjs") candidates.push(`${stem}.cts`);
+  let candidates;
+  if (extension === ".js") candidates = [`${stem}.ts`, `${stem}.tsx`, base];
+  else if (extension === ".jsx") candidates = [`${stem}.tsx`, base];
+  else if (extension === ".mjs") candidates = [`${stem}.mts`, base];
+  else if (extension === ".cjs") candidates = [`${stem}.cts`, base];
   else if (!extension) {
-    candidates.push(
+    candidates = [
       `${base}.ts`,
       `${base}.tsx`,
       `${base}.mjs`,
+      `${base}.js`,
+      `${base}.jsx`,
+      `${base}.cjs`,
+      `${base}.mts`,
+      `${base}.cts`,
       `${base}/index.ts`,
       `${base}/index.tsx`,
       `${base}/index.mjs`,
-    );
-  }
+      `${base}/index.js`,
+      `${base}/index.jsx`,
+      `${base}/index.cjs`,
+      `${base}/index.mts`,
+      `${base}/index.cts`,
+    ];
+  } else candidates = [base];
   for (const candidate of candidates) {
     if (files.has(candidate)) return candidate;
   }
   return undefined;
+}
+
+function hasNonLiteralModuleLoad(file, source) {
+  let finding = false;
+  function visit(node) {
+    if (
+      ts.isCallExpression(node) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) &&
+          node.expression.text === "require")) &&
+      (node.arguments.length === 0 || !ts.isStringLiteral(node.arguments[0]))
+    ) {
+      finding = true;
+    }
+    if (!finding) ts.forEachChild(node, visit);
+  }
+  visit(parseSource(file, source));
+  return finding;
 }
 
 function hasExportModifier(node) {
@@ -321,7 +353,7 @@ export function verifyHttpBoundarySources(inputFiles) {
   }
 
   const routes = [...files.keys()].filter((file) =>
-    /(?:^|\/)app\/.*\/route\.ts$/.test(file),
+    /(?:^|\/)app\/.*\/route\.(?:[cm]?[jt]s|[jt]sx)$/.test(file),
   );
   for (const route of routes) {
     const source = files.get(route);
@@ -371,6 +403,11 @@ export function verifyHttpBoundarySources(inputFiles) {
 
     for (const file of reachable) {
       const reachableSource = files.get(file);
+      if (hasNonLiteralModuleLoad(file, reachableSource)) {
+        findings.push(
+          `${file}: reachable helper cannot use a non-literal module load`,
+        );
+      }
       for (const edge of graph.get(file) ?? []) {
         const rawInternalBoundary =
           edge.target === "lib/db/internal-rpc.ts" ||
