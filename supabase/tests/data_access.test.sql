@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path to extensions, public, pg_catalog;
 
-select plan(18);
+select plan(20);
 
 select is(
   (
@@ -75,6 +75,33 @@ select ok(
   and not has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'UPDATE')
   and not has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'DELETE'),
   'internal RPC owner has no analytics table access before an event RPC exists'
+);
+
+select is(
+  (
+    select coalesce(
+      array_agg(
+        relation.relname || ':' || grant_row.privilege_type
+        order by relation.relname || ':' || grant_row.privilege_type
+      ),
+      array[]::text[]
+    )
+    from pg_catalog.pg_class relation
+    join pg_catalog.pg_namespace namespace on namespace.oid = relation.relnamespace
+    cross join lateral aclexplode(
+      coalesce(relation.relacl, acldefault('r', relation.relowner))
+    ) grant_row
+    join pg_catalog.pg_roles grantee on grantee.oid = grant_row.grantee
+    where namespace.nspname = 'public'
+      and relation.relkind in ('r', 'p')
+      and grantee.rolname = 'gyeop_internal_rpc'
+  ),
+  array[
+    'rate_limit_buckets:INSERT',
+    'rate_limit_buckets:SELECT',
+    'rate_limit_buckets:UPDATE'
+  ]::text[],
+  'internal RPC owner relation privileges match the exact allowlist'
 );
 
 select ok(
@@ -235,6 +262,31 @@ select ok(
     where function.oid = 'public.consume_rate_limit(bytea,text,integer,integer)'::regprocedure
   ),
   'consume_rate_limit schema-qualifies its application relation'
+);
+
+select ok(
+  not exists (
+    select 1
+    from pg_catalog.pg_proc function
+    join pg_catalog.pg_namespace namespace on namespace.oid = function.pronamespace
+    cross join lateral regexp_matches(
+      function.prosrc,
+      '(?:\mfrom|\mjoin|\mupdate|\minsert\s+into|\mdelete\s+from)\s+([a-z_][a-z0-9_$.]*)',
+      'gi'
+    ) relation_match
+    where namespace.nspname = 'public'
+      and function.prosecdef
+      and lower(relation_match[1]) <> 'set'
+      and lower(relation_match[1]) !~ '^(public|private|pg_catalog)\.'
+      and not exists (
+        select 1
+        from pg_catalog.pg_depend dependency
+        where dependency.classid = 'pg_proc'::regclass
+          and dependency.objid = function.oid
+          and dependency.deptype = 'e'
+      )
+  ),
+  'every SECURITY DEFINER application function schema-qualifies relation references'
 );
 
 select ok(

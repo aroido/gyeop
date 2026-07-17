@@ -6,6 +6,7 @@ import {
   collectRepositoryPolicyFiles,
   verifyDataAccessFiles,
   verifyOwnerMutationSql,
+  verifySecurityDefinerSql,
 } from "../../scripts/verify-data-access.mjs";
 
 const root = path.resolve(new URL("../../", import.meta.url).pathname);
@@ -22,7 +23,7 @@ test("accepts the repository server-only RPC boundary", async () => {
 test("rejects secret use, direct tables, actor imports, and raw client exports", async () => {
   const files = await fixtureFiles();
   files["lib/leaked-secret.ts"] =
-    'const key = process.env.SUPABASE_SECRET_KEY; db.from("events");';
+    'const key = process.env.SUPABASE_SECRET_KEY; db.from("events"); db["from"]("events");';
   files["app/api/leaked-actor.ts"] =
     'import { withOwnerMutationActor } from "@/lib/db/owner-mutation-actor";';
   files[internalPath] += "\nexport const leakedClient = getInternalClient();\n";
@@ -54,8 +55,8 @@ test("requires job-bound delete preparation and literal hard delete", async () =
   const files = await fixtureFiles();
   files[internalPath] += `
 export async function deleteAuthUser({ jobId, proof }) {
-  const { data: prepared } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
-  if (prepared.allowed && prepared.call_before > Date.now()) {
+  const { data: prepared, error: prepareError } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  if (!prepareError && prepared.allowed && prepared.call_before > Date.now()) {
     return getInternalClient().auth.admin.deleteUser(prepared.uid, true);
   }
 }
@@ -70,8 +71,8 @@ test("rejects raw UID wrapper input and unguarded recipient lookup", async () =>
   const files = await fixtureFiles();
   files[internalPath] += `
 export async function deleteAuthUser({ jobId, proof, uid }) {
-  const { data: prepared } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
-  if (prepared.status === "prepared" && prepared.call_before > Date.now()) {
+  const { data: prepared, error: prepareError } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  if (!prepareError && prepared.status === "prepared" && prepared.call_before > Date.now()) {
     return getInternalClient().auth.admin.deleteUser(uid, false);
   }
 }
@@ -90,8 +91,8 @@ test("accepts structurally guarded named Auth Admin wrappers", async () => {
   const files = await fixtureFiles();
   files[internalPath] += `
 export async function deleteAuthUser({ jobId, proof }) {
-  const { data: prepared } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
-  if (prepared.allowed && prepared.call_before > Date.now()) {
+  const { data: prepared, error: prepareError } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  if (!prepareError && prepared.allowed && prepared.call_before > Date.now()) {
     return getInternalClient().auth.admin.deleteUser(prepared.uid, false);
   }
 }
@@ -104,6 +105,27 @@ export async function resolveNotificationRecipient({ jobId, proof }) {
 `;
 
   assert.deepEqual(verifyDataAccessFiles(files), []);
+});
+
+test("rejects denied delete branches and arbitrary resolved identities", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function deleteAuthUser({ jobId, proof }) {
+  const { data: prepared, error: prepareError } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  if (!prepareError && !prepared.allowed && prepared.call_before > Date.now()) {
+    return getInternalClient().auth.admin.deleteUser(prepared.uid, false);
+  }
+}
+export async function resolveNotificationRecipient({ jobId, proof }) {
+  const { data: identity, error: identityError } = await getInternalClient().rpc("resolve_notification_recipient_identity", { jobId, proof });
+  if (!identityError && identity?.user_id) {
+    return getInternalClient().auth.admin.getUserById("arbitrary");
+  }
+}
+`;
+  const findings = verifyDataAccessFiles(files).join("\n");
+  assert.match(findings, /dominated by prepare success/);
+  assert.match(findings, /identity must come from the resolved job result/);
 });
 
 const guardedOwnerSql = `
@@ -187,4 +209,52 @@ export async function createShareLink() {
   const findings = verifyDataAccessFiles(files).join("\n");
   assert.match(findings, /wrapper accepts callback only/);
   assert.match(findings, /must bind the owner deadline signal/);
+});
+
+test("requires exact fresh actor values in owner mutation RPC arguments", async () => {
+  const forged = await fixtureFiles();
+  forged[internalPath] += `
+export async function createShareLink() {
+  return withOwnerMutationActor(async ({ actor, signal }) =>
+    getInternalClient().rpc("create_share_link", {
+      p_actor_id: "forged",
+      p_recovery_actor_candidates: [],
+    }).abortSignal(signal),
+  );
+}
+`;
+  const findings = verifyDataAccessFiles(forged).join("\n");
+  assert.match(findings, /must pass actor.uid as p_actor_id/);
+  assert.match(findings, /must pass actor.recoveryActorCandidates/);
+
+  const valid = await fixtureFiles();
+  valid[internalPath] += `
+export async function createShareLink() {
+  return withOwnerMutationActor(async ({ actor, signal }) =>
+    getInternalClient().rpc("create_share_link", {
+      p_actor_id: actor.uid,
+      p_recovery_actor_candidates: actor.recoveryActorCandidates,
+    }).abortSignal(signal),
+  );
+}
+`;
+  assert.deepEqual(verifyDataAccessFiles(valid), []);
+});
+
+test("requires schema-qualified relations in every SECURITY DEFINER function", () => {
+  const unsafe = `
+create function public.future_probe() returns void
+language plpgsql security definer set search_path = ''
+as $$ begin perform 1 from future_probe; end $$;
+`;
+  assert.match(
+    verifySecurityDefinerSql(unsafe).join("\n"),
+    /uses unqualified relation future_probe/,
+  );
+  assert.deepEqual(
+    verifySecurityDefinerSql(
+      unsafe.replace("from future_probe", "from public.future_probe"),
+    ),
+    [],
+  );
 });

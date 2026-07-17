@@ -14,14 +14,14 @@ const ALLOWED_RPC_EXPORTS = new Map([
   ["resolveNotificationRecipient", "resolve_notification_recipient_identity"],
 ]);
 
-const OWNER_MUTATION_EXPORTS = new Set([
-  "createOrResumePlay",
-  "saveSelfAnswer",
-  "completePlay",
-  "claimPlay",
-  "createShareLink",
-  "rotateShareLink",
-  "disableShareLink",
+const OWNER_MUTATION_EXPORTS = new Map([
+  ["createOrResumePlay", "create_or_resume_play"],
+  ["saveSelfAnswer", "save_self_answer"],
+  ["completePlay", "complete_play"],
+  ["claimPlay", "claim_play"],
+  ["createShareLink", "create_share_link"],
+  ["rotateShareLink", "rotate_share_link"],
+  ["disableShareLink", "disable_share_link"],
 ]);
 
 const OWNER_MUTATION_SQL = new Set([
@@ -48,15 +48,25 @@ function hasDirectTableCall(filePath, source) {
   const file = sourceFile(filePath, source);
   let found = false;
   function visit(node) {
-    if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.name.text === "from" &&
-      !["Array", "Buffer", "Object"].includes(
-        node.expression.expression.getText(),
-      )
-    ) {
-      found = true;
+    if (ts.isCallExpression(node)) {
+      const access = node.expression;
+      const propertyName = ts.isPropertyAccessExpression(access)
+        ? access.name.text
+        : ts.isElementAccessExpression(access) &&
+            ts.isStringLiteral(access.argumentExpression)
+          ? access.argumentExpression.text
+          : undefined;
+      const receiver =
+        ts.isPropertyAccessExpression(access) ||
+        ts.isElementAccessExpression(access)
+          ? access.expression.getText()
+          : "";
+      if (
+        propertyName === "from" &&
+        !["Array", "Buffer", "Object"].includes(receiver)
+      ) {
+        found = true;
+      }
     }
     ts.forEachChild(node, visit);
   }
@@ -99,12 +109,49 @@ function bindingNames(parameter) {
     .sort();
 }
 
-function callIsInsideRequiredIf(call, requiredPattern) {
+function isDescendantOf(node, ancestor) {
+  let current = node;
+  while (current) {
+    if (current === ancestor) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+function conjunctionTerms(expression) {
+  if (
+    ts.isBinaryExpression(expression) &&
+    expression.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+  ) {
+    return [
+      ...conjunctionTerms(expression.left),
+      ...conjunctionTerms(expression.right),
+    ];
+  }
+  if (ts.isParenthesizedExpression(expression)) {
+    return conjunctionTerms(expression.expression);
+  }
+  return [expression];
+}
+
+function callIsInsideSafeGuard(call, requiredTerms) {
   let current = call.parent;
   while (current) {
-    if (ts.isIfStatement(current)) {
-      const condition = current.expression.getText();
-      if (requiredPattern.test(condition)) return true;
+    if (
+      ts.isIfStatement(current) &&
+      isDescendantOf(call, current.thenStatement) &&
+      !isDescendantOf(call, current.elseStatement)
+    ) {
+      const terms = conjunctionTerms(current.expression).map((term) =>
+        term.getText(),
+      );
+      if (
+        requiredTerms.every((pattern) =>
+          terms.some((term) => pattern.test(term)),
+        )
+      ) {
+        return true;
+      }
     }
     if (
       ts.isFunctionDeclaration(current) ||
@@ -193,16 +240,26 @@ function verifyAdminCalls(filePath, source, findings) {
             );
           }
           if (
-            !callIsInsideRequiredIf(
-              node,
-              /(?:prepared\.allowed|prepared\.status\s*===\s*["']prepared["'])[\s\S]*(?:callBefore|call_before)[\s\S]*(?:Date\.now|now)/,
-            )
+            !callIsInsideSafeGuard(node, [
+              /^!(?:prepare|prepared)[A-Za-z]*Error$/,
+              /^(?:prepared\.allowed|prepared\.status\s*===\s*["']prepared["'])$/,
+              /^(?!.*\|\|).*prepared\.(?:callBefore|call_before).*?>.*?(?:Date\.now|\bnow\b)/,
+            ])
           ) {
             findings.push(
               `${filePath}: deleteUser must be dominated by prepare success and call_before`,
             );
           }
         } else if (method === "getUserById") {
+          if (
+            !/(?:identity|recipient)\.(?:uid|userId|user_id)/.test(
+              node.arguments[0]?.getText() ?? "",
+            )
+          ) {
+            findings.push(
+              `${filePath}: getUserById identity must come from the resolved job result`,
+            );
+          }
           if (
             !source.includes('.rpc("resolve_notification_recipient_identity"')
           ) {
@@ -211,10 +268,10 @@ function verifyAdminCalls(filePath, source, findings) {
             );
           }
           if (
-            !callIsInsideRequiredIf(
-              node,
-              /!(?:identity|recipient)[A-Za-z]*Error[\s\S]*(?:identity|recipient)[\s\S]*(?:uid|userId|user_id)/,
-            )
+            !callIsInsideSafeGuard(node, [
+              /^!(?:identity|recipient)[A-Za-z]*Error$/,
+              /^(?:identity|recipient)(?:\?\.|\.)(?:uid|userId|user_id)$/,
+            ])
           ) {
             findings.push(
               `${filePath}: getUserById must be dominated by a non-empty job-bound identity`,
@@ -230,6 +287,97 @@ function verifyAdminCalls(filePath, source, findings) {
   }
 
   visit(file);
+}
+
+function objectPropertyValue(objectLiteral, name) {
+  if (!ts.isObjectLiteralExpression(objectLiteral)) return undefined;
+  const property = objectLiteral.properties.find(
+    (candidate) =>
+      ts.isPropertyAssignment(candidate) &&
+      candidate.name.getText().replace(/["']/g, "") === name,
+  );
+  return property && ts.isPropertyAssignment(property)
+    ? property.initializer.getText()
+    : undefined;
+}
+
+function verifyOwnerMutationFunction(statement, name, findings) {
+  const expectedRpc = OWNER_MUTATION_EXPORTS.get(name);
+  let callback;
+  let rpcCall;
+
+  function visit(node) {
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.getText() === "withOwnerMutationActor"
+    ) {
+      const candidate = node.arguments[0];
+      if (
+        candidate &&
+        (ts.isArrowFunction(candidate) || ts.isFunctionExpression(candidate))
+      ) {
+        callback = candidate;
+      }
+    }
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === "rpc" &&
+      ts.isStringLiteral(node.arguments[0]) &&
+      node.arguments[0].text === expectedRpc
+    ) {
+      rpcCall = node;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(statement);
+
+  const callbackBindings =
+    callback?.parameters.length === 1
+      ? bindingNames(callback.parameters[0])
+      : [];
+  if (callbackBindings.join(",") !== "actor,signal") {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} must receive actor and signal from withOwnerMutationActor`,
+    );
+  }
+  if (!rpcCall || !callback || !isDescendantOf(rpcCall, callback.body)) {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} must invoke ${expectedRpc} inside the fresh actor callback`,
+    );
+    return;
+  }
+
+  const args = rpcCall.arguments[1];
+  if (objectPropertyValue(args, "p_actor_id") !== "actor.uid") {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} must pass actor.uid as p_actor_id`,
+    );
+  }
+  if (
+    objectPropertyValue(args, "p_recovery_actor_candidates") !==
+    "actor.recoveryActorCandidates"
+  ) {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} must pass actor.recoveryActorCandidates`,
+    );
+  }
+
+  const abortAccess = rpcCall.parent;
+  const abortCall = abortAccess?.parent;
+  if (
+    !abortAccess ||
+    !ts.isPropertyAccessExpression(abortAccess) ||
+    abortAccess.name.text !== "abortSignal" ||
+    !abortCall ||
+    !ts.isCallExpression(abortCall) ||
+    abortCall.arguments.length !== 1 ||
+    abortCall.arguments[0].getText() !== "signal"
+  ) {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} must bind the owner deadline signal`,
+    );
+  }
 }
 
 function verifyInternalRpc(source, findings) {
@@ -266,16 +414,7 @@ function verifyInternalRpc(source, findings) {
     }
     if (OWNER_MUTATION_EXPORTS.has(name)) {
       const body = statement.body?.getText() ?? "";
-      if (!body.includes("withOwnerMutationActor")) {
-        findings.push(
-          `${INTERNAL_RPC_PATH}: ${name} must use withOwnerMutationActor`,
-        );
-      }
-      if (!body.includes(".abortSignal(signal)")) {
-        findings.push(
-          `${INTERNAL_RPC_PATH}: ${name} must bind the owner deadline signal`,
-        );
-      }
+      verifyOwnerMutationFunction(statement, name, findings);
       if (
         /return\s+(?:actor\b|\{[^}]*\b(?:actor|uid|recoveryActorCandidates)\b)/s.test(
           body,
@@ -399,6 +538,48 @@ export function verifyOwnerMutationSql(sql, filePath = "migration.sql") {
   return findings;
 }
 
+export function verifySecurityDefinerSql(sql, filePath = "migration.sql") {
+  const findings = [];
+  const functionPattern =
+    /create\s+(?:or\s+replace\s+)?function\s+([a-z_][a-z0-9_]*)\.([a-z_][a-z0-9_]*)\s*\(/gi;
+
+  for (const match of sql.matchAll(functionPattern)) {
+    const afterStart = sql.slice(match.index);
+    const tagMatch = afterStart.match(/\bas\s+(\$[A-Za-z0-9_]*\$)/i);
+    if (!tagMatch || tagMatch.index === undefined) continue;
+    const header = afterStart.slice(0, tagMatch.index);
+    if (!/\bsecurity\s+definer\b/i.test(header)) continue;
+
+    const qualifiedName = `${match[1]}.${match[2]}`;
+    if (!/\bset\s+search_path\s*=\s*''/i.test(header)) {
+      findings.push(
+        `${filePath}: ${qualifiedName} must set an empty search_path`,
+      );
+    }
+
+    const tag = tagMatch[1];
+    const bodyStart = tagMatch.index + tagMatch[0].length;
+    const bodyEnd = afterStart.indexOf(tag, bodyStart);
+    if (bodyEnd < 0) continue;
+    const body = afterStart
+      .slice(bodyStart, bodyEnd)
+      .replace(/--[^\n]*/g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    const relationPattern =
+      /(?:\bfrom|\bjoin|\bupdate(?!\s+set\b)|\binsert\s+into|\bdelete\s+from)\s+([a-z_][a-z0-9_$.]*)/gi;
+    for (const relationMatch of body.matchAll(relationPattern)) {
+      const relation = relationMatch[1];
+      if (!/^(?:public|private|pg_catalog)\./i.test(relation)) {
+        findings.push(
+          `${filePath}: ${qualifiedName} uses unqualified relation ${relation}`,
+        );
+      }
+    }
+  }
+
+  return findings;
+}
+
 export function verifyDataAccessFiles(files) {
   const findings = [];
 
@@ -446,6 +627,7 @@ export function verifyDataAccessFiles(files) {
     .map(([filePath, source]) => `\n-- ${filePath}\n${source}`)
     .join("\n");
   findings.push(...verifyOwnerMutationSql(migrations, "supabase/migrations"));
+  findings.push(...verifySecurityDefinerSql(migrations, "supabase/migrations"));
 
   const internalRpc = files[INTERNAL_RPC_PATH];
   if (!internalRpc) {
