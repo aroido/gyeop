@@ -2,82 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import type { Pack, PackCard } from "../packs";
 import styles from "./page.module.css";
 
-const STORAGE_KEY = "gyeop:old-friend-play:v1";
 const OPENING_MS = 1200;
-
-type Card = {
-  id: string;
-  signature?: boolean;
-  question: string;
-  a: string;
-  b: string;
-};
-
-const cards: readonly Card[] = [
-  {
-    id: "conflict",
-    signature: true,
-    question: "서운한 일이 생기면 나는?",
-    a: "바로 이야기한다",
-    b: "생각을 정리한 뒤 말한다",
-  },
-  {
-    id: "reunion",
-    question: "오랜만에 친구를 만나면 나는?",
-    a: "어제 본 듯 바로 편해진다",
-    b: "근황부터 천천히 맞춰 간다",
-  },
-  {
-    id: "plans",
-    question: "약속을 잡을 때 나는?",
-    a: "미리 날짜를 정한다",
-    b: "그때그때 편한 날을 본다",
-  },
-  {
-    id: "comfort",
-    question: "친구가 고민을 털어놓으면 나는?",
-    a: "먼저 끝까지 들어준다",
-    b: "해결 방법부터 같이 찾는다",
-  },
-  {
-    id: "gathering",
-    question: "여러 친구가 모인 자리에서 나는?",
-    a: "먼저 분위기를 띄운다",
-    b: "익숙한 사람 곁에서 시작한다",
-  },
-  {
-    id: "reconnect",
-    question: "연락이 뜸해졌을 때 나는?",
-    a: "짧게 안부부터 보낸다",
-    b: "만날 약속부터 잡는다",
-  },
-  {
-    id: "memory",
-    question: "옛날 이야기가 나오면 나는?",
-    a: "구체적인 장면부터 떠올린다",
-    b: "그때 느낀 감정부터 떠올린다",
-  },
-  {
-    id: "travel",
-    question: "친구와 여행 일정을 정할 때 나는?",
-    a: "미리 계획을 세운다",
-    b: "현장에서 그때그때 정한다",
-  },
-  {
-    id: "celebration",
-    question: "친구의 좋은 소식을 들은 직후 나는?",
-    a: "바로 연락해 축하한다",
-    b: "다음에 만날 때 직접 축하한다",
-  },
-  {
-    id: "hard-day",
-    question: "힘든 날에 나는?",
-    a: "먼저 연락해 털어놓는다",
-    b: "혼자 정리한 뒤 연락한다",
-  },
-];
 
 type Answer = "a" | "b";
 type Answers = Record<string, Answer>;
@@ -89,9 +17,8 @@ type Draft = {
 };
 
 const emptyDraft: Draft = { currentIndex: 0, answers: {}, completed: false };
-const cardIds = new Set<string>(cards.map((card) => card.id));
 
-function readDraft(raw: string | null): Draft {
+function readDraft(raw: string | null, cards: readonly PackCard[]): Draft {
   if (!raw) return emptyDraft;
 
   try {
@@ -117,6 +44,7 @@ function readDraft(raw: string | null): Draft {
       return emptyDraft;
     }
 
+    const cardIds = new Set(cards.map((card) => card.id));
     const entries = Object.entries(candidate.answers);
     if (
       entries.some(
@@ -143,54 +71,42 @@ function readDraft(raw: string | null): Draft {
   }
 }
 
-type OldFriendPlayProps = {
-  disabled?: boolean;
-  skipOpening?: boolean;
-};
-
-export default function OldFriendPlay({
-  disabled = false,
-  skipOpening = false,
-}: OldFriendPlayProps = {}) {
+export default function PackPlay({ pack }: { pack: Pack }) {
+  const { cards, storageKey, title } = pack;
   const [draft, setDraft] = useState<Draft>(() => {
-    if (disabled || typeof window === "undefined") return emptyDraft;
+    if (typeof window === "undefined") return emptyDraft;
     try {
-      return readDraft(window.localStorage.getItem(STORAGE_KEY));
+      return readDraft(window.localStorage.getItem(storageKey), cards);
     } catch {
       return emptyDraft;
     }
   });
-  const [opening, setOpening] = useState(!skipOpening);
+  const [opening, setOpening] = useState(true);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const { answers, completed, currentIndex } = draft;
-  const shellClassName = skipOpening
-    ? `${styles.shell} ${styles.top}`
-    : styles.shell;
 
   useEffect(() => {
-    if (skipOpening) return;
     const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
       ? 0
       : OPENING_MS;
     const timer = window.setTimeout(() => setOpening(false), delay);
     return () => window.clearTimeout(timer);
-  }, [skipOpening]);
+  }, []);
 
   useEffect(() => {
-    if (disabled) return;
     try {
       if (currentIndex === 0 && Object.keys(answers).length === 0) {
-        window.localStorage.removeItem(STORAGE_KEY);
+        window.localStorage.removeItem(storageKey);
         return;
       }
       window.localStorage.setItem(
-        STORAGE_KEY,
+        storageKey,
         JSON.stringify({ version: 1, currentIndex, answers }),
       );
     } catch {
       // ponytail: storage can be unavailable; React state is the fallback.
     }
-  }, [answers, currentIndex, disabled]);
+  }, [answers, currentIndex, storageKey]);
 
   useEffect(() => {
     if (opening) return;
@@ -214,7 +130,7 @@ export default function OldFriendPlay({
 
   function restart() {
     try {
-      window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(storageKey);
     } catch {
       // The in-memory reset still succeeds.
     }
@@ -223,12 +139,12 @@ export default function OldFriendPlay({
 
   if (opening) {
     return (
-      <main className={shellClassName}>
+      <main className={styles.shell}>
         <section className={styles.opening} aria-labelledby="opening-title">
           <div className={styles.openingCard} aria-hidden="true">
             <span>겹</span>
           </div>
-          <p>오래된 친구팩</p>
+          <p>{title}</p>
           <h1 id="opening-title">질문 카드를 여는 중이에요</h1>
         </section>
       </main>
@@ -237,9 +153,9 @@ export default function OldFriendPlay({
 
   if (completed) {
     return (
-      <main className={shellClassName}>
+      <main className={styles.shell}>
         <section className={styles.complete} aria-labelledby="complete-title">
-          <p className={styles.brand}>겹 · 오래된 친구팩</p>
+          <p className={styles.brand}>겹 · {title}</p>
           <h1 id="complete-title" ref={headingRef} tabIndex={-1}>
             나의 10장을 모두 골랐어요
           </h1>
@@ -272,12 +188,12 @@ export default function OldFriendPlay({
   }
 
   return (
-    <main className={shellClassName}>
+    <main className={styles.shell}>
       <section className={styles.play} aria-labelledby="question-title">
         <header className={styles.progressHeader}>
-          <p className={styles.brand}>겹 · 오래된 친구팩</p>
+          <p className={styles.brand}>겹 · {title}</p>
           <span aria-hidden="true">
-            {disabled ? "준비 중" : `${currentIndex + 1} / ${cards.length}`}
+            {currentIndex + 1} / {cards.length}
           </span>
         </header>
 
@@ -298,7 +214,6 @@ export default function OldFriendPlay({
               type="button"
               data-choice="a"
               aria-pressed={selected === "a"}
-              disabled={disabled}
               onClick={() => choose("a")}
             >
               <span>A</span>
@@ -308,7 +223,6 @@ export default function OldFriendPlay({
               type="button"
               data-choice="b"
               aria-pressed={selected === "b"}
-              disabled={disabled}
               onClick={() => choose("b")}
             >
               <span>B</span>

@@ -2,10 +2,47 @@
 
 import styles from "./page.module.css";
 
-const upcomingPacks = [
-  { title: "첫인상팩", style: styles.blueCard, number: "02" },
-  { title: "직장동료팩", style: styles.redCard, number: "03" },
-  { title: "솔직한 나팩", style: styles.blackCard, number: "04" },
+const packPreviews = [
+  {
+    slug: "old-friend",
+    title: "오래된 친구팩",
+    style: styles.activeCard,
+    number: "01",
+    relationship: "오래된 친구",
+    mood: "따뜻한 회상",
+    sensitivity: "낮은 민감도",
+    sharing: "공개 공유 추천",
+  },
+  {
+    slug: "first-impression",
+    title: "첫인상팩",
+    style: styles.blueCard,
+    number: "02",
+    relationship: "새로 알게 된 사이",
+    mood: "가벼운 첫 만남",
+    sensitivity: "낮은 민감도",
+    sharing: "공개 공유 추천",
+  },
+  {
+    slug: "coworker",
+    title: "직장동료팩",
+    style: styles.redCard,
+    number: "03",
+    relationship: "직장 동료",
+    mood: "담백한 관찰",
+    sensitivity: "낮은 민감도",
+    sharing: "공개 공유 추천",
+  },
+  {
+    slug: "honest-self",
+    title: "솔직한 나팩",
+    style: styles.blackCard,
+    number: "04",
+    relationship: "가까운 사이",
+    mood: "차분한 솔직함",
+    sensitivity: "중간 민감도",
+    sharing: "1:1 공유 추천",
+  },
 ];
 
 export default function Home() {
@@ -60,54 +97,55 @@ export default function Home() {
             }}
             tabIndex={0}
           >
-            <li>
-              <article
-                className={`${styles.packCard} ${styles.activeCard}`}
-                data-pack-state="active"
-              >
-                <div className={styles.cardTopline}>
-                  <span>지금 시작</span>
-                  <b>01</b>
-                </div>
-                <h3>오래된 친구팩</h3>
-                <p className={styles.relationship}>오래된 친구</p>
-                <div className={styles.packMeta}>
-                  <span>질문 10장</span>
-                  <span>약 2분</span>
-                  <span>따뜻한 회상</span>
-                  <span>낮은 민감도</span>
-                  <span>공개 공유 추천</span>
-                </div>
+            {packPreviews.map((pack, index) => {
+              const showDetails = prototypeEnabled || index === 0;
 
-                {prototypeEnabled ? (
-                  <a className={styles.cta} href="/play/old-friend">
-                    팩 열어보기 <span aria-hidden="true">→</span>
-                  </a>
-                ) : (
-                  <button className={styles.cta} type="button" disabled>
-                    팩 준비 중
-                  </button>
-                )}
-              </article>
-            </li>
+              return (
+                <li key={pack.slug}>
+                  <article
+                    className={`${styles.packCard} ${pack.style}`}
+                    data-pack-state={
+                      prototypeEnabled || index === 0 ? "active" : "upcoming"
+                    }
+                  >
+                    <div className={styles.cardTopline}>
+                      <span>{prototypeEnabled ? "지금 시작" : "준비 중"}</span>
+                      <b>{pack.number}</b>
+                    </div>
+                    <h3>{pack.title}</h3>
 
-            {upcomingPacks.map((pack) => (
-              <li key={pack.title}>
-                <article
-                  className={`${styles.packCard} ${pack.style}`}
-                  data-pack-state="upcoming"
-                >
-                  <div className={styles.cardTopline}>
-                    <span>준비 중</span>
-                    <b>{pack.number}</b>
-                  </div>
-                  <h3>{pack.title}</h3>
-                  <span className={styles.cardMark} aria-hidden="true">
-                    ✳
-                  </span>
-                </article>
-              </li>
-            ))}
+                    {showDetails ? (
+                      <>
+                        <p className={styles.relationship}>
+                          {pack.relationship}
+                        </p>
+                        <div className={styles.packMeta}>
+                          <span>질문 10장</span>
+                          <span>약 2분</span>
+                          <span>{pack.mood}</span>
+                          <span>{pack.sensitivity}</span>
+                          <span>{pack.sharing}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <span className={styles.cardMark} aria-hidden="true">
+                        ✳
+                      </span>
+                    )}
+
+                    {prototypeEnabled ? (
+                      <a className={styles.cta} href={`/play/${pack.slug}`}>
+                        팩 열어보기 <span aria-hidden="true">→</span>
+                      </a>
+                    ) : index === 0 ? (
+                      <button className={styles.cta} type="button" disabled>
+                        팩 준비 중
+                      </button>
+                    ) : null}
+                  </article>
+                </li>
+              );
+            })}
           </ul>
         </section>
       </div>

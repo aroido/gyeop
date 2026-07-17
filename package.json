@@ -16,7 +16,7 @@
     "format:check": "prettier --check app tests scripts/validate-env.mjs playwright.config.ts next.config.ts eslint.config.mjs package.json .github/workflows/ci.yml",
     "lint": "eslint app tests/e2e playwright.config.ts next.config.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/unit/validate-env.test.mjs",
+    "test": "node --test tests/unit/validate-env.test.mjs tests/unit/packs.test.mjs",
     "test:secrets": "node --test tests/unit/repository-secrets.test.mjs",
     "supabase:start": "supabase start --exclude studio,imgproxy,edge-runtime,logflare,vector,storage-api,realtime,supavisor",
     "supabase:stop": "supabase stop --no-backup",
