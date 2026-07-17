@@ -79,6 +79,15 @@ function hasDirectTableCall(filePath, source) {
       const value = staticString(node.initializer);
       if (value !== undefined) stringBindings.set(node.name.text, value);
     }
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isIdentifier(node.left)
+    ) {
+      const value = staticString(node.right);
+      if (value === undefined) stringBindings.delete(node.left.text);
+      else stringBindings.set(node.left.text, value);
+    }
     if (isMemberAccess(node)) {
       const resolvedName =
         memberName(node) ??
@@ -93,6 +102,26 @@ function hasDirectTableCall(filePath, source) {
       if (
         (resolvedName === "from" || suspiciousDynamicReceiver) &&
         !["Array", "Buffer", "Object"].includes(receiver)
+      ) {
+        found = true;
+      }
+    }
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      ((node.expression.expression.getText() === "Reflect" &&
+        node.expression.name.text === "get") ||
+        (node.expression.expression.getText() === "Object" &&
+          node.expression.name.text === "getOwnPropertyDescriptor"))
+    ) {
+      const receiver = node.arguments[0]?.getText() ?? "";
+      const resolvedName = node.arguments[1]
+        ? staticString(node.arguments[1])
+        : undefined;
+      if (
+        resolvedName === "from" ||
+        (resolvedName === undefined &&
+          /(?:^|\.)(?:db|client|supabase)$/i.test(receiver))
       ) {
         found = true;
       }
@@ -290,7 +319,9 @@ function hasUnsafeRebinding(
       ts.isBinaryExpression(node) &&
       node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
       node.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
-      restricted.has(assignedRootName(node.left))
+      (restricted.has(assignedRootName(node.left)) ||
+        containsRestrictedIdentifier(node.left) ||
+        containsRestrictedIdentifier(node.right))
     ) {
       found = true;
       return;
@@ -372,6 +403,23 @@ function isDescendantOf(node, ancestor) {
   let current = node;
   while (current) {
     if (current === ancestor) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+function isInsideLoop(node, boundary) {
+  let current = node.parent;
+  while (current && current !== boundary) {
+    if (
+      ts.isForStatement(current) ||
+      ts.isForInStatement(current) ||
+      ts.isForOfStatement(current) ||
+      ts.isWhileStatement(current) ||
+      ts.isDoStatement(current)
+    ) {
+      return true;
+    }
     current = current.parent;
   }
   return false;
@@ -653,7 +701,7 @@ function directAdminMethods(root) {
       isMemberAccess(node.expression) &&
       isAuthAdminReference(node.expression.expression)
     ) {
-      methods.push(memberName(node.expression));
+      methods.push({ method: memberName(node.expression), call: node });
     }
     ts.forEachChild(node, visit);
   }
@@ -664,13 +712,23 @@ function directAdminMethods(root) {
 function verifyOwnerMutationFunction(statement, name, findings) {
   const expectedRpc = OWNER_MUTATION_EXPORTS.get(name);
   const callbacks = [];
+  const wrapperCalls = [];
   const rpcCalls = [];
+  const nestedOwnerReferences = [];
 
   function visit(node) {
+    if (
+      ts.isIdentifier(node) &&
+      OWNER_MUTATION_EXPORTS.has(node.text) &&
+      !(ts.isFunctionDeclaration(node.parent) && node.parent.name === node)
+    ) {
+      nestedOwnerReferences.push(node.text);
+    }
     if (
       ts.isCallExpression(node) &&
       node.expression.getText() === "withOwnerMutationActor"
     ) {
+      wrapperCalls.push(node);
       const candidate = node.arguments[0];
       if (
         candidate &&
@@ -690,6 +748,12 @@ function verifyOwnerMutationFunction(statement, name, findings) {
   }
   visit(statement);
 
+  if (nestedOwnerReferences.length > 0) {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} cannot invoke or alias another owner wrapper`,
+    );
+  }
+
   const callback = callbacks.length === 1 ? callbacks[0] : undefined;
   if (callbacks.length !== 1) {
     findings.push(
@@ -700,6 +764,14 @@ function verifyOwnerMutationFunction(statement, name, findings) {
     findings.push(`${INTERNAL_RPC_PATH}: ${name} must invoke exactly one RPC`);
   }
   const rpcCall = rpcCalls.length === 1 ? rpcCalls[0] : undefined;
+  if (
+    wrapperCalls.some((call) => isInsideLoop(call, statement)) ||
+    rpcCalls.some((call) => isInsideLoop(call, callback?.body ?? statement))
+  ) {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} cannot run owner mutation calls inside a loop`,
+    );
+  }
 
   const callbackBindings =
     callback?.parameters.length === 1
@@ -856,10 +928,15 @@ function verifyInternalRpc(source, findings) {
       const adminMethods = directAdminMethods(statement);
       if (
         adminMethods.length !== 1 ||
-        adminMethods[0] !== expectedAdminMethod
+        adminMethods[0]?.method !== expectedAdminMethod
       ) {
         findings.push(
           `${INTERNAL_RPC_PATH}: ${name} must make exactly one ${expectedAdminMethod} provider call`,
+        );
+      }
+      if (adminMethods.some(({ call }) => isInsideLoop(call, statement))) {
+        findings.push(
+          `${INTERNAL_RPC_PATH}: ${name} cannot call the provider inside a loop`,
         );
       }
     }
@@ -1067,11 +1144,49 @@ export function verifySecurityDefinerSql(sql, filePath = "migration.sql") {
 
 function importsOwnerActorModule(filePath, source) {
   const file = sourceFile(filePath, source);
+  const stringBindings = new Map();
   let found = false;
   function isRestrictedModule(specifier) {
     return /owner-mutation-actor(?:-core)?(?:\.[cm]?[jt]s)?$/.test(specifier);
   }
+  function staticString(expression) {
+    if (
+      ts.isStringLiteral(expression) ||
+      ts.isNoSubstitutionTemplateLiteral(expression)
+    ) {
+      return expression.text;
+    }
+    if (ts.isIdentifier(expression)) return stringBindings.get(expression.text);
+    if (
+      ts.isBinaryExpression(expression) &&
+      expression.operatorToken.kind === ts.SyntaxKind.PlusToken
+    ) {
+      const left = staticString(expression.left);
+      const right = staticString(expression.right);
+      return left !== undefined && right !== undefined
+        ? left + right
+        : undefined;
+    }
+    return undefined;
+  }
   function visit(node) {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer
+    ) {
+      const value = staticString(node.initializer);
+      if (value !== undefined) stringBindings.set(node.name.text, value);
+    }
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isIdentifier(node.left)
+    ) {
+      const value = staticString(node.right);
+      if (value === undefined) stringBindings.delete(node.left.text);
+      else stringBindings.set(node.left.text, value);
+    }
     if (
       (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
       node.moduleSpecifier &&
@@ -1083,13 +1198,14 @@ function importsOwnerActorModule(filePath, source) {
     if (
       ts.isCallExpression(node) &&
       node.arguments.length === 1 &&
-      ts.isStringLiteral(node.arguments[0]) &&
       (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
         (ts.isIdentifier(node.expression) &&
-          node.expression.text === "require")) &&
-      isRestrictedModule(node.arguments[0].text)
+          node.expression.text === "require"))
     ) {
-      found = true;
+      const specifier = staticString(node.arguments[0]);
+      if (specifier === undefined || isRestrictedModule(specifier)) {
+        found = true;
+      }
     }
     ts.forEachChild(node, visit);
   }

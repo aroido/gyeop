@@ -266,6 +266,23 @@ export async function deleteAuthUser({ jobId, proof }) {
   );
 });
 
+test("rejects destructuring mutation of trusted Admin results", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function deleteAuthUser({ jobId, proof }) {
+  const { data: prepared, error: prepareError } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  ({ uid: prepared.uid, allowed: prepared.allowed, call_before: prepared.call_before } = forged);
+  if (!prepareError && prepared.allowed && prepared.call_before > Date.now()) {
+    return getInternalClient().auth.admin.deleteUser(prepared.uid, false);
+  }
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /cannot shadow or mutate trusted provenance/,
+  );
+});
+
 test("requires exactly one provider call per named Admin wrapper", async () => {
   const files = await fixtureFiles();
   files[internalPath] += `
@@ -280,6 +297,24 @@ export async function deleteAuthUser({ jobId, proof }) {
   assert.match(
     verifyDataAccessFiles(files).join("\n"),
     /must make exactly one deleteUser provider call/,
+  );
+});
+
+test("rejects provider calls inside loops", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function deleteAuthUser({ jobId, proof }) {
+  const { data: prepared, error: prepareError } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  for (const item of [1]) {
+    if (!prepareError && prepared.allowed && prepared.call_before > Date.now()) {
+      return getInternalClient().auth.admin.deleteUser(prepared.uid, false);
+    }
+  }
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /cannot call the provider inside a loop/,
   );
 });
 
@@ -298,6 +333,20 @@ export async function leak() {
   assert.match(findings, /owner actor internals cannot be imported/);
 });
 
+test("resolves aliased dynamic owner actor import paths", async () => {
+  const files = await fixtureFiles();
+  files["app/api/aliased-actor.ts"] = `
+export async function leak() {
+  const path = "@/lib/db/owner-mutation-actor";
+  return import(path);
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /owner actor internals cannot be imported/,
+  );
+});
+
 test("rejects computed table method aliases", async () => {
   const files = await fixtureFiles();
   files["components/computed-leak.tsx"] = `
@@ -307,6 +356,20 @@ export const leak = db[method]("analytics_events");
   assert.match(
     verifyDataAccessFiles(files).join("\n"),
     /components\/computed-leak\.tsx: direct table access/,
+  );
+});
+
+test("rejects reflected and reassigned table methods", async () => {
+  const files = await fixtureFiles();
+  files["components/reflected-leak.tsx"] = `
+export const reflected = Reflect.get(db, "from")("analytics_events");
+let method = "safe";
+method = "from";
+export const reassigned = db[method]("analytics_events");
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /components\/reflected-leak\.tsx: direct table access/,
   );
 });
 
@@ -463,6 +526,45 @@ export async function createShareLink() {
   assert.match(
     verifyDataAccessFiles(files).join("\n"),
     /createShareLink must invoke exactly one RPC/,
+  );
+});
+
+test("rejects cross-wrapper owner mutation invocation", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function createShareLink() {
+  await disableShareLink();
+  return withOwnerMutationActor(async ({ actor, signal }) =>
+    getInternalClient().rpc("create_share_link", {
+      p_actor_id: actor.uid,
+      p_recovery_actor_candidates: actor.recoveryActorCandidates,
+    }).abortSignal(signal),
+  );
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /cannot invoke or alias another owner wrapper/,
+  );
+});
+
+test("rejects owner mutation calls inside loops", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function createShareLink() {
+  for (const item of [1]) {
+    return withOwnerMutationActor(async ({ actor, signal }) =>
+      getInternalClient().rpc("create_share_link", {
+        p_actor_id: actor.uid,
+        p_recovery_actor_candidates: actor.recoveryActorCandidates,
+      }).abortSignal(signal),
+    );
+  }
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /cannot run owner mutation calls inside a loop/,
   );
 });
 
