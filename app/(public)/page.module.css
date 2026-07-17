@@ -1,216 +1,336 @@
 .shell {
-  display: grid;
   min-height: 100svh;
-  width: min(100%, 30rem);
-  margin: 0 auto;
-  padding: 1.25rem 1rem 1.5rem;
-  grid-template-rows: auto 19rem auto 1fr auto;
-  gap: 0.75rem;
   overflow: hidden;
+  background: #050505;
+  color: #fff;
+}
+
+.frame {
+  display: grid;
+  width: min(100%, 30rem);
+  min-height: 100svh;
+  margin: 0 auto;
+  padding: 1rem 0.9rem 1.2rem;
+  grid-template-rows: auto auto 1fr;
+  gap: 0.8rem;
 }
 
 .brand {
   display: flex;
+  min-height: 2rem;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.55rem;
 }
 
-.brand span {
-  position: relative;
-  display: block;
-  width: 2.25rem;
-  height: 2.25rem;
-}
-
-.brand span::before,
-.brand span::after {
-  position: absolute;
-  width: 1.55rem;
-  height: 1.55rem;
+.brand > span {
+  display: grid;
+  width: 1.9rem;
+  height: 1.9rem;
+  place-items: center;
   border-radius: 0.55rem;
-  background: var(--accent);
-  box-shadow: 0 0.45rem 1rem rgb(95 75 182 / 18%);
-  content: "";
-}
-
-.brand span::before {
-  top: 0.05rem;
-  left: 0.05rem;
-}
-
-.brand span::after {
-  right: 0.05rem;
-  bottom: 0.05rem;
-  background: #c9bff0;
+  background: #315cff;
+  color: #fff;
+  font-size: 1.15rem;
 }
 
 .brand strong {
-  font-size: 1rem;
-  letter-spacing: -0.04em;
+  font-size: 1.08rem;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+}
+
+.brand small {
+  margin-left: auto;
+  color: #a8a8a8;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
 }
 
 .hero {
   position: relative;
-  min-height: 0;
+  min-height: 12.5rem;
+  padding-top: 0.25rem;
 }
 
-.card {
-  position: absolute;
-  top: 50%;
-  width: 10.75rem;
-  height: 12.5rem;
-  padding: 1.05rem;
-  border: 1px solid var(--line);
-  border-radius: 1.6rem;
-  box-shadow: var(--shadow);
-}
-
-.selfCard {
-  left: 50%;
-  background: var(--surface);
-  transform: translate(-92%, -50%) rotate(-7deg);
-}
-
-.friendCard {
-  right: 50%;
-  background: var(--surface-muted);
-  transform: translate(92%, -50%) rotate(7deg);
-}
-
-.avatar {
-  display: grid;
-  width: 3.2rem;
-  height: 3.2rem;
-  place-items: center;
-  border-radius: 1rem;
-  background: #eee9f7;
-  color: var(--accent-strong);
-  font-size: 0.9rem;
-  font-weight: 850;
-}
-
-.friendCard .avatar {
-  margin-left: auto;
-  background: #f8e9ef;
-  color: #8e4765;
-}
-
-.card p {
-  margin: 1.1rem 0 1.25rem;
-  font-size: 0.78rem;
-  font-weight: 800;
+.hero > p {
+  margin: 0 0 0.45rem;
+  color: #bdbdbd;
+  font-size: 0.72rem;
+  font-weight: 750;
   letter-spacing: -0.025em;
 }
 
-.friendCard p {
-  text-align: right;
-}
-
-.card i {
-  display: block;
-  width: 100%;
-  height: 0.65rem;
-  border-radius: 999px;
-  background: rgb(95 75 182 / 10%);
-}
-
-.card i + i {
-  width: 68%;
-  margin-top: 0.65rem;
-}
-
-.friendCard i {
-  margin-left: auto;
-  background: rgb(142 71 101 / 10%);
-}
-
-.overlap {
-  position: absolute;
-  z-index: 2;
-  top: 50%;
-  left: 50%;
-  display: grid;
-  width: 3.6rem;
-  height: 3.6rem;
-  place-items: center;
-  border: 0.35rem solid var(--background);
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0.75rem 1.75rem rgb(72 54 144 / 28%);
-  color: white;
-  font-size: 0.9rem;
-  font-weight: 850;
-  transform: translate(-50%, -50%);
-}
-
-.copy {
-  text-align: center;
-}
-
-.copy h1 {
+.hero h1 {
+  position: relative;
+  z-index: 1;
   margin: 0;
-  font-size: clamp(2rem, 9.5vw, 2.7rem);
-  line-height: 1.16;
-  letter-spacing: -0.06em;
+  font-size: clamp(2.2rem, 10.8vw, 3.2rem);
+  font-weight: 950;
+  line-height: 0.99;
+  letter-spacing: -0.075em;
   word-break: keep-all;
 }
 
-.copy p {
-  margin: 0.75rem 0 0;
-  color: var(--ink-muted);
-  font-size: 0.82rem;
+.hero mark {
+  display: inline-block;
+  margin-top: 0.18rem;
+  padding: 0.02em 0.15em 0.08em 0.08em;
+  background: #dfff00;
+  box-shadow: 0.14em 0.12em 0 #315cff;
+  color: #050505;
+  transform: rotate(-1deg);
+}
+
+.perspectiveStack {
+  position: absolute;
+  right: -0.25rem;
+  bottom: 0.2rem;
+  width: 9.4rem;
+  height: 3.7rem;
+}
+
+.perspectiveStack span {
+  position: absolute;
+  width: 7.5rem;
+  height: 2.1rem;
+  border: 1px solid rgb(255 255 255 / 70%);
+  border-radius: 0.6rem;
+  box-shadow: 0 0.6rem 1.5rem rgb(0 0 0 / 45%);
+}
+
+.perspectiveStack span:nth-child(1) {
+  top: 0;
+  left: 0;
+  background: #315cff;
+  transform: rotate(-5deg);
+}
+
+.perspectiveStack span:nth-child(2) {
+  top: 0.75rem;
+  left: 0.8rem;
+  background: #dfff00;
+  transform: rotate(2deg);
+}
+
+.perspectiveStack span:nth-child(3) {
+  top: 1.5rem;
+  left: 1.6rem;
+  background: #ff4d42;
+  transform: rotate(7deg);
+}
+
+.packs {
+  min-width: 0;
+  min-height: 0;
+}
+
+.packHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.55rem;
+}
+
+.packHeading h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.packHeading p {
+  margin: 0;
+  color: #bdbdbd;
+  font-size: 0.66rem;
   font-weight: 700;
+}
+
+.packRail {
+  display: flex;
+  width: calc(100% + 1.8rem);
+  margin: 0 -0.9rem;
+  padding: 0.2rem 0.9rem 0.75rem;
+  gap: 0.75rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  list-style: none;
+  scroll-padding-inline: 0.9rem;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.packRail::-webkit-scrollbar {
+  display: none;
+}
+
+.packRail:focus-visible {
+  border-radius: 0.8rem;
+  outline: 3px solid #dfff00;
+  outline-offset: -3px;
+}
+
+.packRail > li {
+  flex: 0 0 clamp(15.6rem, 78vw, 18rem);
+  scroll-snap-align: start;
+}
+
+.packCard {
+  position: relative;
+  display: flex;
+  min-height: 14.6rem;
+  padding: 0.9rem;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #fff;
+  border-radius: 1rem;
+  scroll-snap-align: start;
+}
+
+.activeCard {
+  background: #dfff00;
+  color: #050505;
+  box-shadow: 0.35rem 0.35rem 0 #315cff;
+  transform: rotate(-0.7deg);
+}
+
+.blueCard {
+  background: #315cff;
+  color: #fff;
+  transform: rotate(0.7deg);
+}
+
+.redCard {
+  background: #ff4d42;
+  color: #050505;
+  transform: rotate(-0.7deg);
+}
+
+.blackCard {
+  background: #0a0a0a;
+  color: #fff;
+  transform: rotate(0.7deg);
+}
+
+.cardTopline {
+  display: flex;
+  min-height: 1.6rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.cardTopline span {
+  padding: 0.24rem 0.48rem;
+  border-radius: 999px;
+  background: #050505;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 850;
+}
+
+.blackCard .cardTopline span {
+  border: 1px solid #fff;
+}
+
+.cardTopline b {
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
+.packCard h3 {
+  position: relative;
+  z-index: 1;
+  margin: 0.55rem 0 0;
+  font-size: 2rem;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: -0.075em;
+}
+
+.relationship {
+  margin: 0.38rem 0 0;
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.packMeta {
+  display: flex;
+  margin-top: 0.65rem;
+  flex-wrap: wrap;
+  gap: 0.32rem;
+}
+
+.packMeta span {
+  padding: 0.25rem 0.42rem;
+  border: 1px solid rgb(5 5 5 / 45%);
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 800;
 }
 
 .cta {
   display: flex;
-  min-height: 3.35rem;
-  width: 100%;
+  min-height: 3rem;
+  margin-top: auto;
+  padding: 0 0.9rem;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   border: 0;
-  border-radius: 1rem;
-  background: var(--accent);
-  box-shadow: 0 0.7rem 1.5rem rgb(95 75 182 / 24%);
-  color: white;
+  border-radius: 0.65rem;
+  background: #050505;
+  color: #fff;
   font: inherit;
-  font-weight: 800;
+  font-size: 0.8rem;
+  font-weight: 850;
   text-decoration: none;
-  grid-row: 5;
 }
 
 .cta:focus-visible {
-  outline: 3px solid #bdacef;
+  outline: 3px solid #315cff;
   outline-offset: 3px;
 }
 
 .cta:disabled {
-  background: #aaa3b8;
-  box-shadow: none;
+  justify-content: center;
+  background: #454545;
+  color: #fff;
   cursor: not-allowed;
 }
 
+.cardMark {
+  position: absolute;
+  right: -0.15em;
+  bottom: -0.2em;
+  font-size: 8rem;
+  font-weight: 900;
+  line-height: 1;
+  opacity: 0.9;
+  transform: rotate(12deg);
+}
+
 @media (max-width: 21rem) {
-  .shell {
-    padding-inline: 0.8rem;
+  .frame {
+    padding-inline: 0.75rem;
   }
 
-  .card {
-    width: 9.7rem;
-    height: 11.5rem;
+  .hero h1 {
+    font-size: 2.08rem;
   }
 
-  .copy h1 {
-    font-size: 1.85rem;
+  .packRail {
+    width: calc(100% + 1.5rem);
+    margin-inline: -0.75rem;
+    padding-inline: 0.75rem;
   }
 }
 
 @media (min-width: 48rem) {
-  .shell {
-    width: min(100%, 60rem);
+  .frame {
+    width: min(100%, 64rem);
     padding: 2rem;
-    grid-template-columns: 1.15fr 1fr;
-    grid-template-rows: auto 1fr auto;
+    grid-template-columns: minmax(20rem, 0.8fr) minmax(26rem, 1.2fr);
+    grid-template-rows: auto 1fr;
     column-gap: 3rem;
   }
 
@@ -219,16 +339,17 @@
   }
 
   .hero {
-    grid-row: 2 / 4;
+    align-self: center;
   }
 
-  .copy {
-    align-self: end;
-    text-align: left;
+  .packs {
+    min-width: 0;
+    align-self: center;
   }
 
-  .cta {
-    align-self: start;
-    grid-row: auto;
+  .packRail {
+    width: 100%;
+    margin: 0;
+    padding-inline: 0.2rem 2rem;
   }
 }
