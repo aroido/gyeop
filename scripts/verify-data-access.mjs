@@ -48,24 +48,18 @@ function hasDirectTableCall(filePath, source) {
   const file = sourceFile(filePath, source);
   let found = false;
   function visit(node) {
-    if (ts.isCallExpression(node)) {
-      const access = node.expression;
-      const propertyName = ts.isPropertyAccessExpression(access)
-        ? access.name.text
-        : ts.isElementAccessExpression(access) &&
-            ts.isStringLiteral(access.argumentExpression)
-          ? access.argumentExpression.text
-          : undefined;
-      const receiver =
-        ts.isPropertyAccessExpression(access) ||
-        ts.isElementAccessExpression(access)
-          ? access.expression.getText()
-          : "";
-      if (
-        propertyName === "from" &&
-        !["Array", "Buffer", "Object"].includes(receiver)
-      ) {
+    if (isMemberAccess(node) && memberName(node) === "from") {
+      const receiver = node.expression.getText();
+      if (!["Array", "Buffer", "Object"].includes(receiver)) {
         found = true;
+      }
+    }
+    if (ts.isObjectBindingPattern(node)) {
+      for (const element of node.elements) {
+        const property =
+          element.propertyName?.getText().replace(/["']/g, "") ??
+          element.name.getText();
+        if (property === "from") found = true;
       }
     }
     ts.forEachChild(node, visit);
@@ -117,6 +111,23 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function hasExactJobProofPayload(call) {
+  const payload = call.arguments[1];
+  if (
+    !ts.isObjectLiteralExpression(payload) ||
+    payload.properties.length !== 2
+  ) {
+    return false;
+  }
+  const values = payload.properties.map((property) => {
+    if (ts.isShorthandPropertyAssignment(property)) return property.name.text;
+    if (ts.isPropertyAssignment(property))
+      return property.initializer.getText();
+    return undefined;
+  });
+  return values.every(Boolean) && values.sort().join(",") === "jobId,proof";
+}
+
 function functionName(node) {
   if (ts.isFunctionDeclaration(node) && node.name) return node.name.text;
   if (
@@ -152,6 +163,81 @@ function bindingNames(parameter) {
     .sort();
 }
 
+function namesBoundBy(node) {
+  if (ts.isIdentifier(node)) return [node.text];
+  if (ts.isObjectBindingPattern(node) || ts.isArrayBindingPattern(node)) {
+    return node.elements.flatMap((element) =>
+      ts.isBindingElement(element) ? namesBoundBy(element.name) : [],
+    );
+  }
+  return [];
+}
+
+function assignedRootName(expression) {
+  let current = expression;
+  while (
+    ts.isPropertyAccessExpression(current) ||
+    ts.isElementAccessExpression(current) ||
+    ts.isParenthesizedExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return ts.isIdentifier(current) ? current.text : undefined;
+}
+
+function hasUnsafeRebinding(root, names, beforeNode, ignoredDeclaration) {
+  const restricted = new Set(names);
+  let found = false;
+  function visit(node) {
+    if (found || node.pos >= beforeNode.pos) return;
+    if (
+      ts.isVariableDeclaration(node) &&
+      node !== ignoredDeclaration &&
+      namesBoundBy(node.name).some((name) => restricted.has(name))
+    ) {
+      found = true;
+      return;
+    }
+    if (
+      (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) &&
+      node.name &&
+      restricted.has(node.name.text)
+    ) {
+      found = true;
+      return;
+    }
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+      node.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
+      restricted.has(assignedRootName(node.left))
+    ) {
+      found = true;
+      return;
+    }
+    if (
+      (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) &&
+      [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(
+        node.operator,
+      ) &&
+      restricted.has(assignedRootName(node.operand))
+    ) {
+      found = true;
+      return;
+    }
+    if (
+      ts.isDeleteExpression(node) &&
+      restricted.has(assignedRootName(node.expression))
+    ) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(root);
+  return found;
+}
+
 function boundRpcResults(ownerFunction, rpcName, beforeNode) {
   const matches = [];
 
@@ -170,8 +256,10 @@ function boundRpcResults(ownerFunction, rpcName, beforeNode) {
         ts.isCallExpression(initializer) &&
         ts.isPropertyAccessExpression(initializer.expression) &&
         initializer.expression.name.text === "rpc" &&
+        initializer.expression.expression.getText() === "getInternalClient()" &&
         ts.isStringLiteral(initializer.arguments[0]) &&
         initializer.arguments[0].text === rpcName &&
+        hasExactJobProofPayload(initializer) &&
         ts.isVariableDeclarationList(node.parent) &&
         (node.parent.flags & ts.NodeFlags.Const) !== 0
       ) {
@@ -183,7 +271,7 @@ function boundRpcResults(ownerFunction, rpcName, beforeNode) {
         }
         const data = bindings.get("data");
         const error = bindings.get("error");
-        if (data && error) matches.push({ data, error });
+        if (data && error) matches.push({ data, error, declaration: node });
       }
     }
     ts.forEachChild(node, visit);
@@ -277,6 +365,15 @@ function verifyAdminCalls(filePath, source, findings) {
         if (!ts.isPropertyAccessExpression(access)) {
           findings.push(`${filePath}: dynamic auth.admin access is forbidden`);
         }
+        const authAccess = adminAccess.expression;
+        if (
+          !isMemberAccess(authAccess) ||
+          authAccess.expression.getText() !== "getInternalClient()"
+        ) {
+          findings.push(
+            `${filePath}: auth.admin must use the internal client directly`,
+          );
+        }
         const ownerFunction = enclosingFunction(node);
         const ownerName = ownerFunction
           ? functionName(ownerFunction)
@@ -323,6 +420,27 @@ function verifyAdminCalls(filePath, source, findings) {
           const prepared = bindings[0]?.data;
           const prepareError = bindings[0]?.error;
           if (
+            ownerFunction?.body &&
+            bindings[0] &&
+            hasUnsafeRebinding(
+              ownerFunction.body,
+              [
+                prepared,
+                prepareError,
+                "jobId",
+                "proof",
+                "getInternalClient",
+                "Date",
+              ],
+              node,
+              bindings[0].declaration,
+            )
+          ) {
+            findings.push(
+              `${filePath}: deleteAuthUser cannot shadow or mutate trusted provenance`,
+            );
+          }
+          if (
             node.arguments.length !== 2 ||
             node.arguments[1].kind !== ts.SyntaxKind.FalseKeyword
           ) {
@@ -349,7 +467,7 @@ function verifyAdminCalls(filePath, source, findings) {
                 `^(?:${escapeRegExp(prepared)}\\.allowed|${escapeRegExp(prepared)}\\.status\\s*===\\s*["']prepared["'])$`,
               ),
               new RegExp(
-                `^(?!.*\\|\\|).*${escapeRegExp(prepared)}\\.(?:callBefore|call_before).*?>.*?(?:Date\\.now|\\bnow\\b)`,
+                `^${escapeRegExp(prepared)}\\.(?:callBefore|call_before)\\s*>\\s*Date\\.now\\(\\)$`,
               ),
             ])
           ) {
@@ -372,6 +490,20 @@ function verifyAdminCalls(filePath, source, findings) {
           }
           const identity = bindings[0]?.data;
           const identityError = bindings[0]?.error;
+          if (
+            ownerFunction?.body &&
+            bindings[0] &&
+            hasUnsafeRebinding(
+              ownerFunction.body,
+              [identity, identityError, "jobId", "proof", "getInternalClient"],
+              node,
+              bindings[0].declaration,
+            )
+          ) {
+            findings.push(
+              `${filePath}: resolveNotificationRecipient cannot shadow or mutate trusted provenance`,
+            );
+          }
           if (
             !identity ||
             ![
@@ -476,12 +608,25 @@ function verifyOwnerMutationFunction(statement, name, findings) {
     !ts.isStringLiteral(rpcCall.arguments[0]) ||
     rpcCall.arguments[0].text !== expectedRpc ||
     !callback ||
-    !isDescendantOf(rpcCall, callback.body)
+    !isDescendantOf(rpcCall, callback.body) ||
+    enclosingFunction(rpcCall) !== callback
   ) {
     findings.push(
       `${INTERNAL_RPC_PATH}: ${name} must invoke ${expectedRpc} inside the fresh actor callback`,
     );
     return;
+  }
+
+  if (
+    hasUnsafeRebinding(
+      statement,
+      ["actor", "signal", "getInternalClient", "withOwnerMutationActor"],
+      rpcCall,
+    )
+  ) {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} cannot shadow or mutate trusted owner sources`,
+    );
   }
 
   const args = rpcCall.arguments[1];
@@ -553,6 +698,11 @@ function verifyInternalRpc(source, findings) {
       }
       if (!ts.isPropertyAccessExpression(node)) {
         findings.push(`${INTERNAL_RPC_PATH}: dynamic RPC access is forbidden`);
+      }
+      if (node.expression.getText() !== "getInternalClient()") {
+        findings.push(
+          `${INTERNAL_RPC_PATH}: RPC calls must use the internal client directly`,
+        );
       }
     }
     ts.forEachChild(node, collectRpcAccess);
@@ -702,7 +852,9 @@ export function verifyOwnerMutationSql(sql, filePath = "migration.sql") {
       ? body.slice(body.toLowerCase().indexOf("begin") + 5).trimStart()
       : "";
     if (
-      !/^perform\s+private\.assert_owner_mutation_actor\s*\(/i.test(executable)
+      !/^perform\s+private\.assert_owner_mutation_actor\s*\(\s*p_actor_id\s*,\s*p_recovery_actor_candidates\s*\)\s*;/i.test(
+        executable,
+      )
     ) {
       findings.push(
         `${filePath}: ${name} must call the owner guard as its first statement`,
@@ -755,6 +907,38 @@ export function verifySecurityDefinerSql(sql, filePath = "migration.sql") {
   return findings;
 }
 
+function importsOwnerActorModule(filePath, source) {
+  const file = sourceFile(filePath, source);
+  let found = false;
+  function isRestrictedModule(specifier) {
+    return /owner-mutation-actor(?:-core)?(?:\.[cm]?[jt]s)?$/.test(specifier);
+  }
+  function visit(node) {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier) &&
+      isRestrictedModule(node.moduleSpecifier.text)
+    ) {
+      found = true;
+    }
+    if (
+      ts.isCallExpression(node) &&
+      node.arguments.length === 1 &&
+      ts.isStringLiteral(node.arguments[0]) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) &&
+          node.expression.text === "require")) &&
+      isRestrictedModule(node.arguments[0].text)
+    ) {
+      found = true;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(file);
+  return found;
+}
+
 export function verifyDataAccessFiles(files) {
   const findings = [];
 
@@ -774,7 +958,7 @@ export function verifyDataAccessFiles(files) {
       if (
         filePath !== OWNER_ACTOR_PATH &&
         filePath !== INTERNAL_RPC_PATH &&
-        /from\s+["'][^"']*owner-mutation-actor(?:-core)?/.test(source)
+        importsOwnerActorModule(filePath, source)
       ) {
         findings.push(
           `${filePath}: owner actor internals cannot be imported here`,
