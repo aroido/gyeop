@@ -66,7 +66,7 @@ Issue: https://github.com/aroido/gyeop/issues/13
   - `consume_rate_limit`은 DB `clock_timestamp()`로 fixed window를 계산하고 `INSERT ... ON CONFLICT ... DO UPDATE count = count + 1 RETURNING`으로 경쟁 호출을 직렬화한다.
   - limit 초과 호출도 관측 count를 원자 증가시키고 `retry_after_seconds`는 현재 window 끝까지 남은 초를 최소 1로 올림한다.
 - 두 table 모두 RLS enabled이며 public policy가 없다. 직접 table access는 `service_role`도 회수해 secret key의 허용 경로를 RPC로 한정한다.
-- migration은 `gyeop_internal_rpc` 전용 role을 `NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`로 만들고 role membership을 부여하지 않는다. role에는 `public` USAGE, `rate_limit_buckets`의 SELECT/INSERT/UPDATE, 그 role만 통과하는 table RLS policy와 function ownership만 준다. schema CREATE, table ownership, DELETE, 다른 application table 권한은 최종 상태에 남기지 않는다.
+- migration은 `gyeop_internal_rpc` 전용 role을 `NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`로 만든다. Supabase role administration이 role creator인 `postgres`에 남기는 admin-only membership은 `inherit_option=false`, `set_option=false`일 때만 허용하고, 그 밖의 member 또는 inherit/set 가능한 membership은 전수 거부한다. role에는 `public` USAGE, `rate_limit_buckets`의 SELECT/INSERT/UPDATE, 그 role만 통과하는 table RLS policy와 function ownership만 준다. schema CREATE, table ownership, DELETE, 다른 application table 권한은 최종 상태에 남기지 않는다.
 - `consume_rate_limit`은 `SECURITY DEFINER SET search_path = ''`, schema-qualified relation을 사용하고 `OWNER TO gyeop_internal_rpc`로 바꾼 뒤 `service_role`에만 EXECUTE를 grant한다. catalog gate는 owner role 속성·membership·exact relation privilege와 함수 owner를 함께 검사한다.
 - `internal-rpc.ts`의 Supabase client는 `persistSession:false`, `autoRefreshToken:false`, `detectSessionInUrl:false`로 생성하며 module 밖으로 export하지 않는다.
 - `consumeRateLimit` wrapper는 허용된 RPC 이름과 입력·출력만 노출하고 Supabase error 원문이나 secret을 log하지 않은 채 일반화된 server error로 실패한다.
@@ -89,7 +89,7 @@ Issue: https://github.com/aroido/gyeop/issues/13
 - [ ] service_role도 table 직접 권한은 없고 `consume_rate_limit` EXECUTE만 가진다.
 - [ ] 새 public application table의 RLS가 꺼져 있거나 table/sequence/function default grant가 열리면 pgTAP이 실패한다.
 - [ ] security mode와 무관하게 모든 application function은 `PUBLIC`·`anon`·`authenticated` EXECUTE가 없고, `service_role` EXECUTE는 코드와 테스트에 명시한 exact signature allowlist와 일치한다.
-- [ ] `SECURITY DEFINER` 함수가 최소 권한 `gyeop_internal_rpc` owner, empty search path, schema-qualified relation 중 하나라도 어기거나 owner role에 login/superuser/bypassrls/role membership/과도한 relation 권한이 생기면 pgTAP 또는 정적 gate가 실패한다.
+- [ ] `SECURITY DEFINER` 함수가 최소 권한 `gyeop_internal_rpc` owner, empty search path, schema-qualified relation 중 하나라도 어기거나 owner role에 login/superuser/bypassrls/과도한 relation 권한이 생기면 pgTAP 또는 정적 gate가 실패한다. Supabase bootstrap의 `postgres` admin-only·inherit/set 불가 edge 외 role membership도 실패한다.
 - [ ] `SUPABASE_SECRET_KEY`와 secret `createClient`는 `lib/db/internal-rpc.ts`에만 있고 raw client와 `.from()`은 export·호출되지 않는다.
 - [ ] 허용되지 않은 RPC export, 다른 Auth Admin method, named wrapper 밖 Admin 호출, soft/dynamic delete, raw UID/email/array wrapper 인자 fixture는 정적 gate에서 실패한다.
 - [ ] named Auth wrapper가 resolver/prepare error·empty·denied·expired 뒤 Admin method에 도달하는 fixture는 실패하고, wrapper가 아직 없는 현재 runtime에는 가짜 Admin 동작을 추가하지 않는다.
@@ -138,6 +138,6 @@ P0/P1 Findings: 0
 ## 리스크와 미결정 사항
 
 - Supabase project별 built-in default ACL owner가 다를 수 있다. migration은 application object creator인 `postgres`의 기본 권한을 회수하고 pgTAP은 실제 application object에 남은 public grant를 최종 판정한다. 다른 owner가 future migration을 만들면 CI catalog gate가 차단한다.
-- `service_role` table 직접 grant도 회수하므로 이후 모든 server data access는 definer RPC로만 추가해야 한다. `gyeop_internal_rpc`는 로그인·role membership·BYPASSRLS 없이 exact table policy와 privilege만 받아 이 경계를 넓히지 않는다.
+- `service_role` table 직접 grant도 회수하므로 이후 모든 server data access는 definer RPC로만 추가해야 한다. `gyeop_internal_rpc`는 로그인·BYPASSRLS·runtime inherit/set 경로 없이 exact table policy와 privilege만 받아 이 경계를 넓히지 않는다. Supabase가 role creator에 남기는 admin-only edge는 migration 권한 운영용이며 Data API role의 실행 경로가 아니다.
 - Auth Admin과 owner lifecycle의 전체 runtime 검증은 해당 schema가 생기는 후속 이슈에서 완성된다. 이번 이슈는 그 코드가 들어오는 순간 실패하는 정적 fixture gate까지만 제공하며 보안 동작을 흉내 내는 placeholder는 만들지 않는다.
 - 구현 전 해결해야 할 외부 블로커는 없다.

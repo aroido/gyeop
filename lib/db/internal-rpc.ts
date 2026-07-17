@@ -1,0 +1,80 @@
+import "server-only";
+
+import { Buffer } from "node:buffer";
+
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+let internalClient: SupabaseClient | undefined;
+
+function requiredServerEnv(name: string) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required server configuration: ${name}`);
+  }
+  return value;
+}
+
+function getInternalClient() {
+  internalClient ??= createClient(
+    requiredServerEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    requiredServerEnv("SUPABASE_SECRET_KEY"),
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    },
+  );
+  return internalClient;
+}
+
+export type ConsumeRateLimitInput = Readonly<{
+  keyHash: Uint8Array;
+  action: string;
+  windowSeconds: number;
+  limit: number;
+  signal?: AbortSignal;
+}>;
+
+export type ConsumeRateLimitResult = Readonly<{
+  allowed: boolean;
+  currentCount: number;
+  limitCount: number;
+  retryAfterSeconds: number;
+  windowStart: string;
+  expiresAt: string;
+}>;
+
+export async function consumeRateLimit(
+  input: ConsumeRateLimitInput,
+): Promise<ConsumeRateLimitResult> {
+  if (input.keyHash.byteLength !== 32) {
+    throw new Error("Rate limit key must be 32 bytes");
+  }
+
+  let query = getInternalClient().rpc("consume_rate_limit", {
+    p_key_hash: `\\x${Buffer.from(input.keyHash).toString("hex")}`,
+    p_action: input.action,
+    p_window_seconds: input.windowSeconds,
+    p_limit: input.limit,
+  });
+  if (input.signal) {
+    query = query.abortSignal(input.signal);
+  }
+
+  const { data, error } = await query;
+  const row = Array.isArray(data) ? data[0] : undefined;
+  if (error || !row) {
+    throw new Error("Internal rate limit RPC failed");
+  }
+
+  return Object.freeze({
+    allowed: Boolean(row.allowed),
+    currentCount: Number(row.current_count),
+    limitCount: Number(row.limit_count),
+    retryAfterSeconds: Number(row.retry_after_seconds),
+    windowStart: String(row.window_start),
+    expiresAt: String(row.expires_at),
+  });
+}

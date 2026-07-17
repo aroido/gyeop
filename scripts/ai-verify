@@ -82,6 +82,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm test:secrets
+node scripts/verify-data-access.mjs
 
 if ! pnpm exec supabase status --output json >/dev/null 2>&1; then
   SUPABASE_STARTED_BY_VERIFY=1
@@ -92,6 +93,8 @@ if ! pnpm supabase:start >/dev/null; then
 fi
 pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
 pnpm test:db
+pnpm supabase:lint
+node --test tests/integration/data-access.test.mjs
 pnpm build
 pnpm test:e2e --project=mobile-chromium
 

@@ -12,22 +12,27 @@
     "prestart": "node --env-file-if-exists=.env.local scripts/validate-env.mjs",
     "start": "next start",
     "build": "next build",
-    "format": "prettier --write app tests scripts/validate-env.mjs playwright.config.ts next.config.ts eslint.config.mjs package.json .github/workflows/ci.yml",
-    "format:check": "prettier --check app tests scripts/validate-env.mjs playwright.config.ts next.config.ts eslint.config.mjs package.json .github/workflows/ci.yml",
-    "lint": "eslint app tests/e2e playwright.config.ts next.config.ts",
+    "format": "prettier --write app lib tests scripts/validate-env.mjs scripts/verify-data-access.mjs playwright.config.ts next.config.ts eslint.config.mjs package.json .github/workflows/ci.yml",
+    "format:check": "prettier --check app lib tests scripts/validate-env.mjs scripts/verify-data-access.mjs playwright.config.ts next.config.ts eslint.config.mjs package.json .github/workflows/ci.yml",
+    "lint": "eslint app lib tests/e2e playwright.config.ts next.config.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/unit/validate-env.test.mjs tests/unit/packs.test.mjs",
+    "test": "node --test tests/unit/validate-env.test.mjs tests/unit/packs.test.mjs tests/unit/data-access-policy.test.mjs tests/unit/owner-mutation-actor.test.mjs",
     "test:secrets": "node --test tests/unit/repository-secrets.test.mjs",
+    "test:data-access": "node scripts/verify-data-access.mjs && node --test tests/integration/data-access.test.mjs",
     "supabase:start": "supabase start --exclude studio,imgproxy,edge-runtime,logflare,vector,storage-api,realtime,supavisor",
     "supabase:stop": "supabase stop --no-backup",
     "supabase:reset": "supabase db reset",
     "test:db": "supabase test db supabase/tests --local",
+    "supabase:lint": "supabase db lint --local --level warning",
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@supabase/ssr": "0.12.3",
+    "@supabase/supabase-js": "2.110.7",
     "next": "16.2.10",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "server-only": "0.0.1"
   },
   "devDependencies": {
     "@playwright/test": "1.61.1",

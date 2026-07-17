@@ -1,0 +1,190 @@
+import assert from "node:assert/strict";
+import path from "node:path";
+import test from "node:test";
+
+import {
+  collectRepositoryPolicyFiles,
+  verifyDataAccessFiles,
+  verifyOwnerMutationSql,
+} from "../../scripts/verify-data-access.mjs";
+
+const root = path.resolve(new URL("../../", import.meta.url).pathname);
+const internalPath = "lib/db/internal-rpc.ts";
+
+async function fixtureFiles() {
+  return collectRepositoryPolicyFiles(root);
+}
+
+test("accepts the repository server-only RPC boundary", async () => {
+  assert.deepEqual(verifyDataAccessFiles(await fixtureFiles()), []);
+});
+
+test("rejects secret use, direct tables, actor imports, and raw client exports", async () => {
+  const files = await fixtureFiles();
+  files["lib/leaked-secret.ts"] =
+    'const key = process.env.SUPABASE_SECRET_KEY; db.from("events");';
+  files["app/api/leaked-actor.ts"] =
+    'import { withOwnerMutationActor } from "@/lib/db/owner-mutation-actor";';
+  files[internalPath] += "\nexport const leakedClient = getInternalClient();\n";
+
+  const findings = verifyDataAccessFiles(files).join("\n");
+  assert.match(findings, /SUPABASE_SECRET_KEY is restricted/);
+  assert.match(findings, /direct table access is forbidden/);
+  assert.match(findings, /owner actor internals cannot be imported/);
+  assert.match(findings, /exported runtime variables are forbidden/);
+});
+
+test("rejects non-allowlisted and dynamic Auth Admin access", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function unsafeAdmin() {
+  const method = "listUsers";
+  await getInternalClient().auth.admin[method]();
+  return getInternalClient().auth.admin.listUsers();
+}
+`;
+
+  const findings = verifyDataAccessFiles(files).join("\n");
+  assert.match(findings, /dynamic auth.admin access is forbidden/);
+  assert.match(findings, /auth.admin.listUsers is outside its named wrapper/);
+  assert.match(findings, /unsafeAdmin is not allowlisted/);
+});
+
+test("requires job-bound delete preparation and literal hard delete", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function deleteAuthUser({ jobId, proof }) {
+  const { data: prepared } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  if (prepared.allowed && prepared.call_before > Date.now()) {
+    return getInternalClient().auth.admin.deleteUser(prepared.uid, true);
+  }
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /deleteUser requires literal false/,
+  );
+});
+
+test("rejects raw UID wrapper input and unguarded recipient lookup", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function deleteAuthUser({ jobId, proof, uid }) {
+  const { data: prepared } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  if (prepared.status === "prepared" && prepared.call_before > Date.now()) {
+    return getInternalClient().auth.admin.deleteUser(uid, false);
+  }
+}
+export async function resolveNotificationRecipient({ jobId, proof }) {
+  await getInternalClient().rpc("resolve_notification_recipient_identity", { jobId, proof });
+  return getInternalClient().auth.admin.getUserById("arbitrary");
+}
+`;
+
+  const findings = verifyDataAccessFiles(files).join("\n");
+  assert.match(findings, /must accept only \{ jobId, proof \}/);
+  assert.match(findings, /getUserById must be dominated/);
+});
+
+test("accepts structurally guarded named Auth Admin wrappers", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function deleteAuthUser({ jobId, proof }) {
+  const { data: prepared } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  if (prepared.allowed && prepared.call_before > Date.now()) {
+    return getInternalClient().auth.admin.deleteUser(prepared.uid, false);
+  }
+}
+export async function resolveNotificationRecipient({ jobId, proof }) {
+  const { data: identity, error: identityError } = await getInternalClient().rpc("resolve_notification_recipient_identity", { jobId, proof });
+  if (!identityError && identity && identity.user_id) {
+    return getInternalClient().auth.admin.getUserById(identity.user_id);
+  }
+}
+`;
+
+  assert.deepEqual(verifyDataAccessFiles(files), []);
+});
+
+const guardedOwnerSql = `
+create function private.assert_owner_mutation_actor() returns void language plpgsql as $$ begin null; end $$;
+create function public.create_share_link(
+  p_actor_id uuid,
+  p_recovery_actor_candidates jsonb
+) returns void language plpgsql as $body$
+begin
+  perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);
+  return;
+end
+$body$;
+`;
+
+test("requires the common owner guard as the first executable SQL statement", () => {
+  assert.deepEqual(verifyOwnerMutationSql(guardedOwnerSql), []);
+
+  assert.match(
+    verifyOwnerMutationSql(
+      guardedOwnerSql.replace(
+        "perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);",
+        "perform now();\n  perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);",
+      ),
+    ).join("\n"),
+    /must call the owner guard as its first statement/,
+  );
+
+  assert.match(
+    verifyOwnerMutationSql(
+      guardedOwnerSql.replace(
+        "perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);",
+        "if false then\n    perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);\n  end if;",
+      ),
+    ).join("\n"),
+    /must call the owner guard as its first statement/,
+  );
+});
+
+test("requires owner actor inputs and the shared guard definition", () => {
+  const sql = guardedOwnerSql
+    .replace(/create function private[\s\S]*?\$\$;/, "")
+    .replace("p_actor_id uuid,", "p_uid uuid,");
+  const findings = verifyOwnerMutationSql(sql).join("\n");
+  assert.match(findings, /require private.assert_owner_mutation_actor/);
+  assert.match(findings, /missing the exact owner actor inputs/);
+});
+
+test("rejects owner RPCs that expose actor material", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function createShareLink() {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    await getInternalClient().rpc("create_share_link", {}).abortSignal(signal);
+    return actor;
+  });
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /cannot return owner actor material/,
+  );
+});
+
+test("rejects injected actor sources and owner RPCs without the deadline signal", async () => {
+  const files = await fixtureFiles();
+  files["lib/db/owner-mutation-actor.ts"] = files[
+    "lib/db/owner-mutation-actor.ts"
+  ].replace(
+    "callback: (context: OwnerMutationContext) => Promise<T>,",
+    "callback: (context: OwnerMutationContext) => Promise<T>, uid: string,",
+  );
+  files[internalPath] += `
+export async function createShareLink() {
+  return withOwnerMutationActor(async ({ signal }) => {
+    return getInternalClient().rpc("create_share_link", {});
+  });
+}
+`;
+
+  const findings = verifyDataAccessFiles(files).join("\n");
+  assert.match(findings, /wrapper accepts callback only/);
+  assert.match(findings, /must bind the owner deadline signal/);
+});
