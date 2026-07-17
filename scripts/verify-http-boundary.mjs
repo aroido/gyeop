@@ -16,6 +16,7 @@ const REQUIRED_FILES = [
   "lib/http/http-boundary-core.mjs",
   "lib/http/request-boundary.ts",
   "lib/http/rate-limit.ts",
+  "lib/http/published-pack.ts",
   "lib/http/strict-json-schema.ts",
   "lib/security/network-key.mjs",
   "lib/security/proxy-origin-secret.mjs",
@@ -50,6 +51,10 @@ const HTTP_METHODS = new Set([
   "OPTIONS",
 ]);
 const PUBLIC_BOUNDARY_FILE = "lib/http/request-boundary.ts";
+const REVIEWED_INTERNAL_ADAPTERS = new Set([
+  "lib/http/rate-limit.ts",
+  "lib/http/published-pack.ts",
+]);
 
 function parseSource(file, source) {
   let scriptKind = ts.ScriptKind.TS;
@@ -254,7 +259,21 @@ function isDeferredBoundaryCallback(expression) {
   return ts.isArrowFunction(callback) || ts.isFunctionExpression(callback);
 }
 
-function handlerReturnsReviewedBoundary(handler, aliases) {
+function returnedExpression(handler) {
+  const body = handler.body;
+  if (!body) return undefined;
+  if (!ts.isBlock(body)) return body;
+  if (
+    body.statements.length === 1 &&
+    ts.isReturnStatement(body.statements[0]) &&
+    body.statements[0].expression !== undefined
+  ) {
+    return body.statements[0].expression;
+  }
+  return undefined;
+}
+
+function reviewedBoundaryCallFromHandler(handler, aliases) {
   if (
     handler.parameters.length === 0 ||
     !ts.isIdentifier(handler.parameters[0].name) ||
@@ -265,31 +284,271 @@ function handlerReturnsReviewedBoundary(handler, aliases) {
       bindingShadowsAlias(parameter.name, aliases),
     )
   ) {
-    return false;
+    return undefined;
   }
-  const body = handler.body;
-  if (!body) return false;
-  let expression;
-  if (!ts.isBlock(body)) {
-    expression = body;
-  } else if (
-    body.statements.length === 1 &&
-    ts.isReturnStatement(body.statements[0]) &&
-    body.statements[0].expression !== undefined
-  ) {
-    expression = body.statements[0].expression;
-  } else {
-    return false;
-  }
+  const expression = returnedExpression(handler);
+  if (!expression) return undefined;
   const call = reviewedBoundaryCall(expression, aliases);
-  if (!call || call.arguments.length !== 3) return false;
+  if (!call || call.arguments.length !== 3) return undefined;
   const requestArgument = unwrapExpression(call.arguments[0]);
-  return (
+  if (
     ts.isIdentifier(requestArgument) &&
     requestArgument.text === handler.parameters[0].name.text &&
     isSafeBoundaryOptions(call.arguments[1]) &&
     isDeferredBoundaryCallback(call.arguments[2])
+  ) {
+    return call;
+  }
+  return undefined;
+}
+
+function handlerReturnsReviewedBoundary(handler, aliases) {
+  return reviewedBoundaryCallFromHandler(handler, aliases) !== undefined;
+}
+
+function moduleLoadsTarget(parsed, route, files, target) {
+  const loads = [];
+  function record(node, specifier) {
+    if (resolveImport(route, specifier, files) === target) loads.push(node);
+  }
+  function visit(node) {
+    if (
+      (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      record(node, node.moduleSpecifier.text);
+    } else if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference) &&
+      node.moduleReference.expression &&
+      ts.isStringLiteral(node.moduleReference.expression)
+    ) {
+      record(node, node.moduleReference.expression.text);
+    } else if (
+      ts.isCallExpression(node) &&
+      node.arguments.length >= 1 &&
+      ts.isStringLiteral(node.arguments[0]) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) &&
+          node.expression.text === "require"))
+    ) {
+      record(node, node.arguments[0].text);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(parsed);
+  return loads;
+}
+
+function exactNamedImportAliases(parsed, route, files, target, importedName) {
+  const aliases = new Set();
+  const loads = moduleLoadsTarget(parsed, route, files, target);
+  if (loads.length !== 1 || !ts.isImportDeclaration(loads[0])) {
+    return undefined;
+  }
+  const importClause = loads[0].importClause;
+  if (
+    !importClause ||
+    importClause.isTypeOnly ||
+    importClause.name ||
+    !importClause.namedBindings ||
+    !ts.isNamedImports(importClause.namedBindings) ||
+    importClause.namedBindings.elements.length !== 1
+  ) {
+    return undefined;
+  }
+  const [binding] = importClause.namedBindings.elements;
+  if (
+    binding.isTypeOnly ||
+    (binding.propertyName ?? binding.name).text !== importedName
+  ) {
+    return undefined;
+  }
+  aliases.add(binding.name.text);
+  return aliases;
+}
+
+function identifierUses(node, aliases) {
+  const uses = [];
+  function visit(current) {
+    if (ts.isImportDeclaration(current)) return;
+    if (ts.isIdentifier(current) && aliases.has(current.text)) {
+      const parent = current.parent;
+      const isPropertyName =
+        (ts.isPropertyAccessExpression(parent) && parent.name === current) ||
+        (ts.isPropertyAssignment(parent) && parent.name === current) ||
+        (ts.isMethodDeclaration(parent) && parent.name === current) ||
+        (ts.isPropertyDeclaration(parent) && parent.name === current);
+      if (!isPropertyName) uses.push(current);
+    }
+    ts.forEachChild(current, visit);
+  }
+  visit(node);
+  return uses;
+}
+
+function singleDirectImportedCall(parsed, aliases) {
+  const uses = identifierUses(parsed, aliases);
+  if (uses.length !== 1) return undefined;
+  const [use] = uses;
+  const parent = use.parent;
+  return ts.isCallExpression(parent) &&
+    parent.expression === use &&
+    !parent.questionDotToken
+    ? parent
+    : undefined;
+}
+
+function directlyReturnedCall(handler, aliases) {
+  const expression = returnedExpression(handler);
+  if (!expression) return undefined;
+  const call = reviewedBoundaryCall(expression, aliases);
+  return call;
+}
+
+function isExactIdentifier(expression, expected) {
+  const value = unwrapExpression(expression);
+  return ts.isIdentifier(value) && value.text === expected;
+}
+
+function isFixedPackCatalogPolicy(expression) {
+  const policy = unwrapExpression(expression);
+  if (!ts.isObjectLiteralExpression(policy)) return false;
+  const values = new Map();
+  for (const property of policy.properties) {
+    if (ts.isShorthandPropertyAssignment(property)) {
+      if (
+        values.has(property.name.text) ||
+        property.objectAssignmentInitializer
+      ) {
+        return false;
+      }
+      values.set(property.name.text, property.name);
+      continue;
+    }
+    if (!ts.isPropertyAssignment(property)) return false;
+    const name = propertyNameText(property.name);
+    if (!name || values.has(name)) return false;
+    values.set(name, property.initializer);
+  }
+  if (
+    values.size !== 5 ||
+    !["keyHash", "action", "windowSeconds", "limit", "signal"].every((name) =>
+      values.has(name),
+    )
+  ) {
+    return false;
+  }
+  const action = unwrapExpression(values.get("action"));
+  const windowSeconds = unwrapExpression(values.get("windowSeconds"));
+  const limit = unwrapExpression(values.get("limit"));
+  return (
+    isExactIdentifier(values.get("keyHash"), "networkKey") &&
+    ts.isStringLiteral(action) &&
+    action.text === "pack_catalog_read" &&
+    ts.isNumericLiteral(windowSeconds) &&
+    windowSeconds.text === "60" &&
+    ts.isNumericLiteral(limit) &&
+    limit.text === "60" &&
+    isExactIdentifier(values.get("signal"), "signal")
   );
+}
+
+function isNonRepeatedCallbackCall(call, callback) {
+  let current = call.parent;
+  while (current && current !== callback) {
+    if (
+      ts.isFunctionLike(current) ||
+      ts.isForStatement(current) ||
+      ts.isForInStatement(current) ||
+      ts.isForOfStatement(current) ||
+      ts.isWhileStatement(current) ||
+      ts.isDoStatement(current) ||
+      ts.isIfStatement(current) ||
+      ts.isConditionalExpression(current) ||
+      ts.isSwitchStatement(current) ||
+      ts.isCaseClause(current) ||
+      ts.isDefaultClause(current) ||
+      ts.isCatchClause(current)
+    ) {
+      return false;
+    }
+    if (
+      ts.isBinaryExpression(current) &&
+      [
+        ts.SyntaxKind.AmpersandAmpersandToken,
+        ts.SyntaxKind.BarBarToken,
+        ts.SyntaxKind.QuestionQuestionToken,
+      ].includes(current.operatorToken.kind)
+    ) {
+      return false;
+    }
+    current = current.parent;
+  }
+  return current === callback;
+}
+
+function hasSafePackCatalogOrder(route, files, contract, graph, reachable) {
+  const rateAliases = exactNamedImportAliases(
+    contract.parsed,
+    route,
+    files,
+    "lib/http/rate-limit.ts",
+    "runRateLimitedDomain",
+  );
+  const catalogAliases = exactNamedImportAliases(
+    contract.parsed,
+    route,
+    files,
+    "lib/http/published-pack.ts",
+    "readPublishedPack",
+  );
+  if (!rateAliases || !catalogAliases) return false;
+
+  if (
+    [...reachable].some(
+      (file) =>
+        file !== route &&
+        (graph.get(file) ?? []).some(
+          (edge) =>
+            edge.target === "lib/http/published-pack.ts" ||
+            edge.target === "lib/http/rate-limit.ts",
+        ),
+    )
+  ) {
+    return false;
+  }
+
+  const rateCall = singleDirectImportedCall(contract.parsed, rateAliases);
+  const catalogCall = singleDirectImportedCall(contract.parsed, catalogAliases);
+  const getHandlers = contract.handlers.filter(({ name }) => name === "GET");
+  if (!rateCall || !catalogCall || getHandlers.length !== 1) {
+    return false;
+  }
+
+  const boundaryCall = reviewedBoundaryCallFromHandler(
+    getHandlers[0].node,
+    contract.aliases,
+  );
+  if (!boundaryCall) return false;
+  const boundaryCallback = unwrapExpression(boundaryCall.arguments[2]);
+  if (
+    directlyReturnedCall(boundaryCallback, rateAliases) !== rateCall ||
+    rateCall.arguments.length !== 2 ||
+    !isFixedPackCatalogPolicy(rateCall.arguments[0])
+  ) {
+    return false;
+  }
+
+  const catalogCallback = unwrapExpression(rateCall.arguments[1]);
+  if (
+    !ts.isArrowFunction(catalogCallback) ||
+    catalogCallback.parameters.length !== 0
+  ) {
+    return false;
+  }
+  return isNonRepeatedCallbackCall(catalogCall, catalogCallback);
 }
 
 function routeBoundaryContract(route, source, files) {
@@ -342,7 +601,7 @@ function routeBoundaryContract(route, source, files) {
       }
     }
   }
-  return { aliases, handlers, importsReviewedBoundary };
+  return { aliases, handlers, importsReviewedBoundary, parsed };
 }
 
 export function verifyHttpBoundarySources(inputFiles) {
@@ -419,6 +678,14 @@ export function verifyHttpBoundarySources(inputFiles) {
       }
     }
 
+    if (route === "app/api/packs/[slug]/route.ts") {
+      if (!hasSafePackCatalogOrder(route, files, contract, graph, reachable)) {
+        findings.push(
+          `${route}: published pack read must run once behind the fixed pack_catalog_read rate limit`,
+        );
+      }
+    }
+
     for (const file of reachable) {
       const reachableSource = files.get(file);
       if (hasNonLiteralModuleLoad(file, reachableSource)) {
@@ -430,7 +697,7 @@ export function verifyHttpBoundarySources(inputFiles) {
         const rawInternalBoundary =
           edge.target === "lib/db/internal-rpc.ts" ||
           edge.target === "lib/http/rate-limit-core.mjs";
-        if (rawInternalBoundary && file !== "lib/http/rate-limit.ts") {
+        if (rawInternalBoundary && !REVIEWED_INTERNAL_ADAPTERS.has(file)) {
           findings.push(
             `${file}: reachable helper cannot import a raw internal boundary`,
           );

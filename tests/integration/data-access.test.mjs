@@ -80,32 +80,67 @@ async function waitForDataApiSchema() {
 await waitForDataApiSchema();
 
 async function tableRequest(method, table, key) {
-  const isAnalytics = table === "analytics_events";
   const now = new Date();
   const later = new Date(now.getTime() + 60_000);
-  const query = isAnalytics
-    ? "id=eq.00000000-0000-0000-0000-000000000000"
-    : "action=eq.blocked_probe";
-  const insertBody = isAnalytics
-    ? { event_name: "blocked_probe" }
-    : {
+  const fixtures = {
+    analytics_events: {
+      query: "id=eq.00000000-0000-0000-0000-000000000000",
+      insert: { event_name: "blocked_probe" },
+      update: { event_name: "blocked_update" },
+    },
+    rate_limit_buckets: {
+      query: "action=eq.blocked_probe",
+      insert: {
         key_hash: `\\x${randomBytes(32).toString("hex")}`,
         action: "blocked_probe",
         window_start: now.toISOString(),
         count: 1,
         expires_at: later.toISOString(),
-      };
-  const updateBody = isAnalytics
-    ? { event_name: "blocked_update" }
-    : { count: 2 };
+      },
+      update: { count: 2 },
+    },
+    pack_templates: {
+      query: "slug=eq.old-friend",
+      insert: {
+        slug: "blocked-pack",
+        title: "Blocked",
+        target_relationship: "old_friend",
+        sensitivity: "low",
+      },
+      update: { title: "Blocked update" },
+    },
+    pack_versions: {
+      query: "version=eq.old-friend-v1",
+      insert: {
+        template_id: "11111111-1111-4111-8111-111111111111",
+        version: "blocked-v1",
+      },
+      update: { version: "blocked-v2" },
+    },
+    pack_cards: {
+      query: "id=eq.conflict",
+      insert: {
+        pack_version_id: "15151515-1515-4515-8515-151515151515",
+        id: "blocked-card",
+        position: 1,
+        owner_prompt: "Blocked owner",
+        visitor_prompt: "Blocked visitor",
+        option_a: "A",
+        option_b: "B",
+      },
+      update: { owner_prompt: "Blocked update" },
+    },
+  };
+  const fixture = fixtures[table];
+  if (!fixture) throw new Error(`Missing table fixture for ${table}`);
 
-  return fetch(`${local.SUPABASE_URL}/rest/v1/${table}?${query}`, {
+  return fetch(`${local.SUPABASE_URL}/rest/v1/${table}?${fixture.query}`, {
     method,
     headers: headers(key),
     body:
       method === "GET" || method === "DELETE"
         ? undefined
-        : JSON.stringify(method === "POST" ? insertBody : updateBody),
+        : JSON.stringify(method === "POST" ? fixture.insert : fixture.update),
   });
 }
 
@@ -114,7 +149,13 @@ test("anon and service keys cannot access application tables directly", async ()
     local.SUPABASE_ANON_KEY,
     local.SUPABASE_SERVICE_ROLE_KEY,
   ]) {
-    for (const table of ["analytics_events", "rate_limit_buckets"]) {
+    for (const table of [
+      "analytics_events",
+      "rate_limit_buckets",
+      "pack_templates",
+      "pack_versions",
+      "pack_cards",
+    ]) {
       for (const method of ["GET", "POST", "PATCH", "DELETE"]) {
         const response = await tableRequest(method, table, key);
         assert.ok(
@@ -144,6 +185,26 @@ test("anon key cannot execute the mutation RPC", async () => {
     [401, 403, 404].includes(response.status),
     `anon RPC must be denied, got ${response.status}`,
   );
+});
+
+test("anon key cannot execute pack catalog or publication RPCs", async () => {
+  for (const [name, body] of [
+    ["get_published_pack", { p_slug: "old-friend" }],
+    [
+      "publish_pack_version",
+      { p_pack_version_id: "15151515-1515-4515-8515-151515151515" },
+    ],
+  ]) {
+    const response = await fetch(`${local.SUPABASE_URL}/rest/v1/rpc/${name}`, {
+      method: "POST",
+      headers: headers(local.SUPABASE_ANON_KEY),
+      body: JSON.stringify(body),
+    });
+    assert.ok(
+      [401, 403, 404].includes(response.status),
+      `anon ${name} must be denied, got ${response.status}`,
+    );
+  }
 });
 
 test("service RPC atomically counts competing calls", async () => {

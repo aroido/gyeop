@@ -13,6 +13,47 @@ import {
 
 const root = path.resolve(new URL("../../", import.meta.url).pathname);
 
+function packCatalogFindings({
+  catalogBody = "",
+  catalogCallback,
+  extraRouteImports = "",
+  extraFiles = {},
+}) {
+  const callback =
+    catalogCallback ??
+    `async () => {
+      ${catalogBody}
+    }`;
+  return verifyHttpBoundarySources({
+    "app/api/packs/[slug]/route.ts": `
+      import { withPublicRequest } from "@/lib/http/request-boundary";
+      import { runRateLimitedDomain } from "@/lib/http/rate-limit";
+      import { readPublishedPack } from "@/lib/http/published-pack";
+      ${extraRouteImports}
+      export function GET(request: Request) {
+        return withPublicRequest(request, {}, ({ networkKey, signal }) =>
+          runRateLimitedDomain(
+            {
+              keyHash: networkKey,
+              action: "pack_catalog_read",
+              windowSeconds: 60,
+              limit: 60,
+              signal,
+            },
+            ${callback},
+          ),
+        );
+      }
+    `,
+    "lib/http/request-boundary.ts": "export function withPublicRequest() {}",
+    "lib/http/rate-limit.ts": "export function runRateLimitedDomain() {}",
+    "lib/http/published-pack.ts":
+      'import { getPublishedPack } from "../db/internal-rpc"; export function readPublishedPack() { return getPublishedPack({}); }',
+    "lib/db/internal-rpc.ts": "export function getPublishedPack() {}",
+    ...extraFiles,
+  });
+}
+
 test("the repository HTTP boundary policy passes", () => {
   assert.doesNotThrow(() =>
     execFileSync("node", ["scripts/verify-http-boundary.mjs"], {
@@ -103,6 +144,149 @@ test("rejects a lookalike boundary and transitive direct rate-limit access", () 
   );
   assert.ok(
     findings.some((finding) => finding.includes("raw internal boundary")),
+  );
+});
+
+test("requires the published pack RPC behind the fixed catalog limiter", () => {
+  const findings = verifyHttpBoundarySources({
+    "app/api/packs/[slug]/route.ts": `
+      import { withPublicRequest } from "@/lib/http/request-boundary";
+      import { readPublishedPack } from "@/lib/http/published-pack";
+      export function GET(request: Request) {
+        return withPublicRequest(request, {}, () => readPublishedPack("old-friend"));
+      }
+    `,
+    "lib/http/request-boundary.ts": "export function withPublicRequest() {}",
+    "lib/http/published-pack.ts":
+      'import { getPublishedPack } from "../db/internal-rpc"; export function readPublishedPack() { return getPublishedPack({}); }',
+    "lib/db/internal-rpc.ts": "export function getPublishedPack() {}",
+  });
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("fixed pack_catalog_read rate limit"),
+    ),
+  );
+});
+
+test("rejects an eager pack read disguised as a deferred limiter callback", () => {
+  const findings = verifyHttpBoundarySources({
+    "app/api/packs/[slug]/route.ts": `
+      import { withPublicRequest } from "@/lib/http/request-boundary";
+      import { runRateLimitedDomain } from "@/lib/http/rate-limit";
+      import { readPublishedPack } from "@/lib/http/published-pack";
+      export function GET(request: Request) {
+        return withPublicRequest(request, {}, ({ networkKey, signal }) =>
+          runRateLimitedDomain(
+            {
+              keyHash: networkKey,
+              action: "pack_catalog_read",
+              windowSeconds: 60,
+              limit: 60,
+              signal,
+            },
+            (readPublishedPack("old-friend", signal), async () => Response.json({ ok: true })),
+          ),
+        );
+      }
+    `,
+    "lib/http/request-boundary.ts": "export function withPublicRequest() {}",
+    "lib/http/rate-limit.ts": "export function runRateLimitedDomain() {}",
+    "lib/http/published-pack.ts":
+      'import { getPublishedPack } from "../db/internal-rpc"; export function readPublishedPack() { return getPublishedPack({}); }',
+    "lib/db/internal-rpc.ts": "export function getPublishedPack() {}",
+  });
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("fixed pack_catalog_read rate limit"),
+    ),
+  );
+});
+
+test("rejects a second pack read through a namespace import", () => {
+  const findings = packCatalogFindings({
+    extraRouteImports:
+      'import * as packAdapter from "@/lib/http/published-pack";',
+    catalogBody: `
+      await packAdapter.readPublishedPack("old-friend", signal);
+      await readPublishedPack("old-friend", signal);
+      return Response.json({ ok: true });
+    `,
+  });
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("fixed pack_catalog_read rate limit"),
+    ),
+  );
+});
+
+test("rejects a second pack read through a dynamic adapter load", () => {
+  const findings = packCatalogFindings({
+    catalogBody: `
+      const packAdapter = await import("@/lib/http/published-pack");
+      await packAdapter.readPublishedPack("old-friend", signal);
+      await readPublishedPack("old-friend", signal);
+      return Response.json({ ok: true });
+    `,
+  });
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("fixed pack_catalog_read rate limit"),
+    ),
+  );
+});
+
+test("rejects a syntactically single pack read inside a repeated branch", () => {
+  const findings = packCatalogFindings({
+    catalogBody: `
+      for (const slug of ["old-friend", "old-friend"]) {
+        await readPublishedPack(slug, signal);
+      }
+      return Response.json({ ok: true });
+    `,
+  });
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("fixed pack_catalog_read rate limit"),
+    ),
+  );
+});
+
+test("rejects a named limiter callback that can recursively read the pack", () => {
+  const findings = packCatalogFindings({
+    catalogCallback: `async function loadAgain() {
+      const pack = await readPublishedPack("old-friend", signal);
+      if (!pack) return loadAgain();
+      return Response.json(pack);
+    }`,
+  });
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("fixed pack_catalog_read rate limit"),
+    ),
+  );
+});
+
+test("rejects an additional pack read hidden in a reachable helper", () => {
+  const findings = packCatalogFindings({
+    extraRouteImports: 'import { readAgain } from "@/lib/example/read-again";',
+    catalogBody: `
+      await readPublishedPack("old-friend", signal);
+      await readAgain(signal);
+      return Response.json({ ok: true });
+    `,
+    extraFiles: {
+      "lib/example/read-again.ts": `
+        import { readPublishedPack } from "../http/published-pack";
+        export function readAgain(signal: AbortSignal) {
+          return readPublishedPack("old-friend", signal);
+        }
+      `,
+    },
+  });
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("fixed pack_catalog_read rate limit"),
+    ),
   );
 });
 

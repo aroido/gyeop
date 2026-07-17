@@ -1,0 +1,106 @@
+{
+  "slug": "old-friend",
+  "version": "old-friend-v1",
+  "title": "오래된 친구팩",
+  "targetRelationship": "old_friend",
+  "sensitivity": "low",
+  "active": false,
+  "presentation": {
+    "moodLabel": "따뜻한 회상",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "old-friend-card-v1"
+  },
+  "cards": [
+    {
+      "id": "conflict",
+      "position": 1,
+      "ownerPrompt": "서운한 일이 생기면 나는?",
+      "visitorPrompt": "서운한 일이 생기면 이 사람은?",
+      "optionA": "바로 이야기한다",
+      "optionB": "생각을 정리한 뒤 말한다",
+      "isSignature": true
+    },
+    {
+      "id": "reunion",
+      "position": 2,
+      "ownerPrompt": "오랜만에 친구를 만나면 나는?",
+      "visitorPrompt": "오랜만에 친구를 만나면 이 사람은?",
+      "optionA": "어제 본 듯 바로 편해진다",
+      "optionB": "근황부터 천천히 맞춰 간다",
+      "isSignature": false
+    },
+    {
+      "id": "plans",
+      "position": 3,
+      "ownerPrompt": "약속을 잡을 때 나는?",
+      "visitorPrompt": "약속을 잡을 때 이 사람은?",
+      "optionA": "미리 날짜를 정한다",
+      "optionB": "그때그때 편한 날을 본다",
+      "isSignature": false
+    },
+    {
+      "id": "comfort",
+      "position": 4,
+      "ownerPrompt": "친구가 고민을 털어놓으면 나는?",
+      "visitorPrompt": "친구가 고민을 털어놓으면 이 사람은?",
+      "optionA": "먼저 끝까지 들어준다",
+      "optionB": "해결 방법부터 같이 찾는다",
+      "isSignature": false
+    },
+    {
+      "id": "gathering",
+      "position": 5,
+      "ownerPrompt": "여러 친구가 모인 자리에서 나는?",
+      "visitorPrompt": "여러 친구가 모인 자리에서 이 사람은?",
+      "optionA": "먼저 분위기를 띄운다",
+      "optionB": "익숙한 사람 곁에서 시작한다",
+      "isSignature": false
+    },
+    {
+      "id": "reconnect",
+      "position": 6,
+      "ownerPrompt": "연락이 뜸해졌을 때 나는?",
+      "visitorPrompt": "연락이 뜸해졌을 때 이 사람은?",
+      "optionA": "짧게 안부부터 보낸다",
+      "optionB": "만날 약속부터 잡는다",
+      "isSignature": false
+    },
+    {
+      "id": "memory",
+      "position": 7,
+      "ownerPrompt": "옛날 이야기가 나오면 나는?",
+      "visitorPrompt": "옛날 이야기가 나오면 이 사람은?",
+      "optionA": "구체적인 장면부터 떠올린다",
+      "optionB": "그때 느낀 감정부터 떠올린다",
+      "isSignature": false
+    },
+    {
+      "id": "travel",
+      "position": 8,
+      "ownerPrompt": "친구와 여행 일정을 정할 때 나는?",
+      "visitorPrompt": "친구와 여행 일정을 정할 때 이 사람은?",
+      "optionA": "미리 계획을 세운다",
+      "optionB": "현장에서 그때그때 정한다",
+      "isSignature": false
+    },
+    {
+      "id": "celebration",
+      "position": 9,
+      "ownerPrompt": "친구의 좋은 소식을 들은 직후 나는?",
+      "visitorPrompt": "친구의 좋은 소식을 들은 직후 이 사람은?",
+      "optionA": "바로 연락해 축하한다",
+      "optionB": "다음에 만날 때 직접 축하한다",
+      "isSignature": false
+    },
+    {
+      "id": "hard-day",
+      "position": 10,
+      "ownerPrompt": "힘든 날에 나는?",
+      "visitorPrompt": "힘든 날에 이 사람은?",
+      "optionA": "먼저 연락해 털어놓는다",
+      "optionB": "혼자 정리한 뒤 연락한다",
+      "isSignature": false
+    }
+  ]
+}
