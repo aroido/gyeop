@@ -74,6 +74,49 @@ function hasDirectTableCall(filePath, source) {
   return found;
 }
 
+function memberName(node) {
+  if (ts.isPropertyAccessExpression(node)) return node.name.text;
+  if (
+    ts.isElementAccessExpression(node) &&
+    ts.isStringLiteral(node.argumentExpression)
+  ) {
+    return node.argumentExpression.text;
+  }
+  return undefined;
+}
+
+function isMemberAccess(node) {
+  return (
+    ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)
+  );
+}
+
+function isAuthAdminReference(node) {
+  return (
+    isMemberAccess(node) &&
+    memberName(node) === "admin" &&
+    isMemberAccess(node.expression) &&
+    memberName(node.expression) === "auth"
+  );
+}
+
+function unwrapAwait(expression) {
+  let current = expression;
+  while (
+    ts.isAwaitExpression(current) ||
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isNonNullExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function functionName(node) {
   if (ts.isFunctionDeclaration(node) && node.name) return node.name.text;
   if (
@@ -107,6 +150,47 @@ function bindingNames(parameter) {
     .filter((element) => !element.dotDotDotToken)
     .map((element) => element.name.getText())
     .sort();
+}
+
+function boundRpcResults(ownerFunction, rpcName, beforeNode) {
+  const matches = [];
+
+  function visit(node) {
+    if (node !== ownerFunction && enclosingFunction(node) !== ownerFunction) {
+      return;
+    }
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isObjectBindingPattern(node.name) &&
+      node.initializer &&
+      node.end < beforeNode.pos
+    ) {
+      const initializer = unwrapAwait(node.initializer);
+      if (
+        ts.isCallExpression(initializer) &&
+        ts.isPropertyAccessExpression(initializer.expression) &&
+        initializer.expression.name.text === "rpc" &&
+        ts.isStringLiteral(initializer.arguments[0]) &&
+        initializer.arguments[0].text === rpcName &&
+        ts.isVariableDeclarationList(node.parent) &&
+        (node.parent.flags & ts.NodeFlags.Const) !== 0
+      ) {
+        const bindings = new Map();
+        for (const element of node.name.elements) {
+          const property =
+            element.propertyName?.getText() ?? element.name.getText();
+          bindings.set(property, element.name.getText());
+        }
+        const data = bindings.get("data");
+        const error = bindings.get("error");
+        if (data && error) matches.push({ data, error });
+      }
+    }
+    ts.forEachChild(node, visit);
+  }
+
+  visit(ownerFunction);
+  return matches;
 }
 
 function isDescendantOf(node, ancestor) {
@@ -169,19 +253,30 @@ function verifyAdminCalls(filePath, source, findings) {
   const file = sourceFile(filePath, source);
 
   function visit(node) {
-    if (
-      ts.isElementAccessExpression(node) &&
-      /\.auth\.admin$/.test(node.expression.getText())
-    ) {
-      findings.push(`${filePath}: dynamic auth.admin access is forbidden`);
+    if (isAuthAdminReference(node)) {
+      const methodAccess = node.parent;
+      const directCall =
+        ts.isPropertyAccessExpression(methodAccess) &&
+        methodAccess.expression === node &&
+        ts.isCallExpression(methodAccess.parent) &&
+        methodAccess.parent.expression === methodAccess;
+      if (!directCall) {
+        findings.push(
+          `${filePath}: auth.admin references must be direct allowlisted calls`,
+        );
+      }
     }
 
     if (ts.isCallExpression(node)) {
-      const match = node.expression
-        .getText()
-        .match(/\.auth\.admin\.(deleteUser|getUserById|[A-Za-z0-9_]+)$/);
-      if (match) {
-        const method = match[1];
+      const access = node.expression;
+      const adminAccess = isMemberAccess(access)
+        ? access.expression
+        : undefined;
+      if (adminAccess && isAuthAdminReference(adminAccess)) {
+        const method = memberName(access);
+        if (!ts.isPropertyAccessExpression(access)) {
+          findings.push(`${filePath}: dynamic auth.admin access is forbidden`);
+        }
         const ownerFunction = enclosingFunction(node);
         const ownerName = ownerFunction
           ? functionName(ownerFunction)
@@ -217,6 +312,16 @@ function verifyAdminCalls(filePath, source, findings) {
         }
 
         if (method === "deleteUser") {
+          const bindings = ownerFunction
+            ? boundRpcResults(ownerFunction, "prepare_auth_deletion_call", node)
+            : [];
+          if (bindings.length !== 1) {
+            findings.push(
+              `${filePath}: deleteAuthUser must bind one prepare RPC data/error result`,
+            );
+          }
+          const prepared = bindings[0]?.data;
+          const prepareError = bindings[0]?.error;
           if (
             node.arguments.length !== 2 ||
             node.arguments[1].kind !== ts.SyntaxKind.FalseKeyword
@@ -226,7 +331,8 @@ function verifyAdminCalls(filePath, source, findings) {
             );
           }
           if (
-            !/prepared\.(?:uid|user_id)/.test(
+            !prepared ||
+            ![`${prepared}.uid`, `${prepared}.user_id`].includes(
               node.arguments[0]?.getText() ?? "",
             )
           ) {
@@ -234,16 +340,17 @@ function verifyAdminCalls(filePath, source, findings) {
               `${filePath}: deleteUser identity must come from the prepared job result`,
             );
           }
-          if (!source.includes('.rpc("prepare_auth_deletion_call"')) {
-            findings.push(
-              `${filePath}: deleteAuthUser must prepare the job-bound deletion call`,
-            );
-          }
           if (
+            !prepared ||
+            !prepareError ||
             !callIsInsideSafeGuard(node, [
-              /^!(?:prepare|prepared)[A-Za-z]*Error$/,
-              /^(?:prepared\.allowed|prepared\.status\s*===\s*["']prepared["'])$/,
-              /^(?!.*\|\|).*prepared\.(?:callBefore|call_before).*?>.*?(?:Date\.now|\bnow\b)/,
+              new RegExp(`^!${escapeRegExp(prepareError)}$`),
+              new RegExp(
+                `^(?:${escapeRegExp(prepared)}\\.allowed|${escapeRegExp(prepared)}\\.status\\s*===\\s*["']prepared["'])$`,
+              ),
+              new RegExp(
+                `^(?!.*\\|\\|).*${escapeRegExp(prepared)}\\.(?:callBefore|call_before).*?>.*?(?:Date\\.now|\\bnow\\b)`,
+              ),
             ])
           ) {
             findings.push(
@@ -251,26 +358,40 @@ function verifyAdminCalls(filePath, source, findings) {
             );
           }
         } else if (method === "getUserById") {
+          const bindings = ownerFunction
+            ? boundRpcResults(
+                ownerFunction,
+                "resolve_notification_recipient_identity",
+                node,
+              )
+            : [];
+          if (bindings.length !== 1) {
+            findings.push(
+              `${filePath}: resolveNotificationRecipient must bind one identity RPC data/error result`,
+            );
+          }
+          const identity = bindings[0]?.data;
+          const identityError = bindings[0]?.error;
           if (
-            !/(?:identity|recipient)\.(?:uid|userId|user_id)/.test(
-              node.arguments[0]?.getText() ?? "",
-            )
+            !identity ||
+            ![
+              `${identity}.uid`,
+              `${identity}.userId`,
+              `${identity}.user_id`,
+            ].includes(node.arguments[0]?.getText() ?? "")
           ) {
             findings.push(
               `${filePath}: getUserById identity must come from the resolved job result`,
             );
           }
           if (
-            !source.includes('.rpc("resolve_notification_recipient_identity"')
-          ) {
-            findings.push(
-              `${filePath}: recipient lookup requires the job-bound identity RPC`,
-            );
-          }
-          if (
+            !identity ||
+            !identityError ||
             !callIsInsideSafeGuard(node, [
-              /^!(?:identity|recipient)[A-Za-z]*Error$/,
-              /^(?:identity|recipient)(?:\?\.|\.)(?:uid|userId|user_id)$/,
+              new RegExp(`^!${escapeRegExp(identityError)}$`),
+              new RegExp(
+                `^${escapeRegExp(identity)}(?:\\?\\.|\\.)(?:uid|userId|user_id)$`,
+              ),
             ])
           ) {
             findings.push(
@@ -303,8 +424,8 @@ function objectPropertyValue(objectLiteral, name) {
 
 function verifyOwnerMutationFunction(statement, name, findings) {
   const expectedRpc = OWNER_MUTATION_EXPORTS.get(name);
-  let callback;
-  let rpcCall;
+  const callbacks = [];
+  const rpcCalls = [];
 
   function visit(node) {
     if (
@@ -316,21 +437,30 @@ function verifyOwnerMutationFunction(statement, name, findings) {
         candidate &&
         (ts.isArrowFunction(candidate) || ts.isFunctionExpression(candidate))
       ) {
-        callback = candidate;
+        callbacks.push(candidate);
       }
     }
     if (
       ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.name.text === "rpc" &&
-      ts.isStringLiteral(node.arguments[0]) &&
-      node.arguments[0].text === expectedRpc
+      isMemberAccess(node.expression) &&
+      memberName(node.expression) === "rpc"
     ) {
-      rpcCall = node;
+      rpcCalls.push(node);
     }
     ts.forEachChild(node, visit);
   }
   visit(statement);
+
+  const callback = callbacks.length === 1 ? callbacks[0] : undefined;
+  if (callbacks.length !== 1) {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} must use exactly one fresh actor callback`,
+    );
+  }
+  if (rpcCalls.length !== 1) {
+    findings.push(`${INTERNAL_RPC_PATH}: ${name} must invoke exactly one RPC`);
+  }
+  const rpcCall = rpcCalls.length === 1 ? rpcCalls[0] : undefined;
 
   const callbackBindings =
     callback?.parameters.length === 1
@@ -341,7 +471,13 @@ function verifyOwnerMutationFunction(statement, name, findings) {
       `${INTERNAL_RPC_PATH}: ${name} must receive actor and signal from withOwnerMutationActor`,
     );
   }
-  if (!rpcCall || !callback || !isDescendantOf(rpcCall, callback.body)) {
+  if (
+    !rpcCall ||
+    !ts.isStringLiteral(rpcCall.arguments[0]) ||
+    rpcCall.arguments[0].text !== expectedRpc ||
+    !callback ||
+    !isDescendantOf(rpcCall, callback.body)
+  ) {
     findings.push(
       `${INTERNAL_RPC_PATH}: ${name} must invoke ${expectedRpc} inside the fresh actor callback`,
     );
@@ -389,6 +525,40 @@ function verifyInternalRpc(source, findings) {
   }
 
   const file = sourceFile(INTERNAL_RPC_PATH, source);
+  const rpcCalls = [];
+  function collectRpcAccess(node) {
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.getText() === "getInternalClient"
+    ) {
+      const parent = node.parent;
+      if (
+        !ts.isPropertyAccessExpression(parent) ||
+        !["auth", "rpc"].includes(parent.name.text)
+      ) {
+        findings.push(
+          `${INTERNAL_RPC_PATH}: internal clients cannot be aliased or dynamically accessed`,
+        );
+      }
+    }
+    if (isMemberAccess(node) && memberName(node) === "rpc") {
+      const isDirectCall =
+        ts.isCallExpression(node.parent) && node.parent.expression === node;
+      if (!isDirectCall) {
+        findings.push(
+          `${INTERNAL_RPC_PATH}: RPC references must be direct calls`,
+        );
+      } else {
+        rpcCalls.push(node.parent);
+      }
+      if (!ts.isPropertyAccessExpression(node)) {
+        findings.push(`${INTERNAL_RPC_PATH}: dynamic RPC access is forbidden`);
+      }
+    }
+    ts.forEachChild(node, collectRpcAccess);
+  }
+  collectRpcAccess(file);
+
   for (const statement of file.statements) {
     if (
       ts.isVariableStatement(statement) &&
@@ -427,11 +597,15 @@ function verifyInternalRpc(source, findings) {
     }
   }
 
-  const rpcCalls = [...source.matchAll(/\.rpc\(\s*["']([^"']+)["']/g)].map(
-    (match) => match[1],
-  );
   const allowedRpcNames = new Set(ALLOWED_RPC_EXPORTS.values());
-  for (const rpcName of rpcCalls) {
+  for (const rpcCall of rpcCalls) {
+    const rpcName = ts.isStringLiteral(rpcCall.arguments[0])
+      ? rpcCall.arguments[0].text
+      : undefined;
+    if (!rpcName) {
+      findings.push(`${INTERNAL_RPC_PATH}: RPC name must be a string literal`);
+      continue;
+    }
     if (!allowedRpcNames.has(rpcName) && !OWNER_MUTATION_SQL.has(rpcName)) {
       findings.push(`${INTERNAL_RPC_PATH}: RPC ${rpcName} is not allowlisted`);
     }
@@ -474,24 +648,25 @@ function verifyOwnerActorModule(source, findings) {
   }
 }
 
-function extractSqlFunction(sql, name) {
+function extractSqlFunctions(sql, name) {
   const startPattern = new RegExp(
     `create\\s+(?:or\\s+replace\\s+)?function\\s+public\\.${name}\\s*\\(`,
-    "i",
+    "gi",
   );
-  const start = sql.search(startPattern);
-  if (start < 0) return undefined;
-  const afterStart = sql.slice(start);
-  const tagMatch = afterStart.match(/\bas\s+(\$[A-Za-z0-9_]*\$)/i);
-  if (!tagMatch || tagMatch.index === undefined)
-    return { signature: afterStart, body: "" };
-  const tag = tagMatch[1];
-  const bodyStart = tagMatch.index + tagMatch[0].length;
-  const bodyEnd = afterStart.indexOf(tag, bodyStart);
-  return {
-    signature: afterStart.slice(0, tagMatch.index),
-    body: bodyEnd < 0 ? "" : afterStart.slice(bodyStart, bodyEnd),
-  };
+  return [...sql.matchAll(startPattern)].map((match) => {
+    const afterStart = sql.slice(match.index);
+    const tagMatch = afterStart.match(/\bas\s+(\$[A-Za-z0-9_]*\$)/i);
+    if (!tagMatch || tagMatch.index === undefined) {
+      return { signature: afterStart, body: "" };
+    }
+    const tag = tagMatch[1];
+    const bodyStart = tagMatch.index + tagMatch[0].length;
+    const bodyEnd = afterStart.indexOf(tag, bodyStart);
+    return {
+      signature: afterStart.slice(0, tagMatch.index),
+      body: bodyEnd < 0 ? "" : afterStart.slice(bodyStart, bodyEnd),
+    };
+  });
 }
 
 export function verifyOwnerMutationSql(sql, filePath = "migration.sql") {
@@ -509,7 +684,7 @@ export function verifyOwnerMutationSql(sql, filePath = "migration.sql") {
   }
 
   for (const name of present) {
-    const parsed = extractSqlFunction(sql, name);
+    const parsed = extractSqlFunctions(sql, name).at(-1);
     if (!parsed) continue;
     if (
       !/p_actor_id\s+uuid/i.test(parsed.signature) ||
@@ -584,7 +759,7 @@ export function verifyDataAccessFiles(files) {
   const findings = [];
 
   for (const [filePath, source] of Object.entries(files)) {
-    if (/^(?:app|lib)\//.test(filePath)) {
+    if (/\.(?:c|m)?jsx?$|\.tsx?$/.test(filePath)) {
       if (
         filePath !== INTERNAL_RPC_PATH &&
         source.includes("SUPABASE_SECRET_KEY")
@@ -675,8 +850,46 @@ async function collectFiles(root, relativeDirectory, extensions, files) {
 
 export async function collectRepositoryPolicyFiles(root) {
   const files = {};
-  await collectFiles(root, "app", [".ts", ".tsx", ".mjs"], files);
-  await collectFiles(root, "lib", [".ts", ".tsx", ".mjs"], files);
+  const ignoredSourceDirectories = new Set([
+    ".git",
+    ".next",
+    "coverage",
+    "node_modules",
+    "playwright-report",
+    "test-results",
+  ]);
+  const ignoredTopLevelSourceDirectories = new Set([
+    ".codex",
+    ".omx",
+    "docs",
+    "scripts",
+    "supabase",
+    "tests",
+  ]);
+  async function collectSourceDirectory(relativeDirectory) {
+    const directory = path.join(root, relativeDirectory);
+    const entries = await readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      if (
+        entry.isDirectory() &&
+        (ignoredSourceDirectories.has(entry.name) ||
+          (relativeDirectory === "" &&
+            ignoredTopLevelSourceDirectories.has(entry.name)))
+      ) {
+        continue;
+      }
+      const relativePath = path.posix.join(relativeDirectory, entry.name);
+      if (entry.isDirectory()) {
+        await collectSourceDirectory(relativePath);
+      } else if (/\.(?:c|m)?jsx?$|\.tsx?$/.test(entry.name)) {
+        files[relativePath] = await readFile(
+          path.join(root, relativePath),
+          "utf8",
+        );
+      }
+    }
+  }
+  await collectSourceDirectory("");
   await collectFiles(root, "supabase/migrations", [".sql"], files);
   return files;
 }

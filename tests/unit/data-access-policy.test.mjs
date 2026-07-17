@@ -35,6 +35,16 @@ test("rejects secret use, direct tables, actor imports, and raw client exports",
   assert.match(findings, /exported runtime variables are forbidden/);
 });
 
+test("checks executable source outside app and lib", async () => {
+  const files = await fixtureFiles();
+  files["components/leak.tsx"] =
+    'const key = process.env.SUPABASE_SECRET_KEY; export const leak = db.from("analytics_events");';
+
+  const findings = verifyDataAccessFiles(files).join("\n");
+  assert.match(findings, /components\/leak\.tsx: SUPABASE_SECRET_KEY/);
+  assert.match(findings, /components\/leak\.tsx: direct table access/);
+});
+
 test("rejects non-allowlisted and dynamic Auth Admin access", async () => {
   const files = await fixtureFiles();
   files[internalPath] += `
@@ -49,6 +59,19 @@ export async function unsafeAdmin() {
   assert.match(findings, /dynamic auth.admin access is forbidden/);
   assert.match(findings, /auth.admin.listUsers is outside its named wrapper/);
   assert.match(findings, /unsafeAdmin is not allowlisted/);
+});
+
+test("rejects element-access RPC allowlist bypasses", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function deleteAuthUser({ jobId, proof }) {
+  return getInternalClient()["rpc"]("arbitrary_mutation", { jobId, proof });
+}
+`;
+
+  const findings = verifyDataAccessFiles(files).join("\n");
+  assert.match(findings, /dynamic RPC access is forbidden/);
+  assert.match(findings, /RPC arbitrary_mutation is not allowlisted/);
 });
 
 test("requires job-bound delete preparation and literal hard delete", async () => {
@@ -105,6 +128,55 @@ export async function resolveNotificationRecipient({ jobId, proof }) {
 `;
 
   assert.deepEqual(verifyDataAccessFiles(files), []);
+});
+
+test("requires exact bound RPC provenance and direct Admin calls", async () => {
+  const fabricated = await fixtureFiles();
+  fabricated[internalPath] += `
+export async function deleteAuthUser({ jobId, proof }) {
+  await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  const prepareError = undefined;
+  const prepared = { allowed: true, call_before: Date.now() + 60_000, uid: jobId };
+  if (!prepareError && prepared.allowed && prepared.call_before > Date.now()) {
+    return getInternalClient().auth.admin.deleteUser(prepared.uid, false);
+  }
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(fabricated).join("\n"),
+    /must bind one prepare RPC data\/error result/,
+  );
+
+  const fallback = await fixtureFiles();
+  fallback[internalPath] += `
+export async function deleteAuthUser({ jobId, proof }) {
+  const { data: prepared, error: prepareError } = await getInternalClient().rpc("prepare_auth_deletion_call", { jobId, proof });
+  if (!prepareError && prepared.allowed && prepared.call_before > Date.now()) {
+    return getInternalClient().auth.admin.deleteUser(prepared.uid ?? jobId, false);
+  }
+}
+export async function resolveNotificationRecipient({ jobId, proof }) {
+  const { data: identity, error: identityError } = await getInternalClient().rpc("resolve_notification_recipient_identity", { jobId, proof });
+  if (!identityError && identity?.user_id) {
+    return getInternalClient().auth.admin.getUserById(identity.user_id ?? jobId);
+  }
+}
+`;
+  const fallbackFindings = verifyDataAccessFiles(fallback).join("\n");
+  assert.match(fallbackFindings, /deleteUser identity must come from/);
+  assert.match(fallbackFindings, /getUserById identity must come from/);
+
+  const aliased = await fixtureFiles();
+  aliased[internalPath] += `
+export async function deleteAuthUser({ jobId, proof }) {
+  const { deleteUser } = getInternalClient().auth.admin;
+  return deleteUser(jobId, true);
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(aliased).join("\n"),
+    /auth\.admin references must be direct allowlisted calls/,
+  );
 });
 
 test("rejects denied delete branches and arbitrary resolved identities", async () => {
@@ -239,6 +311,45 @@ export async function createShareLink() {
 }
 `;
   assert.deepEqual(verifyDataAccessFiles(valid), []);
+});
+
+test("rejects owner wrappers with a forged RPC before the valid RPC", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function createShareLink() {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    await getInternalClient().rpc("create_share_link", {
+      p_actor_id: "forged",
+      p_recovery_actor_candidates: [],
+    }).abortSignal(signal);
+    return getInternalClient().rpc("create_share_link", {
+      p_actor_id: actor.uid,
+      p_recovery_actor_candidates: actor.recoveryActorCandidates,
+    }).abortSignal(signal);
+  });
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /createShareLink must invoke exactly one RPC/,
+  );
+});
+
+test("checks the final active owner mutation definition", () => {
+  const replaced = `${guardedOwnerSql}
+create or replace function public.create_share_link(
+  p_actor_id uuid,
+  p_recovery_actor_candidates jsonb
+) returns void language plpgsql as $body$
+begin
+  return;
+end
+$body$;
+`;
+  assert.match(
+    verifyOwnerMutationSql(replaced).join("\n"),
+    /must call the owner guard as its first statement/,
+  );
 });
 
 test("requires schema-qualified relations in every SECURITY DEFINER function", () => {
