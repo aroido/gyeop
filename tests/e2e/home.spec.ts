@@ -6,7 +6,9 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
-test("shows the main landing before the owner flow", async ({ page }) => {
+test("shows GYEOP and multiple pack previews before the owner flow", async ({
+  page,
+}) => {
   await page.goto("/");
 
   await expect(
@@ -16,11 +18,29 @@ test("shows the main landing before the owner flow", async ({ page }) => {
     }),
   ).toBeVisible();
   await expect(page.getByLabel("겹")).toBeVisible();
-  await expect(page.getByTestId("home-hero")).toBeVisible();
-  await expect(page.getByText("10개 질문 · 약 2분")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "질문팩" }),
+  ).toBeVisible();
+
+  for (const title of [
+    "오래된 친구팩",
+    "첫인상팩",
+    "직장동료팩",
+    "솔직한 나팩",
+  ]) {
+    await expect(
+      page.getByRole("heading", { level: 3, name: title }),
+    ).toBeAttached();
+  }
+
+  const upcomingPacks = page.locator('[data-pack-state="upcoming"]');
+  await expect(upcomingPacks).toHaveCount(3);
+  await expect(upcomingPacks.getByText("준비 중", { exact: true })).toHaveCount(
+    3,
+  );
+  await expect(upcomingPacks.locator("a, button, [tabindex]")).toHaveCount(0);
   await expect(page.getByRole("progressbar")).toHaveCount(0);
   await expect(page.locator("[data-choice]")).toHaveCount(0);
-  await expect(page.getByText("서운한 일이 생기면 나는?")).toHaveCount(0);
   expect(
     await page.evaluate((key) => localStorage.getItem(key), storageKey),
   ).toBeNull();
@@ -33,6 +53,26 @@ test("shows the main landing before the owner flow", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
   ).toBeVisible();
+});
+
+test("supports keyboard pack preview navigation", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+
+  const rail = page.getByTestId("pack-rail");
+  const cta = page.getByRole("link", { name: "팩 열어보기" });
+  await page.keyboard.press("Tab");
+  await expect(rail).toBeFocused();
+  await expect(rail).toHaveCSS("outline-style", /^(?!none$).+/);
+
+  const initialScroll = await rail.evaluate((element) => element.scrollLeft);
+  await page.keyboard.press("ArrowRight");
+  await expect
+    .poll(() => rail.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(initialScroll);
+
+  await page.keyboard.press("Tab");
+  await expect(cta).toBeFocused();
 });
 
 test("preserves an existing owner draft", async ({ page }) => {
@@ -76,15 +116,19 @@ for (const viewport of [
       verticalOverflow: false,
     });
 
-    const hero = await page.getByTestId("home-hero").boundingBox();
+    const rail = page.getByTestId("pack-rail");
+    const secondPack = page.getByRole("heading", {
+      level: 3,
+      name: "첫인상팩",
+    });
     const cta = page.getByRole("link", { name: "팩 열어보기" });
     const ctaBox = await cta.boundingBox();
-    expect(hero).not.toBeNull();
+    const secondPackBox = await secondPack.boundingBox();
     expect(ctaBox?.height).toBeGreaterThanOrEqual(44);
     expect(ctaBox!.y + ctaBox!.height).toBeLessThanOrEqual(viewport.height);
+    expect(secondPackBox!.x).toBeLessThan(viewport.width);
 
     await page.keyboard.press("Tab");
-    await expect(cta).toBeFocused();
-    await expect(cta).toHaveCSS("outline-style", /^(?!none$).+/);
+    await expect(rail).toBeFocused();
   });
 }
