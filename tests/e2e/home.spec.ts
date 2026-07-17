@@ -33,19 +33,28 @@ test("shows GYEOP and multiple pack previews before the owner flow", async ({
     ).toBeAttached();
   }
 
-  const upcomingPacks = page.locator('[data-pack-state="upcoming"]');
-  await expect(upcomingPacks).toHaveCount(3);
-  await expect(upcomingPacks.getByText("준비 중", { exact: true })).toHaveCount(
-    3,
+  const activePacks = page.locator('[data-pack-state="active"]');
+  await expect(activePacks).toHaveCount(4);
+  await expect(activePacks.getByText("지금 시작", { exact: true })).toHaveCount(
+    4,
   );
-  await expect(upcomingPacks.locator("a, button, [tabindex]")).toHaveCount(0);
+  const packLinks = page.getByRole("link", { name: "팩 열어보기" });
+  await expect(packLinks).toHaveCount(4);
+  for (const [index, href] of [
+    "/play/old-friend",
+    "/play/first-impression",
+    "/play/coworker",
+    "/play/honest-self",
+  ].entries()) {
+    await expect(packLinks.nth(index)).toHaveAttribute("href", href);
+  }
   await expect(page.getByRole("progressbar")).toHaveCount(0);
   await expect(page.locator("[data-choice]")).toHaveCount(0);
   expect(
     await page.evaluate((key) => localStorage.getItem(key), storageKey),
   ).toBeNull();
 
-  const cta = page.getByRole("link", { name: "팩 열어보기" });
+  const cta = packLinks.first();
   await expect(cta).toBeVisible();
   await cta.click();
 
@@ -60,7 +69,7 @@ test("supports keyboard pack preview navigation", async ({ page }) => {
   await page.waitForLoadState("networkidle");
 
   const rail = page.getByTestId("pack-rail");
-  const cta = page.getByRole("link", { name: "팩 열어보기" });
+  const cta = page.getByRole("link", { name: "팩 열어보기" }).first();
   await page.keyboard.press("Tab");
   await expect(rail).toBeFocused();
   await expect(rail).toHaveCSS("outline-style", /^(?!none$).+/);
@@ -121,7 +130,7 @@ for (const viewport of [
       level: 3,
       name: "첫인상팩",
     });
-    const cta = page.getByRole("link", { name: "팩 열어보기" });
+    const cta = page.getByRole("link", { name: "팩 열어보기" }).first();
     const ctaBox = await cta.boundingBox();
     const secondPackBox = await secondPack.boundingBox();
     expect(ctaBox?.height).toBeGreaterThanOrEqual(44);

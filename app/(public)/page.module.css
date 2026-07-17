@@ -269,6 +269,11 @@
   font-weight: 800;
 }
 
+.blueCard .packMeta span,
+.blackCard .packMeta span {
+  border-color: rgb(255 255 255 / 65%);
+}
+
 .cta {
   display: flex;
   min-height: 3rem;
@@ -289,6 +294,23 @@
 .cta:focus-visible {
   outline: 3px solid #315cff;
   outline-offset: 3px;
+}
+
+.blueCard .cta:focus-visible {
+  outline-color: #dfff00;
+}
+
+.redCard .cta:focus-visible {
+  outline-color: #050505;
+}
+
+.blackCard .cta {
+  background: #dfff00;
+  color: #050505;
+}
+
+.blackCard .cta:focus-visible {
+  outline-color: #315cff;
 }
 
 .cta:disabled {
