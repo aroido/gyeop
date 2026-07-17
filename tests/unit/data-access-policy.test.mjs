@@ -35,6 +35,18 @@ test("rejects secret use, direct tables, actor imports, and raw client exports",
   assert.match(findings, /exported runtime variables are forbidden/);
 });
 
+test("rejects raw internal client re-exports", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export { getInternalClient };
+export default getInternalClient;
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /runtime re-exports and default exports are forbidden/,
+  );
+});
+
 test("checks executable source outside app and lib", async () => {
   const files = await fixtureFiles();
   files["components/leak.tsx"] =
@@ -59,6 +71,20 @@ export async function unsafeAdmin() {
   assert.match(findings, /dynamic auth.admin access is forbidden/);
   assert.match(findings, /auth.admin.listUsers is outside its named wrapper/);
   assert.match(findings, /unsafeAdmin is not allowlisted/);
+});
+
+test("rejects destructured Auth Admin aliases", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function unsafeAdmin() {
+  const { admin: hiddenAdmin } = getInternalClient().auth;
+  return hiddenAdmin.listUsers();
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /internal clients cannot be aliased or dynamically accessed/,
+  );
 });
 
 test("rejects element-access RPC allowlist bypasses", async () => {
@@ -373,6 +399,17 @@ export const reassigned = db[method]("analytics_events");
   );
 });
 
+test("rejects dynamically joined table methods on client aliases", async () => {
+  const files = await fixtureFiles();
+  files["components/joined-leak.tsx"] = `
+export const leaked = publicDb[["fr", "om"].join("")]("analytics_events");
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /components\/joined-leak\.tsx: direct table access/,
+  );
+});
+
 test("rejects denied delete branches and arbitrary resolved identities", async () => {
   const files = await fixtureFiles();
   files[internalPath] += `
@@ -545,6 +582,25 @@ export async function createShareLink() {
   assert.match(
     verifyDataAccessFiles(files).join("\n"),
     /cannot invoke or alias another owner wrapper/,
+  );
+});
+
+test("requires exactly one owner actor wrapper invocation", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function createShareLink() {
+  withOwnerMutationActor(captureOwner);
+  return withOwnerMutationActor(async ({ actor, signal }) =>
+    getInternalClient().rpc("create_share_link", {
+      p_actor_id: actor.uid,
+      p_recovery_actor_candidates: actor.recoveryActorCandidates,
+    }).abortSignal(signal),
+  );
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /must use exactly one fresh actor callback/,
   );
 });
 

@@ -67,6 +67,24 @@ function hasDirectTableCall(filePath, source) {
         ? left + right
         : undefined;
     }
+    if (
+      ts.isCallExpression(expression) &&
+      ts.isPropertyAccessExpression(expression.expression) &&
+      expression.expression.name.text === "join" &&
+      ts.isArrayLiteralExpression(expression.expression.expression) &&
+      expression.arguments.length <= 1
+    ) {
+      const separator = expression.arguments[0]
+        ? staticString(expression.arguments[0])
+        : ",";
+      const parts = expression.expression.expression.elements.map(staticString);
+      if (
+        separator !== undefined &&
+        parts.every((part) => part !== undefined)
+      ) {
+        return parts.join(separator);
+      }
+    }
     return undefined;
   }
 
@@ -98,7 +116,7 @@ function hasDirectTableCall(filePath, source) {
       const suspiciousDynamicReceiver =
         ts.isElementAccessExpression(node) &&
         resolvedName === undefined &&
-        /(?:^|\.)(?:db|client|supabase)$/i.test(receiver);
+        /(?:db|client|supabase)$/i.test(receiver);
       if (
         (resolvedName === "from" || suspiciousDynamicReceiver) &&
         !["Array", "Buffer", "Object"].includes(receiver)
@@ -121,7 +139,7 @@ function hasDirectTableCall(filePath, source) {
       if (
         resolvedName === "from" ||
         (resolvedName === undefined &&
-          /(?:^|\.)(?:db|client|supabase)$/i.test(receiver))
+          /(?:db|client|supabase)$/i.test(receiver))
       ) {
         found = true;
       }
@@ -755,7 +773,7 @@ function verifyOwnerMutationFunction(statement, name, findings) {
   }
 
   const callback = callbacks.length === 1 ? callbacks[0] : undefined;
-  if (callbacks.length !== 1) {
+  if (callbacks.length !== 1 || wrapperCalls.length !== 1) {
     findings.push(
       `${INTERNAL_RPC_PATH}: ${name} must use exactly one fresh actor callback`,
     );
@@ -863,10 +881,21 @@ function verifyInternalRpc(source, findings) {
       node.expression.getText() === "getInternalClient"
     ) {
       const parent = node.parent;
-      if (
-        !ts.isPropertyAccessExpression(parent) ||
-        !["auth", "rpc"].includes(parent.name.text)
-      ) {
+      const directRpc =
+        ts.isPropertyAccessExpression(parent) &&
+        parent.name.text === "rpc" &&
+        ts.isCallExpression(parent.parent) &&
+        parent.parent.expression === parent;
+      const authAdmin =
+        ts.isPropertyAccessExpression(parent) &&
+        parent.name.text === "auth" &&
+        ts.isPropertyAccessExpression(parent.parent) &&
+        parent.parent.name.text === "admin" &&
+        ts.isPropertyAccessExpression(parent.parent.parent) &&
+        parent.parent.parent.expression === parent.parent &&
+        ts.isCallExpression(parent.parent.parent.parent) &&
+        parent.parent.parent.parent.expression === parent.parent.parent;
+      if (!directRpc && !authAdmin) {
         findings.push(
           `${INTERNAL_RPC_PATH}: internal clients cannot be aliased or dynamically accessed`,
         );
@@ -896,6 +925,11 @@ function verifyInternalRpc(source, findings) {
   collectRpcAccess(file);
 
   for (const statement of file.statements) {
+    if (ts.isExportDeclaration(statement) || ts.isExportAssignment(statement)) {
+      findings.push(
+        `${INTERNAL_RPC_PATH}: runtime re-exports and default exports are forbidden`,
+      );
+    }
     if (
       ts.isVariableStatement(statement) &&
       statement.modifiers?.some(
@@ -906,11 +940,31 @@ function verifyInternalRpc(source, findings) {
         `${INTERNAL_RPC_PATH}: exported runtime variables are forbidden`,
       );
     }
+    if (
+      (ts.isClassDeclaration(statement) ||
+        ts.isEnumDeclaration(statement) ||
+        ts.isModuleDeclaration(statement)) &&
+      statement.modifiers?.some(
+        (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+      )
+    ) {
+      findings.push(
+        `${INTERNAL_RPC_PATH}: exported runtime declarations are forbidden`,
+      );
+    }
     if (!ts.isFunctionDeclaration(statement) || !statement.name) continue;
     const isExported = statement.modifiers?.some(
       (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
     );
     if (!isExported) continue;
+
+    if (
+      statement.modifiers?.some(
+        (modifier) => modifier.kind === ts.SyntaxKind.DefaultKeyword,
+      )
+    ) {
+      findings.push(`${INTERNAL_RPC_PATH}: default exports are forbidden`);
+    }
 
     const name = statement.name.text;
     if (!ALLOWED_RPC_EXPORTS.has(name) && !OWNER_MUTATION_EXPORTS.has(name)) {
