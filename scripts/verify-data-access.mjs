@@ -277,13 +277,19 @@ function bindingNames(parameter) {
 
 function actorUseOutsideRpc(callback, rpcCall) {
   const args = rpcCall.arguments[1];
+  const allowedInitializers = [
+    objectPropertyInitializer(args, "p_actor_id"),
+    objectPropertyInitializer(args, "p_recovery_actor_candidates"),
+  ].filter(Boolean);
   let found = false;
   function visit(node) {
     if (found) return;
     if (
       ts.isIdentifier(node) &&
       node.text === "actor" &&
-      (!args || !isDescendantOf(node, args))
+      !allowedInitializers.some((initializer) =>
+        isDescendantOf(node, initializer),
+      )
     ) {
       found = true;
       return;
@@ -740,7 +746,7 @@ function verifyAdminCalls(filePath, source, findings) {
   visit(file);
 }
 
-function objectPropertyValue(objectLiteral, name) {
+function objectPropertyInitializer(objectLiteral, name) {
   if (!ts.isObjectLiteralExpression(objectLiteral)) return undefined;
   const property = objectLiteral.properties.find(
     (candidate) =>
@@ -748,8 +754,12 @@ function objectPropertyValue(objectLiteral, name) {
       candidate.name.getText().replace(/["']/g, "") === name,
   );
   return property && ts.isPropertyAssignment(property)
-    ? property.initializer.getText()
+    ? property.initializer
     : undefined;
+}
+
+function objectPropertyValue(objectLiteral, name) {
+  return objectPropertyInitializer(objectLiteral, name)?.getText();
 }
 
 function directAdminMethods(root) {
@@ -1201,7 +1211,9 @@ export function verifyOwnerMutationSql(sql, filePath = "migration.sql") {
       );
     }
     const guardCallCount = [
-      ...body.matchAll(/private\.assert_owner_mutation_actor\s*\(/gi),
+      ...body.matchAll(
+        /(?:"private"|private)\s*\.\s*(?:"assert_owner_mutation_actor"|assert_owner_mutation_actor)\s*\(/gi,
+      ),
     ].length;
     if (guardCallCount !== 1) {
       findings.push(

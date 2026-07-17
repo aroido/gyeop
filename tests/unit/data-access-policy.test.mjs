@@ -565,6 +565,27 @@ export async function createShareLink() {
   );
 });
 
+test("rejects actor aliases created inside unrelated RPC arguments", async () => {
+  const files = await fixtureFiles();
+  files[internalPath] += `
+export async function createShareLink() {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    let leaked;
+    await getInternalClient().rpc("create_share_link", {
+      p_actor_id: actor.uid,
+      p_recovery_actor_candidates: actor.recoveryActorCandidates,
+      p_slug: (leaked = actor, "safe-slug"),
+    }).abortSignal(signal);
+    return leaked;
+  });
+}
+`;
+  assert.match(
+    verifyDataAccessFiles(files).join("\n"),
+    /cannot expose or use owner actor material outside RPC arguments/,
+  );
+});
+
 test("rejects injected actor sources and owner RPCs without the deadline signal", async () => {
   const files = await fixtureFiles();
   files["lib/db/owner-mutation-actor.ts"] = files[
@@ -813,6 +834,18 @@ test("requires exactly one owner SQL guard call", () => {
     "perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);",
     `perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);
   perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);`,
+  );
+  assert.match(
+    verifyOwnerMutationSql(duplicated).join("\n"),
+    /must call the owner guard exactly once/,
+  );
+});
+
+test("counts quoted owner SQL guard calls", () => {
+  const duplicated = guardedOwnerSql.replace(
+    "perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);",
+    `perform private.assert_owner_mutation_actor(p_actor_id, p_recovery_actor_candidates);
+  perform "private"."assert_owner_mutation_actor"(p_actor_id, p_recovery_actor_candidates);`,
   );
   assert.match(
     verifyOwnerMutationSql(duplicated).join("\n"),
