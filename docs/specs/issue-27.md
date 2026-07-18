@@ -1,6 +1,6 @@
 # Issue 27 구현 스펙: [데이터] 주인용 최소 시선 프로필 구현
 
-Status: Draft
+Status: Reviewed
 Issue: https://github.com/aroido/gyeop/issues/27
 
 ## 목표
@@ -306,9 +306,9 @@ server-only DB adapter는 management expiry와 profile을 decode한다. HTTP는 
 
 ## 스펙 검토
 
-Reviewer Agent:
-Review Status: FAIL
-P0/P1 Findings:
+Reviewer Agent: issue27_spec_review
+Review Status: PASS
+P0/P1 Findings: 0
 
 ## 리스크와 미결정 사항
 
