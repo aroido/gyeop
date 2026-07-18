@@ -13,6 +13,7 @@ Issue: https://github.com/aroido/gyeop/issues/23
 
 - `visitor_responses`에 `(id, pack_version_id)` unique key를 추가한다.
 - `visitor_assignments` table을 추가하고 response와 card 양쪽에 pack-version composite FK를 둔다.
+- migration 전에 #22에서 만들어진 기존 draft response를 같은 결정 규칙으로 정확히 3장 backfill한다. backfill은 기존 response·quota·analytics event를 추가하거나 바꾸지 않는다.
 - 필수 assignment는 response마다 정확히 3개를 한 번에 insert한다. Signature는 position 1, 비-Signature 2장은 position 2·3이다.
 - 비-Signature 후보는 같은 owner play의 `submitted` 필수 assignment 표본 수 오름차순, domain-separated `response UUID + card ID` SHA-256 오름차순, pack position/card ID 오름차순으로 정렬해 처음 2장을 고른다.
 - `public.start_response`를 `kind in ('public', 'one_to_one')`로 확장하고 신규 response branch에 assignment 생성을 포함한다.
@@ -20,7 +21,7 @@ Issue: https://github.com/aroido/gyeop/issues/23
 - response state에 방문자에게 필요한 exact 카드 필드만 반환한다. owner prompt·self choice·표본 수·내부 pack/play/link ID는 반환하지 않는다.
 - analytics policy의 두 visitor-start event가 `public|one_to_one` exact link kind를 허용하게 한다.
 - generated DB types, named RPC adapter, strict decoder, HTTP/browser contract, source verifier, pgTAP, concurrency·live HTTP 테스트를 갱신한다.
-- 최소 표본 문구의 singleton fallback과 결정적 tie-break를 제품 SSOT에 명시한다.
+- 최소 표본 문구의 singleton fallback과 결정적 tie-break를 `question-pack-spec`, `p0-development-plan`, `decision-log` 세 SSOT에 함께 명시한다.
 
 ## 제외 범위
 
@@ -58,7 +59,16 @@ Issue: https://github.com/aroido/gyeop/issues/23
 
 초기 최소 group에 2장 이상 있으면 둘 다 그 group에서 선택된다. 1장뿐이면 그 1장을 먼저 선택하고, 남은 후보 중 다음 최소 표본 카드를 두 번째로 선택한다. 이 규칙은 정확히 2장, 표본 우선, response별 다양성, 재현 가능한 tie-break를 동시에 보장한다. assignment가 저장된 뒤에는 어떤 표본 변화가 생겨도 같은 response를 재배정하지 않는다.
 
-표본 scope는 pack version 전체가 아니라 현재 link가 속한 `pack_play_id`다. `visitor_assignments.stage='required'`이고 parent `visitor_responses.status='submitted'`인 row만 센다. draft/만료/철회 response와 다른 owner play의 assignment는 세지 않는다. #23 배포 시점에는 submit 경로가 아직 없어 production count는 0이며, #24가 status 전이를 열면 같은 query가 제출 표본을 즉시 반영한다.
+표본 scope는 pack version 전체가 아니라 현재 link가 속한 `pack_play_id`다. `visitor_assignments.stage='required'`이고 parent `visitor_responses.status='submitted'`인 row만 센다. draft/withdrawn/invalid response와 다른 owner play의 assignment는 세지 않는다. 제출된 response의 `session_expires_at`은 capability 접근 기한일 뿐 표본 유효기간이 아니므로 과거여도 계속 센다. source share link가 나중에 disabled/expired되어도 이미 제출된 표본은 계속 센다. #23 배포 시점에는 submit 경로가 아직 없어 production count는 0이며, #24가 status 전이를 열면 같은 query가 제출 표본을 즉시 반영한다.
+
+### 기존 #22 response upgrade
+
+- `00700` migration은 새 table/helper를 만든 직후, 기존 `visitor_responses`를 `created_at, id` 순으로 순회해 각 response의 link가 속한 play/version으로 필수 3장을 backfill한다.
+- #22 schema는 `status='draft'`만 허용하므로 upgrade 대상은 모두 미제출이며 submitted sample count는 0이다. 선택은 response+card hash로 결정된다.
+- backfill은 기존 response row, `response_start` bucket, `relationship_selected|visitor_response_started` event를 insert/update하지 않는다.
+- 모든 기존 response가 assignments 3개·position 1/2/3·Signature 1개를 얻었는지 migration 안에서 검증한다. 한 건이라도 실패하면 migration 전체를 abort해 partial upgrade를 금지한다.
+- 같은 private assignment helper를 backfill과 신규 `start_response`가 함께 사용해 알고리즘 drift를 막는다.
+- upgrade integration test는 DB를 `20260718000600`까지 reset하고 legacy draft를 만든 뒤 `00700`을 적용한다. exact 3장과 정상 resume, response/quota/event 불변을 확인하고 finally에서 최신 migration으로 reset한다.
 
 ## 사용자 흐름 영향
 
@@ -92,6 +102,7 @@ Issue: https://github.com/aroido/gyeop/issues/23
 - rate-limit 초과는 assignment/response/event 없이 `429`와 exact `Retry-After`다.
 - malformed·tampered·expired response cookie와 disabled/expired/invalid link는 #22의 generic 404·cookie deletion 차이를 그대로 유지한다.
 - strict decoder가 assignment cardinality, Signature 수, position, exact keys, card 문구를 거부하면 raw DB payload를 브라우저에 전달하지 않고 generic internal error로 닫는다.
+- #22에서 생성된 legacy draft도 migration backfill 뒤 같은 `resume` 계약을 만족한다. legacy 여부를 HTTP에 노출하는 분기는 없다.
 
 ## 디자인 영향
 
@@ -125,6 +136,8 @@ Issue: https://github.com/aroido/gyeop/issues/23
 - index `(response_id, stage, position)`은 unique key가 제공하므로 별도 중복 index를 만들지 않는다.
 
 table은 RLS를 enable하고 `gyeop_internal_rpc`에 select/insert만 허용한다. public, anon, authenticated, service_role에는 direct table 권한이나 policy가 없다. update/delete grant는 이 이슈에 필요 없으며 제출/철회 이슈가 실제 mutation과 함께 추가한다.
+
+`private.assign_required_response_cards(response_id, pack_play_id, pack_version_id)` helper는 card selection·exact 3 insert·postcondition 검증을 한 경계에 둔다. 함수 owner는 `gyeop_internal_rpc`, direct API role execute는 모두 revoke한다. migration backfill과 신규 `start_response`만 이 helper를 호출한다.
 
 ### assignment state helper
 
@@ -167,6 +180,8 @@ exact 함수 signature와 HTTP request body는 #22와 동일하게 유지한다.
 
 steps 6~10은 같은 nested transaction이다. rate-limit, credential collision, assignment cardinality/FK/insert, analytics 중 하나라도 실패하면 신규 branch 전체가 rollback된다. collision과 rate-limit만 기존 typed outcome으로 복구하고, pack/assignment 불변식 실패는 redacted internal error로 fail closed한다.
 
+`unique_violation` catch는 무조건 `collision`으로 매핑하지 않는다. `GET STACKED DIAGNOSTICS ... CONSTRAINT_NAME`으로 exact `visitor_responses_pkey|visitor_responses_session_token_hash_key`만 credential collision으로 허용한다. 그 밖의 assignment PK/position/FK-adjacent invariant나 analytics unique failure는 원래 exception을 rethrow한다. server adapter는 typed `collision`에서만 새 credential을 만들며, assignment failure에서는 재시도하지 않는다.
+
 analytics policy는 두 visitor event의 `properties.linkKind`를 `public|one_to_one` exact allowlist로 확장한다. 기존 property key allowlist와 금지 payload는 그대로다.
 
 ### deterministic hash
@@ -199,9 +214,9 @@ analytics policy는 두 visitor event의 `properties.linkKind`를 `public|one_to
 
 ## 구현 계획
 
-1. 최소 표본 singleton fallback, deterministic tie-break, submitted required sample scope를 제품 SSOT에 반영한다.
-2. `visitor_responses` composite key, `visitor_assignments`, RLS/privilege/FK, assignment helper와 확장 `start_response` migration을 구현한다.
-3. pgTAP sampling matrix로 exact 3장, Signature, duplicate/FK, minimum counts, deterministic vector, public/1:1, same-session idempotency, rollback을 고정한다.
+1. `docs/product/question-pack-spec.md` §6과 `docs/engineering/p0-development-plan.md` §9.2를 같은 ordered-candidate 규칙으로 정렬하고 `docs/product/decision-log.md`에 singleton fallback·hash tie-break 결정을 기록한다.
+2. `visitor_responses` composite key, `visitor_assignments`, RLS/privilege/FK, shared assignment helper, legacy draft backfill과 확장 `start_response` migration을 구현한다.
+3. pgTAP sampling matrix로 exact 3장, Signature, duplicate/FK, minimum counts, deterministic vector, public/1:1, same-session idempotency, collision 분류와 rollback을 고정한다.
 4. generated Supabase types, internal RPC result type, visitor state/outcome strict decoder를 확장한다.
 5. HTTP/browser adapter와 source verifier를 exact assignment allowlist에 맞춘다.
 6. concurrency test를 response+assignments+quota+events cardinality까지 확장하고 route/live test로 one_to_one, resume, no-self-answer를 확인한다.
@@ -216,6 +231,8 @@ analytics policy는 두 visitor event의 `properties.linkKind`를 `public|one_to
 - [ ] 다른 owner play의 sample, draft response, 다른 pack version은 count에 영향을 주지 않는다.
 - [ ] response/card pack-version mismatch는 두 composite FK와 RPC source selection으로 거절된다.
 - [ ] same-session resume·duplicate start는 assignment/quota/response/event를 늘리지 않고 stored 관계·시점·3장을 반환한다.
+- [ ] #22 legacy draft는 migration 뒤 정확히 3장을 가지며 정상 resume되고 response/quota/event 수는 migration 전과 같다.
+- [ ] response ID/session-hash constraint만 typed credential collision이며 assignment unique failure는 collision이나 adapter 재시도로 오분류되지 않는다.
 - [ ] rate-limit, credential collision, malformed pack, assignment/FK/event failure는 partial response·assignment·bucket·event를 남기지 않는다.
 - [ ] direct API roles는 assignments를 읽거나 쓰지 못한다.
 - [ ] HTTP에는 visitor prompt, A/B labels, card ID, required position, Signature 여부만 추가되고 self choice·owner prompt·sample count·내부 ID가 없다.
@@ -227,10 +244,17 @@ analytics policy는 두 visitor event의 `properties.linkKind`를 `public|one_to
   - table/column/PK/unique/composite FK/RLS/privilege inventory
   - old-friend fixed UUID hash order vector와 exact 3장/Signature/position
   - 0/동률, skew, singleton-minimum, 다른 play, draft 제외 sampling matrix
+  - submitted response의 expired session·disabled source link도 표본에 포함하고 withdrawn/invalid는 제외
   - 다른 pack-version card/response FK rejection
   - public·one_to_one created/resumed, disabled/expired unavailable
   - same-session retry에서 assignment 3, quota 1, event 2 고정
+  - response credential constraint collision만 typed collision
+  - forced assignment PK/position unique failure는 exception·no-retry이며 response/assignment/bucket/event 전부 rollback
   - malformed pack/forced assignment failure와 11번째 rate-limit rollback
+- `tests/integration/visitor-assignment-upgrade.test.mjs`
+  - `db reset --version 20260718000600` → legacy response start → `migration up`
+  - exact 3장/Signature, same legacy session resume, response/quota/event 불변
+  - finally에서 latest `db reset`으로 local schema 복원
 - `tests/unit/visitor-response.test.mjs`
   - exact assignments decode, duplicate/reordered/cardinality/signature/extra-field/self-field rejection
   - HTTP/browser strict state와 existing single-flight regression
