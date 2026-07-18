@@ -36,3 +36,30 @@ export const recordShareActionSchema = strictJsonObject({
 export const inviteMetadataSchema = strictJsonObject({
   secret: z.string().regex(/^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/),
 });
+
+export const visitorResponseSchema = strictJsonObject({
+  intent: z.enum(["resume", "start"]),
+  secret: z.string().regex(/^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/),
+  relationshipCode: z
+    .enum([
+      "old_friend",
+      "school_friend",
+      "coworker",
+      "romantic",
+      "family",
+      "online_friend",
+      "social_follower",
+      "other",
+    ])
+    .optional(),
+  knownSinceCode: z
+    .enum([
+      "under_one_year",
+      "one_to_three_years",
+      "three_to_five_years",
+      "five_to_ten_years",
+      "ten_years_or_more",
+      "not_sure",
+    ])
+    .optional(),
+});

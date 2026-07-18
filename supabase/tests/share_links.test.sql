@@ -621,9 +621,9 @@ select ok(
     from pg_catalog.pg_policies policy
     where policy.schemaname = 'public'
       and policy.tablename = 'analytics_events'
-      and policy.policyname = 'analytics_share_flow_internal_insert'
+      and policy.policyname = 'analytics_core_visitor_flow_internal_insert'
   ),
-  'analytics RLS only allows the four share events and exact property keys'
+  'analytics RLS retains the four share events and exact property keys'
 );
 
 select * from finish();

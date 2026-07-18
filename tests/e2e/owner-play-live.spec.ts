@@ -95,6 +95,66 @@ select (
   return Number(output.trim());
 }
 
+function readVisitorResponseSummary(publicId: string) {
+  const sql = String.raw`\set public_id '${publicId}'
+select jsonb_build_object(
+  'responses', (
+    select count(*)
+    from public.visitor_responses response
+    join public.share_links link on link.id = response.share_link_id
+    where link.public_id = :'public_id'
+  ),
+  'sessionHashes', (
+    select count(distinct encode(response.session_token_hash, 'hex'))
+    from public.visitor_responses response
+    join public.share_links link on link.id = response.share_link_id
+    where link.public_id = :'public_id'
+  ),
+  'contexts', (
+    select jsonb_agg(
+      jsonb_build_object(
+        'relationship', response.relationship_code,
+        'knownSince', response.known_since_code,
+        'status', response.status,
+        'fixedTtl', response.session_expires_at - response.created_at = interval '24 hours'
+      ) order by response.relationship_code
+    )
+    from public.visitor_responses response
+    join public.share_links link on link.id = response.share_link_id
+    where link.public_id = :'public_id'
+  ),
+  'events', (
+    select jsonb_object_agg(event_name, event_count)
+    from (
+      select event.event_name, count(*) as event_count
+      from public.analytics_events event
+      join public.visitor_responses response on response.id = event.visitor_response_id
+      join public.share_links link on link.id = response.share_link_id
+      where link.public_id = :'public_id'
+      group by event.event_name
+    ) counted
+  )
+);`;
+  const output = execFileSync(
+    "docker",
+    [
+      "exec",
+      "-i",
+      databaseContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-At",
+      "-v",
+      "ON_ERROR_STOP=1",
+    ],
+    { encoding: "utf8", input: sql },
+  );
+  return JSON.parse(output.trim()) as unknown;
+}
+
 async function postShareAction(
   page: import("@playwright/test").Page,
   playId: string,
@@ -348,8 +408,22 @@ test.describe("live owner flow", () => {
     await tamperedContext.close();
     expect(readShareActionEvents()).toHaveLength(2);
 
+    const invite = new URL(inviteUrl);
+    const publicId = invite.pathname.split("/").at(-1)!;
+    const rawSecret = new URLSearchParams(invite.hash.slice(1)).get("k")!;
     const visitors = await Promise.all(
-      ["198.51.100.220", "198.51.100.221"].map(async (ip) => {
+      [
+        {
+          ip: "198.51.100.220",
+          relationship: "오래된 친구",
+          knownSince: "10년 이상이에요",
+        },
+        {
+          ip: "198.51.100.221",
+          relationship: "가족",
+          knownSince: "1년 이상 · 3년 미만",
+        },
+      ].map(async ({ ip, relationship, knownSince }) => {
         const visitorContext = await browser.newContext({
           extraHTTPHeaders: { ...visitorHeaders, "x-forwarded-for": ip },
         });
@@ -357,12 +431,68 @@ test.describe("live owner flow", () => {
         await visitor.goto(inviteUrl);
         await expect(
           visitor.getByRole("heading", {
-            name: "친구가 먼저 답한 질문팩이에요",
+            name: "이 사람과 어떤 사이인가요?",
           }),
-        ).toBeVisible();
+        ).toBeFocused();
+        await visitor
+          .getByRole("radio", { name: relationship, exact: true })
+          .check();
+        await visitor
+          .getByRole("radio", { name: knownSince, exact: true })
+          .check();
+        await visitor.getByRole("button", { name: "3장 답하러 가기" }).click();
+        await expect(
+          visitor.getByRole("heading", { name: "응답을 시작했어요" }),
+        ).toBeFocused();
+        const sessionCookie = (await visitorContext.cookies()).find(
+          (cookie) => cookie.name === "__Host-gyeop-response",
+        );
+        expect(sessionCookie).toMatchObject({
+          httpOnly: true,
+          secure: true,
+          sameSite: "Lax",
+          path: "/",
+        });
+        expect(sessionCookie?.value).toMatch(
+          /^v1\.[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/,
+        );
         return { visitor, visitorContext };
       }),
     );
+
+    await visitors[0].visitor.reload();
+    await expect(
+      visitors[0].visitor.getByRole("heading", {
+        name: "응답을 시작했어요",
+      }),
+    ).toBeFocused();
+    await expect(
+      visitors[0].visitor.getByText("오래된 친구", { exact: true }),
+    ).toBeVisible();
+    await expect
+      .poll(() => readVisitorResponseSummary(publicId))
+      .toEqual({
+        responses: 2,
+        sessionHashes: 2,
+        contexts: [
+          {
+            relationship: "family",
+            knownSince: "one_to_three_years",
+            status: "draft",
+            fixedTtl: true,
+          },
+          {
+            relationship: "old_friend",
+            knownSince: "ten_years_or_more",
+            status: "draft",
+            fixedTtl: true,
+          },
+        ],
+        events: {
+          relationship_selected: 2,
+          visitor_response_started: 2,
+        },
+      });
 
     const rateContext = await browser.newContext({
       extraHTTPHeaders: {
@@ -372,9 +502,6 @@ test.describe("live owner flow", () => {
     });
     const ratePage = await rateContext.newPage();
     await ratePage.goto("/");
-    const invite = new URL(inviteUrl);
-    const publicId = invite.pathname.split("/").at(-1)!;
-    const rawSecret = new URLSearchParams(invite.hash.slice(1)).get("k")!;
     const rateResults = await ratePage.evaluate(
       async ({ publicId, rawSecret }) => {
         const results: { status: number; retryAfter: string | null }[] = [];
