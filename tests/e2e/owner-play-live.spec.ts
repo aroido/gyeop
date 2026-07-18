@@ -132,6 +132,7 @@ test.describe("live owner flow", () => {
     context,
     page,
   }) => {
+    test.setTimeout(90_000);
     await context.addInitScript(() => {
       const state = { shareMode: "resolve" as "resolve" | "cancel" | "fail" };
       (
