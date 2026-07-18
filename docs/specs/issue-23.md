@@ -1,6 +1,6 @@
 # Issue 23 구현 스펙: [백엔드] Signature 1장과 최소 표본 2장 원자 배정 구현
 
-Status: Draft
+Status: Reviewed
 Issue: https://github.com/aroido/gyeop/issues/23
 
 ## 목표
@@ -118,7 +118,7 @@ Issue: https://github.com/aroido/gyeop/issues/23
 
 `public.visitor_responses`:
 
-- `unique (id, pack_version_id)`를 추가해 assignment parent composite FK의 대상이 되게 한다.
+- named `constraint visitor_responses_id_pack_version_key unique (id, pack_version_id)`를 추가해 assignment parent composite FK의 대상이 되게 한다.
 - #22의 draft-only status/lifecycle constraint는 바꾸지 않는다. #24가 submit lifecycle을 여는 migration에서 교체한다.
 
 `public.visitor_assignments`:
@@ -180,7 +180,7 @@ exact 함수 signature와 HTTP request body는 #22와 동일하게 유지한다.
 
 steps 6~10은 같은 nested transaction이다. rate-limit, credential collision, assignment cardinality/FK/insert, analytics 중 하나라도 실패하면 신규 branch 전체가 rollback된다. collision과 rate-limit만 기존 typed outcome으로 복구하고, pack/assignment 불변식 실패는 redacted internal error로 fail closed한다.
 
-`unique_violation` catch는 무조건 `collision`으로 매핑하지 않는다. `GET STACKED DIAGNOSTICS ... CONSTRAINT_NAME`으로 exact `visitor_responses_pkey|visitor_responses_session_token_hash_key`만 credential collision으로 허용한다. 그 밖의 assignment PK/position/FK-adjacent invariant나 analytics unique failure는 원래 exception을 rethrow한다. server adapter는 typed `collision`에서만 새 credential을 만들며, assignment failure에서는 재시도하지 않는다.
+`unique_violation` catch는 무조건 `collision`으로 매핑하지 않는다. `GET STACKED DIAGNOSTICS ... CONSTRAINT_NAME`으로 exact `visitor_responses_pkey|visitor_responses_id_pack_version_key|visitor_responses_session_token_hash_key`만 credential collision으로 허용한다. 같은 response ID가 PK보다 새 composite unique에서 먼저 보고되는 경우도 같은 credential collision이다. 그 밖의 assignment PK/position/FK-adjacent invariant나 analytics unique failure는 원래 exception을 rethrow한다. server adapter는 typed `collision`에서만 새 credential을 만들며, assignment failure에서는 재시도하지 않는다.
 
 analytics policy는 두 visitor event의 `properties.linkKind`를 `public|one_to_one` exact allowlist로 확장한다. 기존 property key allowlist와 금지 payload는 그대로다.
 
@@ -248,7 +248,7 @@ analytics policy는 두 visitor event의 `properties.linkKind`를 `public|one_to
   - 다른 pack-version card/response FK rejection
   - public·one_to_one created/resumed, disabled/expired unavailable
   - same-session retry에서 assignment 3, quota 1, event 2 고정
-  - response credential constraint collision만 typed collision
+  - response PK/composite ID/session-hash credential constraint collision만 typed collision
   - forced assignment PK/position unique failure는 exception·no-retry이며 response/assignment/bucket/event 전부 rollback
   - malformed pack/forced assignment failure와 11번째 rate-limit rollback
 - `tests/integration/visitor-assignment-upgrade.test.mjs`
@@ -299,9 +299,9 @@ submitted sampling skew fixture는 pgTAP transaction 안에서 #22의 draft-only
 
 ## 스펙 검토
 
-Reviewer Agent:
-Review Status: FAIL
-P0/P1 Findings:
+Reviewer Agent: issue23_spec_review
+Review Status: PASS
+P0/P1 Findings: 0
 
 ## 리스크와 미결정 사항
 
