@@ -11,15 +11,11 @@ import {
   startVisitorResponseSession,
 } from "../visitor-response/visitor-responses.ts";
 import { visitorResponseHttpState } from "../visitor-response/visitor-context-core.mjs";
+import { errorResponse } from "./errors.ts";
 import { inviteUnavailableResponse } from "./share-links.ts";
 import { privateNoStore } from "./owner-play.ts";
 
 type ValidCookie = Extract<ParsedVisitorResponseCookie, { outcome: "valid" }>;
-
-const RATE_LIMITED = Object.freeze({
-  code: "RATE_LIMITED",
-  message: "잠시 후 다시 시도해 주세요.",
-});
 
 function deletedUnavailableResponse() {
   const response = inviteUnavailableResponse();
@@ -28,9 +24,7 @@ function deletedUnavailableResponse() {
 }
 
 function rateLimitedResponse(retryAfterSeconds: number) {
-  const response = privateNoStore(Response.json(RATE_LIMITED, { status: 429 }));
-  response.headers.set("Retry-After", String(retryAfterSeconds));
-  return response;
+  return privateNoStore(errorResponse("RATE_LIMITED", retryAfterSeconds));
 }
 
 export async function visitorResponse(input: {

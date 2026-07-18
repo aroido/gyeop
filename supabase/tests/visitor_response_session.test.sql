@@ -135,7 +135,8 @@ select is(
   (
     select count(*)
     from public.rate_limit_buckets
-    where action = 'response_start'
+    where key_hash = decode(repeat('20', 32), 'hex')
+      and action = 'response_start'
   ),
   0::bigint,
   'initial resume consumes no quota'

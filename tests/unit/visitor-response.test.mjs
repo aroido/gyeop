@@ -124,6 +124,8 @@ test("parses one canonical response cookie and rejects ambiguity", () => {
   assert.deepEqual(parseVisitorResponseCookie(null), { outcome: "absent" });
   for (const header of [
     `${VISITOR_RESPONSE_COOKIE_NAME}=bad`,
+    VISITOR_RESPONSE_COOKIE_NAME,
+    `${VISITOR_RESPONSE_COOKIE_NAME}; ${VISITOR_RESPONSE_COOKIE_NAME}=${cookieValue}`,
     `${VISITOR_RESPONSE_COOKIE_NAME}=${cookieValue}; ${VISITOR_RESPONSE_COOKIE_NAME}=${cookieValue}`,
     `${VISITOR_RESPONSE_COOKIE_NAME}=v1.${id}.${secret.slice(1)}`,
   ]) {

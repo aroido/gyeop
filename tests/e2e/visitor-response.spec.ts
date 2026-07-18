@@ -196,6 +196,9 @@ for (const width of [320, 390, 430]) {
     ).toBeGreaterThanOrEqual(44);
     await radios.nth(0).check();
     await page.getByRole("radio", { name: "잘 모르겠어요" }).check();
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = "200%";
+    });
     expect(
       (
         await page

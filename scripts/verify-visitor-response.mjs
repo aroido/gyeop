@@ -95,6 +95,11 @@ export function verifyVisitorResponse() {
     idCheck >= 0 && cookieParse > idCheck && domain > cookieParse,
     `${routePath} must validate path, then cookie, then domain`,
   );
+  const httpAdapter = source("lib/http/visitor-responses.ts");
+  assert.match(
+    httpAdapter,
+    /errorResponse\("RATE_LIMITED",\s*retryAfterSeconds\)/,
+  );
 
   const client = source("lib/visitor-response/visitor-response-client.ts");
   for (const contract of [
