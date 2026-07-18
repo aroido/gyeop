@@ -43,8 +43,7 @@
 }
 
 .lead,
-.terminal > p:not(.brand),
-.continue p {
+.terminal > p:not(.brand) {
   color: #bdbdbd;
   line-height: 1.55;
   word-break: keep-all;
@@ -234,22 +233,18 @@
   color: var(--lime);
 }
 
-.continue {
-  margin-top: 1.2rem;
-  padding: 1rem;
-  border: 1px solid #4b4b4b;
-  border-radius: 0.85rem;
-  background: #111;
+.reshare {
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid #3c3c3c;
 }
 
-.continue h2 {
+.reshare p {
   margin: 0;
-  font-size: 1.2rem;
-}
-
-.continue p {
-  margin: 0.4rem 0 0;
-  font-size: 0.82rem;
+  color: #bdbdbd;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  word-break: keep-all;
 }
 
 .primary {

@@ -136,6 +136,7 @@ export async function recordShareActionResponse(input: {
   cookie: OwnerCookie;
   linkId: string;
   event: "share_handoff_succeeded" | "share_link_copied";
+  entrySource: "profile_reshare" | null;
   signal: AbortSignal;
 }) {
   const result = await recordOwnerShareAction({
@@ -143,6 +144,7 @@ export async function recordShareActionResponse(input: {
     managementSecretHash: input.cookie.managementSecretHash,
     linkId: input.linkId,
     event: input.event,
+    entrySource: input.entrySource,
     signal: input.signal,
   });
   if (result.outcome !== "recorded") return ownerFailure(result.outcome);

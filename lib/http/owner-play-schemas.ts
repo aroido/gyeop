@@ -31,10 +31,11 @@ export const createShareLinkSchema = strictJsonObject({
 export const recordShareActionSchema = strictJsonObject({
   event: z.enum(["share_handoff_succeeded", "share_link_copied"]),
   linkId: canonicalUuidV4,
+  entrySource: z.literal("profile_reshare").nullable().optional(),
 });
 
 export const ownerProfileEventSchema = strictJsonObject({
-  event: z.literal("profile_viewed"),
+  event: z.enum(["profile_viewed", "profile_reshare_clicked"]),
 });
 
 export const inviteMetadataSchema = strictJsonObject({

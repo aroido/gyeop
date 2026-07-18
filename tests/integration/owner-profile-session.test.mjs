@@ -332,6 +332,21 @@ test("submitted public sights refresh live and reveal only at three samples", as
   const publicLink = insertLink(owner.playId, "public");
   const oneToOneLink = insertLink(owner.playId, "one_to_one");
 
+  const ineligibleReshare = await ownerRequest("/api/me/profile/events", {
+    method: "POST",
+    ip: "198.51.100.130",
+    cookie: ownerCookie(owner),
+    body: { event: "profile_reshare_clicked" },
+  });
+  assert.equal(ineligibleReshare.status, 404);
+  assert.equal(
+    sql(
+      "select count(*) from public.analytics_events where event_name = 'profile_reshare_clicked'",
+      true,
+    ),
+    "0",
+  );
+
   insertSubmittedResponse(publicLink, "a");
   insertSubmittedResponse(publicLink, "b");
   insertSubmittedResponse(oneToOneLink, "b");
@@ -344,6 +359,21 @@ test("submitted public sights refresh live and reveal only at three samples", as
   assert.equal(beforeProfile.sightCount, 2);
   assert.equal(beforeProfile.cards[0].sampleCount, 2);
   assert.equal(beforeProfile.cards[0].counts, null);
+
+  const eligibleReshare = await ownerRequest("/api/me/profile/events", {
+    method: "POST",
+    ip: "198.51.100.130",
+    cookie: ownerCookie(owner),
+    body: { event: "profile_reshare_clicked" },
+  });
+  assert.equal(eligibleReshare.status, 204, serverLog);
+  assert.equal(
+    sql(
+      "select count(*) from public.analytics_events where event_name = 'profile_reshare_clicked' and visitor_response_id is null and properties = jsonb_build_object('packVersion', 'old-friend-v1', 'entrySource', 'profile_reshare')",
+      true,
+    ),
+    "1",
+  );
 
   insertSubmittedResponse(publicLink, "a");
   const after = await ownerRequest("/api/me/profile", {

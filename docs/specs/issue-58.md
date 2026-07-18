@@ -120,7 +120,7 @@ Issue: https://github.com/aroido/gyeop/issues/58
 
 ### analytics policy와 types
 
-- 새 additive migration `20260718001000_profile_reshare.sql`에서 owner profile policy와 core visitor/share policy를 exact superset으로 교체한다.
+- 새 additive migration `20260718001000_profile_reshare.sql`에서 기존 profile-view/core share policy는 유지하고, profile click과 source-aware share success의 exact property set만 허용하는 별도 permissive insert policy를 추가한다.
 - `profile_reshare_clicked`는 null `visitor_response_id`, string `packVersion`, exact `entrySource=profile_reshare`만 허용한다.
 - share success events는 기존 2-key properties 또는 profile source가 있는 3-key properties만 허용한다. unrelated event의 property set은 바뀌지 않는다.
 - `database.types.ts`, `internal-rpc.ts`, event outcome decoder와 source verifier를 새 RPC signature·enum에 맞춘다.

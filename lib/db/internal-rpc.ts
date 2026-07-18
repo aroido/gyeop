@@ -322,7 +322,7 @@ export async function getOwnerProfile(input: {
 export async function recordOwnerProfileEvent(input: {
   playId: string;
   managementSecretHash: Uint8Array;
-  event: "profile_viewed";
+  event: "profile_viewed" | "profile_reshare_clicked";
   signal?: AbortSignal;
 }): Promise<OwnerProfileEventResult> {
   let query = getInternalClient().rpc("record_owner_profile_event", {
@@ -498,13 +498,15 @@ export async function recordOwnerShareAction(input: {
   managementSecretHash: Uint8Array;
   linkId: string;
   event: "share_handoff_succeeded" | "share_link_copied";
+  entrySource: "profile_reshare" | null;
   signal?: AbortSignal;
 }): Promise<RecordShareActionResult> {
-  let query = getInternalClient().rpc("record_owner_share_action", {
+  let query = getInternalClient().rpc("record_owner_share_action_with_source", {
     p_play_id: input.playId,
     p_management_secret_hash: bytea(input.managementSecretHash),
     p_link_id: input.linkId,
     p_event_name: input.event,
+    p_entry_source: nullableRpcString(input.entrySource),
   });
   if (input.signal) query = query.abortSignal(input.signal);
   const { data, error } = await query;

@@ -41,6 +41,12 @@ select has_function(
   array['uuid', 'bytea', 'uuid', 'text'],
   'record share action RPC has the exact signature'
 );
+select has_function(
+  'public',
+  'record_owner_share_action_with_source',
+  array['uuid', 'bytea', 'uuid', 'text', 'text'],
+  'source-aware share action RPC has a distinct exact signature'
+);
 
 select ok(
   not has_table_privilege('service_role', 'public.share_links', 'SELECT')
@@ -92,6 +98,16 @@ select ok(
   and has_function_privilege(
     'service_role',
     'public.record_owner_share_action(uuid,bytea,uuid,text)',
+    'EXECUTE'
+  )
+  and has_function_privilege(
+    'service_role',
+    'public.record_owner_share_action_with_source(uuid,bytea,uuid,text,text)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'anon',
+    'public.record_owner_share_action_with_source(uuid,bytea,uuid,text,text)',
     'EXECUTE'
   )
   and not has_function_privilege(
@@ -312,6 +328,45 @@ select is(
   )->>'outcome',
   'recorded',
   'browser-reported one-to-one copy records an event'
+);
+
+select is(
+  public.record_owner_share_action_with_source(
+    '19000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex'),
+    '19100000-0000-4000-8000-000000000001',
+    'share_handoff_succeeded',
+    'profile_reshare'
+  )->>'outcome',
+  'recorded',
+  'profile-entry public handoff records the fixed source'
+);
+
+select is(
+  public.record_owner_share_action_with_source(
+    '19000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex'),
+    '19100000-0000-4000-8000-000000000002',
+    'share_link_copied',
+    'profile_reshare'
+  )->>'outcome',
+  'recorded',
+  'profile-entry one-to-one copy records the fixed source'
+);
+
+select throws_ok(
+  $$
+    select public.record_owner_share_action_with_source(
+      '19000000-0000-4000-8000-000000000001',
+      decode(repeat('11', 32), 'hex'),
+      '19100000-0000-4000-8000-000000000001',
+      'share_link_copied',
+      'anything_else'
+    )
+  $$,
+  '22023',
+  'invalid share action input',
+  'arbitrary entry source values are rejected before mutation'
 );
 
 select is(
@@ -554,9 +609,11 @@ select is(
   ),
   '[
     {"event":"share_handoff_succeeded","properties":{"packVersion":"old-friend-v1","linkKind":"public"}},
-    {"event":"share_link_copied","properties":{"packVersion":"old-friend-v1","linkKind":"one_to_one"}}
+    {"event":"share_link_copied","properties":{"packVersion":"old-friend-v1","linkKind":"one_to_one"}},
+    {"event":"share_handoff_succeeded","properties":{"packVersion":"old-friend-v1","linkKind":"public","entrySource":"profile_reshare"}},
+    {"event":"share_link_copied","properties":{"packVersion":"old-friend-v1","linkKind":"one_to_one","entrySource":"profile_reshare"}}
   ]'::jsonb,
-  'share actions contain only DB-derived pack version and actual link kind'
+  'share actions preserve legacy properties and add only the fixed profile source'
 );
 
 select is(
@@ -624,6 +681,24 @@ select ok(
       and policy.policyname = 'analytics_core_visitor_flow_internal_insert'
   ),
   'analytics RLS retains the four share events and exact property keys'
+);
+
+select ok(
+  (
+    select count(*) = 1
+      and bool_and(policy.roles = array['gyeop_internal_rpc']::name[])
+      and bool_and(policy.cmd = 'INSERT')
+      and bool_and(position('profile_reshare_clicked' in policy.with_check) > 0)
+      and bool_and(position('profile_reshare' in policy.with_check) > 0)
+      and bool_and(position('entrySource' in policy.with_check) > 0)
+      and bool_and(position('share_handoff_succeeded' in policy.with_check) > 0)
+      and bool_and(position('share_link_copied' in policy.with_check) > 0)
+    from pg_catalog.pg_policies policy
+    where policy.schemaname = 'public'
+      and policy.tablename = 'analytics_events'
+      and policy.policyname = 'analytics_profile_reshare_internal_insert'
+  ),
+  'profile reshare analytics policy is the exact additional allowlist'
 );
 
 select * from finish();

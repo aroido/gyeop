@@ -4,7 +4,7 @@
 
 - 결정: 비공개 재미 검증의 `/me` 전체 시선 수와 질문별 A/B 표본은 `submitted` 공개 링크 응답만 live query로 집계한다. 1:1 응답은 방문자 본인의 즉시 비교에만 남기고 private 프로필 누적에서도 제외한다.
 - 이유: 지금 검증할 세 번째 가설은 공개 링크로 도착한 익명 시선이 쌓여 재공유를 만드는지다. 1:1 owner 비교, 관계별 이중 threshold, 별도 aggregate를 함께 열면 핵심 재공유 동기와 구현 범위가 섞인다.
-- 결과: `/me`는 셀프 10장, 공개 링크 완료 수, 카드별 3표본 threshold, same-browser 새 시선 count watermark, 재공유 CTA만 제공한다. 공개 프로필·관계 레이어·1:1 포함은 production beta 재승인 또는 후속 이슈 전에는 열지 않는다.
+- 결과: `/me`는 셀프 10장, 공개 링크 완료 수, 카드별 3표본 threshold, same-browser 새 시선 count watermark, 시선 1건 이상에서 같은 owner play로 돌아가는 단일 재공유 CTA만 제공한다. profile 재공유 진입은 fixed `profile_reshare` code로만 방향성을 측정하고 raw link secret을 복원하지 않는다. 공개 프로필·관계 레이어·1:1 포함은 production beta 재승인 또는 후속 이슈 전에는 열지 않는다.
 
 ## 2026-07-18 — 오래된 친구팩 private MVP 진입 활성화
 

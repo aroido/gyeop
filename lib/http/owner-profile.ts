@@ -45,7 +45,7 @@ export async function readOwnerProfileResponse(input: {
 
 export async function recordOwnerProfileEventResponse(input: {
   cookie: ValidOwnerCookie;
-  event: "profile_viewed";
+  event: "profile_viewed" | "profile_reshare_clicked";
   signal: AbortSignal;
 }) {
   const result = await recordOwnerProfileEvent({
@@ -61,5 +61,6 @@ export async function recordOwnerProfileEventResponse(input: {
     return ownerNotFoundResponse(true);
   }
   if (result.outcome === "not_completed") return ownerNotFoundResponse();
+  if (result.outcome === "not_eligible") return ownerNotFoundResponse();
   return ownerInternalErrorResponse();
 }

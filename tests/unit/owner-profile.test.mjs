@@ -117,6 +117,10 @@ test("strictly decodes profile and event RPC outcomes", () => {
   assert.deepEqual(decodeOwnerProfileEventOutcome({ outcome: "recorded" }), {
     outcome: "recorded",
   });
+  assert.deepEqual(
+    decodeOwnerProfileEventOutcome({ outcome: "not_eligible" }),
+    { outcome: "not_eligible" },
+  );
 
   for (const invalid of [
     { outcome: "authorized", profile: profile() },

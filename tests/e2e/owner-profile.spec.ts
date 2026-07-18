@@ -62,14 +62,26 @@ async function installProfileApi(
   initial: Profile,
   options: { status?: number } = {},
 ) {
-  const state = { profile: initial, eventCalls: 0 };
+  const state = {
+    profile: initial,
+    eventCalls: 0,
+    eventBodies: [] as Array<{
+      event: "profile_viewed" | "profile_reshare_clicked";
+    }>,
+  };
   await page.route("**/api/me/profile**", async (route) => {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
     if (pathname === "/api/me/profile/events") {
       state.eventCalls += 1;
       expect(request.method()).toBe("POST");
-      expect(request.postDataJSON()).toEqual({ event: "profile_viewed" });
+      const body = request.postDataJSON() as {
+        event: "profile_viewed" | "profile_reshare_clicked";
+      };
+      expect(["profile_viewed", "profile_reshare_clicked"]).toContain(
+        body.event,
+      );
+      state.eventBodies.push(body);
       return route.fulfill({
         status: 204,
         headers: { "cache-control": "private, no-store" },
@@ -111,18 +123,15 @@ test("renders the private zero-sight profile and records viewing after render", 
   await expect(page.locator("article")).toHaveCount(10);
   await expect(page.getByText("시선을 모으는 중 · 0/3")).toHaveCount(10);
   await expect(page.getByText("친구 시선", { exact: false })).toHaveCount(0);
-  await expect(
-    page.getByRole("link", { name: "친구에게 더 공유하기" }),
-  ).toHaveAttribute("href", `/me/plays/${playId}`);
-  await page.keyboard.press("Tab");
-  const shareLink = page.getByRole("link", { name: "친구에게 더 공유하기" });
-  await expect(shareLink).toBeFocused();
-  await expect(shareLink).toHaveCSS("outline-color", "rgb(49, 92, 255)");
+  await expect(page.getByRole("link", { name: "시선 더 모으기" })).toHaveCount(
+    0,
+  );
   await page.keyboard.press("Shift+Tab");
   const backLink = page.getByRole("link", { name: "← 내 답변" });
   await expect(backLink).toBeFocused();
   await expect(backLink).toHaveCSS("outline-color", "rgb(49, 92, 255)");
   await expect.poll(() => api.eventCalls).toBe(1);
+  expect(api.eventBodies).toEqual([{ event: "profile_viewed" }]);
 });
 
 test("reveals exact counts at three samples and shows each increase only once", async ({
@@ -133,6 +142,9 @@ test("reveals exact counts at three samples and shows each increase only once", 
   await expect(page.getByText("새 시선 도착")).toBeVisible();
   await expect(page.getByText("시선을 모으는 중 · 2/3")).toBeVisible();
   await expect(page.getByText("A · 바로 이야기한다")).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "시선 더 모으기" }),
+  ).toHaveAttribute("href", `/me/plays/${playId}?entry_source=profile_reshare`);
 
   api.profile = profile(3, 3);
   await page.reload();
@@ -147,6 +159,31 @@ test("reveals exact counts at three samples and shows each increase only once", 
   await expect(page.getByText("시선이 쌓여 있어요")).toBeVisible();
   await expect.poll(() => api.eventCalls).toBe(3);
 });
+
+for (const activation of ["pointer", "keyboard"] as const) {
+  test(`${activation} profile reshare records the click and keeps the same play`, async ({
+    page,
+  }) => {
+    const api = await installProfileApi(page, profile(1, 1));
+    await page.goto("/me");
+    const cta = page.getByRole("link", { name: "시선 더 모으기" });
+    if (activation === "pointer") {
+      await cta.click();
+    } else {
+      await cta.focus();
+      await page.keyboard.press("Enter");
+    }
+    await expect(page).toHaveURL(
+      `/me/plays/${playId}?entry_source=profile_reshare`,
+    );
+    await expect
+      .poll(() => api.eventBodies)
+      .toEqual([
+        { event: "profile_viewed" },
+        { event: "profile_reshare_clicked" },
+      ]);
+  });
+}
 
 test("never claims a new sight when browser storage is unavailable", async ({
   page,
@@ -204,11 +241,8 @@ for (const viewport of [
       ),
     ).toBe(true);
     expect(
-      (
-        await page
-          .getByRole("link", { name: "친구에게 더 공유하기" })
-          .boundingBox()
-      )?.height,
+      (await page.getByRole("link", { name: "시선 더 모으기" }).boundingBox())
+        ?.height,
     ).toBeGreaterThanOrEqual(44);
   });
 }

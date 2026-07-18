@@ -35,6 +35,8 @@ export function POST(
           ) {
             throw new Error("INTERNAL_ERROR");
           }
+          const entrySource =
+            input.entrySource === "profile_reshare" ? "profile_reshare" : null;
           const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
           if (cookie.outcome === "absent") return ownerNotFoundResponse();
           if (cookie.outcome === "malformed")
@@ -47,6 +49,7 @@ export function POST(
             cookie,
             linkId: input.linkId,
             event: input.event,
+            entrySource,
             signal,
           });
         },

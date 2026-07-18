@@ -11,6 +11,7 @@ import {
 } from "@/lib/owner-profile/owner-profile-core.mjs";
 import {
   loadOwnerProfile,
+  recordOwnerProfileReshareClicked,
   recordOwnerProfileViewed,
 } from "@/lib/owner-profile/owner-profile-client";
 import type {
@@ -203,6 +204,22 @@ export default function OwnerProfileView() {
               아직 도착한 시선이 없어요
             </span>
           ) : null}
+          {profile.sightCount > 0 ? (
+            <div className={styles.reshare}>
+              <p>같은 팩 링크로 친구 시선을 더 받아요.</p>
+              <Link
+                className={styles.primary}
+                href={`/me/plays/${profile.playId}?entry_source=profile_reshare`}
+                onClick={() => {
+                  void recordOwnerProfileReshareClicked().catch(
+                    () => undefined,
+                  );
+                }}
+              >
+                시선 더 모으기
+              </Link>
+            </div>
+          ) : null}
         </section>
 
         <div className={styles.sectionHead}>
@@ -214,16 +231,6 @@ export default function OwnerProfileView() {
             <ProfileCard key={card.cardId} card={card} />
           ))}
         </div>
-
-        <section className={styles.continue} aria-labelledby="continue-title">
-          <h2 id="continue-title">조금 더 선명하게 만들까요?</h2>
-          <p>
-            친구에게 링크를 더 보내면 아직 비어 있는 질문에도 시선이 쌓여요.
-          </p>
-          <Link className={styles.primary} href={`/me/plays/${profile.playId}`}>
-            친구에게 더 공유하기
-          </Link>
-        </section>
       </section>
     </main>
   );
