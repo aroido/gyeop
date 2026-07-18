@@ -22,10 +22,11 @@ Issue: https://github.com/aroido/gyeop/issues/22
 - `relationship_selected`, `visitor_response_started` analytics event를 신규 response와 같은 transaction에서 한 번만 기록한다.
 - disabled·expired·invalid link, malformed·tampered·expired same-link session은 방문자 데이터가 없는 같은 generic 404로 수렴한다.
 - strict decoder, source policy, pgTAP, integration, mobile Playwright, live Supabase E2E와 문서를 갱신한다.
+- `docs/product/question-pack-spec.md`, `docs/product/decision-log.md`, `docs/engineering/p0-development-plan.md`에 exact registry와 단계별 이슈 소유권을 같은 PR에서 반영한다.
 
 ## 제외 범위
 
-- 1:1 링크 response 시작. 기존 1:1 invite는 정보 화면만 유지하고 #23 또는 #24에서 single-use 제출 계약과 함께 response 시작을 확장한다.
+- 1:1 링크 response 시작. 기존 1:1 invite는 정보 화면만 유지하고 #23이 같은 `start_response` transaction을 `public|one_to_one`과 필수 3장 assignment로 확장한다. #24는 이미 생성·배정된 1:1 response의 제출 시 원자 소비만 소유한다.
 - Signature·최소 표본 카드 배정, `visitor_assignments`, 카드 문구 반환.
 - A/B 답 저장, 필수 3장 제출, owner self answer·관계 집계·비교 결과 노출.
 - 방문자 management secret·철회 링크, 선택 2장, 프로필, 알림, 공개 집계.
@@ -67,16 +68,17 @@ Issue: https://github.com/aroido/gyeop/issues/22
 
 | code | 한글 label |
 |---|---|
-| `under_one_year` | 1년 안 됐어요 |
-| `one_to_three_years` | 1~3년 됐어요 |
-| `three_to_five_years` | 3~5년 됐어요 |
-| `five_to_ten_years` | 5~10년 됐어요 |
-| `over_ten_years` | 10년 넘었어요 |
+| `under_one_year` | 1년 미만이에요 |
+| `one_to_three_years` | 1년 이상 · 3년 미만 |
+| `three_to_five_years` | 3년 이상 · 5년 미만 |
+| `five_to_ten_years` | 5년 이상 · 10년 미만 |
+| `ten_years_or_more` | 10년 이상이에요 |
 | `not_sure` | 잘 모르겠어요 |
 
 - code는 DB constraint, strict HTTP schema, RPC decoder, analytics policy가 공유하는 immutable identifier다.
+- 기간 경계는 현재 시각 기준 `<1`, `>=1 && <3`, `>=3 && <5`, `>=5 && <10`, `>=10`, `unknown`으로 비중첩이다. 저장된 code는 선택 당시 구간을 뜻하며 시간이 지나도 자동 변경하지 않는다.
 - 한글 label은 `lib/visitor-response/visitor-context-core.mjs`의 frozen registry에서만 정의한다. `visitor_responses`와 analytics에는 label을 저장하지 않는다.
-- #9의 P1 문구 이슈는 이 PR 뒤 중복 상태를 다시 평가한다. P0 코드 의미를 바꾸는 label 변경은 하지 않는다.
+- #9의 code·label 확정 범위는 #22에 흡수해 중복 이슈를 닫았다. 민감 관계 공개 안내가 필요하면 별도 P1 이슈로 다시 정의한다.
 
 ## 사용자 흐름 영향
 
@@ -131,7 +133,7 @@ Issue: https://github.com/aroido/gyeop/issues/22
 - label 클릭 영역 전체가 radio를 선택하고 각 control은 keyboard·screen reader에서 group과 checked state를 제공한다.
 - 320/390/430px에서 44px target, visible focus, reduced motion, 200% text zoom, 가로 overflow 없음 조건을 유지한다.
 - start 성공은 started heading으로 focus를 이동한다. validation·rate-limit·retry failure는 `role=alert`, loading·success는 `role=status`/`aria-live=polite` 한 곳만 사용한다.
-- 1:1 metadata에서는 관계 form을 렌더하지 않고 기존 `나에게 온 1:1 초대` 맥락과 다음 단계 안내를 유지한다.
+- 1:1 metadata에서는 관계 form을 렌더하지 않고 기존 `나에게 온 1:1 초대` 맥락과 `1:1 응답은 다음 단계에서 이어져요.` 안내를 유지한다. #23이 1:1 start+assignment를 함께 연다.
 
 ## API와 데이터 영향
 
@@ -145,12 +147,12 @@ Issue: https://github.com/aroido/gyeop/issues/22
 - `share_link_id uuid not null references public.share_links(id) on update restrict on delete cascade`
 - `pack_version_id uuid not null references public.pack_versions(id) on update restrict on delete restrict`
 - nullable `relationship_code text`, nullable `known_since_code text`
-- `status text not null default 'draft' check (status in ('draft','submitted','withdrawn','invalid'))`
+- `status text not null default 'draft' check (status = 'draft')`
 - nullable unique `session_token_hash bytea` with exact 32-byte check
 - `session_expires_at timestamptz not null`
 - nullable unique `management_token_hash bytea` with exact 32-byte check
 - `created_at timestamptz not null`, nullable `submitted_at`, nullable `withdrawn_at`
-- #22 상태 constraint는 `draft`에서 relationship/session hash가 non-null이고 submit/withdraw 시각과 management hash가 null임을 강제한다. 후속 #24와 철회 이슈가 상태별 constraint를 교체한다.
+- #22 상태 constraint는 유일한 허용 상태 `draft`에서 relationship/session hash가 non-null이고 submit/withdraw 시각과 management hash가 null임을 강제한다. #24가 `submitted`를 추가할 때 constraint·RPC·decoder를 함께 교체하고 철회 이슈가 `withdrawn|invalid`를 확장한다.
 
 인덱스는 계획에 이미 있는 query만 추가한다.
 
@@ -160,13 +162,14 @@ Issue: https://github.com/aroido/gyeop/issues/22
 
 table은 RLS를 enable하고 `gyeop_internal_rpc`에 필요한 select/insert/update만 grant한다. `public`, `anon`, `authenticated`, `service_role` direct table 권한은 모두 없다.
 
-기존 analytics insert policy를 교체한다.
+`public.analytics_events`에 nullable 내부 subject column `visitor_response_id uuid references public.visitor_responses(id) on update restrict on delete set null`과 withdrawal lookup index를 추가하고 기존 analytics insert policy를 교체한다. 이 column은 외부 HTTP나 analytics properties에 노출하지 않는다.
 
-- 기존 `share_link_created|invite_opened|share_handoff_succeeded|share_link_copied` exact payload를 유지한다.
-- `relationship_selected`는 exact `packVersion|linkKind|relationshipCode|knownSinceCode`만 허용한다.
-- `visitor_response_started`는 exact `packVersion|linkKind`만 허용한다.
+- 기존 `share_link_created|invite_opened|share_handoff_succeeded|share_link_copied`는 `visitor_response_id is null`과 기존 exact payload를 유지한다.
+- `relationship_selected`는 `visitor_response_id is not null`과 exact `packVersion|linkKind|relationshipCode|knownSinceCode`만 허용한다.
+- `visitor_response_started`는 `visitor_response_id is not null`과 exact `packVersion|linkKind`만 허용한다.
 - `linkKind`는 이 PR에서 `public`만 가능하다.
-- relationship/known-since label, IP/network key, UUID, raw/hash token, A/B choice, user agent, URL은 금지한다.
+- analytics `properties`에는 relationship/known-since label, IP/network key, UUID, raw/hash token, A/B choice, user agent, URL을 금지한다. nullable 내부 subject column의 DB-derived response UUID만 예외다.
+- 두 신규 event의 `visitor_response_id`는 `start_response`가 방금 insert한 DB row에서 derive한다. 철회 이슈 #26은 이 column으로 연결 event를 잠그고 relationship/known-since property와 subject ID를 같은 transaction에서 제거한다.
 
 ### response session credential
 
@@ -175,10 +178,13 @@ table은 RLS를 enable하고 `gyeop_internal_rpc`에 필요한 select/insert/upd
 - cookie name: `__Host-gyeop-response`
 - value: `v1.{canonical-response-uuid}.{43-char-base64url-secret}`
 - secret: CSPRNG 32 bytes
-- hash: `SHA-256("gyeop-visitor-response-v1\\0" || secretBytes)`
-- response start rate key: `SHA-256("gyeop-response-start-v1\\0" || networkKey || 0x00 || publicId)`
+- secret encoding: regex `^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$`, unpadded base64url decode exact 32 bytes, decode→encode canonical round-trip
+- hash bytes: `SHA-256(UTF8("gyeop-visitor-response-v1") || 0x00 || rawSecretBytes)`
+- hash vector: raw bytes `00..1f` → `cd14ce89186655f35031108d679cab09551ea0f53bcf4576cbc30f947f4fbaf6`
+- response start rate key bytes: `SHA-256(UTF8("gyeop-response-start-v1") || 0x00 || networkKey32 || 0x00 || UTF8(publicId))`
+- rate vector: network bytes `00..1f`, public ID `AAAAAAAAAAAAAAAAAAAAAA` → `7f667381a24e34737c6fba266ae316b2070295a195b6c00598f198bd3a363e6a`
 - parser는 absent, malformed, exact valid를 구분하고 duplicate cookie name을 malformed로 처리한다.
-- serializer는 RPC가 반환한 `sessionTtlSeconds <= 86400`과 `sessionExpiresAt`만 사용해 Path=/, Expires, Max-Age, HttpOnly, Secure, SameSite=Lax를 고정한다.
+- serializer는 RPC `sessionTtlSeconds <= 86400`과 `sessionExpiresAt`을 검증하고 serialize 직전 `Max-Age=min(sessionTtlSeconds, floor((expiresAt-now)/1000))`로 clamp한다. 0 이하면 cookie를 serialize하지 않고 generic expired outcome으로 처리한다. Path=/, Expires, Max-Age, HttpOnly, Secure, SameSite=Lax를 고정하며 DB expiry가 최종 권한이다.
 - 삭제 serializer는 같은 attributes와 epoch/Max-Age=0을 사용한다.
 
 ### `public.start_response`
@@ -204,13 +210,13 @@ start_response(
 
 1. public ID·hash length·intent·existing pair·new pair·registry code·rate key shape를 검증한다. `resume`은 new credential/codes가 null이고, `start`는 new credential/codes가 모두 non-null이어야 한다.
 2. public ID row를 잠그고 secret hash, `kind=public`, `status=active`, expiry를 확인한다. 기한 지난 active link는 `expired`로 수렴한 뒤 `unavailable`을 반환한다.
-3. existing pair가 있으면 response id+hash를 검증한다. DB expiry가 지났거나 row가 없으면 `session_invalid`이다.
-4. valid existing response가 target link와 같으면 intent/body의 code와 무관하게 `resumed`와 저장 state를 반환한다.
+3. existing pair가 있으면 response row를 잠그고 exact id+hash, `status='draft'`, future DB expiry를 함께 검증한다. 하나라도 어긋나면 `session_invalid`이다.
+4. valid draft response가 target link와 같으면 intent/body의 code와 무관하게 `resumed`와 저장 state를 반환한다.
 5. valid existing response가 다른 link에 속하면 target에 대해서는 session absent로 취급한다. `resume`은 `no_session`, `start`는 신규 branch로 진행한다.
 6. existing pair가 없고 intent가 `resume`이면 `no_session`이다. quota·row·event는 바뀌지 않는다.
 7. 신규 branch의 nested exception block에서 `public.consume_rate_limit(p_rate_limit_key,'response_start',600,10)`을 호출한다. over-limit custom SQLSTATE를 catch해 increment를 rollback하고 `rate_limited|retryAfterSeconds`를 반환한다.
 8. response row를 target link의 pack version으로 insert하고 `session_expires_at = clock_timestamp() + interval '24 hours'`를 고정한다.
-9. 두 analytics event를 같은 transaction에 insert한다.
+9. 두 analytics event를 방금 생성한 `visitor_response_id` subject와 함께 같은 transaction에 insert한다.
 10. credential uniqueness 충돌은 nested block 전체를 rollback하고 `collision`을 반환한다. server wrapper가 새 credential로 제한 재시도하므로 quota·row·event가 남지 않는다.
 11. 반환 state는 exact `id|status|relationshipCode|knownSinceCode|sessionExpiresAt|sessionTtlSeconds`다. link/share/play/pack UUID, token/hash, owner answer, assignment, 집계를 반환하지 않는다.
 
@@ -223,14 +229,14 @@ start_response(
 - request body maximum 256 bytes, strict unknown-key rejection.
 - `intent=resume`: exact `{ intent, secret }`; relationship/known-since key가 있으면 400.
 - `intent=start`: exact `{ intent, secret, relationshipCode, knownSinceCode }`; 두 code 중 하나라도 없으면 400.
-- common public boundary 순서는 proxy proof → Origin → bounded UTF-8 JSON → strict schema → public ID → response cookie parse → domain wrapper다.
+- common public boundary 순서는 proxy proof → Origin → bounded UTF-8 JSON → strict schema → intent별 exact key matrix → public ID → response cookie parse → domain wrapper다.
 - malformed/duplicate cookie는 domain RPC 없이 generic 404+deleted response cookie다.
 - valid/absent cookie와 새 credential, secret hash, domain-separated network+link rate key만 wrapper에 전달한다.
 - `created` → 201 JSON + Set-Cookie.
 - `resumed` → 200 JSON + 동일 cookie value를 원 expiry까지만 재serialize.
 - `no_session` → 204, Set-Cookie 없음.
 - `rate_limited` → 429 + exact Retry-After, Set-Cookie 없음.
-- `unavailable|session_invalid` → byte-identical generic 404. session-invalid만 cookie를 삭제하되 body로 원인을 구분하지 않는다.
+- `unavailable|session_invalid` → status, body bytes, cache/security headers가 같은 generic 404. `session_invalid`만 exact deleted Set-Cookie를 추가하며 그 외 header 차이는 없다.
 - 모든 outcome은 `Cache-Control: private, no-store`와 common security boundary headers를 가진다.
 
 ### browser client
@@ -239,7 +245,7 @@ start_response(
 - public ID·secret·codes를 call 전에 allowlist 검증한다.
 - `201|200` response context는 exact keys, canonical UUID, draft status, registry codes, parseable future expiry, `1..86400` TTL, code-derived exact label로 strict decode한다.
 - 204는 resume의 `null`만 의미한다. start에서 204, body 없는 success, wrong cache header, extra field는 invalid response다.
-- same mounted client의 resume/start flights를 public ID 단위로 dedupe하고, submit latch로 same-tick double activation을 막는다.
+- same mounted client의 flight key는 `publicId+intent`로 분리한다. initial resume이 settle하기 전에는 form/CTA를 활성화하지 않고, start submit latch로 same-tick double activation의 HTTP request를 정확히 한 번으로 막는다.
 - raw secret, response id, 선택 code를 console/error/analytics/storage에 기록하지 않는다.
 
 ## 구현 계획
@@ -249,7 +255,7 @@ start_response(
 3. generated DB types와 named internal RPC wrapper·strict outcome decoder를 추가한다.
 4. strict request schema, HTTP response mapper, exact response route를 추가한다.
 5. browser client와 invite active public state의 resume/form/start/started UI를 구현한다.
-6. source policy, integration, Playwright mock/live, 문서 trace를 갱신한다.
+6. source policy, integration, Playwright mock/live, 제품 SSOT와 문서 trace를 갱신하고 GitHub #23의 1:1 start 소유권을 정렬한다.
 7. 독립 QA와 `./scripts/run-ai-verify --mode full`을 통과한다.
 
 ## 완료 기준
@@ -269,8 +275,8 @@ start_response(
 ### unit/source policy
 
 - 관계 8개·시점 6개의 exact code/label registry와 unknown/extra/coerced input 거절.
-- response credential hash vector, cookie absent/malformed/duplicate/valid, fixed expiry serializer, delete serializer.
-- response-start rate key domain separation과 network/public ID scope.
+- response credential canonical regex/32-byte round-trip/exact hash vector, cookie absent/malformed/duplicate/valid, delayed-response Max-Age clamp·0 이하 거절, delete serializer.
+- response-start rate key exact byte layout/vector와 network/public ID scope.
 - start-response outcome·HTTP context exact decoder가 extra/missing/wrong type/expired/label mismatch를 거절.
 - source verifier가 direct table access, raw client export, non-allowlisted RPC, response token log/storage, loose route schema를 거절.
 
@@ -280,7 +286,8 @@ start_response(
 - active public create가 relation/time code, 24시간 expiry, hash-only credential, exact events를 commit.
 - same session resume·duplicate start가 response/event/bucket count를 바꾸지 않고 stored codes를 반환.
 - same public link의 두 credential이 독립 row를 만든다.
-- two concurrent same-credential starts는 한 row/event pair로 수렴하거나 collision retry contract를 지킨다.
+- RPC에 동일 new credential을 준 동시 start 두 건은 정확히 `created` 1건·`collision` 1건, response 1건, event pair 1개, bucket count 1로 끝난다.
+- server wrapper가 처음 받은 `collision` subtransaction은 bucket·row·event 0으로 rollback되고 fresh credential bounded retry 한 번의 결과만 남는다.
 - 10 starts 후 11번째가 rate_limited이며 bucket 10·response 10·event pair 10을 유지.
 - invalid secret, disabled, expired, 1:1 link의 unavailable과 expired status convergence.
 - missing/tampered/expired valid-shape session이 `session_invalid`, cross-link valid session resume이 `no_session`.
@@ -290,16 +297,17 @@ start_response(
 
 - exact POST path/method, strict body byte/UTF-8/unknown-key/intent-field matrix.
 - `resume` absent 204, created 201, resumed 200, private no-store와 cookie exact flags/expiry.
-- malformed cookie와 DB tamper/expiry의 generic 404·cookie deletion, invalid link body 동일성.
+- malformed cookie와 DB tamper/expiry의 generic 404·cookie deletion, invalid link와 status/body bytes/cache/security header 동일성 및 deletion Set-Cookie만의 허용 차이.
 - new-response 429 exact Retry-After와 domain row/event 0.
 - anon/service direct table/RPC 접근 차단과 server-only wrapper allowlist.
 - response body·error·headers에 raw/hash secret, label, owner answer, assignment, IDs beyond response id가 없음.
+- random live credential test는 Playwright trace/screenshot/video를 강제로 끄고 failure attachment·console·request/response dump에 Cookie/Set-Cookie를 출력하지 않는다.
 
 ### Playwright
 
 - active public invite가 관계 8개와 시점 6개, 선택 전 disabled CTA를 표시.
 - radio keyboard·label activation, checked state, 44px target, focus order.
-- 두 선택 뒤 exact start body 한 번, same-tick double click 한 번, started heading focus.
+- initial resume settle 전 form 비활성, 두 선택 뒤 exact start body 한 번, same-tick double click의 HTTP request 정확히 한 번, started heading focus.
 - resume 204는 form, 200은 stored started state를 form flash 없이 복구.
 - rate-limit/retry failure가 선택을 보존하고 accessible feedback을 제공.
 - 1:1 invite에 form/start request가 없음.
@@ -309,7 +317,7 @@ start_response(
 
 - 실제 owner 완료·public link 생성 뒤 metadata→resume absent→start→reload resume.
 - 두 isolated browser context가 같은 public link에서 독립 response를 생성.
-- DB에는 두 distinct hash/response, raw token·label 0건, exact analytics payload만 존재.
+- DB에는 두 distinct hash/response, raw token·label 0건, 두 신규 event의 내부 `visitor_response_id`와 exact analytics payload만 존재.
 - cookie tamper, DB expiry, link disable/expiry, 11번째 start, duplicate request를 실제 Route/RPC로 검증.
 
 ### final
@@ -319,7 +327,7 @@ start_response(
 
 ## 분석과 관측성
 
-- 신규 response transaction만 `relationship_selected`와 `visitor_response_started`를 각각 한 번 기록한다.
+- 신규 response transaction만 `relationship_selected`와 `visitor_response_started`를 각각 한 번 기록하고 두 event의 nullable 내부 subject column에 같은 DB-derived response ID를 둔다.
 - `relationship_selected`: `packVersion`, `linkKind=public`, `relationshipCode`, `knownSinceCode`.
 - `visitor_response_started`: `packVersion`, `linkKind=public`.
 - resume, duplicate start, invalid/unavailable/session-invalid/rate-limited/collision에는 event를 기록하지 않는다.
@@ -338,11 +346,11 @@ start_response(
 
 ## 롤아웃과 복구
 
-- migration은 additive다. app rollback 뒤 새 table/RPC/policy가 남아도 기존 invite metadata와 share flow는 계속 동작한다.
+- migration은 additive다. app rollback 뒤 새 table/RPC/policy/nullable analytics subject column이 남아도 기존 invite metadata와 share flow는 계속 동작한다.
 - app 배포는 migration 적용 뒤 진행한다. route가 없거나 실패하면 기존 generic invite 정보 화면으로 rollback할 수 있다.
 - response 시작을 끄기 위한 feature flag·UA 분기는 추가하지 않는다. 문제가 있으면 app release를 이전 버전으로 돌리고 신규 route 호출을 제거한다.
 - DB down migration으로 response를 삭제하지 않는다. 비공개 검증 데이터 정리가 필요하면 retention/withdrawal 계약에 맞는 별도 승인 작업으로 처리한다.
-- #23은 같은 table/RPC를 교체해 assignment를 transaction에 추가하되 response/session/cookie/event/quota 계약을 유지한다.
+- #23은 같은 table/RPC를 교체해 `kind=public|one_to_one` validation과 assignment를 한 transaction에 추가하되 response/session/cookie/event/quota 계약을 유지한다. #24는 그 결과의 1:1 제출 소비만 소유한다.
 
 ## 스펙 검토
 
@@ -352,7 +360,7 @@ P0/P1 Findings:
 
 ## 리스크와 미결정 사항
 
-- 관계·시점 label은 #22에서 P0 검증 문구로 고정한다. #9가 같은 범위를 그대로 유지하면 중복 이슈이므로 #22 병합 뒤 닫거나 P1 민감 관계 공개 안내로 재범위화한다.
+- 관계·시점 code/label은 #22에서 P0 검증 문구로 제품 SSOT에 고정하고 중복 #9를 닫았다. 민감 관계 공개 안내가 필요하면 별도 P1 이슈로 다시 정의한다.
 - 하나의 `__Host-gyeop-response` cookie만 사용하므로 같은 브라우저에서 동시에 유지하는 active visitor session은 하나다. 다른 링크를 명시적으로 시작하면 cookie가 새 response로 교체된다. P0 핵심 지표는 링크별 독립 browser 참여이며 multi-tab multi-response 복구는 요구하지 않는다.
 - metadata 성공과 start 사이 link가 비활성화될 수 있다. start RPC의 row lock과 상태 재검증이 최종 권한이다.
 - response commit 뒤 Set-Cookie가 유실되면 raw session secret을 복구할 수 없다. #22는 cookie를 JS storage에 복제하지 않는다. 동일 HTTP response 유실의 별도 idempotency key는 실제 발생률을 측정한 뒤 검토한다.

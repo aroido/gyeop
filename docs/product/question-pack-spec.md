@@ -78,14 +78,29 @@
 
 방문자는 응답 전에 관계와 시점을 직접 선택한다.
 
-- 오래된 친구
-- 학교 친구
-- 직장 동료
-- 썸·연인
-- 가족
-- 온라인 친구
-- SNS 팔로워·온라인에서만 봄
-- 기타
+관계 code와 한글 label은 다음 exact registry를 사용한다. DB와 analytics에는 code만 저장하고 label은 검수된 registry에서 derive한다.
+
+| code | 한글 label |
+|---|---|
+| `old_friend` | 오래된 친구 |
+| `school_friend` | 학교 친구 |
+| `coworker` | 직장 동료 |
+| `romantic` | 썸·연인 |
+| `family` | 가족 |
+| `online_friend` | 온라인 친구 |
+| `social_follower` | SNS 팔로워·온라인에서만 봄 |
+| `other` | 기타 |
+
+알게 된 시점은 현재 시각 기준 서로 알게 되거나 팔로우하기 시작한 기간을 고른다. 구간은 비중첩이며 저장한 code는 선택 당시 구간을 뜻해 시간이 지나도 자동 변경하지 않는다.
+
+| code | 한글 label | 경계 |
+|---|---|---|
+| `under_one_year` | 1년 미만이에요 | `< 1년` |
+| `one_to_three_years` | 1년 이상 · 3년 미만 | `>= 1년, < 3년` |
+| `three_to_five_years` | 3년 이상 · 5년 미만 | `>= 3년, < 5년` |
+| `five_to_ten_years` | 5년 이상 · 10년 미만 | `>= 5년, < 10년` |
+| `ten_years_or_more` | 10년 이상이에요 | `>= 10년` |
+| `not_sure` | 잘 모르겠어요 | 구간을 고르기 어려움 |
 
 공개 링크에서는 이름을 요구하지 않는다. 같은 관계 응답자가 3명 이상 모이기 전에는 공개 관계별 집계를 만들지 않는다.
 
