@@ -79,66 +79,6 @@ begin
       message = 'required assignment response binding not found';
   end if;
 
-  with candidate_cards as (
-    select
-      card.id,
-      card.position,
-      card.is_signature,
-      (
-        select count(*)
-        from public.visitor_assignments as prior_assignment
-        join public.visitor_responses as prior_response
-          on prior_response.id = prior_assignment.response_id
-        join public.share_links as prior_link
-          on prior_link.id = prior_response.share_link_id
-        where prior_assignment.pack_version_id = card.pack_version_id
-          and prior_assignment.card_id = card.id
-          and prior_assignment.stage = 'required'
-          and prior_response.status = 'submitted'
-          and prior_link.pack_play_id = p_pack_play_id
-      ) as submitted_sample_count,
-      pg_catalog.sha256(
-        convert_to('gyeop-required-assignment-v1', 'UTF8')
-        || decode('00', 'hex')
-        || convert_to(p_response_id::text, 'UTF8')
-        || decode('00', 'hex')
-        || convert_to(card.id, 'UTF8')
-      ) as tie_hash
-    from public.pack_cards as card
-    where card.pack_version_id = p_pack_version_id
-  ),
-  selected_cards as (
-    select
-      card.id,
-      1::smallint as assignment_position
-    from candidate_cards as card
-    where card.is_signature
-
-    union all
-
-    select
-      candidate.id,
-      (candidate.selection_position + 1)::smallint as assignment_position
-    from (
-      select
-        card.id,
-        row_number() over (
-          order by
-            card.submitted_sample_count,
-            card.tie_hash,
-            card.position,
-            card.id
-        ) as selection_position
-      from candidate_cards as card
-      where not card.is_signature
-      order by
-        card.submitted_sample_count,
-        card.tie_hash,
-        card.position,
-        card.id
-      limit 2
-    ) as candidate
-  )
   insert into public.visitor_assignments (
     response_id,
     pack_version_id,
@@ -152,7 +92,65 @@ begin
     selected.id,
     'required',
     selected.assignment_position
-  from selected_cards as selected
+  from (
+    select
+      card.id,
+      1::smallint as assignment_position
+    from public.pack_cards as card
+    where card.pack_version_id = p_pack_version_id
+      and card.is_signature
+
+    union all
+
+    select
+      candidate.id,
+      (candidate.selection_position + 1)::smallint as assignment_position
+    from (
+      select
+        ranked_card.id,
+        row_number() over (
+          order by
+            ranked_card.submitted_sample_count,
+            ranked_card.tie_hash,
+            ranked_card.position,
+            ranked_card.id
+        ) as selection_position
+      from (
+        select
+          card.id,
+          card.position,
+          (
+            select count(*)
+            from public.visitor_assignments as prior_assignment
+            join public.visitor_responses as prior_response
+              on prior_response.id = prior_assignment.response_id
+            join public.share_links as prior_link
+              on prior_link.id = prior_response.share_link_id
+            where prior_assignment.pack_version_id = card.pack_version_id
+              and prior_assignment.card_id = card.id
+              and prior_assignment.stage = 'required'
+              and prior_response.status = 'submitted'
+              and prior_link.pack_play_id = p_pack_play_id
+          ) as submitted_sample_count,
+          pg_catalog.sha256(
+            convert_to('gyeop-required-assignment-v1', 'UTF8')
+            || decode('00', 'hex')
+            || convert_to(p_response_id::text, 'UTF8')
+            || decode('00', 'hex')
+            || convert_to(card.id, 'UTF8')
+          ) as tie_hash
+        from public.pack_cards as card
+        where card.pack_version_id = p_pack_version_id
+          and not card.is_signature
+      ) as ranked_card
+      order by
+        ranked_card.submitted_sample_count,
+        ranked_card.tie_hash,
+        ranked_card.position,
+        ranked_card.id
+      limit 2
+    ) as candidate
+  ) as selected
   order by selected.assignment_position;
 
   select

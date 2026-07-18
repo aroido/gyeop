@@ -1500,19 +1500,11 @@ export function verifySecurityDefinerSql(sql, filePath = "migration.sql") {
       .slice(bodyStart, bodyEnd)
       .replace(/--[^\n]*/g, "")
       .replace(/\/\*[\s\S]*?\*\//g, "");
-    const commonTableExpressions = new Set(
-      [
-        ...body.matchAll(
-          /(?:\bwith|,)\s+([a-z_][a-z0-9_]*)\s+as\s+(?:(?:not\s+)?materialized\s+)?\(/gi,
-        ),
-      ].map((cte) => cte[1].toLowerCase()),
-    );
     const relationPattern =
       /(?:\bfrom|\bjoin|\bupdate(?!\s+set\b)|\binsert\s+into|\bdelete\s+from)\s+([a-z_][a-z0-9_$.]*)/gi;
     for (const relationMatch of body.matchAll(relationPattern)) {
       const relation = relationMatch[1];
       if (relation.toLowerCase() === "of") continue;
-      if (commonTableExpressions.has(relation.toLowerCase())) continue;
       if (!/^(?:public|private|pg_catalog)\./i.test(relation)) {
         findings.push(
           `${filePath}: ${qualifiedName} uses unqualified relation ${relation}`,
