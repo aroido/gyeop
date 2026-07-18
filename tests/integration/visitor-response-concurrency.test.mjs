@@ -182,8 +182,10 @@ test("same new response credential commits exactly once under concurrency", asyn
   assert.equal(secondResumeResult.code, 0, secondResumeResult.stderr);
   const assignmentPayload = (output) =>
     output.split("\n").find((line) => line.startsWith("["));
+  const firstAssignmentPayload = assignmentPayload(firstResumeResult.stdout);
+  assert.ok(firstAssignmentPayload, "first retry must return assignments");
   assert.equal(
-    assignmentPayload(firstResumeResult.stdout),
+    firstAssignmentPayload,
     assignmentPayload(secondResumeResult.stdout),
   );
   assert.equal(
