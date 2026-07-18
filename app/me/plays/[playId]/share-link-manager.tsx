@@ -1,18 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { loadOwnerFlow } from "@/lib/owner-flow/owner-flow-client";
+import type { ShareKind } from "@/lib/packs/presentation";
+import {
+  buildShareData,
+  isShareCancellation,
+} from "@/lib/share-links/share-handoff-core.mjs";
 import {
   createShareLink,
   disableShareLink,
   listShareLinks,
+  recordShareAction,
   rotateShareLink,
   type ShareLink,
   ShareLinkHttpError,
 } from "@/lib/share-links/share-link-client";
-import type { ShareKind } from "@/lib/packs/presentation";
 
 import styles from "./share-links.module.css";
 
@@ -20,6 +25,15 @@ type State =
   | { kind: "loading" }
   | { kind: "terminal" }
   | { kind: "ready"; packTitle: string; links: readonly ShareLink[] };
+type ReadyLink = Readonly<{
+  linkId: string;
+  kind: "public" | "one_to_one";
+  inviteUrl: string;
+}>;
+type Feedback = Readonly<{
+  tone: "status" | "alert";
+  message: string;
+}>;
 
 async function readManagerState(playId: string): Promise<State> {
   const { play, pack } = await loadOwnerFlow(playId);
@@ -39,6 +53,16 @@ function replaceLink(links: readonly ShareLink[], next: ShareLink) {
   return links.map((link) => (link.id === next.id ? next : link));
 }
 
+function subscribeShareSupport() {
+  return () => undefined;
+}
+
+function readShareSupport() {
+  return (
+    typeof navigator !== "undefined" && typeof navigator.share === "function"
+  );
+}
+
 export default function ShareLinkManager({
   playId,
   defaultShareKind,
@@ -50,16 +74,36 @@ export default function ShareLinkManager({
     playId ? { kind: "loading" } : { kind: "terminal" },
   );
   const [selectedKind, setSelectedKind] = useState<ShareKind>(defaultShareKind);
-  const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [readyLink, setReadyLink] = useState<ReadyLink | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const canShare = useSyncExternalStore(
+    subscribeShareSupport,
+    readShareSupport,
+    () => false,
+  );
+  const actionLatchRef = useRef(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const readyHeadingRef = useRef<HTMLHeadingElement>(null);
+  const manualUrlRef = useRef<HTMLInputElement>(null);
+
+  function beginAction(action: string) {
+    if (actionLatchRef.current) return false;
+    actionLatchRef.current = true;
+    setBusy(action);
+    return true;
+  }
+
+  function endAction() {
+    actionLatchRef.current = false;
+    setBusy(null);
+  }
 
   async function load() {
     if (!playId) return;
     setState({ kind: "loading" });
-    setInviteUrl(null);
-    setError(null);
+    setReadyLink(null);
+    setFeedback(null);
     try {
       setState(await readManagerState(playId));
     } catch {
@@ -86,75 +130,167 @@ export default function ShareLinkManager({
     if (state.kind !== "loading") headingRef.current?.focus();
   }, [state.kind]);
 
+  useEffect(() => {
+    if (readyLink) readyHeadingRef.current?.focus();
+  }, [readyLink]);
+
   async function create() {
-    if (!playId || state.kind !== "ready" || busy) return;
-    setBusy("create");
-    setError(null);
+    if (!playId || state.kind !== "ready" || !beginAction("create")) return;
+    setFeedback(null);
     try {
       const result = await createShareLink(playId, selectedKind);
-      setInviteUrl(result.inviteUrl);
-      setState({ ...state, links: [result.link, ...state.links] });
+      setReadyLink({
+        linkId: result.link.id,
+        kind: result.link.kind,
+        inviteUrl: result.inviteUrl,
+      });
+      setState((current) =>
+        current.kind === "ready"
+          ? { ...current, links: [result.link, ...current.links] }
+          : current,
+      );
     } catch {
-      setInviteUrl(null);
-      setError("링크를 만들지 못했어요. 목록을 다시 확인해 주세요.");
-      void load();
+      setFeedback({
+        tone: "alert",
+        message: "링크를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+      });
     } finally {
-      setBusy(null);
+      endAction();
     }
   }
 
   async function disable(link: ShareLink) {
-    if (state.kind !== "ready" || busy) return;
+    if (state.kind !== "ready") return;
     if (
       !window.confirm(
         "이 링크를 비활성화할까요? 더 이상 초대에 사용할 수 없어요.",
-      )
+      ) ||
+      !beginAction(link.id)
     )
       return;
-    setBusy(link.id);
-    setError(null);
+    setFeedback(null);
     try {
       const next = await disableShareLink(link.id);
-      setInviteUrl(null);
-      setState({ ...state, links: replaceLink(state.links, next) });
+      setReadyLink((current) => (current?.linkId === link.id ? null : current));
+      setState((current) =>
+        current.kind === "ready"
+          ? { ...current, links: replaceLink(current.links, next) }
+          : current,
+      );
     } catch {
-      setError("링크 상태를 바꾸지 못했어요. 다시 확인해 주세요.");
+      setFeedback({
+        tone: "alert",
+        message: "링크 상태를 바꾸지 못했어요. 다시 확인해 주세요.",
+      });
     } finally {
-      setBusy(null);
+      endAction();
     }
   }
 
   async function rotate(link: ShareLink) {
-    if (state.kind !== "ready" || busy) return;
+    if (state.kind !== "ready") return;
     if (
       !window.confirm(
         "새로 발급하면 지금 링크는 바로 비활성화돼요. 계속할까요?",
-      )
+      ) ||
+      !beginAction(link.id)
     )
       return;
-    setBusy(link.id);
-    setError(null);
+    setFeedback(null);
     try {
       const result = await rotateShareLink(link.id);
-      setInviteUrl(result.inviteUrl);
-      setState({
-        ...state,
-        links: [
-          result.link,
-          ...replaceLink(state.links, { ...link, status: "disabled" }),
-        ],
+      setReadyLink({
+        linkId: result.link.id,
+        kind: result.link.kind,
+        inviteUrl: result.inviteUrl,
       });
-    } catch (caught) {
-      setInviteUrl(null);
-      setError(
-        caught instanceof ShareLinkHttpError &&
-          caught.code === "SHARE_LINK_NOT_ACTIVE"
-          ? "링크 상태가 바뀌었어요. 목록을 다시 불러왔습니다."
-          : "새 링크를 발급하지 못했어요. 목록을 다시 확인해 주세요.",
+      setState((current) =>
+        current.kind === "ready"
+          ? {
+              ...current,
+              links: [
+                result.link,
+                ...replaceLink(current.links, {
+                  ...link,
+                  status: "disabled",
+                }),
+              ],
+            }
+          : current,
       );
-      void load();
+    } catch (caught) {
+      const drifted =
+        caught instanceof ShareLinkHttpError &&
+        caught.code === "SHARE_LINK_NOT_ACTIVE";
+      setFeedback({
+        tone: "alert",
+        message: drifted
+          ? "링크 상태가 바뀌었어요. 목록을 다시 불러왔습니다."
+          : "새 링크를 발급하지 못했어요. 기존 링크는 그대로 있어요.",
+      });
+      if (drifted) void load();
     } finally {
-      setBusy(null);
+      endAction();
+    }
+  }
+
+  async function shareReadyLink() {
+    if (!playId || !readyLink || !canShare || !beginAction("share")) return;
+    setFeedback(null);
+    try {
+      await navigator.share(buildShareData(readyLink.inviteUrl));
+      setFeedback({
+        tone: "status",
+        message: "공유 메뉴로 링크를 전달했어요.",
+      });
+      void recordShareAction(
+        playId,
+        readyLink.linkId,
+        "share_handoff_succeeded",
+      ).catch(() => undefined);
+    } catch (caught) {
+      setFeedback(
+        isShareCancellation(caught)
+          ? {
+              tone: "status",
+              message: "공유를 취소했어요. 링크는 그대로 있어요.",
+            }
+          : {
+              tone: "alert",
+              message: "공유 메뉴를 열지 못했어요. 링크 복사를 사용해 주세요.",
+            },
+      );
+    } finally {
+      endAction();
+    }
+  }
+
+  async function copyReadyLink() {
+    if (!playId || !readyLink || !beginAction("copy")) return;
+    setFeedback(null);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("unavailable");
+      await navigator.clipboard.writeText(readyLink.inviteUrl);
+      setFeedback({
+        tone: "status",
+        message:
+          "링크를 복사했어요. 카카오톡이나 인스타그램 DM, 문자에 붙여넣어 보내세요.",
+      });
+      void recordShareAction(
+        playId,
+        readyLink.linkId,
+        "share_link_copied",
+      ).catch(() => undefined);
+    } catch {
+      setFeedback({
+        tone: "alert",
+        message:
+          "자동 복사가 안 됐어요. 아래 링크를 길게 눌러 직접 복사해 주세요.",
+      });
+      manualUrlRef.current?.focus();
+      manualUrlRef.current?.select();
+    } finally {
+      endAction();
     }
   }
 
@@ -196,7 +332,7 @@ export default function ShareLinkManager({
           친구가 나를 어떻게 보는지 답할 수 있는 초대를 준비해요.
         </p>
 
-        <fieldset className={styles.kinds}>
+        <fieldset className={styles.kinds} disabled={busy !== null}>
           <legend>누구에게 보낼까요?</legend>
           {(
             [
@@ -241,16 +377,70 @@ export default function ShareLinkManager({
           {busy === "create" ? "만드는 중…" : "공유 링크 만들기"}
         </button>
 
-        {inviteUrl ? (
-          <aside className={styles.ready} aria-live="polite">
-            <strong>공유 링크가 준비됐어요</strong>
-            <p>이 전체 링크는 현재 화면에서만 사용할 수 있어요.</p>
-            <code>{inviteUrl}</code>
+        {readyLink ? (
+          <aside className={styles.ready} aria-labelledby="ready-link-title">
+            <h2 id="ready-link-title" ref={readyHeadingRef} tabIndex={-1}>
+              공유 링크가 준비됐어요
+            </h2>
+            <p>
+              내가 먼저 답한 질문이에요. 친구에게 보내고 서로의 답을 확인해
+              보세요.
+            </p>
+            <div className={styles.handoffActions}>
+              {canShare ? (
+                <button
+                  className={styles.primary}
+                  disabled={busy !== null}
+                  type="button"
+                  onClick={shareReadyLink}
+                >
+                  {busy === "share"
+                    ? "공유 메뉴 여는 중…"
+                    : "친구에게 공유하기"}
+                </button>
+              ) : null}
+              <button
+                className={canShare ? styles.secondary : styles.primary}
+                disabled={busy !== null}
+                type="button"
+                onClick={copyReadyLink}
+              >
+                {busy === "copy" ? "복사하는 중…" : "링크 복사"}
+              </button>
+            </div>
+            {feedback ? (
+              <p
+                className={
+                  feedback.tone === "alert" ? styles.error : styles.feedback
+                }
+                role={feedback.tone}
+                aria-live={feedback.tone === "status" ? "polite" : undefined}
+              >
+                {feedback.message}
+              </p>
+            ) : null}
+            <label className={styles.manualLabel} htmlFor="manual-share-url">
+              공유 링크 직접 복사
+            </label>
+            <input
+              id="manual-share-url"
+              ref={manualUrlRef}
+              className={styles.manualUrl}
+              readOnly
+              value={readyLink.inviteUrl}
+              onFocus={(event) => event.currentTarget.select()}
+            />
+            <small>전체 링크는 현재 화면에서만 사용할 수 있어요.</small>
           </aside>
-        ) : null}
-        {error ? (
-          <p className={styles.error} role="alert">
-            {error}
+        ) : feedback ? (
+          <p
+            className={
+              feedback.tone === "alert" ? styles.error : styles.feedback
+            }
+            role={feedback.tone}
+            aria-live={feedback.tone === "status" ? "polite" : undefined}
+          >
+            {feedback.message}
           </p>
         ) : null}
 
@@ -282,6 +472,11 @@ export default function ShareLinkManager({
                   ) : (
                     <small>자동 만료 없음</small>
                   )}
+                  {link.status === "active" && readyLink?.linkId !== link.id ? (
+                    <p className={styles.reissueGuide}>
+                      전체 링크가 사라졌어요. 공유하려면 새로 발급해 주세요.
+                    </p>
+                  ) : null}
                   {link.status === "active" ? (
                     <div className={styles.actions}>
                       <button

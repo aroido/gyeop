@@ -81,6 +81,9 @@ export function verifyShareLinks() {
     "rotateFlights = new Map",
     'credentials: "same-origin"',
     'cache: "no-store"',
+    "recordShareAction",
+    "share_handoff_succeeded",
+    "share_link_copied",
     "#k=",
   ]) {
     if (contract === "#k=") continue;
@@ -90,12 +93,30 @@ export function verifyShareLinks() {
     );
   }
 
+  const handoff = readFileSync(
+    path.join(ROOT, "lib/share-links/share-handoff-core.mjs"),
+    "utf8",
+  );
+  assert.doesNotMatch(handoff, /from\s+["']node:/);
+  assert.match(handoff, /겹 · 오래된 친구팩/);
+  assert.match(handoff, /너는 나를 어떻게 보는지 3장만 골라줘/);
+
+  const manager = readFileSync(
+    path.join(ROOT, "app/me/plays/[playId]/share-link-manager.tsx"),
+    "utf8",
+  );
+  assert.match(manager, /actionLatchRef/);
+  assert.match(manager, /navigator\.share\s*\(/);
+  assert.match(manager, /navigator\.clipboard\.writeText\s*\(/);
+  assert.match(manager, /공유 링크 직접 복사/);
+
   const routes = [
     "app/api/plays/[playId]/links/route.ts",
     "app/api/me/plays/[playId]/links/route.ts",
     "app/api/links/[linkId]/route.ts",
     "app/api/links/[linkId]/rotate/route.ts",
     "app/api/invites/[publicId]/metadata/route.ts",
+    "app/api/me/plays/[playId]/share-events/route.ts",
   ];
   for (const route of routes) {
     const source = readFileSync(path.join(ROOT, route), "utf8");
@@ -115,7 +136,17 @@ export function verifyShareLinks() {
       `${route} must apply a limiter`,
     );
   }
-  const inviteRoute = readFileSync(path.join(ROOT, routes.at(-1)), "utf8");
+  const shareEventRoute = readFileSync(
+    path.join(ROOT, "app/api/me/plays/[playId]/share-events/route.ts"),
+    "utf8",
+  );
+  assert.match(shareEventRoute, /recordShareActionSchema/);
+  assert.match(shareEventRoute, /action:\s*"owner_play_access"/);
+  assert.doesNotMatch(shareEventRoute, /inviteUrl|channel|recipient/);
+  const inviteRoute = readFileSync(
+    path.join(ROOT, "app/api/invites/[publicId]/metadata/route.ts"),
+    "utf8",
+  );
   assert.match(inviteRoute, /action:\s*"invite_metadata"/);
   assert.match(inviteRoute, /windowSeconds:\s*60/);
   assert.match(inviteRoute, /limit:\s*60/);

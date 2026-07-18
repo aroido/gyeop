@@ -44,7 +44,18 @@ function json(route: Route, status: number, body: unknown) {
   });
 }
 
-async function installShareApi(page: Page) {
+function noContent(route: Route) {
+  return route.fulfill({
+    status: 204,
+    headers: { "cache-control": "private, no-store" },
+    body: "",
+  });
+}
+
+async function installShareApi(
+  page: Page,
+  options: { shareEventStatus?: 204 | 500 } = {},
+) {
   const links: LinkState[] = [];
   const calls: { method: string; pathname: string; body?: unknown }[] = [];
   await page.route("**/api/**", async (route) => {
@@ -54,6 +65,7 @@ async function installShareApi(page: Page) {
     const body = request.postData() ? request.postDataJSON() : undefined;
     if (
       !url.pathname.includes("/links") &&
+      !url.pathname.includes("/share-events") &&
       !url.pathname.includes("/invites/")
     ) {
       return route.fallback();
@@ -61,6 +73,17 @@ async function installShareApi(page: Page) {
     calls.push({ method, pathname: url.pathname, body });
     if (method === "GET" && url.pathname === `/api/me/plays/${playId}/links`) {
       return json(route, 200, { links });
+    }
+    if (
+      method === "POST" &&
+      url.pathname === `/api/me/plays/${playId}/share-events`
+    ) {
+      return options.shareEventStatus === 500
+        ? json(route, 500, {
+            code: "INTERNAL_ERROR",
+            message: "요청을 처리하지 못했습니다.",
+          })
+        : noContent(route);
     }
     if (method === "POST" && url.pathname === `/api/plays/${playId}/links`) {
       const kind = (body as { kind: "public" | "one_to_one" }).kind;
@@ -128,6 +151,63 @@ async function installShareApi(page: Page) {
   return { links, calls };
 }
 
+async function installBrowserHandoff(
+  page: Page,
+  options: {
+    share: "unsupported" | "resolve" | "cancel" | "fail" | "pending";
+    clipboard: "resolve" | "fail";
+  },
+) {
+  await page.addInitScript((initial) => {
+    type HandoffState = {
+      shareMode: typeof initial.share;
+      clipboardMode: typeof initial.clipboard;
+      shareCalls: ShareData[];
+      copyCalls: string[];
+      resolveShare?: () => void;
+    };
+    const state: HandoffState = {
+      shareMode: initial.share,
+      clipboardMode: initial.clipboard,
+      shareCalls: [],
+      copyCalls: [],
+    };
+    (
+      window as typeof window & { __gyeopHandoff: HandoffState }
+    ).__gyeopHandoff = state;
+    if (initial.share !== "unsupported") {
+      Object.defineProperty(navigator, "share", {
+        configurable: true,
+        value: async (data: ShareData) => {
+          state.shareCalls.push(data);
+          if (state.shareMode === "cancel") {
+            throw new DOMException("cancelled", "AbortError");
+          }
+          if (state.shareMode === "fail") {
+            throw new DOMException("failed", "NotAllowedError");
+          }
+          if (state.shareMode === "pending") {
+            await new Promise<void>((resolve) => {
+              state.resolveShare = resolve;
+            });
+          }
+        },
+      });
+    }
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (value: string) => {
+          state.copyCalls.push(value);
+          if (state.clipboardMode === "fail") {
+            throw new DOMException("failed", "NotAllowedError");
+          }
+        },
+      },
+    });
+  }, options);
+}
+
 async function completedOwner(page: Page) {
   const owner = await installOwnerFlowApi(page);
   owner.state.status = "completed";
@@ -149,7 +229,9 @@ test("creates the recommended public link and loses the raw URL on reload", asyn
   ).toBeChecked();
   await page.getByRole("button", { name: "공유 링크 만들기" }).click();
   await expect(page.getByText("공유 링크가 준비됐어요")).toBeVisible();
-  await expect(page.locator("code")).toContainText(`#k=${secret}`);
+  await expect(page.getByLabel("공유 링크 직접 복사")).toHaveValue(
+    new RegExp(`#k=${secret}$`),
+  );
   expect(
     share.calls.find(
       (call) => call.pathname.endsWith("/links") && call.method === "POST",
@@ -157,8 +239,9 @@ test("creates the recommended public link and loses the raw URL on reload", asyn
   ).toEqual({ kind: "public" });
 
   await page.reload();
-  await expect(page.locator("code")).toHaveCount(0);
+  await expect(page.getByLabel("공유 링크 직접 복사")).toHaveCount(0);
   await expect(page.getByText("사용 중")).toBeVisible();
+  await expect(page.getByText(/공유하려면 새로 발급/)).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -183,8 +266,188 @@ test("creates a one-to-one link, rotates it, and disables the replacement", asyn
 
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "비활성화" }).click();
-  await expect(page.locator("code")).toHaveCount(0);
+  await expect(page.getByLabel("공유 링크 직접 복사")).toHaveCount(0);
   await expect(page.getByText("사용 중")).toHaveCount(0);
+});
+
+test("hands off the exact public link once despite same-tick activation", async ({
+  page,
+}) => {
+  await installBrowserHandoff(page, {
+    share: "pending",
+    clipboard: "resolve",
+  });
+  await completedOwner(page);
+  const share = await installShareApi(page, { shareEventStatus: 500 });
+  await page.goto(`/me/plays/${playId}`);
+  await page.getByRole("button", { name: "공유 링크 만들기" }).click();
+
+  const shareButton = page.getByRole("button", { name: "친구에게 공유하기" });
+  await expect(shareButton).toBeVisible();
+  await shareButton.evaluate((button) => {
+    (button as HTMLElement).click();
+    (button as HTMLElement).click();
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __gyeopHandoff: { shareCalls: ShareData[] };
+            }
+          ).__gyeopHandoff.shareCalls.length,
+      ),
+    )
+    .toBe(1);
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __gyeopHandoff: { resolveShare?: () => void };
+      }
+    ).__gyeopHandoff.resolveShare?.();
+  });
+  await expect(page.getByRole("status")).toHaveText(
+    "공유 메뉴로 링크를 전달했어요.",
+  );
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __gyeopHandoff: { shareCalls: ShareData[] };
+          }
+        ).__gyeopHandoff.shareCalls[0],
+    ),
+  ).toEqual({
+    title: "겹 · 오래된 친구팩",
+    text: "내가 먼저 답한 오래된 친구팩이야. 너는 나를 어떻게 보는지 3장만 골라줘.",
+    url: `http://127.0.0.1:3000/i/${publicIds[0]}#k=${secret}`,
+  });
+  await expect
+    .poll(() =>
+      share.calls.filter((call) => call.pathname.endsWith("/share-events")),
+    )
+    .toEqual([
+      {
+        method: "POST",
+        pathname: `/api/me/plays/${playId}/share-events`,
+        body: {
+          event: "share_handoff_succeeded",
+          linkId: linkIds[0],
+        },
+      },
+    ]);
+});
+
+test("treats native share cancellation and failure as zero success events", async ({
+  page,
+}) => {
+  await installBrowserHandoff(page, {
+    share: "cancel",
+    clipboard: "resolve",
+  });
+  await completedOwner(page);
+  const share = await installShareApi(page);
+  await page.goto(`/me/plays/${playId}`);
+  await page.getByRole("button", { name: "공유 링크 만들기" }).click();
+  const button = page.getByRole("button", { name: "친구에게 공유하기" });
+
+  await button.click();
+  await expect(page.getByRole("status")).toHaveText(
+    "공유를 취소했어요. 링크는 그대로 있어요.",
+  );
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __gyeopHandoff: { shareMode: "fail" };
+      }
+    ).__gyeopHandoff.shareMode = "fail";
+  });
+  await button.click();
+  await expect(page.locator("aside").getByRole("alert")).toHaveText(
+    "공유 메뉴를 열지 못했어요. 링크 복사를 사용해 주세요.",
+  );
+  expect(
+    share.calls.filter((call) => call.pathname.endsWith("/share-events")),
+  ).toHaveLength(0);
+});
+
+test("copies a one-to-one link without a fake share control", async ({
+  page,
+}) => {
+  await installBrowserHandoff(page, {
+    share: "unsupported",
+    clipboard: "resolve",
+  });
+  await completedOwner(page);
+  const share = await installShareApi(page);
+  await page.goto(`/me/plays/${playId}`);
+  await page.getByRole("radio", { name: /한 친구에게 1:1/ }).check();
+  await page.getByRole("button", { name: "공유 링크 만들기" }).click();
+  await expect(
+    page.getByRole("button", { name: "친구에게 공유하기" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "링크 복사" }).click();
+  await expect(page.getByRole("status")).toContainText("링크를 복사했어요");
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __gyeopHandoff: { copyCalls: string[] };
+          }
+        ).__gyeopHandoff.copyCalls,
+    ),
+  ).toEqual([`http://127.0.0.1:3000/i/${publicIds[0]}#k=${secret}`]);
+  await expect
+    .poll(() =>
+      share.calls.filter((call) => call.pathname.endsWith("/share-events")),
+    )
+    .toEqual([
+      {
+        method: "POST",
+        pathname: `/api/me/plays/${playId}/share-events`,
+        body: { event: "share_link_copied", linkId: linkIds[0] },
+      },
+    ]);
+  expect(share.links[0]).toMatchObject({
+    kind: "one_to_one",
+    status: "active",
+  });
+});
+
+test("focuses and selects the manual URL when clipboard fails", async ({
+  page,
+}) => {
+  await installBrowserHandoff(page, {
+    share: "unsupported",
+    clipboard: "fail",
+  });
+  await completedOwner(page);
+  const share = await installShareApi(page);
+  await page.goto(`/me/plays/${playId}`);
+  await page.getByRole("button", { name: "공유 링크 만들기" }).click();
+  await page.getByRole("button", { name: "링크 복사" }).click();
+  const manual = page.getByLabel("공유 링크 직접 복사");
+  await expect(page.locator("aside").getByRole("alert")).toContainText(
+    "자동 복사가 안 됐어요",
+  );
+  await expect(manual).toBeFocused();
+  expect(
+    await manual.evaluate((input) => ({
+      start: (input as HTMLInputElement).selectionStart,
+      end: (input as HTMLInputElement).selectionEnd,
+      length: (input as HTMLInputElement).value.length,
+    })),
+  ).toEqual({
+    start: 0,
+    end: `http://127.0.0.1:3000/i/${publicIds[0]}#k=${secret}`.length,
+    length: `http://127.0.0.1:3000/i/${publicIds[0]}#k=${secret}`.length,
+  });
+  expect(
+    share.calls.filter((call) => call.pathname.endsWith("/share-events")),
+  ).toHaveLength(0);
 });
 
 test("reads only an exact fragment and renders generic invite states", async ({

@@ -34,6 +34,36 @@ function setOldFriendActive() {
   );
 }
 
+function readShareActionEvents() {
+  const output = execFileSync(
+    "docker",
+    [
+      "exec",
+      databaseContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-At",
+      "-c",
+      `select coalesce(
+        jsonb_agg(
+          jsonb_build_object('event', event_name, 'properties', properties)
+          order by event_name, occurred_at, id
+        ),
+        '[]'::jsonb
+      )
+      from public.analytics_events
+      where event_name in ('share_handoff_succeeded', 'share_link_copied')`,
+    ],
+    { encoding: "utf8" },
+  );
+  return JSON.parse(output.trim()) as unknown;
+}
+
+test.use({ trace: "off", screenshot: "off", video: "off" });
+
 test.describe("live owner flow", () => {
   test.skip(!live, "GYEOP_E2E_LIVE=1 runs the local Supabase browser gate");
   test.describe.configure({ mode: "serial" });
@@ -46,6 +76,16 @@ test.describe("live owner flow", () => {
     context,
     page,
   }) => {
+    await context.addInitScript(() => {
+      Object.defineProperty(navigator, "share", {
+        configurable: true,
+        value: async () => undefined,
+      });
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: async () => undefined },
+      });
+    });
     await page.goto("/play/new?pack=old-friend");
     await page.waitForURL(/\/play\/[0-9a-f-]{36}$/);
     await expect(
@@ -96,10 +136,59 @@ test.describe("live owner flow", () => {
       page.getByRole("heading", { name: "공유 링크" }),
     ).toBeFocused();
     await page.getByRole("button", { name: "공유 링크 만들기" }).click();
-    const inviteUrl = await page.locator("code").innerText();
+    const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
     expect(inviteUrl).toMatch(
       /^http:\/\/127\.0\.0\.1:3000\/i\/[A-Za-z0-9_-]{22}#k=[A-Za-z0-9_-]{43}$/,
     );
+    await page.getByRole("button", { name: "친구에게 공유하기" }).click();
+    await expect(page.getByRole("status")).toHaveText(
+      "공유 메뉴로 링크를 전달했어요.",
+    );
+
+    await page.getByRole("radio", { name: /한 친구에게 1:1/ }).check();
+    await page.getByRole("button", { name: "공유 링크 만들기" }).click();
+    await page.getByRole("button", { name: "링크 복사" }).click();
+    await expect(page.getByRole("status")).toContainText("링크를 복사했어요");
+    await expect
+      .poll(() => readShareActionEvents())
+      .toEqual([
+        {
+          event: "share_handoff_succeeded",
+          properties: {
+            packVersion: "old-friend-v1",
+            linkKind: "public",
+          },
+        },
+        {
+          event: "share_link_copied",
+          properties: {
+            packVersion: "old-friend-v1",
+            linkKind: "one_to_one",
+          },
+        },
+      ]);
+    const rejectedExtraField = await page.evaluate(async () => {
+      const playId = location.pathname.split("/").at(-1);
+      const response = await fetch(`/api/me/plays/${playId}/share-events`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          event: "share_link_copied",
+          linkId: "19100000-0000-4000-8000-000000000099",
+          inviteUrl: "https://example.invalid/deterministic-fixture",
+        }),
+      });
+      return {
+        status: response.status,
+        cacheControl: response.headers.get("cache-control"),
+      };
+    });
+    expect(rejectedExtraField).toEqual({
+      status: 400,
+      cacheControl: "private, no-store",
+    });
+    expect(readShareActionEvents()).toHaveLength(2);
 
     const visitors = await Promise.all(
       ["198.51.100.220", "198.51.100.221"].map(async (ip) => {
@@ -155,12 +244,19 @@ test.describe("live owner flow", () => {
     await rateContext.close();
 
     await page.reload();
-    await expect(page.locator("code")).toHaveCount(0);
-    await expect(page.getByText("사용 중")).toBeVisible();
+    await expect(page.getByLabel("공유 링크 직접 복사")).toHaveCount(0);
+    await expect(page.getByText("사용 중")).toHaveCount(2);
 
     page.once("dialog", (dialog) => dialog.accept());
-    await page.getByRole("button", { name: "새로 발급" }).click();
-    const rotatedUrl = await page.locator("code").innerText();
+    await page
+      .getByRole("listitem")
+      .filter({ hasText: "여러 친구" })
+      .filter({ hasText: "사용 중" })
+      .getByRole("button", { name: "새로 발급" })
+      .click();
+    const rotatedUrl = await page
+      .getByLabel("공유 링크 직접 복사")
+      .inputValue();
     expect(rotatedUrl).not.toBe(inviteUrl);
 
     await visitors[0].visitor.reload();
@@ -171,8 +267,13 @@ test.describe("live owner flow", () => {
     ).toBeVisible();
 
     page.once("dialog", (dialog) => dialog.accept());
-    await page.getByRole("button", { name: "비활성화" }).click();
-    await expect(page.locator("code")).toHaveCount(0);
+    await page
+      .getByRole("listitem")
+      .filter({ hasText: "여러 친구" })
+      .filter({ hasText: "사용 중" })
+      .getByRole("button", { name: "비활성화" })
+      .click();
+    await expect(page.getByLabel("공유 링크 직접 복사")).toHaveCount(0);
 
     for (const { visitorContext } of visitors) await visitorContext.close();
   });

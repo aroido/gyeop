@@ -169,3 +169,28 @@ export async function readInviteMetadata(
   );
   return decodeInviteMetadataHttp(await json(response)) as InviteMetadata;
 }
+
+export type ShareActionEvent = "share_handoff_succeeded" | "share_link_copied";
+
+export async function recordShareAction(
+  playId: string,
+  linkId: string,
+  event: ShareActionEvent,
+): Promise<void> {
+  if (
+    !isShareLinkId(linkId) ||
+    (event !== "share_handoff_succeeded" && event !== "share_link_copied")
+  ) {
+    throw new ShareLinkHttpError(400, "INVALID_INPUT");
+  }
+  const response = await fetch(
+    `/api/me/plays/${playPath(playId)}/share-events`,
+    request("POST", { event, linkId }),
+  );
+  if (
+    response.status !== 204 ||
+    response.headers.get("cache-control") !== "private, no-store"
+  ) {
+    throw new ShareLinkHttpError(response.status, "INVALID_RESPONSE");
+  }
+}

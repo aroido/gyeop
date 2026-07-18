@@ -35,6 +35,12 @@ select has_function(
   array['text', 'bytea'],
   'invite metadata RPC has the exact signature'
 );
+select has_function(
+  'public',
+  'record_owner_share_action',
+  array['uuid', 'bytea', 'uuid', 'text'],
+  'record share action RPC has the exact signature'
+);
 
 select ok(
   not has_table_privilege('service_role', 'public.share_links', 'SELECT')
@@ -81,6 +87,11 @@ select ok(
   and has_function_privilege(
     'service_role',
     'public.get_invite_metadata(text,bytea)',
+    'EXECUTE'
+  )
+  and has_function_privilege(
+    'service_role',
+    'public.record_owner_share_action(uuid,bytea,uuid,text)',
     'EXECUTE'
   )
   and not has_function_privilege(
@@ -169,6 +180,24 @@ where id in (
   '19000000-0000-4000-8000-000000000002'
 );
 
+insert into public.share_links (
+  id,
+  public_id,
+  pack_play_id,
+  kind,
+  secret_hash,
+  created_at,
+  updated_at
+) values (
+  '19300000-0000-4000-8000-000000000003',
+  'GGGGGGGGGGGGGGGGGGGGGg',
+  '19000000-0000-4000-8000-000000000003',
+  'public',
+  decode(repeat('73', 32), 'hex'),
+  timestamptz '2030-01-01 00:00:00+00',
+  timestamptz '2030-01-01 00:00:00+00'
+);
+
 set local role service_role;
 
 select throws_ok(
@@ -242,6 +271,64 @@ select is(
   )->>'outcome',
   'created',
   'owner override creates a one-to-one share link'
+);
+
+select is(
+  public.record_owner_share_action(
+    '19000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex'),
+    '19100000-0000-4000-8000-000000000001',
+    'share_handoff_succeeded'
+  )->>'outcome',
+  'recorded',
+  'browser-reported public share handoff records an event'
+);
+
+select is(
+  public.record_owner_share_action(
+    '19000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex'),
+    '19100000-0000-4000-8000-000000000002',
+    'share_link_copied'
+  )->>'outcome',
+  'recorded',
+  'browser-reported one-to-one copy records an event'
+);
+
+select is(
+  public.record_owner_share_action(
+    '19000000-0000-4000-8000-000000000003',
+    decode(repeat('33', 32), 'hex'),
+    '19300000-0000-4000-8000-000000000003',
+    'share_link_copied'
+  )->>'outcome',
+  'not_completed',
+  'draft play cannot record or mutate a share action'
+);
+
+select is(
+  public.record_owner_share_action(
+    '19000000-0000-4000-8000-000000000002',
+    decode(repeat('22', 32), 'hex'),
+    '19100000-0000-4000-8000-000000000001',
+    'share_link_copied'
+  )->>'outcome',
+  'link_not_found',
+  'cross-play action fails closed'
+);
+
+select throws_ok(
+  $$
+    select public.record_owner_share_action(
+      '19000000-0000-4000-8000-000000000001',
+      decode(repeat('11', 32), 'hex'),
+      '19100000-0000-4000-8000-000000000001',
+      'unknown_event'
+    )
+  $$,
+  '22023',
+  'invalid share action input',
+  'arbitrary share action names are rejected'
 );
 
 select is(
@@ -342,6 +429,17 @@ select is(
 );
 
 select is(
+  public.record_owner_share_action(
+    '19000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex'),
+    '19200000-0000-4000-8000-000000000001',
+    'share_link_copied'
+  )->>'outcome',
+  'link_not_active',
+  'disabled link cannot record a share action'
+);
+
+select is(
   public.get_invite_metadata(
     'EEEEEEEEEEEEEEEEEEEEEA',
     decode(repeat('e5', 32), 'hex')
@@ -390,6 +488,50 @@ select is(
   'only valid active invite metadata records an opened event'
 );
 
+select is(
+  (
+    select jsonb_agg(
+      jsonb_build_object('event', event_name, 'properties', properties)
+      order by occurred_at, id
+    )
+    from public.analytics_events
+    where event_name in ('share_handoff_succeeded', 'share_link_copied')
+  ),
+  '[
+    {"event":"share_handoff_succeeded","properties":{"packVersion":"old-friend-v1","linkKind":"public"}},
+    {"event":"share_link_copied","properties":{"packVersion":"old-friend-v1","linkKind":"one_to_one"}}
+  ]'::jsonb,
+  'share actions contain only DB-derived pack version and actual link kind'
+);
+
+select is(
+  (
+    select management_expires_at
+    from public.pack_plays
+    where id = '19000000-0000-4000-8000-000000000003'
+  ),
+  timestamptz '2030-01-08 00:00:00+00',
+  'draft share action does not renew owner management TTL'
+);
+
+select is(
+  (
+    select jsonb_build_object(
+      'status', status,
+      'updatedAt', updated_at,
+      'expiresAt', expires_at
+    )
+    from public.share_links
+    where id = '19300000-0000-4000-8000-000000000003'
+  ),
+  jsonb_build_object(
+    'status', 'active',
+    'updatedAt', timestamptz '2030-01-01 00:00:00+00',
+    'expiresAt', null
+  ),
+  'draft share action leaves link state and expiry unchanged'
+);
+
 select ok(
   (
     select count(*) = 1
@@ -397,15 +539,17 @@ select ok(
       and bool_and(policy.cmd = 'INSERT')
       and bool_and(position('share_link_created' in policy.with_check) > 0)
       and bool_and(position('invite_opened' in policy.with_check) > 0)
+      and bool_and(position('share_handoff_succeeded' in policy.with_check) > 0)
+      and bool_and(position('share_link_copied' in policy.with_check) > 0)
       and bool_and(position('packVersion' in policy.with_check) > 0)
       and bool_and(position('linkKind' in policy.with_check) > 0)
       and bool_and(position('properties - ARRAY[''packVersion''' in policy.with_check) > 0)
     from pg_catalog.pg_policies policy
     where policy.schemaname = 'public'
       and policy.tablename = 'analytics_events'
-      and policy.policyname = 'analytics_share_invite_internal_insert'
+      and policy.policyname = 'analytics_share_flow_internal_insert'
   ),
-  'analytics RLS only allows the two share events and exact property keys'
+  'analytics RLS only allows the four share events and exact property keys'
 );
 
 select * from finish();
