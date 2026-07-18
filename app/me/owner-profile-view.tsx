@@ -121,6 +121,7 @@ export default function OwnerProfileView() {
   const [state, setState] = useState<State>({ kind: "loading" });
   const headingRef = useRef<HTMLHeadingElement>(null);
   const eventPlayRef = useRef<string | null>(null);
+  const reshareClickRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -211,6 +212,8 @@ export default function OwnerProfileView() {
                 className={styles.primary}
                 href={`/me/plays/${profile.playId}?entry_source=profile_reshare`}
                 onClick={() => {
+                  if (reshareClickRef.current) return;
+                  reshareClickRef.current = true;
                   void recordOwnerProfileReshareClicked().catch(
                     () => undefined,
                   );

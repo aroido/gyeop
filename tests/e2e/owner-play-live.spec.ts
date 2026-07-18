@@ -35,7 +35,12 @@ function setOldFriendActive() {
   );
 }
 
-function readShareActionEvents() {
+type ShareActionEventRow = {
+  event: "share_handoff_succeeded" | "share_link_copied";
+  properties: Record<string, unknown>;
+};
+
+function readShareActionEvents(): ShareActionEventRow[] {
   const output = execFileSync(
     "docker",
     [
@@ -60,7 +65,21 @@ function readShareActionEvents() {
     ],
     { encoding: "utf8" },
   );
-  return JSON.parse(output.trim()) as unknown;
+  return JSON.parse(output.trim()) as ShareActionEventRow[];
+}
+
+function readShareActionEventsSince(
+  baseline: ShareActionEventRow[],
+): ShareActionEventRow[] {
+  const current = readShareActionEvents();
+  return (["share_handoff_succeeded", "share_link_copied"] as const).flatMap(
+    (event) => {
+      const baselineCount = baseline.filter(
+        (row) => row.event === event,
+      ).length;
+      return current.filter((row) => row.event === event).slice(baselineCount);
+    },
+  );
 }
 
 function readProfileReshareClickEvents() {
@@ -590,6 +609,7 @@ test.describe("live owner flow", () => {
     request,
   }) => {
     test.setTimeout(120_000);
+    const initialShareActionEvents = readShareActionEvents();
     await context.addInitScript(() => {
       const state = { shareMode: "resolve" as "resolve" | "cancel" | "fail" };
       (
@@ -680,7 +700,7 @@ test.describe("live owner flow", () => {
       .inputValue();
     await expect(page.getByRole("status")).toContainText("링크를 복사했어요");
     await expect
-      .poll(() => readShareActionEvents())
+      .poll(() => readShareActionEventsSince(initialShareActionEvents))
       .toEqual([
         {
           event: "share_handoff_succeeded",
@@ -743,7 +763,9 @@ test.describe("live owner flow", () => {
     await expect(page.getByRole("status")).toHaveText(
       "공유를 취소했어요. 링크는 그대로 있어요.",
     );
-    expect(readShareActionEvents()).toHaveLength(2);
+    expect(readShareActionEventsSince(initialShareActionEvents)).toHaveLength(
+      2,
+    );
     await page.evaluate(() => {
       (
         window as typeof window & {
@@ -755,7 +777,9 @@ test.describe("live owner flow", () => {
     await expect(page.locator("aside").getByRole("alert")).toHaveText(
       "공유 메뉴를 열지 못했어요. 링크 복사를 사용해 주세요.",
     );
-    expect(readShareActionEvents()).toHaveLength(2);
+    expect(readShareActionEventsSince(initialShareActionEvents)).toHaveLength(
+      2,
+    );
     await page.evaluate(() => {
       (
         window as typeof window & {
@@ -784,7 +808,9 @@ test.describe("live owner flow", () => {
       status: 400,
       cacheControl: "private, no-store",
     });
-    expect(readShareActionEvents()).toHaveLength(2);
+    expect(readShareActionEventsSince(initialShareActionEvents)).toHaveLength(
+      2,
+    );
 
     const ownerLinks = await page.evaluate(async (playId) => {
       const response = await fetch(`/api/me/plays/${playId}/links`, {
@@ -839,7 +865,9 @@ test.describe("live owner flow", () => {
       ),
     ).toMatchObject({ status: 404, cacheControl: "private, no-store" });
     await tamperedContext.close();
-    expect(readShareActionEvents()).toHaveLength(2);
+    expect(readShareActionEventsSince(initialShareActionEvents)).toHaveLength(
+      2,
+    );
 
     setVisitorLinkStatus(
       oneToOneInvite.pathname.split("/").at(-1)!,
@@ -1301,7 +1329,7 @@ test.describe("live owner flow", () => {
       "공유 메뉴로 링크를 전달했어요.",
     );
     await expect
-      .poll(() => readShareActionEvents())
+      .poll(() => readShareActionEventsSince(initialShareActionEvents))
       .toEqual([
         {
           event: "share_handoff_succeeded",
@@ -1372,14 +1400,13 @@ test.describe("live owner flow", () => {
       status: 204,
       cacheControl: "private, no-store",
     });
-    await expect.poll(() => readShareActionEvents()).toHaveLength(4);
+    await expect
+      .poll(() => readShareActionEventsSince(initialShareActionEvents))
+      .toHaveLength(4);
     expect(
-      (
-        readShareActionEvents() as Array<{
-          event: string;
-          properties: object;
-        }>
-      ).filter(({ event }) => event === "share_link_copied"),
+      readShareActionEventsSince(initialShareActionEvents).filter(
+        ({ event }) => event === "share_link_copied",
+      ),
     ).toEqual([
       {
         event: "share_link_copied",
@@ -1425,7 +1452,9 @@ test.describe("live owner flow", () => {
         disabledPublic!,
       ),
     ).toMatchObject({ status: 404, cacheControl: "private, no-store" });
-    expect(readShareActionEvents()).toHaveLength(4);
+    expect(readShareActionEventsSince(initialShareActionEvents)).toHaveLength(
+      4,
+    );
 
     let limited:
       | {
@@ -1444,7 +1473,9 @@ test.describe("live owner flow", () => {
     }
     expect(limited?.status).toBe(429);
     expect(Number(limited?.retryAfter)).toBeGreaterThan(0);
-    expect(readShareActionEvents()).toHaveLength(4);
+    expect(readShareActionEventsSince(initialShareActionEvents)).toHaveLength(
+      4,
+    );
 
     for (const { visitorContext } of visitors) await visitorContext.close();
   });

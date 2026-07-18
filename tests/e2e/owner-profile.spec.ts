@@ -185,6 +185,26 @@ for (const activation of ["pointer", "keyboard"] as const) {
   });
 }
 
+test("deduplicates same-tick profile reshare activation", async ({ page }) => {
+  const api = await installProfileApi(page, profile(1, 1));
+  await page.goto("/me");
+  await page
+    .getByRole("link", { name: "시선 더 모으기" })
+    .evaluate((element) => {
+      (element as HTMLElement).click();
+      (element as HTMLElement).click();
+    });
+  await expect(page).toHaveURL(
+    `/me/plays/${playId}?entry_source=profile_reshare`,
+  );
+  await expect
+    .poll(() => api.eventBodies)
+    .toEqual([
+      { event: "profile_viewed" },
+      { event: "profile_reshare_clicked" },
+    ]);
+});
+
 test("never claims a new sight when browser storage is unavailable", async ({
   page,
 }) => {

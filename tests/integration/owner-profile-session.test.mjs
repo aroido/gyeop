@@ -327,6 +327,12 @@ test("current-cookie-only profile auth is private and generic", async () => {
 });
 
 test("submitted public sights refresh live and reveal only at three samples", async () => {
+  const initialProfileReshareCount = Number(
+    sql(
+      "select count(*) from public.analytics_events where event_name = 'profile_reshare_clicked'",
+      true,
+    ),
+  );
   const owner = createOwnerCredential();
   insertOwner(owner, true);
   const publicLink = insertLink(owner.playId, "public");
@@ -344,7 +350,7 @@ test("submitted public sights refresh live and reveal only at three samples", as
       "select count(*) from public.analytics_events where event_name = 'profile_reshare_clicked'",
       true,
     ),
-    "0",
+    String(initialProfileReshareCount),
   );
 
   insertSubmittedResponse(publicLink, "a");
@@ -372,7 +378,7 @@ test("submitted public sights refresh live and reveal only at three samples", as
       "select count(*) from public.analytics_events where event_name = 'profile_reshare_clicked' and visitor_response_id is null and properties = jsonb_build_object('packVersion', 'old-friend-v1', 'entrySource', 'profile_reshare')",
       true,
     ),
-    "1",
+    String(initialProfileReshareCount + 1),
   );
 
   insertSubmittedResponse(publicLink, "a");
