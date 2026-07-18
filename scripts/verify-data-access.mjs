@@ -17,6 +17,7 @@ const ALLOWED_RPC_EXPORTS = new Map([
   ["completeOwnerPlay", "complete_owner_play"],
   ["revokeOwnerPlaySession", "revoke_owner_play_session"],
   ["getInviteMetadata", "get_invite_metadata"],
+  ["recordOwnerShareAction", "record_owner_share_action"],
   ["deleteAuthUser", "prepare_auth_deletion_call"],
   ["resolveNotificationRecipient", "resolve_notification_recipient_identity"],
 ]);
@@ -44,6 +45,7 @@ const PLAY_CAPABILITY_EXPORTS = new Map([
   ["rotateShareLink", "rotate_share_link"],
   ["disableShareLink", "disable_share_link"],
   ["listOwnerShareLinks", "list_owner_share_links"],
+  ["recordOwnerShareAction", "record_owner_share_action"],
 ]);
 
 function sourceFile(filePath, source) {
@@ -1434,7 +1436,16 @@ export function verifyOwnerCapabilitySql(sql, filePath = "migration.sql") {
       `${filePath}: share link capability RPC set must be complete`,
     );
   }
-  for (const name of presentShareFunctions) {
+  const guardedShareFunctions = [
+    ...presentShareFunctions,
+    ...(new RegExp(
+      "function\\s+public\\.record_owner_share_action\\s*\\(",
+      "i",
+    ).test(sql)
+      ? ["record_owner_share_action"]
+      : []),
+  ];
+  for (const name of guardedShareFunctions) {
     const parsed = extractSqlFunctions(sql, name).at(-1);
     if (!parsed) continue;
     const body = parsed.body

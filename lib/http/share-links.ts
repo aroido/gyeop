@@ -4,6 +4,7 @@ import {
   disableShareLink,
   getInviteMetadata,
   listOwnerShareLinks,
+  recordOwnerShareAction,
 } from "../db/internal-rpc.ts";
 import { serializeOwnerCookie } from "../owner-play/owner-play-session-core.mjs";
 import type { ParsedOwnerCookie } from "../owner-play/owner-play-session.ts";
@@ -126,6 +127,27 @@ export async function rotateShareLinkResponse(input: {
   if (result.outcome !== "rotated") return ownerFailure(result.outcome);
   return renewOwnerCookie(
     ownerJson({ link: result.link, inviteUrl: result.inviteUrl }, 201),
+    input.cookie,
+    result,
+  );
+}
+
+export async function recordShareActionResponse(input: {
+  cookie: OwnerCookie;
+  linkId: string;
+  event: "share_handoff_succeeded" | "share_link_copied";
+  signal: AbortSignal;
+}) {
+  const result = await recordOwnerShareAction({
+    playId: input.cookie.playId,
+    managementSecretHash: input.cookie.managementSecretHash,
+    linkId: input.linkId,
+    event: input.event,
+    signal: input.signal,
+  });
+  if (result.outcome !== "recorded") return ownerFailure(result.outcome);
+  return renewOwnerCookie(
+    privateNoStore(new Response(null, { status: 204 })),
     input.cookie,
     result,
   );

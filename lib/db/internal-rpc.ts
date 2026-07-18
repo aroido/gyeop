@@ -15,6 +15,7 @@ import {
   decodeDisableShareLinkOutcome,
   decodeInviteMetadataOutcome,
   decodeListShareLinksOutcome,
+  decodeRecordShareActionOutcome,
   decodeRotateShareLinkOutcome,
 } from "../share-links/share-link-state-core.mjs";
 
@@ -67,6 +68,10 @@ type InviteMetadataResult =
       }>;
     }>
   | Readonly<{ outcome: "invalid" | "unavailable" }>;
+type RecordShareActionResult =
+  | (ShareManagementState & Readonly<{ outcome: "recorded" }>)
+  | OwnerShareFailure
+  | Readonly<{ outcome: "link_not_found" | "link_not_active" }>;
 
 function requiredServerEnv(name: string) {
   const value = process.env[name];
@@ -393,6 +398,25 @@ export async function listOwnerShareLinks(input: {
   const { data, error } = await query;
   if (error) throw new Error("Internal share link RPC failed");
   return decodeListShareLinksOutcome(data) as ListShareLinksResult;
+}
+
+export async function recordOwnerShareAction(input: {
+  playId: string;
+  managementSecretHash: Uint8Array;
+  linkId: string;
+  event: "share_handoff_succeeded" | "share_link_copied";
+  signal?: AbortSignal;
+}): Promise<RecordShareActionResult> {
+  let query = getInternalClient().rpc("record_owner_share_action", {
+    p_play_id: input.playId,
+    p_management_secret_hash: bytea(input.managementSecretHash),
+    p_link_id: input.linkId,
+    p_event_name: input.event,
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal share action RPC failed");
+  return decodeRecordShareActionOutcome(data) as RecordShareActionResult;
 }
 
 export async function getInviteMetadata(input: {

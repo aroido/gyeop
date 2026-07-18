@@ -408,6 +408,15 @@ export type Database = {
         Args: { p_pack_version_id: string };
         Returns: string;
       };
+      record_owner_share_action: {
+        Args: {
+          p_event_name: string;
+          p_link_id: string;
+          p_management_secret_hash: string;
+          p_play_id: string;
+        };
+        Returns: Json;
+      };
       revoke_owner_play_session: {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: boolean;

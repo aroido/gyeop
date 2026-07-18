@@ -7,6 +7,11 @@ const lowerKebab = z
   .min(1)
   .max(64)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+const canonicalUuidV4 = z
+  .string()
+  .regex(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+  );
 
 export const createOwnerPlaySchema = strictJsonObject({
   packSlug: lowerKebab,
@@ -21,6 +26,11 @@ export const emptyOwnerMutationSchema = strictJsonObject({});
 
 export const createShareLinkSchema = strictJsonObject({
   kind: z.enum(["public", "one_to_one"]),
+});
+
+export const recordShareActionSchema = strictJsonObject({
+  event: z.enum(["share_handoff_succeeded", "share_link_copied"]),
+  linkId: canonicalUuidV4,
 });
 
 export const inviteMetadataSchema = strictJsonObject({

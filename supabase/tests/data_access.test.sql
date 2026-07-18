@@ -254,6 +254,7 @@ select is(
     'get_published_pack(text)',
     'list_owner_share_links(uuid,bytea)',
     'publish_pack_version(uuid)',
+    'record_owner_share_action(uuid,bytea,uuid,text)',
     'revoke_owner_play_session(uuid,bytea)',
     'rotate_share_link(uuid,bytea,uuid,uuid,text,bytea)',
     'save_owner_answer(uuid,bytea,text,text,smallint)'

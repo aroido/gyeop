@@ -3,11 +3,18 @@ import test from "node:test";
 
 import { parseInviteFragment } from "../../lib/share-links/invite-fragment-core.mjs";
 import {
+  buildShareData,
+  isShareCancellation,
+  SHARE_TEXT,
+  SHARE_TITLE,
+} from "../../lib/share-links/share-handoff-core.mjs";
+import {
   deriveInviteRateLimitKey,
   hashShareSecret,
 } from "../../lib/share-links/share-link-session-core.mjs";
 import {
   decodeInviteMetadataOutcome,
+  decodeRecordShareActionOutcome,
   decodeShareLinkList,
   isSharePublicId,
 } from "../../lib/share-links/share-link-state-core.mjs";
@@ -93,4 +100,45 @@ test("strictly decodes only public invite metadata", () => {
       metadata: { ...value.metadata, ownerName: "hidden" },
     }),
   );
+});
+
+test("builds the exact native share payload without channel metadata", () => {
+  const url = `http://127.0.0.1:3000/i/AAAAAAAAAAAAAAAAAAAAAA#k=${secret}`;
+  assert.deepEqual(buildShareData(url), {
+    title: SHARE_TITLE,
+    text: SHARE_TEXT,
+    url,
+  });
+  assert.equal(SHARE_TITLE, "겹 · 오래된 친구팩");
+  assert.equal(
+    SHARE_TEXT,
+    "내가 먼저 답한 오래된 친구팩이야. 너는 나를 어떻게 보는지 3장만 골라줘.",
+  );
+  assert.throws(() => buildShareData(""));
+});
+
+test("classifies only AbortError as a native share cancellation", () => {
+  assert.equal(isShareCancellation({ name: "AbortError" }), true);
+  assert.equal(isShareCancellation({ name: "NotAllowedError" }), false);
+  assert.equal(isShareCancellation(new Error("failed")), false);
+  assert.equal(isShareCancellation(null), false);
+});
+
+test("strictly decodes record share action outcomes", () => {
+  const recorded = {
+    outcome: "recorded",
+    managementExpiresAt: "2030-01-08T00:00:00Z",
+    managementTtlSeconds: 604800,
+  };
+  assert.deepEqual(decodeRecordShareActionOutcome(recorded), recorded);
+  assert.deepEqual(
+    decodeRecordShareActionOutcome({ outcome: "not_completed" }),
+    {
+      outcome: "not_completed",
+    },
+  );
+  assert.throws(() =>
+    decodeRecordShareActionOutcome({ ...recorded, inviteUrl: "secret" }),
+  );
+  assert.throws(() => decodeRecordShareActionOutcome({ outcome: "recorded" }));
 });
