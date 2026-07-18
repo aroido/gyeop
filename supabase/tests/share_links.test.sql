@@ -331,6 +331,20 @@ select throws_ok(
   'arbitrary share action names are rejected'
 );
 
+select throws_ok(
+  $$
+    select public.record_owner_share_action(
+      '19000000-0000-4000-8000-000000000001',
+      decode(repeat('11', 32), 'hex'),
+      '19100000-0000-4000-8000-000000000001',
+      null
+    )
+  $$,
+  '22023',
+  'invalid share action input',
+  'null share action names are rejected before mutation'
+);
+
 select is(
   (
     select array_agg(key order by key)

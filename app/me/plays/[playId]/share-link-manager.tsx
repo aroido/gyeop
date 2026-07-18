@@ -86,6 +86,8 @@ export default function ShareLinkManager({
   const headingRef = useRef<HTMLHeadingElement>(null);
   const readyHeadingRef = useRef<HTMLHeadingElement>(null);
   const manualUrlRef = useRef<HTMLInputElement>(null);
+  const shareButtonRef = useRef<HTMLButtonElement>(null);
+  const copyButtonRef = useRef<HTMLButtonElement>(null);
 
   function beginAction(action: string) {
     if (actionLatchRef.current) return false;
@@ -103,7 +105,6 @@ export default function ShareLinkManager({
     if (!playId) return;
     setState({ kind: "loading" });
     setReadyLink(null);
-    setFeedback(null);
     try {
       setState(await readManagerState(playId));
     } catch {
@@ -262,12 +263,14 @@ export default function ShareLinkManager({
       );
     } finally {
       endAction();
+      requestAnimationFrame(() => shareButtonRef.current?.focus());
     }
   }
 
   async function copyReadyLink() {
     if (!playId || !readyLink || !beginAction("copy")) return;
     setFeedback(null);
+    let manualFallback = false;
     try {
       if (!navigator.clipboard?.writeText) throw new Error("unavailable");
       await navigator.clipboard.writeText(readyLink.inviteUrl);
@@ -282,6 +285,7 @@ export default function ShareLinkManager({
         "share_link_copied",
       ).catch(() => undefined);
     } catch {
+      manualFallback = true;
       setFeedback({
         tone: "alert",
         message:
@@ -291,6 +295,9 @@ export default function ShareLinkManager({
       manualUrlRef.current?.select();
     } finally {
       endAction();
+      if (!manualFallback) {
+        requestAnimationFrame(() => copyButtonRef.current?.focus());
+      }
     }
   }
 
@@ -389,6 +396,7 @@ export default function ShareLinkManager({
             <div className={styles.handoffActions}>
               {canShare ? (
                 <button
+                  ref={shareButtonRef}
                   className={styles.primary}
                   disabled={busy !== null}
                   type="button"
@@ -400,6 +408,7 @@ export default function ShareLinkManager({
                 </button>
               ) : null}
               <button
+                ref={copyButtonRef}
                 className={canShare ? styles.secondary : styles.primary}
                 disabled={busy !== null}
                 type="button"

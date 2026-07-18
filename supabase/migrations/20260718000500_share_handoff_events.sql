@@ -43,6 +43,7 @@ begin
     or p_management_secret_hash is null
     or octet_length(p_management_secret_hash) <> 32
     or p_link_id is null
+    or p_event_name is null
     or p_event_name not in ('share_handoff_succeeded', 'share_link_copied')
   then
     raise exception using errcode = '22023', message = 'invalid share action input';

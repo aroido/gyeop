@@ -310,6 +310,7 @@ test("hands off the exact public link once despite same-tick activation", async 
   await expect(page.getByRole("status")).toHaveText(
     "공유 메뉴로 링크를 전달했어요.",
   );
+  await expect(shareButton).toBeFocused();
   expect(
     await page.evaluate(
       () =>
@@ -357,6 +358,7 @@ test("treats native share cancellation and failure as zero success events", asyn
   await expect(page.getByRole("status")).toHaveText(
     "공유를 취소했어요. 링크는 그대로 있어요.",
   );
+  await expect(button).toBeFocused();
   await page.evaluate(() => {
     (
       window as typeof window & {
@@ -368,6 +370,7 @@ test("treats native share cancellation and failure as zero success events", asyn
   await expect(page.locator("aside").getByRole("alert")).toHaveText(
     "공유 메뉴를 열지 못했어요. 링크 복사를 사용해 주세요.",
   );
+  await expect(button).toBeFocused();
   expect(
     share.calls.filter((call) => call.pathname.endsWith("/share-events")),
   ).toHaveLength(0);
@@ -388,8 +391,10 @@ test("copies a one-to-one link without a fake share control", async ({
   await expect(
     page.getByRole("button", { name: "친구에게 공유하기" }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "링크 복사" }).click();
+  const copyButton = page.getByRole("button", { name: "링크 복사" });
+  await copyButton.click();
   await expect(page.getByRole("status")).toContainText("링크를 복사했어요");
+  await expect(copyButton).toBeFocused();
   expect(
     await page.evaluate(
       () =>
