@@ -347,6 +347,9 @@ export default function ShareLinkManager({
         <p className={styles.lead}>
           친구가 나를 어떻게 보는지 답할 수 있는 초대를 준비해요.
         </p>
+        <Link className={styles.profileEntry} href="/me">
+          내 시선 프로필 →
+        </Link>
 
         <fieldset className={styles.kinds} disabled={busy !== null}>
           <legend>누구에게 보낼까요?</legend>

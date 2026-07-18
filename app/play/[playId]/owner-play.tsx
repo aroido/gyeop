@@ -457,6 +457,12 @@ export default function OwnerPlay({ playId }: { playId: string | null }) {
           >
             친구에게 공유하기
           </button>
+          <button
+            className={styles.profileButton}
+            onClick={() => router.push("/me")}
+          >
+            내 시선 프로필
+          </button>
         </section>
       </main>
     );

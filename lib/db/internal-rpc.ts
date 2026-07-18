@@ -8,6 +8,14 @@ import { decodeRateLimitRow } from "./rate-limit-result.mjs";
 import type { Database } from "./database.types.ts";
 import { decodeOwnerPlayOutcome } from "../owner-play/owner-play-session-core.mjs";
 import type { OwnerPlayState } from "../owner-play/owner-play-session.ts";
+import {
+  decodeOwnerProfileEventOutcome,
+  decodeOwnerProfileOutcome,
+} from "../owner-profile/owner-profile-core.mjs";
+import type {
+  OwnerProfileEventResult,
+  OwnerProfileResult,
+} from "../owner-profile/owner-profile.ts";
 import { decodePublishedPack } from "../packs/published-pack-core.mjs";
 import type { PublishedPack } from "../packs/published-pack.ts";
 import {
@@ -294,6 +302,38 @@ export async function getOwnerPlay(input: {
     "expired",
     "not_found",
   ]) as GetOwnerPlayResult;
+}
+
+export async function getOwnerProfile(input: {
+  playId: string;
+  managementSecretHash: Uint8Array;
+  signal?: AbortSignal;
+}): Promise<OwnerProfileResult> {
+  let query = getInternalClient().rpc("get_owner_profile", {
+    p_play_id: input.playId,
+    p_management_secret_hash: bytea(input.managementSecretHash),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal owner profile RPC failed");
+  return decodeOwnerProfileOutcome(data) as OwnerProfileResult;
+}
+
+export async function recordOwnerProfileEvent(input: {
+  playId: string;
+  managementSecretHash: Uint8Array;
+  event: "profile_viewed";
+  signal?: AbortSignal;
+}): Promise<OwnerProfileEventResult> {
+  let query = getInternalClient().rpc("record_owner_profile_event", {
+    p_play_id: input.playId,
+    p_management_secret_hash: bytea(input.managementSecretHash),
+    p_event_name: input.event,
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal owner profile event RPC failed");
+  return decodeOwnerProfileEventOutcome(data) as OwnerProfileEventResult;
 }
 
 export type SaveOwnerAnswerResult =

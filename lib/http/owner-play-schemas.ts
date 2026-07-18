@@ -33,6 +33,10 @@ export const recordShareActionSchema = strictJsonObject({
   linkId: canonicalUuidV4,
 });
 
+export const ownerProfileEventSchema = strictJsonObject({
+  event: z.literal("profile_viewed"),
+});
+
 export const inviteMetadataSchema = strictJsonObject({
   secret: z.string().regex(/^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/),
 });
