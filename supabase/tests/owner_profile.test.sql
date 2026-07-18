@@ -2,6 +2,9 @@ begin;
 
 select no_plan();
 
+delete from public.analytics_events
+where event_name = 'profile_viewed';
+
 select has_function(
   'public',
   'get_owner_profile',

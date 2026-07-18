@@ -213,9 +213,19 @@ test("current-cookie-only profile auth is private and generic", async () => {
   const ownerA = createOwnerCredential();
   const ownerB = createOwnerCredential();
   const draft = createOwnerCredential();
+  const expired = createOwnerCredential();
   insertOwner(ownerA, true);
   insertOwner(ownerB, true);
   insertOwner(draft, false);
+  insertOwner(expired, true);
+  sql(`with expired_time as (
+      select clock_timestamp() - interval '1 second' as value
+    )
+    update public.pack_plays
+    set management_expires_at = expired_time.value,
+        last_active_at = expired_time.value - interval '7 days'
+    from expired_time
+    where id = '${expired.playId}'`);
 
   const absent = await ownerRequest("/api/me/profile");
   const absentBody = await absent.text();
@@ -249,6 +259,32 @@ test("current-cookie-only profile auth is private and generic", async () => {
   assert.equal(draftResponse.status, 404);
   assert.equal(await draftResponse.text(), absentBody);
   assert.match(draftResponse.headers.get("set-cookie") ?? "", /Max-Age=604800/);
+
+  const expiredResponse = await ownerRequest("/api/me/profile", {
+    cookie: ownerCookie(expired),
+  });
+  assert.equal(expiredResponse.status, 404);
+  assert.equal(await expiredResponse.text(), absentBody);
+  assert.match(expiredResponse.headers.get("set-cookie") ?? "", /Max-Age=0/);
+
+  const expiredEvent = await ownerRequest("/api/me/profile/events", {
+    method: "POST",
+    ip: "198.51.100.30",
+    cookie: ownerCookie(expired),
+    body: { event: "profile_viewed" },
+  });
+  assert.equal(expiredEvent.status, 404);
+  assert.equal(await expiredEvent.text(), absentBody);
+  assert.match(expiredEvent.headers.get("set-cookie") ?? "", /Max-Age=0/);
+  assert.equal(
+    Number(
+      sql(
+        "select count(*) from public.analytics_events where event_name = 'profile_viewed'",
+        true,
+      ),
+    ),
+    initialProfileViewCount,
+  );
 
   const responseA = await ownerRequest("/api/me/profile", {
     cookie: ownerCookie(ownerA),
@@ -326,6 +362,12 @@ test("submitted public sights refresh live and reveal only at three samples", as
 test("owner profile access limit blocks the 121st request before the domain", async () => {
   const owner = createOwnerCredential();
   insertOwner(owner, true);
+  const initialProfileViewCount = Number(
+    sql(
+      "select count(*) from public.analytics_events where event_name = 'profile_viewed'",
+      true,
+    ),
+  );
   const ip = "198.51.100.129";
   for (let attempt = 0; attempt < 120; attempt += 1) {
     const response = await ownerRequest("/api/me/profile", {
@@ -341,11 +383,13 @@ test("owner profile access limit blocks the 121st request before the domain", as
   assert.equal(blocked.status, 429);
   assert.match(blocked.headers.get("retry-after") ?? "", /^[1-9][0-9]*$/);
   assert.equal(
-    sql(
-      `select count(*) from public.analytics_events where event_name = 'profile_viewed'`,
-      true,
+    Number(
+      sql(
+        "select count(*) from public.analytics_events where event_name = 'profile_viewed'",
+        true,
+      ),
     ),
-    "1",
+    initialProfileViewCount,
     "GET profile access never writes render events",
   );
 });

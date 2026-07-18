@@ -269,6 +269,7 @@
 .primary:focus-visible,
 .primaryLink:focus-visible,
 .back:focus-visible,
+.profileEntry:focus-visible,
 .kind:focus-within,
 .actions button:focus-visible,
 .secondary:focus-visible,

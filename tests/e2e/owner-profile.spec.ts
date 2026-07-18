@@ -114,6 +114,14 @@ test("renders the private zero-sight profile and records viewing after render", 
   await expect(
     page.getByRole("link", { name: "친구에게 더 공유하기" }),
   ).toHaveAttribute("href", `/me/plays/${playId}`);
+  await page.keyboard.press("Tab");
+  const shareLink = page.getByRole("link", { name: "친구에게 더 공유하기" });
+  await expect(shareLink).toBeFocused();
+  await expect(shareLink).toHaveCSS("outline-color", "rgb(49, 92, 255)");
+  await page.keyboard.press("Shift+Tab");
+  const backLink = page.getByRole("link", { name: "← 내 답변" });
+  await expect(backLink).toBeFocused();
+  await expect(backLink).toHaveCSS("outline-color", "rgb(49, 92, 255)");
   await expect.poll(() => api.eventCalls).toBe(1);
 });
 

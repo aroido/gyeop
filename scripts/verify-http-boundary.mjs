@@ -587,11 +587,11 @@ const OWNER_ROUTE_CONTRACTS = new Map([
     {
       method: "POST",
       sequence: [
-        ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
         [
           "lib/owner-play/owner-play-session-core.mjs",
           "parseOwnerCookieHeader",
         ],
+        ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
         ["lib/http/owner-profile.ts", "recordOwnerProfileEventResponse"],
       ],
       limited: true,

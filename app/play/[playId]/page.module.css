@@ -203,6 +203,7 @@ button.saveChip {
 .choices button:focus-visible,
 .messageActions button:focus-visible,
 .homeButton:focus-visible,
+.profileButton:focus-visible,
 .completionRetry:focus-visible,
 .dialogActions button:focus-visible {
   outline: 3px solid var(--blue);

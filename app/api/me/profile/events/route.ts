@@ -18,6 +18,9 @@ export function POST(request: Request) {
       if (event !== "profile_viewed") {
         throw new Error("INTERNAL_ERROR");
       }
+      const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
+      if (cookie.outcome === "absent") return ownerNotFoundResponse();
+      if (cookie.outcome === "malformed") return ownerNotFoundResponse(true);
       return runRateLimitedDomain(
         {
           keyHash: networkKey,
@@ -26,18 +29,12 @@ export function POST(request: Request) {
           limit: 120,
           signal,
         },
-        () => {
-          const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
-          if (cookie.outcome === "absent") return ownerNotFoundResponse();
-          if (cookie.outcome === "malformed") {
-            return ownerNotFoundResponse(true);
-          }
-          return recordOwnerProfileEventResponse({
+        () =>
+          recordOwnerProfileEventResponse({
             cookie,
             event,
             signal,
-          });
-        },
+          }),
       );
     },
   );

@@ -572,6 +572,10 @@ for (const viewport of [
     await expect(
       page.getByRole("link", { name: "내 시선 프로필" }),
     ).toBeFocused();
+    await expect(page.getByRole("link", { name: "내 시선 프로필" })).toHaveCSS(
+      "outline-color",
+      "rgb(49, 92, 255)",
+    );
     await page.keyboard.press("Tab");
     await expect(publicRadio).toBeFocused();
     expect(

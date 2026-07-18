@@ -265,6 +265,12 @@
   text-decoration: none;
 }
 
+.back:focus-visible,
+.primary:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shell *,
   .shell *::before,
