@@ -31,6 +31,7 @@ type SubmittedResponse = Omit<DraftResponse, "status" | "assignments"> & {
   allMatched: boolean;
   assignments: Array<
     Omit<Assignment, "visitorChoice"> & {
+      packPosition: number;
       visitorChoice: "a" | "b";
       ownerChoice: "a" | "b";
       matches: boolean;
@@ -72,6 +73,11 @@ const assignments: Assignment[] = [
     visitorChoice: null,
   },
 ];
+const packPositions = new Map([
+  ["conflict", 1],
+  ["hard-day", 10],
+  ["plans", 3],
+]);
 
 function json(route: Route, status: number, body: unknown, extra = {}) {
   return route.fulfill({
@@ -105,6 +111,7 @@ async function installVisitorApi(
   options: {
     rateLimitFirstStart?: boolean;
     failFirstSave?: boolean;
+    submitConflictAfterCommit?: boolean;
     kind?: "public" | "one_to_one";
   } = {},
 ) {
@@ -208,13 +215,20 @@ async function installVisitorApi(
         ({ visitorChoice }) => visitorChoice !== "a",
       );
       const highlight =
-        differences.find(({ isSignature }) => isSignature) ?? differences[0];
+        differences.find(({ isSignature }) => isSignature) ??
+        differences.reduce((first, candidate) =>
+          packPositions.get(candidate.cardId)! <
+          packPositions.get(first.cardId)!
+            ? candidate
+            : first,
+        );
       saved = {
         ...saved,
         status: "submitted",
         allMatched: differences.length === 0,
         assignments: saved.assignments.map((assignment) => ({
           ...assignment,
+          packPosition: packPositions.get(assignment.cardId)!,
           visitorChoice: assignment.visitorChoice!,
           ownerChoice: "a",
           matches: assignment.visitorChoice === "a",
@@ -222,6 +236,12 @@ async function installVisitorApi(
         })),
       };
       consumed = options.kind === "one_to_one";
+      if (options.submitConflictAfterCommit) {
+        return json(route, 409, {
+          code: "VISITOR_RESPONSE_CONFLICT",
+          message: "이미 다른 관리 링크로 제출된 답변이에요.",
+        });
+      }
       return json(route, 200, saved);
     }
     const match = url.pathname.match(/\/answers\/([^/]+)$/);
@@ -278,8 +298,25 @@ test("public invite completes three cards, compares, copies, and reloads", async
   await chooseContext(page);
   await expect(
     page.getByRole("heading", { name: assignments[0].visitorPrompt }),
-  ).toBeVisible();
-  await answerThree(page);
+  ).toBeFocused();
+  await page.getByRole("button", { name: /^B / }).click();
+  await expect(
+    page.getByRole("heading", { name: assignments[1].visitorPrompt }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: "이전" }).click();
+  await expect(
+    page.getByRole("heading", { name: assignments[0].visitorPrompt }),
+  ).toBeFocused();
+  await expect(page.getByRole("button", { name: /^B / })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.getByRole("button", { name: /^A / }).click();
+  await expect(
+    page.getByRole("heading", { name: assignments[1].visitorPrompt }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: /^B / }).click();
+  await page.getByRole("button", { name: /^A / }).click();
   await expect(page.getByText("3장 비교 완료")).toBeVisible();
   await expect(page.getByText("가장 다른 답", { exact: true })).toBeVisible();
   await expect(
@@ -289,6 +326,7 @@ test("public invite completes three cards, compares, copies, and reloads", async
   await expect(
     page.getByRole("button", { name: "관리 링크 복사됨" }),
   ).toBeVisible();
+  await expect(page.getByText("관리 링크를 복사했어요.")).toBeVisible();
   expect(
     await page.evaluate(
       () => (window as typeof window & { __copied?: string }).__copied,
@@ -318,6 +356,79 @@ test("one-to-one invite uses the same flow and only its response resumes after c
   await expect(page.getByText("3장 비교 완료")).toBeVisible();
   await page.reload();
   await expect(page.getByText("3장 비교 완료")).toBeVisible();
+  expect(api.state()?.status).toBe("submitted");
+});
+
+test("does not skip a card when the same rendered answer is tapped twice", async ({
+  page,
+}) => {
+  await installClipboard(page);
+  const api = await installVisitorApi(page);
+  await page.goto(`/i/${publicId}#k=${secret}`);
+  await chooseContext(page);
+
+  await page.getByRole("button", { name: /^B / }).evaluate((element) => {
+    const answer = element as HTMLButtonElement;
+    answer.click();
+    answer.click();
+  });
+  await expect(
+    page.getByRole("heading", { name: assignments[1].visitorPrompt }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: /^A / }).click();
+  await expect(
+    page.getByRole("heading", { name: assignments[2].visitorPrompt }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: /^A / }).click();
+  await expect(page.getByText("3장 비교 완료")).toBeVisible();
+
+  const answerCalls = api.calls.filter(
+    ({ pathname, method }) =>
+      pathname.includes("/answers/") && method === "PUT",
+  );
+  expect(answerCalls).toHaveLength(4);
+  expect(new Set(answerCalls.map(({ pathname }) => pathname)).size).toBe(3);
+});
+
+test("keeps comparison but discards a mismatched pending management secret", async ({
+  page,
+}) => {
+  const api = await installVisitorApi(page, {
+    submitConflictAfterCommit: true,
+  });
+  await page.goto(`/i/${publicId}#k=${secret}`);
+  await chooseContext(page);
+  await page.evaluate(
+    ({ id, pendingSecret }) => {
+      localStorage.setItem(
+        `gyeop:visitor-management:v1:${id}`,
+        JSON.stringify({
+          version: 1,
+          responseId: id,
+          status: "pending",
+          secret: pendingSecret,
+        }),
+      );
+    },
+    { id: responseId, pendingSecret: secret },
+  );
+  await answerThree(page);
+
+  await expect(page.getByText("3장 비교 완료")).toBeVisible();
+  await expect(
+    page.getByText(
+      "이 브라우저에서 관리 링크를 복구할 수 없어요. 비교 결과는 계속 볼 수 있어요.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "내 관리 링크 복사" }),
+  ).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      (id) => localStorage.getItem(`gyeop:visitor-management:v1:${id}`),
+      responseId,
+    ),
+  ).toBeNull();
   expect(api.state()?.status).toBe("submitted");
 });
 
@@ -376,6 +487,15 @@ test("shows a readonly management fallback when clipboard is denied", async ({
   const fallback = page.getByRole("textbox", { name: "직접 복사하기" });
   await expect(fallback).toBeVisible();
   await expect(fallback).toHaveValue(/\/responses\/manage#token=/);
+  await page.getByRole("button", { name: "전체 선택" }).click();
+  expect(
+    await fallback.evaluate((input) => {
+      const field = input as HTMLInputElement;
+      return (
+        field.selectionStart === 0 && field.selectionEnd === field.value.length
+      );
+    }),
+  ).toBe(true);
 });
 
 for (const width of [320, 390, 430]) {
@@ -389,6 +509,9 @@ for (const width of [320, 390, 430]) {
       (await radios.first().locator("..").boundingBox())?.height,
     ).toBeGreaterThanOrEqual(44);
     await chooseContext(page);
+    await expect(
+      page.getByRole("progressbar", { name: "필수 답변 진행" }),
+    ).toHaveAttribute("aria-valuenow", "0");
     expect(
       (await page.getByRole("button", { name: /^B / }).boundingBox())?.height,
     ).toBeGreaterThanOrEqual(44);
@@ -401,3 +524,19 @@ for (const width of [320, 390, 430]) {
     ).toBe(true);
   });
 }
+
+test("unsupported response methods are private 405 responses", async ({
+  request,
+}) => {
+  for (const [path, method, allow] of [
+    [`/api/responses/${responseId}`, "POST", "GET"],
+    [`/api/responses/${responseId}/submit`, "GET", "POST"],
+    [`/api/responses/${responseId}/answers/conflict`, "POST", "PUT"],
+    [`/api/responses/${responseId}/events`, "PUT", "POST"],
+  ] as const) {
+    const response = await request.fetch(path, { method });
+    expect(response.status(), `${method} ${path}`).toBe(405);
+    expect(response.headers()["allow"]).toBe(allow);
+    expect(response.headers()["cache-control"]).toBe("private, no-store");
+  }
+});

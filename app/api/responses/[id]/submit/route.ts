@@ -4,6 +4,7 @@ import { withPublicRequest } from "../../../../../lib/http/request-boundary.ts";
 import {
   malformedVisitorResponseCookie,
   submitVisitorAnswers,
+  visitorResponseMethodNotAllowed,
 } from "../../../../../lib/http/visitor-responses.ts";
 import { inviteUnavailableResponse } from "../../../../../lib/http/share-links.ts";
 import { isVisitorResponseId } from "../../../../../lib/visitor-response/visitor-context-core.mjs";
@@ -55,3 +56,13 @@ export function POST(
     },
   );
 }
+
+const methodNotAllowed = () => visitorResponseMethodNotAllowed("POST");
+export {
+  methodNotAllowed as DELETE,
+  methodNotAllowed as GET,
+  methodNotAllowed as HEAD,
+  methodNotAllowed as OPTIONS,
+  methodNotAllowed as PATCH,
+  methodNotAllowed as PUT,
+};

@@ -215,7 +215,7 @@ cookie는 `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, `Domain` 없음이며 
 | `pack_cards` | `id`, `pack_version_id`, `position` 1..10, `owner_prompt`, `visitor_prompt`, `option_a`, `option_b`, `is_signature`; `publish_pack_version`가 10장·Signature 1장을 검증한 뒤 발행 |
 | `pack_plays` | `id`, `pack_version_id`, nullable unique `management_secret_hash`, `last_active_at`, `management_expires_at`, nullable `management_revoked_at`, `status` (`draft|completed`), `current_position`, nullable `completed_at`, timestamps; play id+hash capability와 서버 시각만 권한 판정 |
 | `self_answers` | PK `(pack_play_id, card_id)`, `pack_version_id`, `choice` (`a|b`), timestamps; composite FK로 play와 card의 pack version 일치, completed parent의 insert/update/delete 금지 |
-| `share_links` | `id`, unique `public_id`, `pack_play_id`, `kind`, unique `secret_hash`, `status` (`active|disabled|expired`), nullable `expires_at`, timestamps; `consumed_response_id`, `consumed_at`, `consumed` 상태는 방문자 응답 schema 뒤 #24에서 추가 |
+| `share_links` | `id`, unique `public_id`, `pack_play_id`, `kind`, unique `secret_hash`, `status` (`active|disabled|expired`), nullable `expires_at`, timestamps; #24가 nullable unique `consumed_response_id`, `consumed_at`을 추가하고 소비된 1:1도 rollback 호환 상태 `disabled`로 저장 |
 | `visitor_responses` | `id`, `share_link_id`, `pack_version_id`, nullable `relationship_code`, nullable `known_since_code`, `status`, unique nullable `session_token_hash`, `session_expires_at`, unique nullable `management_token_hash`, `created_at`, `submitted_at`, `withdrawn_at`; session 만료는 서버 시각으로만 판정 |
 | `visitor_assignments` | PK `(response_id, card_id)`, `pack_version_id`, `stage`, `position`; composite FK로 response와 card의 pack version 일치, response 안 카드 중복 금지 |
 | `visitor_answers` | PK `(response_id, card_id)`, `choice` A/B, `updated_at`; assignment가 있는 카드만 허용 |
@@ -233,7 +233,7 @@ P0는 팩 하나뿐이므로 presentation metadata를 DB schema로 확장하지 
 ### 8.2 상태
 
 - `pack_plays.status` active 비공개 검증: `draft → completed`; 완료 뒤 self answer는 불변이다. `answered|active|archived`와 Auth claim 상태는 production beta 후보 재승인 전까지 inactive다.
-- `share_links.status`: 현재 `active → disabled | expired`; `consumed` 전이는 방문자 응답 schema 뒤 #24에서 추가
+- `share_links.status`: `active → disabled | expired`; #24의 1:1 소비도 `disabled`와 내부 `consumed_response_id`·`consumed_at` binding으로 표현하며 새 public status를 추가하지 않는다
 - `visitor_responses.status`: `draft → submitted → withdrawn | invalid`
 - `notification_jobs.status`: `pending → sending → delivered | retry | failed | cancelled`; `retry_kind=same_attempt`는 ambiguous transport, typed `rate_limit_exceeded`, quota pause 뒤 재개처럼 provider가 받지 않은 같은 payload 재생이라 논리 횟수를 보존하고 `next_attempt`만 다음 claim에서 증가
 - `notification_provider_controls.state`: `active → quota_paused → active`; quota error가 pause를 원자 기록하고 승인된 운영자 resume만 active 복귀

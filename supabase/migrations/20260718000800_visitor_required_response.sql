@@ -160,6 +160,7 @@ as $function$
               'cardId', card.id,
               'stage', assignment.stage,
               'position', assignment.position,
+              'packPosition', card.position,
               'visitorPrompt', card.visitor_prompt,
               'optionA', card.option_a,
               'optionB', card.option_b,

@@ -98,10 +98,19 @@ function writeRecord(
 
 export function ensurePendingManagementRecord(
   responseId: string,
-  storage: Pick<Storage, "getItem" | "setItem"> = globalThis.localStorage,
+  storage: Pick<
+    Storage,
+    "getItem" | "setItem" | "removeItem"
+  > = globalThis.localStorage,
   source: Pick<Crypto, "getRandomValues"> = globalThis.crypto,
 ) {
-  const existing = readManagementRecord(responseId, storage);
+  let existing: ManagementRecord | null;
+  try {
+    existing = readManagementRecord(responseId, storage);
+  } catch {
+    storage.removeItem(key(responseId));
+    existing = null;
+  }
   if (existing) return existing;
   return writeRecord(
     Object.freeze({
@@ -112,6 +121,13 @@ export function ensurePendingManagementRecord(
     }),
     storage,
   );
+}
+
+export function removeManagementRecord(
+  responseId: string,
+  storage: Pick<Storage, "removeItem"> = globalThis.localStorage,
+) {
+  storage.removeItem(key(responseId));
 }
 
 export function completeManagementRecord(

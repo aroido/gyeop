@@ -39,6 +39,7 @@ export type VisitorResponse =
         allMatched: boolean;
         assignments: readonly Readonly<
           VisitorAssignmentBase & {
+            packPosition: number;
             visitorChoice: "a" | "b";
             ownerChoice: "a" | "b";
             matches: boolean;

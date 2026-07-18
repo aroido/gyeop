@@ -90,6 +90,12 @@ export function malformedVisitorResponseCookie() {
   return deletedUnavailableResponse();
 }
 
+export function visitorResponseMethodNotAllowed(allow: "GET" | "POST" | "PUT") {
+  return privateNoStore(
+    new Response(null, { status: 405, headers: { Allow: allow } }),
+  );
+}
+
 function conflictResponse(
   code: "VISITOR_RESPONSE_CONFLICT" | "VISITOR_RESPONSE_INCOMPLETE",
 ) {

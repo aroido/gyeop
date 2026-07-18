@@ -235,6 +235,7 @@ export function verifyVisitorResponse() {
     "v_constraint_name <> 'analytics_visitor_terminal_event_unique_idx'",
     "'visitor_required_answer_saved'",
     "'visitor_required_submitted'",
+    "'packPosition'",
     "'comparison_viewed'",
     "'same_pack_start_clicked'",
   ]) {
@@ -244,17 +245,30 @@ export function verifyVisitorResponse() {
     );
   }
 
-  for (const route of [
+  const responseRoutePaths = [
     "app/api/responses/[id]/route.ts",
     "app/api/responses/[id]/answers/[cardId]/route.ts",
     "app/api/responses/[id]/submit/route.ts",
     "app/api/responses/[id]/events/route.ts",
-  ]) {
-    const contents = source(route);
+  ];
+  const routeSources = responseRoutePaths.map(source);
+  for (const contents of routeSources) {
     assert.match(contents, /withPublicRequest\s*\(/);
     assert.match(contents, /privateNoStore:\s*true/);
     assert.match(contents, /parseVisitorResponseCookie/);
     assert.match(contents, /cookie\.responseId !== id/);
+  }
+  for (const contract of [
+    'visitorResponseMethodNotAllowed("GET")',
+    'visitorResponseMethodNotAllowed("POST")',
+    'visitorResponseMethodNotAllowed("PUT")',
+    "methodNotAllowed as HEAD",
+    "methodNotAllowed as OPTIONS",
+  ]) {
+    assert.ok(
+      routeSources.some((route) => route.includes(contract)),
+      `missing unsupported-method contract: ${contract}`,
+    );
   }
 
   const answerRoute = source(
@@ -278,6 +292,7 @@ export function verifyVisitorResponse() {
     'status: "completed"',
     "/responses/manage#token=",
     "globalThis.localStorage",
+    "storage.removeItem(key(responseId))",
   ]) {
     assert.ok(
       management.includes(contract),

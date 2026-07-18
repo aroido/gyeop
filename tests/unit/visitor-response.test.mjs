@@ -91,6 +91,7 @@ const submittedState = Object.freeze({
     assignments.map((assignment, index) =>
       Object.freeze({
         ...assignment,
+        packPosition: [1, 10, 3][index],
         visitorChoice: index === 1 ? "b" : "a",
         ownerChoice: "a",
         matches: index !== 1,
@@ -148,6 +149,25 @@ test("strictly decodes DB and browser response state", () => {
       sessionExpiresAt: "February 3, 2030",
     }),
   );
+  const twoDifferences = {
+    ...submittedState,
+    assignments: submittedState.assignments.map((assignment, index) => ({
+      ...assignment,
+      visitorChoice: index === 0 ? "a" : "b",
+      matches: index === 0,
+      isHighlight: index === 2,
+    })),
+  };
+  assert.deepEqual(decodeVisitorResponseState(twoDifferences), twoDifferences);
+  assert.throws(() =>
+    decodeVisitorResponseState({
+      ...twoDifferences,
+      assignments: twoDifferences.assignments.map((assignment, index) => ({
+        ...assignment,
+        isHighlight: index === 1,
+      })),
+    }),
+  );
   assert.throws(() =>
     decodeVisitorResponseHttpState(
       { ...http, relationshipLabel: "친구" },
@@ -179,6 +199,7 @@ test("rejects malformed or privacy-leaking assignment payloads", () => {
     [assignments[0], assignments[1], { ...assignments[2], cardId: "hard-day" }],
     [{ ...assignments[0], isSignature: false }, assignments[1], assignments[2]],
     [assignments[0], { ...assignments[1], isSignature: true }, assignments[2]],
+    [{ ...assignments[0], packPosition: 1 }, assignments[1], assignments[2]],
     [
       { ...assignments[0], ownerPrompt: "비공개 자기 질문" },
       assignments[1],
@@ -195,6 +216,15 @@ test("rejects malformed or privacy-leaking assignment payloads", () => {
       decodeVisitorResponseState({ ...state, assignments: candidate }),
     );
   }
+  assert.throws(() =>
+    decodeVisitorResponseState({
+      ...submittedState,
+      assignments: submittedState.assignments.map((assignment, index) => ({
+        ...assignment,
+        packPosition: index === 2 ? 10 : assignment.packPosition,
+      })),
+    }),
+  );
 });
 
 test("uses the exact response credential and rate-key vectors", () => {
@@ -350,6 +380,7 @@ test("persists one exact browser-only management record", () => {
   const storage = {
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value),
+    removeItem: (key) => values.delete(key),
   };
   const source = {
     getRandomValues(bytes) {
@@ -378,6 +409,7 @@ test("persists one exact browser-only management record", () => {
     JSON.stringify({ ...pending, leaked: true }),
   );
   assert.throws(() => readManagementRecord(id, storage));
+  assert.deepEqual(ensurePendingManagementRecord(id, storage, source), pending);
 });
 
 const httpState = Object.freeze({

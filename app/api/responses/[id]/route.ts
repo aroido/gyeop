@@ -2,6 +2,7 @@ import { withPublicRequest } from "../../../../lib/http/request-boundary.ts";
 import {
   malformedVisitorResponseCookie,
   readVisitorResponse,
+  visitorResponseMethodNotAllowed,
 } from "../../../../lib/http/visitor-responses.ts";
 import { inviteUnavailableResponse } from "../../../../lib/http/share-links.ts";
 import { isVisitorResponseId } from "../../../../lib/visitor-response/visitor-context-core.mjs";
@@ -28,3 +29,13 @@ export function GET(
     },
   );
 }
+
+const methodNotAllowed = () => visitorResponseMethodNotAllowed("GET");
+export {
+  methodNotAllowed as DELETE,
+  methodNotAllowed as HEAD,
+  methodNotAllowed as OPTIONS,
+  methodNotAllowed as PATCH,
+  methodNotAllowed as POST,
+  methodNotAllowed as PUT,
+};

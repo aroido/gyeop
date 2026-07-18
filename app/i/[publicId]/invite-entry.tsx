@@ -8,6 +8,7 @@ import {
   completeManagementRecord,
   ensurePendingManagementRecord,
   readManagementRecord,
+  removeManagementRecord,
 } from "@/lib/visitor-management/management-secret";
 import { parseInviteFragment } from "@/lib/share-links/invite-fragment-core.mjs";
 import {
@@ -332,6 +333,10 @@ function ResponseFlow({
   const submittingLatch = useRef(false);
   const choicesRef = useRef(choices);
 
+  useEffect(() => {
+    if (response.status === "draft") headingRef.current?.focus();
+  }, [headingRef, position, response.status]);
+
   const finish = useCallback(async () => {
     if (
       submittingLatch.current ||
@@ -357,6 +362,11 @@ function ResponseFlow({
         try {
           const recovered = await readVisitorResponse(response.id);
           if (recovered.status === "submitted") {
+            try {
+              removeManagementRecord(response.id);
+            } catch {
+              // The comparison stays readable even when storage is unavailable.
+            }
             setResponse(recovered);
             return;
           }
@@ -406,7 +416,7 @@ function ResponseFlow({
     choicesRef.current = nextChoices;
     setChoices(nextChoices);
     queue.current.push({ cardId, choice });
-    setPosition((current) => Math.min(current + 1, 2));
+    setPosition(Math.min(position + 1, 2));
     void drain();
   }
 
@@ -442,7 +452,12 @@ function ResponseFlow({
         <p className={styles.brand}>겹 · {packTitle}</p>
         <div
           className={styles.progressRow}
-          aria-label={`3장 중 ${answered}장 답변`}
+          role="progressbar"
+          aria-label="필수 답변 진행"
+          aria-valuemin={0}
+          aria-valuemax={3}
+          aria-valuenow={answered}
+          aria-valuetext={`3장 중 ${answered}장 답변 완료`}
         >
           <strong>{allChosen ? "답변 완료" : `${position + 1} / 3`}</strong>
           <span>{response.relationshipLabel}</span>
@@ -502,9 +517,15 @@ function ResponseFlow({
                 </button>
               ))}
             </div>
-            {saving ? (
-              <p className={styles.inlineStatus}>앞 답변을 저장하는 중…</p>
-            ) : null}
+            <p className={styles.inlineStatus} aria-live="polite">
+              {saveError
+                ? "저장 실패 · 재시도"
+                : saving
+                  ? "저장 중…"
+                  : answered > 0
+                    ? "저장됨"
+                    : "자동 저장"}
+            </p>
             {saveError ? (
               <div className={styles.inlineError} role="alert">
                 <p>답변을 저장하지 못했어요.</p>
@@ -513,6 +534,27 @@ function ResponseFlow({
                 </button>
               </div>
             ) : null}
+            <nav className={styles.questionNavigation} aria-label="질문 이동">
+              <button
+                type="button"
+                onClick={() =>
+                  setPosition((current) => Math.max(0, current - 1))
+                }
+                disabled={position === 0}
+              >
+                이전
+              </button>
+              {position < 2 && choices[assignment.cardId] ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPosition((current) => Math.min(2, current + 1))
+                  }
+                >
+                  다음
+                </button>
+              ) : null}
+            </nav>
           </div>
         )}
       </section>
@@ -533,6 +575,7 @@ function Comparison({
     "idle" | "copied" | "manual" | "missing"
   >("idle");
   const [managementUrl, setManagementUrl] = useState("");
+  const manualInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void recordVisitorEvent(response.id, "comparison_viewed").catch(
@@ -550,8 +593,15 @@ function Comparison({
       if (record) {
         const url = buildManagementUrl(window.location.origin, record.secret);
         queueMicrotask(() => setManagementUrl(url));
+      } else {
+        queueMicrotask(() => setCopyState("missing"));
       }
     } catch {
+      try {
+        removeManagementRecord(response.id);
+      } catch {
+        // Submitted responses never mint a replacement capability.
+      }
       queueMicrotask(() => setCopyState("missing"));
     }
   }, [response.id]);
@@ -584,7 +634,7 @@ function Comparison({
         </h1>
         <p>
           {response.allMatched
-            ? "세 장 모두 같은 답을 골랐어요."
+            ? "세 항목을 모두 같게 봤어요"
             : "가장 선명하게 갈린 한 장을 먼저 표시했어요."}
         </p>
         <dl className={styles.savedContext}>
@@ -618,7 +668,7 @@ function Comparison({
               <h2>{assignment.visitorPrompt}</h2>
               <dl>
                 <div>
-                  <dt>내 답</dt>
+                  <dt>내가 본 이 사람</dt>
                   <dd>
                     {assignment.visitorChoice === "a"
                       ? assignment.optionA
@@ -626,7 +676,7 @@ function Comparison({
                   </dd>
                 </div>
                 <div>
-                  <dt>친구 답</dt>
+                  <dt>이 사람의 실제 답</dt>
                   <dd>
                     {assignment.ownerChoice === "a"
                       ? assignment.optionA
@@ -655,18 +705,44 @@ function Comparison({
             관리 링크는 이 브라우저에서만 만들 수 있어요. 나에게 따로
             저장해두세요.
           </p>
-          <button type="button" onClick={() => void copyManagementLink()}>
-            {copyState === "copied" ? "관리 링크 복사됨" : "내 관리 링크 복사"}
-          </button>
+          {managementUrl ? (
+            <>
+              <button type="button" onClick={() => void copyManagementLink()}>
+                {copyState === "copied"
+                  ? "관리 링크 복사됨"
+                  : "내 관리 링크 복사"}
+              </button>
+              <p className={styles.copyStatus} aria-live="polite">
+                {copyState === "copied"
+                  ? "관리 링크를 복사했어요."
+                  : copyState === "manual"
+                    ? "자동 복사를 사용할 수 없어 직접 복사가 필요해요."
+                    : ""}
+              </p>
+            </>
+          ) : null}
           {copyState === "manual" ? (
-            <label>
-              직접 복사하기
-              <input
-                readOnly
-                value={managementUrl}
-                onFocus={(event) => event.currentTarget.select()}
-              />
-            </label>
+            <div className={styles.manualCopy}>
+              <label>
+                직접 복사하기
+                <input
+                  ref={manualInputRef}
+                  readOnly
+                  value={managementUrl}
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  manualInputRef.current?.focus();
+                  manualInputRef.current?.select();
+                }}
+              >
+                전체 선택
+              </button>
+              <p>선택된 주소를 복사해 나에게 따로 저장해 주세요.</p>
+            </div>
           ) : null}
           {copyState === "missing" ? (
             <p className={styles.error} role="alert">

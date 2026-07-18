@@ -263,6 +263,19 @@
   color: #aaa;
   font-size: 0.75rem;
 }
+.questionNavigation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+.card .questionNavigation button {
+  min-height: 2.75rem;
+  margin: 0;
+  border: 1px solid #666;
+  background: #202020;
+  color: #fff;
+}
 .inlineError {
   display: grid;
   gap: 0.5rem;
@@ -373,6 +386,10 @@
   font-size: 0.75rem;
   line-height: 1.45;
 }
+.managementBox > .copyStatus {
+  min-height: 1.1rem;
+  color: #ddd;
+}
 .card .managementBox button {
   min-height: 2.7rem;
   margin-top: 0.75rem;
@@ -394,6 +411,18 @@
   background: #050505;
   color: #fff;
   font: inherit;
+}
+.manualCopy > p {
+  margin: 0.55rem 0 0;
+  color: #aaa;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+.card .manualCopy button {
+  min-height: 2.5rem;
+  margin-top: 0.55rem;
+  background: #202020;
+  color: #fff;
 }
 @media (prefers-reduced-motion: reduce) {
   .shell *,

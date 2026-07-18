@@ -4,6 +4,7 @@ import { withPublicRequest } from "../../../../../../lib/http/request-boundary.t
 import {
   malformedVisitorResponseCookie,
   saveVisitorAnswer,
+  visitorResponseMethodNotAllowed,
 } from "../../../../../../lib/http/visitor-responses.ts";
 import { inviteUnavailableResponse } from "../../../../../../lib/http/share-links.ts";
 import { isVisitorResponseId } from "../../../../../../lib/visitor-response/visitor-context-core.mjs";
@@ -60,3 +61,13 @@ export function PUT(
     },
   );
 }
+
+const methodNotAllowed = () => visitorResponseMethodNotAllowed("PUT");
+export {
+  methodNotAllowed as DELETE,
+  methodNotAllowed as GET,
+  methodNotAllowed as HEAD,
+  methodNotAllowed as OPTIONS,
+  methodNotAllowed as PATCH,
+  methodNotAllowed as POST,
+};
