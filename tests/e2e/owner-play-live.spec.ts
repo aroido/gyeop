@@ -1,11 +1,12 @@
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
 
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
 const proxyKey = Buffer.alloc(32, 8).toString("base64url");
+const visitorManagementSecret = Buffer.alloc(32, 6).toString("base64url");
 const visitorHeaders = {
   "x-forwarded-for": "198.51.100.219",
   "x-forwarded-host": "127.0.0.1",
@@ -93,6 +94,108 @@ select (
     { encoding: "utf8", input: sql },
   );
   return Number(output.trim());
+}
+
+function readVisitorMutationSummary(responseId: string) {
+  const output = execFileSync(
+    "docker",
+    [
+      "exec",
+      databaseContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-At",
+      "-c",
+      `select jsonb_build_object(
+        'status', response.status,
+        'answerCount', (select count(*) from public.visitor_answers as answer where answer.response_id = response.id),
+        'answerEvents', (select count(*) from public.analytics_events as event where event.visitor_response_id = response.id and event.event_name = 'visitor_required_answer_saved'),
+        'submitEvents', (select count(*) from public.analytics_events as event where event.visitor_response_id = response.id and event.event_name = 'visitor_required_submitted'),
+        'managed', response.management_token_hash is not null
+      )
+      from public.visitor_responses as response
+      where response.id = '${responseId}'`,
+    ],
+    { encoding: "utf8" },
+  );
+  return JSON.parse(output.trim()) as {
+    status: "draft" | "submitted";
+    answerCount: number;
+    answerEvents: number;
+    submitEvents: number;
+    managed: boolean;
+  };
+}
+
+function seedResponseActionLimit(
+  responseId: string,
+  action: "response_answer_save" | "response_submit",
+  count: number,
+  limit: 10 | 120,
+) {
+  const tag =
+    action === "response_answer_save"
+      ? "gyeop-response-answer-save-v1"
+      : "gyeop-response-submit-v1";
+  execFileSync(
+    "docker",
+    [
+      "exec",
+      databaseContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      `do $block$
+      declare
+        v_index integer;
+        v_key bytea := pg_catalog.sha256(
+          convert_to('${tag}', 'UTF8')
+          || decode('00', 'hex')
+          || convert_to('${responseId}', 'UTF8')
+        );
+      begin
+        delete from public.rate_limit_buckets
+        where key_hash = v_key and action = '${action}';
+        for v_index in 1..${count} loop
+          perform public.consume_rate_limit(v_key, '${action}', 600, ${limit});
+        end loop;
+      end
+      $block$;`,
+    ],
+    { stdio: "ignore" },
+  );
+}
+
+async function rawVisitorAction(
+  request: APIRequestContext,
+  input: {
+    path: string;
+    method: "POST" | "PUT";
+    cookieValue: string;
+    body: unknown;
+  },
+) {
+  const response = await request.fetch(input.path, {
+    method: input.method,
+    headers: {
+      cookie: `__Host-gyeop-response=${input.cookieValue}`,
+      origin: "http://127.0.0.1:3000",
+    },
+    data: input.body,
+  });
+  return {
+    status: response.status(),
+    cacheControl: response.headers()["cache-control"] ?? null,
+    retryAfter: response.headers()["retry-after"] ?? null,
+  };
 }
 
 function readVisitorResponseSummary(publicId: string) {
@@ -337,9 +440,7 @@ function expectExactAssignmentResponse(body: string) {
     if (value === null || typeof value !== "object") return;
     for (const [key, child] of Object.entries(value)) {
       if (
-        /owner|self|choice|sample|packVersionId|playId|linkId|hash|token/i.test(
-          key,
-        )
+        /owner|self|sample|packVersionId|playId|linkId|hash|token/i.test(key)
       ) {
         forbiddenKeys.push(key);
       }
@@ -380,9 +481,52 @@ function expectExactAssignmentResponse(body: string) {
       "optionB",
       "position",
       "stage",
+      "visitorChoice",
       "visitorPrompt",
     ]);
+    expect(assignment.visitorChoice).toBeNull();
   }
+}
+
+function expectExactSubmittedResponse(body: string) {
+  const parsed = JSON.parse(body) as Record<string, unknown>;
+  expect(Object.keys(parsed).sort()).toEqual([
+    "allMatched",
+    "assignments",
+    "id",
+    "knownSinceCode",
+    "knownSinceLabel",
+    "relationshipCode",
+    "relationshipLabel",
+    "sessionExpiresAt",
+    "sessionTtlSeconds",
+    "status",
+  ]);
+  expect(parsed.status).toBe("submitted");
+  expect(typeof parsed.allMatched).toBe("boolean");
+  const submittedAssignments = parsed.assignments as Record<string, unknown>[];
+  expect(submittedAssignments).toHaveLength(3);
+  for (const assignment of submittedAssignments) {
+    expect(Object.keys(assignment).sort()).toEqual([
+      "cardId",
+      "isHighlight",
+      "isSignature",
+      "matches",
+      "optionA",
+      "optionB",
+      "ownerChoice",
+      "packPosition",
+      "position",
+      "stage",
+      "visitorChoice",
+      "visitorPrompt",
+    ]);
+    expect(["a", "b"]).toContain(assignment.visitorChoice);
+    expect(["a", "b"]).toContain(assignment.ownerChoice);
+  }
+  expect(JSON.stringify(parsed)).not.toMatch(
+    /token|hash|secret|linkId|playId/i,
+  );
 }
 
 async function postShareAction(
@@ -421,8 +565,9 @@ test.describe("live owner flow", () => {
     browser,
     context,
     page,
+    request,
   }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(120_000);
     await context.addInitScript(() => {
       const state = { shareMode: "resolve" as "resolve" | "cancel" | "fail" };
       (
@@ -697,13 +842,15 @@ test.describe("live owner flow", () => {
           ip: "198.51.100.220",
           relationship: "오래된 친구",
           knownSince: "10년 이상이에요",
+          complete: true,
         },
         {
           ip: "198.51.100.221",
           relationship: "가족",
           knownSince: "1년 이상 · 3년 미만",
+          complete: false,
         },
-      ].map(async ({ ip, relationship, knownSince }) => {
+      ].map(async ({ ip, relationship, knownSince, complete }) => {
         const visitorContext = await browser.newContext({
           extraHTTPHeaders: { ...visitorHeaders, "x-forwarded-for": ip },
         });
@@ -722,8 +869,31 @@ test.describe("live owner flow", () => {
           .check();
         await visitor.getByRole("button", { name: "3장 답하러 가기" }).click();
         await expect(
-          visitor.getByRole("heading", { name: "응답을 시작했어요" }),
+          visitor.getByRole("heading", {
+            name: "서운한 일이 생기면 이 사람은?",
+          }),
         ).toBeFocused();
+        if (complete) {
+          const questionHeading = visitor.getByRole("heading", { level: 1 });
+          const firstPrompt = await questionHeading.textContent();
+          await visitor.getByRole("button", { name: /^B / }).click();
+          await expect(questionHeading).not.toHaveText(firstPrompt ?? "");
+          await expect(questionHeading).toBeFocused();
+          const secondPrompt = await questionHeading.textContent();
+          await visitor.getByRole("button", { name: /^A / }).click();
+          await expect(questionHeading).not.toHaveText(secondPrompt ?? "");
+          await expect(questionHeading).toBeFocused();
+          await visitor.getByRole("button", { name: /^A / }).click();
+          await expect(visitor.getByText("3장 비교 완료")).toBeVisible({
+            timeout: 15_000,
+          });
+          await expect(
+            visitor.getByRole("link", { name: "나도 이 팩으로 시작하기" }),
+          ).toHaveAttribute(
+            "href",
+            "/play/new?pack=old-friend&source=same_pack_cta",
+          );
+        }
         const sessionCookie = (await visitorContext.cookies()).find(
           (cookie) => cookie.name === "__Host-gyeop-response",
         );
@@ -745,11 +915,7 @@ test.describe("live owner flow", () => {
     );
 
     await visitors[0].visitor.reload();
-    await expect(
-      visitors[0].visitor.getByRole("heading", {
-        name: "응답을 시작했어요",
-      }),
-    ).toBeFocused();
+    await expect(visitors[0].visitor.getByText("3장 비교 완료")).toBeVisible();
     await expect(
       visitors[0].visitor.getByText("오래된 친구", { exact: true }),
     ).toBeVisible();
@@ -760,7 +926,7 @@ test.describe("live owner flow", () => {
       ip: "198.51.100.220",
     });
     expect(publicResume.fingerprint.status).toBe(200);
-    expectExactAssignmentResponse(publicResume.fingerprint.body);
+    expectExactSubmittedResponse(publicResume.fingerprint.body);
     await expect
       .poll(() => readVisitorResponseSummary(publicId))
       .toEqual({
@@ -778,15 +944,147 @@ test.describe("live owner flow", () => {
           {
             relationship: "old_friend",
             knownSince: "ten_years_or_more",
-            status: "draft",
+            status: "submitted",
             fixedTtl: true,
           },
         ],
         events: {
+          comparison_viewed: 1,
           relationship_selected: 2,
+          visitor_required_answer_saved: 3,
+          visitor_required_submitted: 1,
           visitor_response_started: 2,
         },
       });
+
+    const submittedResponseId = visitors[0].cookieValue.split(".")[1];
+    const submittedManagementSecret = await visitors[0].visitor.evaluate(
+      (id) => {
+        const value = localStorage.getItem(`gyeop:visitor-management:v1:${id}`);
+        return value ? (JSON.parse(value) as { secret: string }).secret : null;
+      },
+      submittedResponseId,
+    );
+    expect(submittedManagementSecret).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    seedResponseActionLimit(
+      submittedResponseId,
+      "response_answer_save",
+      119,
+      120,
+    );
+    const submittedAnswerResults = [];
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      submittedAnswerResults.push(
+        await rawVisitorAction(request, {
+          path: `/api/responses/${submittedResponseId}/answers/conflict`,
+          method: "PUT",
+          cookieValue: visitors[0].cookieValue,
+          body: { choice: "a" },
+        }),
+      );
+    }
+    expect(
+      submittedAnswerResults
+        .slice(0, -1)
+        .every(
+          ({ status, cacheControl }) =>
+            status === 409 && cacheControl === "private, no-store",
+        ),
+    ).toBe(true);
+    expect(submittedAnswerResults.at(-1)?.status).toBe(429);
+    expect(Number(submittedAnswerResults.at(-1)?.retryAfter)).toBeGreaterThan(
+      0,
+    );
+
+    seedResponseActionLimit(submittedResponseId, "response_submit", 9, 10);
+    const duplicateSubmitResults = [];
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      duplicateSubmitResults.push(
+        await rawVisitorAction(request, {
+          path: `/api/responses/${submittedResponseId}/submit`,
+          method: "POST",
+          cookieValue: visitors[0].cookieValue,
+          body: { managementSecret: submittedManagementSecret },
+        }),
+      );
+    }
+    expect(
+      duplicateSubmitResults
+        .slice(0, -1)
+        .every(
+          ({ status, cacheControl }) =>
+            status === 200 && cacheControl === "private, no-store",
+        ),
+    ).toBe(true);
+    expect(duplicateSubmitResults.at(-1)?.status).toBe(429);
+    expect(Number(duplicateSubmitResults.at(-1)?.retryAfter)).toBeGreaterThan(
+      0,
+    );
+    expect(readVisitorMutationSummary(submittedResponseId)).toEqual({
+      status: "submitted",
+      answerCount: 3,
+      answerEvents: 3,
+      submitEvents: 1,
+      managed: true,
+    });
+
+    const incompleteResponseId = visitors[1].cookieValue.split(".")[1];
+    seedResponseActionLimit(incompleteResponseId, "response_submit", 9, 10);
+    const incompleteSubmitResults = [];
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      incompleteSubmitResults.push(
+        await rawVisitorAction(request, {
+          path: `/api/responses/${incompleteResponseId}/submit`,
+          method: "POST",
+          cookieValue: visitors[1].cookieValue,
+          body: { managementSecret: visitorManagementSecret },
+        }),
+      );
+    }
+    expect(
+      incompleteSubmitResults
+        .slice(0, -1)
+        .every(({ status }) => status === 409),
+    ).toBe(true);
+    expect(incompleteSubmitResults.at(-1)?.status).toBe(429);
+    expect(Number(incompleteSubmitResults.at(-1)?.retryAfter)).toBeGreaterThan(
+      0,
+    );
+
+    seedResponseActionLimit(
+      incompleteResponseId,
+      "response_answer_save",
+      119,
+      120,
+    );
+    const draftAnswerResults = [];
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      draftAnswerResults.push(
+        await rawVisitorAction(request, {
+          path: `/api/responses/${incompleteResponseId}/answers/conflict`,
+          method: "PUT",
+          cookieValue: visitors[1].cookieValue,
+          body: { choice: "a" },
+        }),
+      );
+    }
+    expect(
+      draftAnswerResults
+        .slice(0, -1)
+        .every(
+          ({ status, cacheControl }) =>
+            status === 200 && cacheControl === "private, no-store",
+        ),
+    ).toBe(true);
+    expect(draftAnswerResults.at(-1)?.status).toBe(429);
+    expect(Number(draftAnswerResults.at(-1)?.retryAfter)).toBeGreaterThan(0);
+    expect(readVisitorMutationSummary(incompleteResponseId)).toEqual({
+      status: "draft",
+      answerCount: 1,
+      answerEvents: 1,
+      submitEvents: 0,
+      managed: false,
+    });
 
     const unavailable = await postRawVisitorResponse({
       publicId: Buffer.alloc(16, 3).toString("base64url"),
@@ -861,6 +1159,47 @@ test.describe("live owner flow", () => {
       relationshipEvents: 12,
       startedEvents: 12,
       maxBucket: 10,
+    });
+
+    const expiredSessionCookie = startResults[0].sessionCookie;
+    if (!expiredSessionCookie) throw new Error("live response cookie missing");
+    const expiredActionResponseId = expiredSessionCookie.split(".")[1];
+    const expiredAssignment = JSON.parse(startResults[0].fingerprint.body)
+      .assignments[0] as { cardId: string };
+    expireVisitorResponse(expiredActionResponseId);
+    seedResponseActionLimit(
+      expiredActionResponseId,
+      "response_answer_save",
+      119,
+      120,
+    );
+    const expiredAnswerResults = [];
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      expiredAnswerResults.push(
+        await rawVisitorAction(request, {
+          path: `/api/responses/${expiredActionResponseId}/answers/${expiredAssignment.cardId}`,
+          method: "PUT",
+          cookieValue: expiredSessionCookie,
+          body: { choice: "a" },
+        }),
+      );
+    }
+    expect(
+      expiredAnswerResults
+        .slice(0, -1)
+        .every(
+          ({ status, cacheControl }) =>
+            status === 404 && cacheControl === "private, no-store",
+        ),
+    ).toBe(true);
+    expect(expiredAnswerResults.at(-1)?.status).toBe(429);
+    expect(Number(expiredAnswerResults.at(-1)?.retryAfter)).toBeGreaterThan(0);
+    expect(readVisitorMutationSummary(expiredActionResponseId)).toEqual({
+      status: "draft",
+      answerCount: 0,
+      answerEvents: 0,
+      submitEvents: 0,
+      managed: false,
     });
 
     const rateContext = await browser.newContext({
@@ -969,7 +1308,7 @@ test.describe("live owner flow", () => {
       .click();
     await expect(
       visitors[0].visitor.getByRole("heading", {
-        name: "응답을 시작했어요",
+        name: "서운한 일이 생기면 이 사람은?",
       }),
     ).toBeFocused();
     const crossLinkCookie = (await visitors[0].visitorContext.cookies()).find(

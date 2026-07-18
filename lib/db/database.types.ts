@@ -304,6 +304,8 @@ export type Database = {
       };
       share_links: {
         Row: {
+          consumed_at: string | null;
+          consumed_response_id: string | null;
           created_at: string;
           expires_at: string | null;
           id: string;
@@ -315,6 +317,8 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          consumed_at?: string | null;
+          consumed_response_id?: string | null;
           created_at?: string;
           expires_at?: string | null;
           id: string;
@@ -326,6 +330,8 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          consumed_at?: string | null;
+          consumed_response_id?: string | null;
           created_at?: string;
           expires_at?: string | null;
           id?: string;
@@ -338,11 +344,53 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: "share_links_consumed_response_binding_fkey";
+            columns: ["consumed_response_id", "id"];
+            isOneToOne: false;
+            referencedRelation: "visitor_responses";
+            referencedColumns: ["id", "share_link_id"];
+          },
+          {
             foreignKeyName: "share_links_pack_play_id_fkey";
             columns: ["pack_play_id"];
             isOneToOne: false;
             referencedRelation: "pack_plays";
             referencedColumns: ["id"];
+          },
+        ];
+      };
+      visitor_answers: {
+        Row: {
+          card_id: string;
+          choice: string;
+          created_at: string;
+          pack_version_id: string;
+          response_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          card_id: string;
+          choice: string;
+          created_at?: string;
+          pack_version_id: string;
+          response_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          card_id?: string;
+          choice?: string;
+          created_at?: string;
+          pack_version_id?: string;
+          response_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "visitor_answers_response_id_pack_version_id_card_id_fkey";
+            columns: ["response_id", "pack_version_id", "card_id"];
+            isOneToOne: false;
+            referencedRelation: "visitor_assignments";
+            referencedColumns: ["response_id", "pack_version_id", "card_id"];
           },
         ];
       };
@@ -513,6 +561,10 @@ export type Database = {
         Returns: Json;
       };
       get_published_pack: { Args: { p_slug: string }; Returns: Json };
+      get_visitor_response: {
+        Args: { p_response_id: string; p_session_hash: string };
+        Returns: Json;
+      };
       list_owner_share_links: {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: Json;
@@ -527,6 +579,14 @@ export type Database = {
           p_link_id: string;
           p_management_secret_hash: string;
           p_play_id: string;
+        };
+        Returns: Json;
+      };
+      record_visitor_response_event: {
+        Args: {
+          p_event_name: string;
+          p_response_id: string;
+          p_session_hash: string;
         };
         Returns: Json;
       };
@@ -555,6 +615,30 @@ export type Database = {
         };
         Returns: Json;
       };
+      save_response_answer: {
+        Args: {
+          p_card_id: string;
+          p_choice: string;
+          p_response_id: string;
+          p_session_hash: string;
+        };
+        Returns: Json;
+      };
+      start_required_response: {
+        Args: {
+          p_existing_response_id: string;
+          p_existing_session_hash: string;
+          p_intent: string;
+          p_known_since_code: string;
+          p_new_response_id: string;
+          p_new_session_hash: string;
+          p_public_id: string;
+          p_rate_limit_key: string;
+          p_relationship_code: string;
+          p_secret_hash: string;
+        };
+        Returns: Json;
+      };
       start_response: {
         Args: {
           p_existing_response_id: string;
@@ -567,6 +651,14 @@ export type Database = {
           p_rate_limit_key: string;
           p_relationship_code: string;
           p_secret_hash: string;
+        };
+        Returns: Json;
+      };
+      submit_response: {
+        Args: {
+          p_management_hash: string;
+          p_response_id: string;
+          p_session_hash: string;
         };
         Returns: Json;
       };

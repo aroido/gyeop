@@ -1,8 +1,19 @@
 import "server-only";
 
-import { startResponse, type StartResponseResult } from "../db/internal-rpc.ts";
+import {
+  getVisitorResponse,
+  recordVisitorResponseEvent,
+  saveResponseAnswer,
+  startResponse,
+  submitResponse,
+  type StartResponseResult,
+  type VisitorResponseState,
+} from "../db/internal-rpc.ts";
 import type { ParsedVisitorResponseCookie } from "./visitor-response-session.ts";
-import { createVisitorResponseCredential } from "./visitor-session-core.mjs";
+import {
+  createVisitorResponseCredential,
+  hashVisitorManagementSecret,
+} from "./visitor-session-core.mjs";
 
 type Existing = Extract<ParsedVisitorResponseCookie, { outcome: "valid" }>;
 
@@ -127,4 +138,60 @@ export async function startVisitorResponseSession(input: {
     throw new Error("Internal visitor response RPC failed");
   }
   throw new Error("Internal visitor response RPC failed");
+}
+
+export type VisitorResponseAccessResult =
+  | Readonly<{ outcome: "authorized"; response: VisitorResponseState }>
+  | Readonly<{ outcome: "session_invalid" }>;
+
+export async function getVisitorResponseSession(input: {
+  cookie: Existing;
+  signal?: AbortSignal;
+}): Promise<VisitorResponseAccessResult> {
+  return getVisitorResponse({
+    responseId: input.cookie.responseId,
+    sessionTokenHash: input.cookie.sessionTokenHash,
+    signal: input.signal,
+  });
+}
+
+export async function saveVisitorResponseAnswer(input: {
+  cookie: Existing;
+  cardId: string;
+  choice: "a" | "b";
+  signal?: AbortSignal;
+}) {
+  return saveResponseAnswer({
+    responseId: input.cookie.responseId,
+    sessionTokenHash: input.cookie.sessionTokenHash,
+    cardId: input.cardId,
+    choice: input.choice,
+    signal: input.signal,
+  });
+}
+
+export async function submitVisitorResponse(input: {
+  cookie: Existing;
+  managementSecret: string;
+  signal?: AbortSignal;
+}) {
+  return submitResponse({
+    responseId: input.cookie.responseId,
+    sessionTokenHash: input.cookie.sessionTokenHash,
+    managementHash: hashVisitorManagementSecret(input.managementSecret),
+    signal: input.signal,
+  });
+}
+
+export async function recordVisitorEvent(input: {
+  cookie: Existing;
+  event: "comparison_viewed" | "same_pack_start_clicked";
+  signal?: AbortSignal;
+}) {
+  return recordVisitorResponseEvent({
+    responseId: input.cookie.responseId,
+    sessionTokenHash: input.cookie.sessionTokenHash,
+    event: input.event,
+    signal: input.signal,
+  });
 }

@@ -2,30 +2,51 @@ import {
   decodeVisitorResponseHttpState,
   isKnownSinceCode,
   isRelationshipCode,
+  isVisitorResponseId,
 } from "./visitor-context-core.mjs";
 import { isSharePublicId } from "../share-links/share-link-state-core.mjs";
 
 const SECRET = /^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
 
-export type VisitorResponse = Readonly<{
+type VisitorAssignmentBase = Readonly<{
+  cardId: string;
+  stage: "required";
+  position: 1 | 2 | 3;
+  visitorPrompt: string;
+  optionA: string;
+  optionB: string;
+  isSignature: boolean;
+  visitorChoice: "a" | "b" | null;
+}>;
+type VisitorResponseBase = Readonly<{
   id: string;
-  status: "draft";
   relationshipCode: string;
   relationshipLabel: string;
   knownSinceCode: string;
   knownSinceLabel: string;
   sessionExpiresAt: string;
   sessionTtlSeconds: number;
-  assignments: readonly Readonly<{
-    cardId: string;
-    stage: "required";
-    position: 1 | 2 | 3;
-    visitorPrompt: string;
-    optionA: string;
-    optionB: string;
-    isSignature: boolean;
-  }>[];
 }>;
+export type VisitorResponse =
+  | (VisitorResponseBase &
+      Readonly<{
+        status: "draft";
+        assignments: readonly VisitorAssignmentBase[];
+      }>)
+  | (VisitorResponseBase &
+      Readonly<{
+        status: "submitted";
+        allMatched: boolean;
+        assignments: readonly Readonly<
+          VisitorAssignmentBase & {
+            packPosition: number;
+            visitorChoice: "a" | "b";
+            ownerChoice: "a" | "b";
+            matches: boolean;
+            isHighlight: boolean;
+          }
+        >[];
+      }>);
 
 export class VisitorResponseHttpError extends Error {
   readonly status: number;
@@ -52,6 +73,17 @@ function request(body: unknown) {
     credentials: "same-origin" as const,
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
+  };
+}
+
+function mutation(method: "POST" | "PUT", body: unknown, keepalive = false) {
+  return {
+    method,
+    cache: "no-store" as const,
+    credentials: "same-origin" as const,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    keepalive,
   };
 }
 
@@ -144,6 +176,35 @@ async function send(
   }
 }
 
+async function stateResponse(response: Response) {
+  if (response.headers.get("cache-control") !== "private, no-store") {
+    throw new VisitorResponseHttpError(
+      response.status,
+      "INVALID_RESPONSE",
+      null,
+    );
+  }
+  if (!response.ok) return decodeError(response);
+  if (response.status !== 200) {
+    throw new VisitorResponseHttpError(
+      response.status,
+      "INVALID_RESPONSE",
+      null,
+    );
+  }
+  let value: unknown;
+  try {
+    value = await response.json();
+    return decodeVisitorResponseHttpState(value) as VisitorResponse;
+  } catch {
+    throw new VisitorResponseHttpError(
+      response.status,
+      "INVALID_RESPONSE",
+      null,
+    );
+  }
+}
+
 const flights = new Map<string, Promise<VisitorResponse | null>>();
 
 function singleFlight(
@@ -200,4 +261,70 @@ export function startVisitorResponse(
     }
     return response;
   });
+}
+
+export function readVisitorResponse(responseId: string) {
+  if (!isVisitorResponseId(responseId)) invalidInput();
+  return fetch(`/api/responses/${encodeURIComponent(responseId)}`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "same-origin",
+  }).then(stateResponse);
+}
+
+export function saveVisitorAnswer(
+  responseId: string,
+  cardId: string,
+  choice: "a" | "b",
+) {
+  if (
+    !isVisitorResponseId(responseId) ||
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(cardId) ||
+    (choice !== "a" && choice !== "b")
+  ) {
+    invalidInput();
+  }
+  return fetch(
+    `/api/responses/${encodeURIComponent(responseId)}/answers/${encodeURIComponent(cardId)}`,
+    mutation("PUT", { choice }),
+  ).then(stateResponse);
+}
+
+export function submitVisitorAnswers(
+  responseId: string,
+  managementSecret: string,
+) {
+  if (!isVisitorResponseId(responseId) || !SECRET.test(managementSecret)) {
+    invalidInput();
+  }
+  return fetch(
+    `/api/responses/${encodeURIComponent(responseId)}/submit`,
+    mutation("POST", { managementSecret }),
+  ).then(stateResponse);
+}
+
+export async function recordVisitorEvent(
+  responseId: string,
+  event: "comparison_viewed" | "same_pack_start_clicked",
+) {
+  if (
+    !isVisitorResponseId(responseId) ||
+    (event !== "comparison_viewed" && event !== "same_pack_start_clicked")
+  ) {
+    invalidInput();
+  }
+  const response = await fetch(
+    `/api/responses/${encodeURIComponent(responseId)}/events`,
+    mutation("POST", { event }, true),
+  );
+  if (
+    response.status !== 204 ||
+    response.headers.get("cache-control") !== "private, no-store"
+  ) {
+    throw new VisitorResponseHttpError(
+      response.status,
+      "INVALID_RESPONSE",
+      null,
+    );
+  }
 }
