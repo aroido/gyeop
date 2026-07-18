@@ -1,6 +1,6 @@
 # Issue 22 구현 스펙: [프론트엔드] 공개 링크 방문자 관계 선택과 응답 세션 구현
 
-Status: Draft
+Status: Reviewed
 Issue: https://github.com/aroido/gyeop/issues/22
 
 ## 목표
@@ -354,9 +354,9 @@ start_response(
 
 ## 스펙 검토
 
-Reviewer Agent:
-Review Status: FAIL
-P0/P1 Findings:
+Reviewer Agent: issue22_spec_review
+Review Status: PASS
+P0/P1 Findings: 0
 
 ## 리스크와 미결정 사항
 
