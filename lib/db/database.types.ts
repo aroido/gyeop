@@ -40,20 +40,31 @@ export type Database = {
           id: string;
           occurred_at: string;
           properties: Json;
+          visitor_response_id: string | null;
         };
         Insert: {
           event_name: string;
           id?: string;
           occurred_at?: string;
           properties?: Json;
+          visitor_response_id?: string | null;
         };
         Update: {
           event_name?: string;
           id?: string;
           occurred_at?: string;
           properties?: Json;
+          visitor_response_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "analytics_events_visitor_response_id_fkey";
+            columns: ["visitor_response_id"];
+            isOneToOne: false;
+            referencedRelation: "visitor_responses";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       pack_cards: {
         Row: {
@@ -335,6 +346,66 @@ export type Database = {
           },
         ];
       };
+      visitor_responses: {
+        Row: {
+          created_at: string;
+          id: string;
+          known_since_code: string | null;
+          management_token_hash: string | null;
+          pack_version_id: string;
+          relationship_code: string | null;
+          session_expires_at: string;
+          session_token_hash: string | null;
+          share_link_id: string;
+          status: string;
+          submitted_at: string | null;
+          withdrawn_at: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          id: string;
+          known_since_code?: string | null;
+          management_token_hash?: string | null;
+          pack_version_id: string;
+          relationship_code?: string | null;
+          session_expires_at: string;
+          session_token_hash?: string | null;
+          share_link_id: string;
+          status?: string;
+          submitted_at?: string | null;
+          withdrawn_at?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          known_since_code?: string | null;
+          management_token_hash?: string | null;
+          pack_version_id?: string;
+          relationship_code?: string | null;
+          session_expires_at?: string;
+          session_token_hash?: string | null;
+          share_link_id?: string;
+          status?: string;
+          submitted_at?: string | null;
+          withdrawn_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "visitor_responses_pack_version_id_fkey";
+            columns: ["pack_version_id"];
+            isOneToOne: false;
+            referencedRelation: "pack_versions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "visitor_responses_share_link_id_fkey";
+            columns: ["share_link_id"];
+            isOneToOne: false;
+            referencedRelation: "share_links";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -439,6 +510,21 @@ export type Database = {
           p_current_position: number;
           p_management_secret_hash: string;
           p_play_id: string;
+        };
+        Returns: Json;
+      };
+      start_response: {
+        Args: {
+          p_existing_response_id: string;
+          p_existing_session_hash: string;
+          p_intent: string;
+          p_known_since_code: string;
+          p_new_response_id: string;
+          p_new_session_hash: string;
+          p_public_id: string;
+          p_rate_limit_key: string;
+          p_relationship_code: string;
+          p_secret_hash: string;
         };
         Returns: Json;
       };

@@ -114,7 +114,10 @@ select is(
     'self_answers:UPDATE',
     'share_links:INSERT',
     'share_links:SELECT',
-    'share_links:UPDATE'
+    'share_links:UPDATE',
+    'visitor_responses:INSERT',
+    'visitor_responses:SELECT',
+    'visitor_responses:UPDATE'
   ]::text[],
   'internal RPC owner relation privileges match the exact allowlist'
 );
@@ -258,6 +261,7 @@ select is(
     'revoke_owner_play_session(uuid,bytea)',
     'rotate_share_link(uuid,bytea,uuid,uuid,text,bytea)',
     'save_owner_answer(uuid,bytea,text,text,smallint)'
+    ,'start_response(text,bytea,text,uuid,bytea,uuid,bytea,text,text,bytea)'
   ]::text[],
   'service_role function grants match the exact RPC allowlist'
 );

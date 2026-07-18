@@ -91,6 +91,7 @@ node scripts/verify-http-boundary.mjs
 node scripts/verify-pack-catalog.mjs
 node scripts/verify-owner-flow.mjs
 node scripts/verify-share-links.mjs
+node scripts/verify-visitor-response.mjs
 node --test tests/integration/http-boundary.test.mjs
 tests/integration/http-boundary-host.test.sh
 
@@ -111,6 +112,7 @@ node --test tests/integration/pack-publication-concurrency.test.mjs
 node --test tests/integration/owner-play-session.test.mjs
 node --test tests/integration/owner-play-concurrency.test.mjs
 node --test tests/integration/share-link-concurrency.test.mjs
+node --test tests/integration/visitor-response-concurrency.test.mjs
 env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SECRET_KEY pnpm build
 node --test tests/integration/pack-runtime.test.mjs
 pnpm test:e2e --project=mobile-chromium

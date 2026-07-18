@@ -18,6 +18,7 @@ import {
   decodeRecordShareActionOutcome,
   decodeRotateShareLinkOutcome,
 } from "../share-links/share-link-state-core.mjs";
+import { decodeStartResponseOutcome } from "../visitor-response/visitor-session-core.mjs";
 
 let internalClient: SupabaseClient<Database> | undefined;
 
@@ -72,6 +73,23 @@ type RecordShareActionResult =
   | (ShareManagementState & Readonly<{ outcome: "recorded" }>)
   | OwnerShareFailure
   | Readonly<{ outcome: "link_not_found" | "link_not_active" }>;
+export type VisitorResponseState = Readonly<{
+  id: string;
+  status: "draft";
+  relationshipCode: string;
+  knownSinceCode: string;
+  sessionExpiresAt: string;
+  sessionTtlSeconds: number;
+}>;
+export type StartResponseResult =
+  | Readonly<{
+      outcome: "created" | "resumed";
+      response: VisitorResponseState;
+    }>
+  | Readonly<{ outcome: "rate_limited"; retryAfterSeconds: number }>
+  | Readonly<{
+      outcome: "collision" | "no_session" | "session_invalid" | "unavailable";
+    }>;
 
 function requiredServerEnv(name: string) {
   const value = process.env[name];
@@ -432,4 +450,55 @@ export async function getInviteMetadata(input: {
   const { data, error } = await query;
   if (error) throw new Error("Internal invite metadata RPC failed");
   return decodeInviteMetadataOutcome(data) as InviteMetadataResult;
+}
+
+export async function startResponse(input: {
+  publicId: string;
+  secretHash: Uint8Array;
+  intent: "resume" | "start";
+  existing?: Readonly<{
+    responseId: string;
+    sessionTokenHash: Uint8Array;
+  }>;
+  created?: Readonly<{
+    responseId: string;
+    sessionTokenHash: Uint8Array;
+    relationshipCode: string;
+    knownSinceCode: string;
+  }>;
+  rateLimitKey: Uint8Array;
+  signal?: AbortSignal;
+}): Promise<StartResponseResult> {
+  if (
+    (input.intent === "resume" && input.created !== undefined) ||
+    (input.intent === "start" && input.created === undefined)
+  ) {
+    throw new Error("Invalid response start branch");
+  }
+  let query = getInternalClient().rpc("start_response", {
+    p_public_id: input.publicId,
+    p_secret_hash: bytea(input.secretHash),
+    p_intent: input.intent,
+    p_existing_response_id: nullableRpcString(
+      input.existing?.responseId ?? null,
+    ),
+    p_existing_session_hash: nullableRpcString(
+      input.existing ? bytea(input.existing.sessionTokenHash) : null,
+    ),
+    p_new_response_id: nullableRpcString(input.created?.responseId ?? null),
+    p_new_session_hash: nullableRpcString(
+      input.created ? bytea(input.created.sessionTokenHash) : null,
+    ),
+    p_relationship_code: nullableRpcString(
+      input.created?.relationshipCode ?? null,
+    ),
+    p_known_since_code: nullableRpcString(
+      input.created?.knownSinceCode ?? null,
+    ),
+    p_rate_limit_key: bytea(input.rateLimitKey),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal visitor response RPC failed");
+  return decodeStartResponseOutcome(data) as StartResponseResult;
 }

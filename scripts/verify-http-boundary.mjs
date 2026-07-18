@@ -28,6 +28,7 @@ const REQUIRED_FILES = [
   "scripts/render-http-boundary-ops.mjs",
   "supabase/tests/http_boundary_atomic_contract.test.sql",
   "supabase/tests/owner_play_session.test.sql",
+  "supabase/tests/visitor_response_session.test.sql",
   "tests/integration/http-boundary-host.test.sh",
 ];
 
@@ -58,6 +59,7 @@ const REVIEWED_INTERNAL_ADAPTERS = new Set([
   "lib/http/published-pack.ts",
   "lib/http/share-links.ts",
   "lib/share-links/share-links.ts",
+  "lib/visitor-response/visitor-responses.ts",
 ]);
 
 function parseSource(file, source) {
@@ -1200,6 +1202,7 @@ export function verifyRepository() {
   const atomicTest = [
     "supabase/tests/http_boundary_atomic_contract.test.sql",
     "supabase/tests/owner_play_session.test.sql",
+    "supabase/tests/visitor_response_session.test.sql",
   ]
     .map((file) => readFileSync(path.join(ROOT, file), "utf8"))
     .join("\n");

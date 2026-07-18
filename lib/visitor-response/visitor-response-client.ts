@@ -1,0 +1,194 @@
+import {
+  decodeVisitorResponseHttpState,
+  isKnownSinceCode,
+  isRelationshipCode,
+} from "./visitor-context-core.mjs";
+import { isSharePublicId } from "../share-links/share-link-state-core.mjs";
+
+const SECRET = /^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
+
+export type VisitorResponse = Readonly<{
+  id: string;
+  status: "draft";
+  relationshipCode: string;
+  relationshipLabel: string;
+  knownSinceCode: string;
+  knownSinceLabel: string;
+  sessionExpiresAt: string;
+  sessionTtlSeconds: number;
+}>;
+
+export class VisitorResponseHttpError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly retryAfterSeconds: number | null;
+
+  constructor(status: number, code: string, retryAfterSeconds: number | null) {
+    super("Visitor response request failed");
+    this.name = "VisitorResponseHttpError";
+    this.status = status;
+    this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
+function invalidInput(): never {
+  throw new VisitorResponseHttpError(400, "INVALID_INPUT", null);
+}
+
+function request(body: unknown) {
+  return {
+    method: "POST",
+    cache: "no-store" as const,
+    credentials: "same-origin" as const,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  };
+}
+
+function retryAfter(response: Response) {
+  const value = response.headers.get("retry-after");
+  if (value === null || !/^[1-9][0-9]*$/.test(value)) return null;
+  const seconds = Number(value);
+  return Number.isSafeInteger(seconds) ? seconds : null;
+}
+
+async function decodeError(response: Response): Promise<never> {
+  let value: unknown;
+  try {
+    value = await response.json();
+  } catch {
+    throw new VisitorResponseHttpError(
+      response.status,
+      "INVALID_RESPONSE",
+      null,
+    );
+  }
+  const record = value as { code?: unknown; message?: unknown };
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    Object.keys(value).sort().join("\0") !== "code\0message" ||
+    typeof record.code !== "string" ||
+    typeof record.message !== "string"
+  ) {
+    throw new VisitorResponseHttpError(
+      response.status,
+      "INVALID_RESPONSE",
+      null,
+    );
+  }
+  const retry = response.status === 429 ? retryAfter(response) : null;
+  if (response.status === 429 && retry === null) {
+    throw new VisitorResponseHttpError(429, "INVALID_RESPONSE", null);
+  }
+  throw new VisitorResponseHttpError(response.status, record.code, retry);
+}
+
+async function send(
+  publicId: string,
+  intent: "resume" | "start",
+  body: unknown,
+) {
+  const response = await fetch(
+    `/api/invites/${encodeURIComponent(publicId)}/responses`,
+    request(body),
+  );
+  if (response.headers.get("cache-control") !== "private, no-store") {
+    throw new VisitorResponseHttpError(
+      response.status,
+      "INVALID_RESPONSE",
+      null,
+    );
+  }
+  if (intent === "resume" && response.status === 204) return null;
+  if (!response.ok) return decodeError(response);
+  if (
+    (intent === "resume" && response.status !== 200) ||
+    (intent === "start" && response.status !== 200 && response.status !== 201)
+  ) {
+    throw new VisitorResponseHttpError(
+      response.status,
+      "INVALID_RESPONSE",
+      null,
+    );
+  }
+  let value: unknown;
+  try {
+    value = await response.json();
+  } catch {
+    throw new VisitorResponseHttpError(
+      response.status,
+      "INVALID_RESPONSE",
+      null,
+    );
+  }
+  try {
+    return decodeVisitorResponseHttpState(value) as VisitorResponse;
+  } catch {
+    throw new VisitorResponseHttpError(
+      response.status,
+      "INVALID_RESPONSE",
+      null,
+    );
+  }
+}
+
+const flights = new Map<string, Promise<VisitorResponse | null>>();
+
+function singleFlight(
+  publicId: string,
+  intent: "resume" | "start",
+  run: () => Promise<VisitorResponse | null>,
+) {
+  const key = `${publicId}\0${intent}`;
+  const existing = flights.get(key);
+  if (existing) return existing;
+  const flight = run();
+  flights.set(key, flight);
+  const clear = () => {
+    if (flights.get(key) === flight) flights.delete(key);
+  };
+  void flight.then(clear, clear);
+  return flight;
+}
+
+function validateCommon(publicId: string, secret: string) {
+  if (!isSharePublicId(publicId) || !SECRET.test(secret)) invalidInput();
+}
+
+export function resumeVisitorResponse(publicId: string, secret: string) {
+  validateCommon(publicId, secret);
+  return singleFlight(publicId, "resume", () =>
+    send(publicId, "resume", { intent: "resume", secret }),
+  );
+}
+
+export function startVisitorResponse(
+  publicId: string,
+  secret: string,
+  relationshipCode: string,
+  knownSinceCode: string,
+) {
+  validateCommon(publicId, secret);
+  if (
+    !isRelationshipCode(relationshipCode) ||
+    !isKnownSinceCode(knownSinceCode)
+  ) {
+    invalidInput();
+  }
+  return singleFlight(publicId, "start", () =>
+    send(publicId, "start", {
+      intent: "start",
+      secret,
+      relationshipCode,
+      knownSinceCode,
+    }),
+  ).then((response) => {
+    if (response === null) {
+      throw new VisitorResponseHttpError(204, "INVALID_RESPONSE", null);
+    }
+    return response;
+  });
+}

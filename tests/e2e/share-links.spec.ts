@@ -138,6 +138,13 @@ async function installShareApi(
       link.status = "disabled";
       return json(route, 200, { link });
     }
+    if (
+      method === "POST" &&
+      url.pathname.startsWith("/api/invites/") &&
+      url.pathname.endsWith("/responses")
+    ) {
+      return noContent(route);
+    }
     if (method === "POST" && url.pathname.startsWith("/api/invites/")) {
       return json(route, 200, {
         packSlug: "old-friend",
@@ -521,18 +528,18 @@ test("reads only an exact fragment and renders generic invite states", async ({
   const share = await installShareApi(page);
   await page.goto(`/i/${publicIds[0]}#k=${secret}`);
   await expect(
-    page.getByRole("heading", { name: "친구가 먼저 답한 질문팩이에요" }),
+    page.getByRole("heading", { name: "이 사람과 어떤 사이인가요?" }),
   ).toBeFocused();
   await expect(page.getByText("여러 친구가 함께 참여")).toBeVisible();
 
   const inviteCalls = () =>
     share.calls.filter((call) => call.pathname.includes("/invites/"));
-  expect(inviteCalls()).toHaveLength(1);
+  expect(inviteCalls()).toHaveLength(2);
   await page.goto(`/i/${publicIds[0]}#k=${secret}&x=1`);
   await expect(
     page.getByRole("heading", { name: "이 초대는 지금 참여할 수 없어요" }),
   ).toBeFocused();
-  expect(inviteCalls()).toHaveLength(1);
+  expect(inviteCalls()).toHaveLength(2);
 });
 
 for (const viewport of [
@@ -594,7 +601,7 @@ for (const viewport of [
 
     await page.goto(`/i/${publicIds[0]}#k=${secret}`);
     await expect(
-      page.getByRole("heading", { name: "친구가 먼저 답한 질문팩이에요" }),
+      page.getByRole("heading", { name: "이 사람과 어떤 사이인가요?" }),
     ).toBeFocused();
     expect(
       await page.evaluate(

@@ -42,6 +42,12 @@
 - 이유: 공개 링크는 친구뿐 아니라 온라인 친구와 SNS 팔로워도 참여할 수 있다.
 - 결과: 방문자가 관계와 알게 된 시점을 직접 선택하고 관계별 프로필 집계에 사용한다.
 
+## 2026-07-18 — P0 관계·알게 된 시점 code와 문구
+
+- 결정: P0 방문자 관계는 `old_friend|school_friend|coworker|romantic|family|online_friend|social_follower|other` exact 8개 code를 사용한다. 알게 된 시점은 현재 시각 기준 `<1`, `>=1 <3`, `>=3 <5`, `>=5 <10`, `>=10`, `unknown`의 비중첩 6개 code를 사용한다.
+- 이유: 관계·시점은 장기 집계 key이므로 사용자 문구와 stable code를 분리하고, 경계가 겹치지 않아야 같은 선택을 일관되게 해석할 수 있다.
+- 결과: DB와 analytics에는 code만 저장하고 한글 label은 `docs/product/question-pack-spec.md` §7의 검수 registry에서 derive한다. 저장된 시점 code는 선택 당시 구간이며 시간이 지나도 자동 변경하지 않는다. 기존 #9의 code·label 확정 범위는 #22에 흡수한다.
+
 ## 2026-07-15 — 방문자를 다음 주인으로 전환
 
 - 결정: 비교 결과의 Primary CTA는 `나도 이 팩으로 시작하기`다.

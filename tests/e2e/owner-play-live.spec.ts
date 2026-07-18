@@ -95,6 +95,193 @@ select (
   return Number(output.trim());
 }
 
+function readVisitorResponseSummary(publicId: string) {
+  const sql = String.raw`\set public_id '${publicId}'
+select jsonb_build_object(
+  'responses', (
+    select count(*)
+    from public.visitor_responses response
+    join public.share_links link on link.id = response.share_link_id
+    where link.public_id = :'public_id'
+  ),
+  'sessionHashes', (
+    select count(distinct encode(response.session_token_hash, 'hex'))
+    from public.visitor_responses response
+    join public.share_links link on link.id = response.share_link_id
+    where link.public_id = :'public_id'
+  ),
+  'contexts', (
+    select jsonb_agg(
+      jsonb_build_object(
+        'relationship', response.relationship_code,
+        'knownSince', response.known_since_code,
+        'status', response.status,
+        'fixedTtl', response.session_expires_at - response.created_at = interval '24 hours'
+      ) order by response.relationship_code
+    )
+    from public.visitor_responses response
+    join public.share_links link on link.id = response.share_link_id
+    where link.public_id = :'public_id'
+  ),
+  'events', (
+    select jsonb_object_agg(event_name, event_count)
+    from (
+      select event.event_name, count(*) as event_count
+      from public.analytics_events event
+      join public.visitor_responses response on response.id = event.visitor_response_id
+      join public.share_links link on link.id = response.share_link_id
+      where link.public_id = :'public_id'
+      group by event.event_name
+    ) counted
+  )
+);`;
+  const output = execFileSync(
+    "docker",
+    [
+      "exec",
+      "-i",
+      databaseContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-At",
+      "-v",
+      "ON_ERROR_STOP=1",
+    ],
+    { encoding: "utf8", input: sql },
+  );
+  return JSON.parse(output.trim()) as unknown;
+}
+
+function readVisitorResponseCounts(publicId: string) {
+  const sql = String.raw`\set public_id '${publicId}'
+select jsonb_build_object(
+  'responses', (
+    select count(*)
+    from public.visitor_responses response
+    join public.share_links link on link.id = response.share_link_id
+    where link.public_id = :'public_id'
+  ),
+  'relationshipEvents', (
+    select count(*)
+    from public.analytics_events event
+    join public.visitor_responses response on response.id = event.visitor_response_id
+    join public.share_links link on link.id = response.share_link_id
+    where link.public_id = :'public_id'
+      and event.event_name = 'relationship_selected'
+  ),
+  'startedEvents', (
+    select count(*)
+    from public.analytics_events event
+    join public.visitor_responses response on response.id = event.visitor_response_id
+    join public.share_links link on link.id = response.share_link_id
+    where link.public_id = :'public_id'
+      and event.event_name = 'visitor_response_started'
+  ),
+  'maxBucket', (
+    select max(count)
+    from public.rate_limit_buckets
+    where action = 'response_start'
+  )
+);`;
+  const output = execFileSync(
+    "docker",
+    [
+      "exec",
+      "-i",
+      databaseContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-At",
+      "-v",
+      "ON_ERROR_STOP=1",
+    ],
+    { encoding: "utf8", input: sql },
+  );
+  return JSON.parse(output.trim()) as unknown;
+}
+
+function expireVisitorResponse(responseId: string) {
+  execFileSync(
+    "docker",
+    [
+      "exec",
+      databaseContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      `with fixed_time as (select clock_timestamp() as value)
+       update public.visitor_responses
+       set created_at = fixed_time.value - interval '25 hours',
+           session_expires_at = fixed_time.value - interval '1 hour'
+       from fixed_time
+       where id = '${responseId}'::uuid`,
+    ],
+    { stdio: "ignore" },
+  );
+}
+
+async function postRawVisitorResponse(input: {
+  publicId: string;
+  secret: string;
+  body?:
+    | { intent: "resume"; secret: string }
+    | {
+        intent: "start";
+        secret: string;
+        relationshipCode: string;
+        knownSinceCode: string;
+      };
+  cookie?: string;
+  ip?: string;
+}) {
+  const headers: Record<string, string> = {
+    ...visitorHeaders,
+    origin: "http://127.0.0.1:3000",
+    "content-type": "application/json",
+  };
+  if (input.ip) headers["x-forwarded-for"] = input.ip;
+  if (input.cookie) headers.cookie = input.cookie;
+  const response = await fetch(
+    `http://127.0.0.1:3000/api/invites/${input.publicId}/responses`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify(
+        input.body ?? { intent: "resume", secret: input.secret },
+      ),
+    },
+  );
+  const setCookie = response.headers.get("set-cookie");
+  return {
+    fingerprint: {
+      status: response.status,
+      body: await response.text(),
+      cacheControl: response.headers.get("cache-control"),
+      contentSecurityPolicy: response.headers.get("content-security-policy"),
+      strictTransportSecurity: response.headers.get(
+        "strict-transport-security",
+      ),
+      referrerPolicy: response.headers.get("referrer-policy"),
+      contentTypeOptions: response.headers.get("x-content-type-options"),
+    },
+    deletesCookie: setCookie?.startsWith("__Host-gyeop-response=;") ?? false,
+    setsSessionCookie:
+      setCookie?.startsWith("__Host-gyeop-response=v1.") ?? false,
+    retryAfter: response.headers.get("retry-after"),
+  };
+}
+
 async function postShareAction(
   page: import("@playwright/test").Page,
   playId: string,
@@ -348,8 +535,22 @@ test.describe("live owner flow", () => {
     await tamperedContext.close();
     expect(readShareActionEvents()).toHaveLength(2);
 
+    const invite = new URL(inviteUrl);
+    const publicId = invite.pathname.split("/").at(-1)!;
+    const rawSecret = new URLSearchParams(invite.hash.slice(1)).get("k")!;
     const visitors = await Promise.all(
-      ["198.51.100.220", "198.51.100.221"].map(async (ip) => {
+      [
+        {
+          ip: "198.51.100.220",
+          relationship: "오래된 친구",
+          knownSince: "10년 이상이에요",
+        },
+        {
+          ip: "198.51.100.221",
+          relationship: "가족",
+          knownSince: "1년 이상 · 3년 미만",
+        },
+      ].map(async ({ ip, relationship, knownSince }) => {
         const visitorContext = await browser.newContext({
           extraHTTPHeaders: { ...visitorHeaders, "x-forwarded-for": ip },
         });
@@ -357,12 +558,146 @@ test.describe("live owner flow", () => {
         await visitor.goto(inviteUrl);
         await expect(
           visitor.getByRole("heading", {
-            name: "친구가 먼저 답한 질문팩이에요",
+            name: "이 사람과 어떤 사이인가요?",
           }),
-        ).toBeVisible();
-        return { visitor, visitorContext };
+        ).toBeFocused();
+        await visitor
+          .getByRole("radio", { name: relationship, exact: true })
+          .check();
+        await visitor
+          .getByRole("radio", { name: knownSince, exact: true })
+          .check();
+        await visitor.getByRole("button", { name: "3장 답하러 가기" }).click();
+        await expect(
+          visitor.getByRole("heading", { name: "응답을 시작했어요" }),
+        ).toBeFocused();
+        const sessionCookie = (await visitorContext.cookies()).find(
+          (cookie) => cookie.name === "__Host-gyeop-response",
+        );
+        expect(sessionCookie).toMatchObject({
+          httpOnly: true,
+          secure: true,
+          sameSite: "Lax",
+          path: "/",
+        });
+        expect(sessionCookie?.value).toMatch(
+          /^v1\.[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/,
+        );
+        return {
+          visitor,
+          visitorContext,
+          cookieValue: sessionCookie!.value,
+        };
       }),
     );
+
+    await visitors[0].visitor.reload();
+    await expect(
+      visitors[0].visitor.getByRole("heading", {
+        name: "응답을 시작했어요",
+      }),
+    ).toBeFocused();
+    await expect(
+      visitors[0].visitor.getByText("오래된 친구", { exact: true }),
+    ).toBeVisible();
+    await expect
+      .poll(() => readVisitorResponseSummary(publicId))
+      .toEqual({
+        responses: 2,
+        sessionHashes: 2,
+        contexts: [
+          {
+            relationship: "family",
+            knownSince: "one_to_three_years",
+            status: "draft",
+            fixedTtl: true,
+          },
+          {
+            relationship: "old_friend",
+            knownSince: "ten_years_or_more",
+            status: "draft",
+            fixedTtl: true,
+          },
+        ],
+        events: {
+          relationship_selected: 2,
+          visitor_response_started: 2,
+        },
+      });
+
+    const unavailable = await postRawVisitorResponse({
+      publicId: Buffer.alloc(16, 3).toString("base64url"),
+      secret: rawSecret,
+    });
+    const malformed = await postRawVisitorResponse({
+      publicId,
+      secret: rawSecret,
+      cookie: "__Host-gyeop-response",
+    });
+    const duplicate = await postRawVisitorResponse({
+      publicId,
+      secret: rawSecret,
+      cookie: `__Host-gyeop-response; __Host-gyeop-response=${visitors[0].cookieValue}`,
+    });
+    for (const rejected of [malformed, duplicate]) {
+      expect(rejected.fingerprint).toEqual(unavailable.fingerprint);
+      expect(rejected.deletesCookie).toBe(true);
+    }
+    expect(unavailable.deletesCookie).toBe(false);
+
+    const responseId = visitors[0].cookieValue.split(".")[1];
+    const tampered = await postRawVisitorResponse({
+      publicId,
+      secret: rawSecret,
+      cookie: `__Host-gyeop-response=v1.${responseId}.${"A".repeat(43)}`,
+    });
+    expect(tampered.fingerprint).toEqual(unavailable.fingerprint);
+    expect(tampered.deletesCookie).toBe(true);
+
+    const expiredResponseId = visitors[1].cookieValue.split(".")[1];
+    expireVisitorResponse(expiredResponseId);
+    const expired = await postRawVisitorResponse({
+      publicId,
+      secret: rawSecret,
+      cookie: `__Host-gyeop-response=${visitors[1].cookieValue}`,
+    });
+    expect(expired.fingerprint).toEqual(unavailable.fingerprint);
+    expect(expired.deletesCookie).toBe(true);
+
+    const startResults: Awaited<ReturnType<typeof postRawVisitorResponse>>[] =
+      [];
+    for (let request = 0; request < 11; request += 1) {
+      startResults.push(
+        await postRawVisitorResponse({
+          publicId,
+          secret: rawSecret,
+          ip: "198.51.100.223",
+          body: {
+            intent: "start",
+            secret: rawSecret,
+            relationshipCode: "online_friend",
+            knownSinceCode: "not_sure",
+          },
+        }),
+      );
+    }
+    expect(
+      startResults
+        .slice(0, 10)
+        .every(
+          (result) =>
+            result.fingerprint.status === 201 && result.setsSessionCookie,
+        ),
+    ).toBe(true);
+    expect(startResults[10].fingerprint.status).toBe(429);
+    expect(Number(startResults[10].retryAfter)).toBeGreaterThan(0);
+    expect(startResults[10].setsSessionCookie).toBe(false);
+    expect(readVisitorResponseCounts(publicId)).toEqual({
+      responses: 12,
+      relationshipEvents: 12,
+      startedEvents: 12,
+      maxBucket: 10,
+    });
 
     const rateContext = await browser.newContext({
       extraHTTPHeaders: {
@@ -372,9 +707,6 @@ test.describe("live owner flow", () => {
     });
     const ratePage = await rateContext.newPage();
     await ratePage.goto("/");
-    const invite = new URL(inviteUrl);
-    const publicId = invite.pathname.split("/").at(-1)!;
-    const rawSecret = new URLSearchParams(invite.hash.slice(1)).get("k")!;
     const rateResults = await ratePage.evaluate(
       async ({ publicId, rawSecret }) => {
         const results: { status: number; retryAfter: string | null }[] = [];
@@ -455,6 +787,34 @@ test.describe("live owner flow", () => {
         name: "이 초대는 지금 참여할 수 없어요",
       }),
     ).toBeVisible();
+
+    await visitors[0].visitor.goto(rotatedUrl);
+    await expect(
+      visitors[0].visitor.getByRole("heading", {
+        name: "이 사람과 어떤 사이인가요?",
+      }),
+    ).toBeFocused();
+    await visitors[0].visitor
+      .getByRole("radio", { name: "학교 친구", exact: true })
+      .check();
+    await visitors[0].visitor
+      .getByRole("radio", { name: "1년 미만이에요", exact: true })
+      .check();
+    await visitors[0].visitor
+      .getByRole("button", { name: "3장 답하러 가기" })
+      .click();
+    await expect(
+      visitors[0].visitor.getByRole("heading", {
+        name: "응답을 시작했어요",
+      }),
+    ).toBeFocused();
+    const crossLinkCookie = (await visitors[0].visitorContext.cookies()).find(
+      (cookie) => cookie.name === "__Host-gyeop-response",
+    );
+    expect(
+      crossLinkCookie?.value.split(".")[1] !==
+        visitors[0].cookieValue.split(".")[1],
+    ).toBe(true);
 
     page.once("dialog", (dialog) => dialog.accept());
     await page
