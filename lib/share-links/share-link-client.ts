@@ -171,21 +171,24 @@ export async function readInviteMetadata(
 }
 
 export type ShareActionEvent = "share_handoff_succeeded" | "share_link_copied";
+export type ShareEntrySource = "profile_reshare" | null;
 
 export async function recordShareAction(
   playId: string,
   linkId: string,
   event: ShareActionEvent,
+  entrySource: ShareEntrySource,
 ): Promise<void> {
   if (
     !isShareLinkId(linkId) ||
-    (event !== "share_handoff_succeeded" && event !== "share_link_copied")
+    (event !== "share_handoff_succeeded" && event !== "share_link_copied") ||
+    (entrySource !== null && entrySource !== "profile_reshare")
   ) {
     throw new ShareLinkHttpError(400, "INVALID_INPUT");
   }
   const response = await fetch(
     `/api/me/plays/${playPath(playId)}/share-events`,
-    request("POST", { event, linkId }),
+    request("POST", { event, linkId, entrySource }),
   );
   if (
     response.status !== 204 ||

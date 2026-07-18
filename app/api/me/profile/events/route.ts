@@ -15,7 +15,7 @@ export function POST(request: Request) {
     },
     ({ input, networkKey, signal }) => {
       const event = input?.event;
-      if (event !== "profile_viewed") {
+      if (event !== "profile_viewed" && event !== "profile_reshare_clicked") {
         throw new Error("INTERNAL_ERROR");
       }
       const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));

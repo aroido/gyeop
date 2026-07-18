@@ -36,5 +36,6 @@ export type OwnerProfileResult =
   | Readonly<{ outcome: "expired" | "not_found" }>;
 
 export type OwnerProfileEventResult = Readonly<{
-  outcome: "recorded" | "expired" | "not_found" | "not_completed";
+  outcome:
+    "recorded" | "expired" | "not_found" | "not_completed" | "not_eligible";
 }>;

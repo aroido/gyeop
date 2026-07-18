@@ -17,6 +17,7 @@ import {
   decodeRecordShareActionOutcome,
   decodeShareLinkList,
   isSharePublicId,
+  parseShareEntrySource,
 } from "../../lib/share-links/share-link-state-core.mjs";
 
 const secret = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8";
@@ -141,4 +142,17 @@ test("strictly decodes record share action outcomes", () => {
     decodeRecordShareActionOutcome({ ...recorded, inviteUrl: "secret" }),
   );
   assert.throws(() => decodeRecordShareActionOutcome({ outcome: "recorded" }));
+});
+
+test("allowlists only the decoded single profile reshare source", () => {
+  assert.equal(parseShareEntrySource("profile_reshare"), "profile_reshare");
+  for (const value of [
+    undefined,
+    null,
+    "",
+    "PROFILE_RESHARE",
+    ["profile_reshare"],
+  ]) {
+    assert.equal(parseShareEntrySource(value), null);
+  }
 });

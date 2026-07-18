@@ -264,6 +264,7 @@ select is(
     'list_owner_share_links(uuid,bytea)',
     'publish_pack_version(uuid)',
     'record_owner_profile_event(uuid,bytea,text)',
+    'record_owner_share_action_with_source(uuid,bytea,uuid,text,text)',
     'record_owner_share_action(uuid,bytea,uuid,text)',
     'record_visitor_response_event(uuid,bytea,text)',
     'revoke_owner_play_session(uuid,bytea)',

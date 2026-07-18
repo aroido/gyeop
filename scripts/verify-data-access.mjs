@@ -17,7 +17,7 @@ const ALLOWED_RPC_EXPORTS = new Map([
   ["completeOwnerPlay", "complete_owner_play"],
   ["revokeOwnerPlaySession", "revoke_owner_play_session"],
   ["getInviteMetadata", "get_invite_metadata"],
-  ["recordOwnerShareAction", "record_owner_share_action"],
+  ["recordOwnerShareAction", "record_owner_share_action_with_source"],
   ["startResponse", "start_required_response"],
   ["getVisitorResponse", "get_visitor_response"],
   ["saveResponseAnswer", "save_response_answer"],
@@ -52,7 +52,7 @@ const PLAY_CAPABILITY_EXPORTS = new Map([
   ["rotateShareLink", "rotate_share_link"],
   ["disableShareLink", "disable_share_link"],
   ["listOwnerShareLinks", "list_owner_share_links"],
-  ["recordOwnerShareAction", "record_owner_share_action"],
+  ["recordOwnerShareAction", "record_owner_share_action_with_source"],
 ]);
 
 function sourceFile(filePath, source) {

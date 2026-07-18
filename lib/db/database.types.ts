@@ -594,6 +594,16 @@ export type Database = {
         };
         Returns: Json;
       };
+      record_owner_share_action_with_source: {
+        Args: {
+          p_entry_source: string;
+          p_event_name: string;
+          p_link_id: string;
+          p_management_secret_hash: string;
+          p_play_id: string;
+        };
+        Returns: Json;
+      };
       record_visitor_response_event: {
         Args: {
           p_event_name: string;

@@ -34,15 +34,25 @@ export async function loadOwnerProfile(): Promise<OwnerProfile> {
   return decodeOwnerProfile(value) as OwnerProfile;
 }
 
-export async function recordOwnerProfileViewed(): Promise<void> {
+async function recordOwnerProfileEvent(
+  event: "profile_viewed" | "profile_reshare_clicked",
+): Promise<void> {
   const response = await fetch("/api/me/profile/events", {
     method: "POST",
     cache: "no-store",
     credentials: "same-origin",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ event: "profile_viewed" }),
+    body: JSON.stringify({ event }),
     keepalive: true,
   });
   privateNoStore(response);
   if (response.status !== 204) throw new OwnerProfileHttpError(response.status);
+}
+
+export function recordOwnerProfileViewed(): Promise<void> {
+  return recordOwnerProfileEvent("profile_viewed");
+}
+
+export function recordOwnerProfileReshareClicked(): Promise<void> {
+  return recordOwnerProfileEvent("profile_reshare_clicked");
 }

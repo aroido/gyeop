@@ -13,6 +13,9 @@ export function verifyOwnerProfile() {
   const migration = source(
     "supabase/migrations/20260718000900_owner_profile.sql",
   );
+  const reshareMigration = source(
+    "supabase/migrations/20260718001000_profile_reshare.sql",
+  );
   for (const contract of [
     "create or replace function public.get_owner_profile",
     "create or replace function public.record_owner_profile_event",
@@ -56,6 +59,19 @@ export function verifyOwnerProfile() {
     1,
     "profile RPC must call the capability helper exactly once",
   );
+  for (const contract of [
+    "'profile_reshare_clicked'",
+    "'entrySource', 'profile_reshare'",
+    "response.status = 'submitted'",
+    "link.kind = 'public'",
+    "record_owner_share_action_with_source",
+    "analytics_profile_reshare_internal_insert",
+  ]) {
+    assert.ok(
+      reshareMigration.includes(contract),
+      `missing profile reshare migration contract: ${contract}`,
+    );
+  }
 
   const getRoute = source("app/api/me/profile/route.ts");
   assert.match(getRoute, /withPublicRequest\s*\(/);
@@ -82,8 +98,10 @@ export function verifyOwnerProfile() {
     "시선을 모으는 중",
     "새 시선 도착",
     "시선이 쌓여 있어요",
-    "친구에게 더 공유하기",
+    "시선 더 모으기",
     "recordOwnerProfileViewed",
+    "recordOwnerProfileReshareClicked",
+    "entry_source=profile_reshare",
   ]) {
     assert.ok(view.includes(contract), `missing profile UI: ${contract}`);
   }

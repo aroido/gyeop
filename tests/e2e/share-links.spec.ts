@@ -286,7 +286,7 @@ test("creates a one-to-one link, rotates it, and disables the replacement", asyn
   await expect(page.getByText("사용 중")).toHaveCount(0);
 });
 
-test("hands off the exact public link once despite same-tick activation", async ({
+test("attributes profile-entry share once despite same-tick activation", async ({
   page,
 }) => {
   await installBrowserHandoff(page, {
@@ -295,7 +295,7 @@ test("hands off the exact public link once despite same-tick activation", async 
   });
   await completedOwner(page);
   const share = await installShareApi(page, { shareEventStatus: 500 });
-  await page.goto(`/me/plays/${playId}`);
+  await page.goto(`/me/plays/${playId}?entry_source=profile_reshare`);
   await page.getByRole("button", { name: "공유 링크 만들기" }).click();
 
   const shareButton = page.getByRole("button", { name: "친구에게 공유하기" });
@@ -383,6 +383,7 @@ test("hands off the exact public link once despite same-tick activation", async 
         body: {
           event: "share_handoff_succeeded",
           linkId: linkIds[0],
+          entrySource: "profile_reshare",
         },
       },
     ]);
@@ -423,7 +424,7 @@ test("treats native share cancellation and failure as zero success events", asyn
   ).toHaveLength(0);
 });
 
-test("copies a one-to-one link without a fake share control", async ({
+test("normalizes an array entry source while copying a one-to-one link", async ({
   page,
 }) => {
   await installBrowserHandoff(page, {
@@ -432,7 +433,9 @@ test("copies a one-to-one link without a fake share control", async ({
   });
   await completedOwner(page);
   const share = await installShareApi(page);
-  await page.goto(`/me/plays/${playId}`);
+  await page.goto(
+    `/me/plays/${playId}?entry_source=profile_reshare&entry_source=anything`,
+  );
   await page.getByRole("radio", { name: /한 친구에게 1:1/ }).check();
   await page.getByRole("button", { name: "공유 링크 만들기" }).click();
   await expect(
@@ -482,7 +485,11 @@ test("copies a one-to-one link without a fake share control", async ({
       {
         method: "POST",
         pathname: `/api/me/plays/${playId}/share-events`,
-        body: { event: "share_link_copied", linkId: linkIds[0] },
+        body: {
+          event: "share_link_copied",
+          linkId: linkIds[0],
+          entrySource: null,
+        },
       },
     ]);
   expect(share.links[0]).toMatchObject({

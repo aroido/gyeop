@@ -3,13 +3,19 @@ begin;
 select no_plan();
 
 delete from public.analytics_events
-where event_name = 'profile_viewed';
+where event_name in ('profile_viewed', 'profile_reshare_clicked');
 
 select has_function(
   'public',
   'get_owner_profile',
   array['uuid', 'bytea'],
   'owner profile RPC has the exact signature'
+);
+select has_function(
+  'public',
+  'record_owner_share_action_with_source',
+  array['uuid', 'bytea', 'uuid', 'text', 'text'],
+  'source-aware owner share action RPC has a distinct exact signature'
 );
 select has_function(
   'public',
@@ -27,6 +33,11 @@ select ok(
   and has_function_privilege(
     'service_role',
     'public.record_owner_profile_event(uuid,bytea,text)',
+    'EXECUTE'
+  )
+  and has_function_privilege(
+    'service_role',
+    'public.record_owner_share_action_with_source(uuid,bytea,uuid,text,text)',
     'EXECUTE'
   )
   and not has_function_privilege(
@@ -269,6 +280,30 @@ select is(
   'profile reads alone do not record a viewed event'
 );
 
+set local role service_role;
+
+select is(
+  public.record_owner_profile_event(
+    '27000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex'),
+    'profile_reshare_clicked'
+  )->>'outcome',
+  'not_eligible',
+  'a completed zero-sight profile cannot record a reshare click'
+);
+
+reset role;
+
+select is(
+  (
+    select count(*)
+    from public.analytics_events
+    where event_name = 'profile_reshare_clicked'
+  ),
+  0::bigint,
+  'an ineligible reshare click stores no analytics row'
+);
+
 insert into public.visitor_responses (
   id,
   share_link_id,
@@ -477,6 +512,15 @@ select is(
   'recorded',
   'a completed owner records the render event explicitly'
 );
+select is(
+  public.record_owner_profile_event(
+    '27000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex'),
+    'profile_reshare_clicked'
+  )->>'outcome',
+  'recorded',
+  'an eligible owner records the profile reshare click'
+);
 
 reset role;
 
@@ -505,6 +549,26 @@ select ok(
     where event_name = 'profile_viewed'
   ),
   'profile event has no visitor response identifier'
+);
+select is(
+  (
+    select properties
+    from public.analytics_events
+    where event_name = 'profile_reshare_clicked'
+  ),
+  jsonb_build_object(
+    'packVersion', 'old-friend-v1',
+    'entrySource', 'profile_reshare'
+  ),
+  'profile reshare click stores only pack version and fixed entry source'
+);
+select ok(
+  (
+    select visitor_response_id is null
+    from public.analytics_events
+    where event_name = 'profile_reshare_clicked'
+  ),
+  'profile reshare click has no visitor response identifier'
 );
 
 select * from finish();

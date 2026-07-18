@@ -84,6 +84,7 @@ export function verifyShareLinks() {
     "recordShareAction",
     "share_handoff_succeeded",
     "share_link_copied",
+    "entrySource",
     "#k=",
   ]) {
     if (contract === "#k=") continue;
@@ -109,6 +110,14 @@ export function verifyShareLinks() {
   assert.match(manager, /navigator\.share\s*\(/);
   assert.match(manager, /navigator\.clipboard\.writeText\s*\(/);
   assert.match(manager, /공유 링크 직접 복사/);
+  assert.match(manager, /entrySource/);
+  assert.match(
+    readFileSync(
+      path.join(ROOT, "lib/share-links/share-link-state-core.mjs"),
+      "utf8",
+    ),
+    /parseShareEntrySource/,
+  );
 
   const routes = [
     "app/api/plays/[playId]/links/route.ts",
@@ -143,6 +152,24 @@ export function verifyShareLinks() {
   assert.match(shareEventRoute, /recordShareActionSchema/);
   assert.match(shareEventRoute, /action:\s*"owner_play_access"/);
   assert.doesNotMatch(shareEventRoute, /inviteUrl|channel|recipient/);
+  assert.match(shareEventRoute, /entrySource/);
+
+  const reshareMigration = readFileSync(
+    path.join(ROOT, "supabase/migrations/20260718001000_profile_reshare.sql"),
+    "utf8",
+  );
+  for (const contract of [
+    "record_owner_share_action_with_source",
+    "p_entry_source",
+    "'profile_reshare'",
+    "analytics_profile_reshare_internal_insert",
+  ]) {
+    assert.ok(
+      reshareMigration.includes(contract),
+      `missing profile reshare share contract: ${contract}`,
+    );
+  }
+  assert.doesNotMatch(reshareMigration, /inviteUrl|fragment|recipient|channel/);
   const inviteRoute = readFileSync(
     path.join(ROOT, "app/api/invites/[publicId]/metadata/route.ts"),
     "utf8",

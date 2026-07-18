@@ -15,6 +15,7 @@ import {
   listShareLinks,
   recordShareAction,
   rotateShareLink,
+  type ShareEntrySource,
   type ShareLink,
   ShareLinkHttpError,
 } from "@/lib/share-links/share-link-client";
@@ -66,9 +67,11 @@ function readShareSupport() {
 export default function ShareLinkManager({
   playId,
   defaultShareKind,
+  entrySource,
 }: {
   playId: string | null;
   defaultShareKind: ShareKind;
+  entrySource: ShareEntrySource;
 }) {
   const [state, setState] = useState<State>(
     playId ? { kind: "loading" } : { kind: "terminal" },
@@ -257,6 +260,7 @@ export default function ShareLinkManager({
         playId,
         readyLink.linkId,
         "share_handoff_succeeded",
+        entrySource,
       ).catch(() => undefined);
     } catch (caught) {
       setFeedback(
@@ -292,6 +296,7 @@ export default function ShareLinkManager({
         playId,
         readyLink.linkId,
         "share_link_copied",
+        entrySource,
       ).catch(() => undefined);
     } catch {
       manualFallback = true;
