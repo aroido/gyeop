@@ -63,3 +63,15 @@ export const visitorResponseSchema = strictJsonObject({
     ])
     .optional(),
 });
+
+export const visitorAnswerSchema = strictJsonObject({
+  choice: z.enum(["a", "b"]),
+});
+
+export const visitorSubmitSchema = strictJsonObject({
+  managementSecret: z.string().regex(/^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/),
+});
+
+export const visitorEventSchema = strictJsonObject({
+  event: z.enum(["comparison_viewed", "same_pack_start_clicked"]),
+});

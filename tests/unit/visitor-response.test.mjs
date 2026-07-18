@@ -9,8 +9,14 @@ import {
   visitorResponseHttpState,
 } from "../../lib/visitor-response/visitor-context-core.mjs";
 import {
+  decodeGetVisitorResponseOutcome,
+  decodeRecordVisitorResponseEventOutcome,
+  decodeSaveResponseAnswerOutcome,
   decodeStartResponseOutcome,
+  decodeSubmitResponseOutcome,
+  deriveResponseActionRateLimitKey,
   deriveResponseStartRateLimitKey,
+  hashVisitorManagementSecret,
   hashVisitorResponseSecret,
   parseVisitorResponseCookie,
   serializeDeletedVisitorResponseCookie,
@@ -18,8 +24,18 @@ import {
   VISITOR_RESPONSE_COOKIE_NAME,
 } from "../../lib/visitor-response/visitor-session-core.mjs";
 import {
+  buildManagementUrl,
+  completeManagementRecord,
+  ensurePendingManagementRecord,
+  readManagementRecord,
+} from "../../lib/visitor-management/management-secret.ts";
+import {
+  readVisitorResponse,
+  recordVisitorEvent,
   resumeVisitorResponse,
+  saveVisitorAnswer,
   startVisitorResponse,
+  submitVisitorAnswers,
   VisitorResponseHttpError,
 } from "../../lib/visitor-response/visitor-response-client.ts";
 
@@ -35,6 +51,7 @@ const assignments = Object.freeze([
     optionA: "바로 이야기한다",
     optionB: "시간을 두고 이야기한다",
     isSignature: true,
+    visitorChoice: null,
   }),
   Object.freeze({
     cardId: "hard-day",
@@ -44,6 +61,7 @@ const assignments = Object.freeze([
     optionA: "조용히 곁에 있어 주기",
     optionB: "기분 전환을 도와주기",
     isSignature: false,
+    visitorChoice: null,
   }),
   Object.freeze({
     cardId: "plans",
@@ -53,6 +71,7 @@ const assignments = Object.freeze([
     optionA: "미리 계획한다",
     optionB: "그날 정한다",
     isSignature: false,
+    visitorChoice: null,
   }),
 ]);
 const state = Object.freeze({
@@ -63,6 +82,22 @@ const state = Object.freeze({
   sessionExpiresAt: "2030-01-02T00:00:00Z",
   sessionTtlSeconds: 86_400,
   assignments,
+});
+const submittedState = Object.freeze({
+  ...state,
+  status: "submitted",
+  allMatched: false,
+  assignments: Object.freeze(
+    assignments.map((assignment, index) =>
+      Object.freeze({
+        ...assignment,
+        visitorChoice: index === 1 ? "b" : "a",
+        ownerChoice: "a",
+        matches: index !== 1,
+        isHighlight: index === 1,
+      }),
+    ),
+  ),
 });
 
 test("freezes the exact relationship and known-since registries", () => {
@@ -122,6 +157,19 @@ test("strictly decodes DB and browser response state", () => {
   assert.throws(() =>
     decodeVisitorResponseHttpState(http, Date.parse(state.sessionExpiresAt)),
   );
+  assert.deepEqual(decodeVisitorResponseState(submittedState), submittedState);
+  assert.throws(() =>
+    decodeVisitorResponseState({ ...submittedState, allMatched: true }),
+  );
+  assert.throws(() =>
+    decodeVisitorResponseState({
+      ...submittedState,
+      assignments: submittedState.assignments.map((assignment) => ({
+        ...assignment,
+        isHighlight: false,
+      })),
+    }),
+  );
 });
 
 test("rejects malformed or privacy-leaking assignment payloads", () => {
@@ -162,6 +210,20 @@ test("uses the exact response credential and rate-key vectors", () => {
       "AAAAAAAAAAAAAAAAAAAAAA",
     ).toString("hex"),
     "7f667381a24e34737c6fba266ae316b2070295a195b6c00598f198bd3a363e6a",
+  );
+  assert.equal(
+    hashVisitorManagementSecret(secret).toString("hex"),
+    "a3d92f51751e5ef82ff0d9ada678b4fdb3ab20a2fef6f4ac58a37e2ca775150d",
+  );
+  assert.equal(
+    deriveResponseActionRateLimitKey(id, "response_answer_save").toString(
+      "hex",
+    ),
+    "51bfa4f29109adfd68625a185fb130cd447ee30266a0a195a7db24d3da01d57a",
+  );
+  assert.equal(
+    deriveResponseActionRateLimitKey(id, "response_submit").toString("hex"),
+    "4bdcce0d0dfc3f822f89a04b3fb41c608520c27658bf402491b9056c96b73d2a",
   );
 });
 
@@ -246,8 +308,86 @@ test("strictly decodes every start-response outcome", () => {
   assert.throws(() => decodeStartResponseOutcome(symbol));
 });
 
+test("strictly decodes read, save, submit, and event outcomes", () => {
+  assert.deepEqual(
+    decodeGetVisitorResponseOutcome({ outcome: "authorized", response: state }),
+    { outcome: "authorized", response: state },
+  );
+  assert.deepEqual(
+    decodeSaveResponseAnswerOutcome({ outcome: "saved", response: state }),
+    { outcome: "saved", response: state },
+  );
+  assert.deepEqual(
+    decodeSubmitResponseOutcome({
+      outcome: "submitted",
+      response: submittedState,
+    }),
+    { outcome: "submitted", response: submittedState },
+  );
+  assert.deepEqual(
+    decodeRecordVisitorResponseEventOutcome({ outcome: "recorded" }),
+    { outcome: "recorded" },
+  );
+  assert.deepEqual(decodeSubmitResponseOutcome({ outcome: "incomplete" }), {
+    outcome: "incomplete",
+  });
+  assert.throws(() =>
+    decodeSaveResponseAnswerOutcome({
+      outcome: "saved",
+      response: submittedState,
+    }),
+  );
+  assert.throws(() =>
+    decodeRecordVisitorResponseEventOutcome({
+      outcome: "recorded",
+      responseId: id,
+    }),
+  );
+});
+
+test("persists one exact browser-only management record", () => {
+  const values = new Map();
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+  const source = {
+    getRandomValues(bytes) {
+      bytes.set(Uint8Array.from({ length: 32 }, (_, index) => index));
+      return bytes;
+    },
+  };
+  const pending = ensurePendingManagementRecord(id, storage, source);
+  assert.deepEqual(pending, {
+    version: 1,
+    responseId: id,
+    status: "pending",
+    secret,
+  });
+  assert.deepEqual(ensurePendingManagementRecord(id, storage, source), pending);
+  assert.deepEqual(completeManagementRecord(id, storage), {
+    ...pending,
+    status: "completed",
+  });
+  assert.equal(
+    buildManagementUrl("https://gyeop.example", secret),
+    `https://gyeop.example/responses/manage#token=${secret}`,
+  );
+  values.set(
+    `gyeop:visitor-management:v1:${id}`,
+    JSON.stringify({ ...pending, leaked: true }),
+  );
+  assert.throws(() => readManagementRecord(id, storage));
+});
+
 const httpState = Object.freeze({
   ...state,
+  sessionExpiresAt: "2099-01-02T00:00:00Z",
+  relationshipLabel: "오래된 친구",
+  knownSinceLabel: "10년 이상이에요",
+});
+const submittedHttpState = Object.freeze({
+  ...submittedState,
   sessionExpiresAt: "2099-01-02T00:00:00Z",
   relationshipLabel: "오래된 친구",
   knownSinceLabel: "10년 이상이에요",
@@ -297,6 +437,57 @@ test("browser client accepts only exact no-store response outcomes", async () =>
         error instanceof VisitorResponseHttpError &&
         error.code === "INVALID_RESPONSE",
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("browser client uses the exact read, save, submit, and event routes", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  try {
+    globalThis.fetch = async (url, init) => {
+      calls.push({ url, init });
+      if (String(url).endsWith("/events")) {
+        return new Response(null, {
+          status: 204,
+          headers: { "cache-control": "private, no-store" },
+        });
+      }
+      return Response.json(
+        String(url).endsWith("/submit") ? submittedHttpState : httpState,
+        { headers: { "cache-control": "private, no-store" } },
+      );
+    };
+    assert.deepEqual(await readVisitorResponse(id), httpState);
+    assert.deepEqual(await saveVisitorAnswer(id, "conflict", "a"), httpState);
+    assert.deepEqual(
+      await submitVisitorAnswers(id, secret),
+      submittedHttpState,
+    );
+    await recordVisitorEvent(id, "comparison_viewed");
+    assert.deepEqual(
+      calls.map(({ url, init }) => [url, init.method, init.body ?? null]),
+      [
+        [`/api/responses/${id}`, "GET", null],
+        [
+          `/api/responses/${id}/answers/conflict`,
+          "PUT",
+          JSON.stringify({ choice: "a" }),
+        ],
+        [
+          `/api/responses/${id}/submit`,
+          "POST",
+          JSON.stringify({ managementSecret: secret }),
+        ],
+        [
+          `/api/responses/${id}/events`,
+          "POST",
+          JSON.stringify({ event: "comparison_viewed" }),
+        ],
+      ],
+    );
+    assert.equal(calls[3].init.keepalive, true);
   } finally {
     globalThis.fetch = originalFetch;
   }

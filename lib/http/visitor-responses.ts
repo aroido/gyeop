@@ -7,8 +7,12 @@ import {
 } from "../visitor-response/visitor-session-core.mjs";
 import type { ParsedVisitorResponseCookie } from "../visitor-response/visitor-response-session.ts";
 import {
+  getVisitorResponseSession,
+  recordVisitorEvent,
   resumeVisitorResponseSession,
+  saveVisitorResponseAnswer,
   startVisitorResponseSession,
+  submitVisitorResponse,
 } from "../visitor-response/visitor-responses.ts";
 import { visitorResponseHttpState } from "../visitor-response/visitor-context-core.mjs";
 import { errorResponse } from "./errors.ts";
@@ -84,4 +88,111 @@ export async function visitorResponse(input: {
 
 export function malformedVisitorResponseCookie() {
   return deletedUnavailableResponse();
+}
+
+function conflictResponse(
+  code: "VISITOR_RESPONSE_CONFLICT" | "VISITOR_RESPONSE_INCOMPLETE",
+) {
+  return privateNoStore(
+    Response.json(
+      {
+        code,
+        message:
+          code === "VISITOR_RESPONSE_INCOMPLETE"
+            ? "세 질문에 모두 답한 뒤 결과를 확인해 주세요."
+            : "이 응답을 더 이상 변경할 수 없어요.",
+      },
+      { status: 409 },
+    ),
+  );
+}
+
+function responseState(
+  cookie: ValidCookie,
+  value: unknown,
+  sessionTtlSeconds: number,
+  sessionExpiresAt: string,
+) {
+  const serialized = serializeVisitorResponseCookie(
+    cookie.value,
+    sessionTtlSeconds,
+    sessionExpiresAt,
+  );
+  if (serialized === null) return deletedUnavailableResponse();
+  const response = privateNoStore(
+    Response.json(visitorResponseHttpState(value)),
+  );
+  response.headers.set("Set-Cookie", serialized);
+  return response;
+}
+
+export async function readVisitorResponse(input: {
+  cookie: ValidCookie;
+  signal: AbortSignal;
+}) {
+  const result = await getVisitorResponseSession(input);
+  if (result.outcome !== "authorized") return deletedUnavailableResponse();
+  return responseState(
+    input.cookie,
+    result.response,
+    result.response.sessionTtlSeconds,
+    result.response.sessionExpiresAt,
+  );
+}
+
+export async function saveVisitorAnswer(input: {
+  cookie: ValidCookie;
+  cardId: string;
+  choice: "a" | "b";
+  signal: AbortSignal;
+}) {
+  const result = await saveVisitorResponseAnswer(input);
+  if (
+    result.outcome === "session_invalid" ||
+    result.outcome === "invalid_card"
+  ) {
+    return result.outcome === "session_invalid"
+      ? deletedUnavailableResponse()
+      : inviteUnavailableResponse();
+  }
+  if (result.outcome === "submitted") {
+    return conflictResponse("VISITOR_RESPONSE_CONFLICT");
+  }
+  return responseState(
+    input.cookie,
+    result.response,
+    result.response.sessionTtlSeconds,
+    result.response.sessionExpiresAt,
+  );
+}
+
+export async function submitVisitorAnswers(input: {
+  cookie: ValidCookie;
+  managementSecret: string;
+  signal: AbortSignal;
+}) {
+  const result = await submitVisitorResponse(input);
+  if (result.outcome === "session_invalid") return deletedUnavailableResponse();
+  if (result.outcome === "incomplete") {
+    return conflictResponse("VISITOR_RESPONSE_INCOMPLETE");
+  }
+  if (result.outcome === "conflict") {
+    return conflictResponse("VISITOR_RESPONSE_CONFLICT");
+  }
+  return responseState(
+    input.cookie,
+    result.response,
+    result.response.sessionTtlSeconds,
+    result.response.sessionExpiresAt,
+  );
+}
+
+export async function recordVisitorResponseScreenEvent(input: {
+  cookie: ValidCookie;
+  event: "comparison_viewed" | "same_pack_start_clicked";
+  signal: AbortSignal;
+}) {
+  const result = await recordVisitorEvent(input);
+  if (result.outcome !== "recorded") return deletedUnavailableResponse();
+  return privateNoStore(new Response(null, { status: 204 }));
 }

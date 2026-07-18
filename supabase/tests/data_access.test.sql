@@ -76,7 +76,6 @@ select ok(
   and not has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'DELETE'),
   'internal RPC owner can only insert allowlisted analytics events'
 );
-
 select is(
   (
     select coalesce(
@@ -115,6 +114,9 @@ select is(
     'share_links:INSERT',
     'share_links:SELECT',
     'share_links:UPDATE',
+    'visitor_answers:INSERT',
+    'visitor_answers:SELECT',
+    'visitor_answers:UPDATE',
     'visitor_assignments:INSERT',
     'visitor_assignments:SELECT',
     'visitor_responses:INSERT',
@@ -257,13 +259,18 @@ select is(
     'get_invite_metadata(text,bytea)',
     'get_owner_play(uuid,bytea)',
     'get_published_pack(text)',
+    'get_visitor_response(uuid,bytea)',
     'list_owner_share_links(uuid,bytea)',
     'publish_pack_version(uuid)',
     'record_owner_share_action(uuid,bytea,uuid,text)',
+    'record_visitor_response_event(uuid,bytea,text)',
     'revoke_owner_play_session(uuid,bytea)',
     'rotate_share_link(uuid,bytea,uuid,uuid,text,bytea)',
-    'save_owner_answer(uuid,bytea,text,text,smallint)'
-    ,'start_response(text,bytea,text,uuid,bytea,uuid,bytea,text,text,bytea)'
+    'save_owner_answer(uuid,bytea,text,text,smallint)',
+    'save_response_answer(uuid,bytea,text,text)',
+    'start_required_response(text,bytea,text,uuid,bytea,uuid,bytea,text,text,bytea)',
+    'start_response(text,bytea,text,uuid,bytea,uuid,bytea,text,text,bytea)',
+    'submit_response(uuid,bytea,bytea)'
   ]::text[],
   'service_role function grants match the exact RPC allowlist'
 );

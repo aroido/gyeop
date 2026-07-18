@@ -337,9 +337,7 @@ function expectExactAssignmentResponse(body: string) {
     if (value === null || typeof value !== "object") return;
     for (const [key, child] of Object.entries(value)) {
       if (
-        /owner|self|choice|sample|packVersionId|playId|linkId|hash|token/i.test(
-          key,
-        )
+        /owner|self|sample|packVersionId|playId|linkId|hash|token/i.test(key)
       ) {
         forbiddenKeys.push(key);
       }
@@ -380,9 +378,51 @@ function expectExactAssignmentResponse(body: string) {
       "optionB",
       "position",
       "stage",
+      "visitorChoice",
       "visitorPrompt",
     ]);
+    expect(assignment.visitorChoice).toBeNull();
   }
+}
+
+function expectExactSubmittedResponse(body: string) {
+  const parsed = JSON.parse(body) as Record<string, unknown>;
+  expect(Object.keys(parsed).sort()).toEqual([
+    "allMatched",
+    "assignments",
+    "id",
+    "knownSinceCode",
+    "knownSinceLabel",
+    "relationshipCode",
+    "relationshipLabel",
+    "sessionExpiresAt",
+    "sessionTtlSeconds",
+    "status",
+  ]);
+  expect(parsed.status).toBe("submitted");
+  expect(typeof parsed.allMatched).toBe("boolean");
+  const submittedAssignments = parsed.assignments as Record<string, unknown>[];
+  expect(submittedAssignments).toHaveLength(3);
+  for (const assignment of submittedAssignments) {
+    expect(Object.keys(assignment).sort()).toEqual([
+      "cardId",
+      "isHighlight",
+      "isSignature",
+      "matches",
+      "optionA",
+      "optionB",
+      "ownerChoice",
+      "position",
+      "stage",
+      "visitorChoice",
+      "visitorPrompt",
+    ]);
+    expect(["a", "b"]).toContain(assignment.visitorChoice);
+    expect(["a", "b"]).toContain(assignment.ownerChoice);
+  }
+  expect(JSON.stringify(parsed)).not.toMatch(
+    /token|hash|secret|linkId|playId/i,
+  );
 }
 
 async function postShareAction(
@@ -697,13 +737,15 @@ test.describe("live owner flow", () => {
           ip: "198.51.100.220",
           relationship: "오래된 친구",
           knownSince: "10년 이상이에요",
+          complete: true,
         },
         {
           ip: "198.51.100.221",
           relationship: "가족",
           knownSince: "1년 이상 · 3년 미만",
+          complete: false,
         },
-      ].map(async ({ ip, relationship, knownSince }) => {
+      ].map(async ({ ip, relationship, knownSince, complete }) => {
         const visitorContext = await browser.newContext({
           extraHTTPHeaders: { ...visitorHeaders, "x-forwarded-for": ip },
         });
@@ -722,8 +764,24 @@ test.describe("live owner flow", () => {
           .check();
         await visitor.getByRole("button", { name: "3장 답하러 가기" }).click();
         await expect(
-          visitor.getByRole("heading", { name: "응답을 시작했어요" }),
+          visitor.getByRole("heading", {
+            name: "서운한 일이 생기면 이 사람은?",
+          }),
         ).toBeFocused();
+        if (complete) {
+          await visitor.getByRole("button", { name: /^B / }).click();
+          await visitor.getByRole("button", { name: /^A / }).click();
+          await visitor.getByRole("button", { name: /^A / }).click();
+          await expect(visitor.getByText("3장 비교 완료")).toBeVisible({
+            timeout: 15_000,
+          });
+          await expect(
+            visitor.getByRole("link", { name: "나도 이 팩으로 시작하기" }),
+          ).toHaveAttribute(
+            "href",
+            "/play/new?pack=old-friend&source=same_pack_cta",
+          );
+        }
         const sessionCookie = (await visitorContext.cookies()).find(
           (cookie) => cookie.name === "__Host-gyeop-response",
         );
@@ -745,11 +803,7 @@ test.describe("live owner flow", () => {
     );
 
     await visitors[0].visitor.reload();
-    await expect(
-      visitors[0].visitor.getByRole("heading", {
-        name: "응답을 시작했어요",
-      }),
-    ).toBeFocused();
+    await expect(visitors[0].visitor.getByText("3장 비교 완료")).toBeVisible();
     await expect(
       visitors[0].visitor.getByText("오래된 친구", { exact: true }),
     ).toBeVisible();
@@ -760,7 +814,7 @@ test.describe("live owner flow", () => {
       ip: "198.51.100.220",
     });
     expect(publicResume.fingerprint.status).toBe(200);
-    expectExactAssignmentResponse(publicResume.fingerprint.body);
+    expectExactSubmittedResponse(publicResume.fingerprint.body);
     await expect
       .poll(() => readVisitorResponseSummary(publicId))
       .toEqual({
@@ -778,12 +832,15 @@ test.describe("live owner flow", () => {
           {
             relationship: "old_friend",
             knownSince: "ten_years_or_more",
-            status: "draft",
+            status: "submitted",
             fixedTtl: true,
           },
         ],
         events: {
+          comparison_viewed: 1,
           relationship_selected: 2,
+          visitor_required_answer_saved: 3,
+          visitor_required_submitted: 1,
           visitor_response_started: 2,
         },
       });
@@ -969,7 +1026,7 @@ test.describe("live owner flow", () => {
       .click();
     await expect(
       visitors[0].visitor.getByRole("heading", {
-        name: "응답을 시작했어요",
+        name: "서운한 일이 생기면 이 사람은?",
       }),
     ).toBeFocused();
     const crossLinkCookie = (await visitors[0].visitorContext.cookies()).find(

@@ -77,6 +77,9 @@ export function verifyVisitorResponse() {
   assert.match(session, /__Host-gyeop-response/);
   assert.match(session, /gyeop-visitor-response-v1/);
   assert.match(session, /gyeop-response-start-v1/);
+  assert.match(session, /gyeop-response-answer-save-v1/);
+  assert.match(session, /gyeop-response-submit-v1/);
+  assert.match(session, /gyeop-visitor-management-v1/);
   assert.match(session, /randomBytes\(32\)/);
   assert.match(session, /HttpOnly/);
   assert.match(session, /SameSite=Lax/);
@@ -114,6 +117,9 @@ export function verifyVisitorResponse() {
     "const flights = new Map",
     "response.status === 204",
     "response.status === 429",
+    "saveVisitorAnswer",
+    "submitVisitorAnswers",
+    "recordVisitorEvent",
   ]) {
     assert.ok(
       client.includes(contract),
@@ -128,8 +134,11 @@ export function verifyVisitorResponse() {
     "KNOWN_SINCE_OPTIONS.map",
     "이 사람과 어떤 사이인가요?",
     "3장 답하러 가기",
-    "응답을 시작했어요",
-    "1:1 응답은 다음 단계에서 이어져요.",
+    "queue.current.push",
+    "친구 답과 맞춰보는 중…",
+    "3장 비교 완료",
+    "내 관리 링크 복사",
+    "/play/new?pack=old-friend&source=same_pack_cta",
   ]) {
     assert.ok(
       entry.includes(contract),
@@ -205,6 +214,76 @@ export function verifyVisitorResponse() {
     /jsonb_build_object\([^;]*(?:owner_prompt|owner_choice|session_token_hash|secret_hash|tie_hash)/s,
     "assignment API JSON cannot expose owner answers, credentials, or hashes",
   );
+
+  const requiredResponseMigration = source(
+    "supabase/migrations/20260718000800_visitor_required_response.sql",
+  );
+  for (const contract of [
+    "create table public.visitor_answers",
+    "create or replace function public.start_required_response",
+    "create or replace function public.get_visitor_response",
+    "create or replace function public.save_response_answer",
+    "create or replace function public.submit_response",
+    "create or replace function public.record_visitor_response_event",
+    "analytics_visitor_terminal_event_unique_idx",
+    "'visitor_responses_id_share_link_key'",
+    "for update of link",
+    "for update of response",
+    "when unique_violation then",
+    "status = 'disabled'",
+    "get stacked diagnostics v_constraint_name = constraint_name",
+    "v_constraint_name <> 'analytics_visitor_terminal_event_unique_idx'",
+    "'visitor_required_answer_saved'",
+    "'visitor_required_submitted'",
+    "'comparison_viewed'",
+    "'same_pack_start_clicked'",
+  ]) {
+    assert.ok(
+      requiredResponseMigration.includes(contract),
+      `missing required response migration contract: ${contract}`,
+    );
+  }
+
+  for (const route of [
+    "app/api/responses/[id]/route.ts",
+    "app/api/responses/[id]/answers/[cardId]/route.ts",
+    "app/api/responses/[id]/submit/route.ts",
+    "app/api/responses/[id]/events/route.ts",
+  ]) {
+    const contents = source(route);
+    assert.match(contents, /withPublicRequest\s*\(/);
+    assert.match(contents, /privateNoStore:\s*true/);
+    assert.match(contents, /parseVisitorResponseCookie/);
+    assert.match(contents, /cookie\.responseId !== id/);
+  }
+
+  const answerRoute = source(
+    "app/api/responses/[id]/answers/[cardId]/route.ts",
+  );
+  const answerLimiter = answerRoute.indexOf("runRateLimitedDomain");
+  const answerDomain = answerRoute.lastIndexOf("saveVisitorAnswer({");
+  assert.ok(answerLimiter >= 0 && answerDomain > answerLimiter);
+  assert.match(answerRoute, /limit:\s*120/);
+  const submitRoute = source("app/api/responses/[id]/submit/route.ts");
+  const submitLimiter = submitRoute.indexOf("runRateLimitedDomain");
+  const submitDomain = submitRoute.lastIndexOf("submitVisitorAnswers({");
+  assert.ok(submitLimiter >= 0 && submitDomain > submitLimiter);
+  assert.match(submitRoute, /limit:\s*10/);
+
+  const management = source("lib/visitor-management/management-secret.ts");
+  for (const contract of [
+    "getRandomValues(bytes)",
+    "gyeop:visitor-management:v1:",
+    'status: "pending"',
+    'status: "completed"',
+    "/responses/manage#token=",
+    "globalThis.localStorage",
+  ]) {
+    assert.ok(
+      management.includes(contract),
+      `missing management storage contract: ${contract}`,
+    );
+  }
 
   const live = source("tests/e2e/owner-play-live.spec.ts");
   assert.match(live, /trace:\s*"off"/);

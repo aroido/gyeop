@@ -70,7 +70,8 @@ select is(
     'visitor_assignments_pack_version_id_card_id_fkey',
     'visitor_assignments_pkey',
     'visitor_assignments_response_id_pack_version_id_fkey',
-    'visitor_assignments_response_id_stage_position_key'
+    'visitor_assignments_response_id_stage_position_key',
+    'visitor_assignments_response_pack_card_key'
   ]::text[],
   'assignment identity and composite FK inventory is exact'
 );
@@ -270,6 +271,8 @@ insert into public.visitor_responses (
   status,
   session_token_hash,
   session_expires_at,
+  management_token_hash,
+  submitted_at,
   created_at
 )
 with fixed_time as (
@@ -284,6 +287,8 @@ select
   'submitted',
   decode(lpad(to_hex(series.value + 96), 2, '0') || repeat('00', 31), 'hex'),
   fixed_time.created_at + interval '24 hours',
+  decode(lpad(to_hex(series.value + 112), 2, '0') || repeat('00', 31), 'hex'),
+  fixed_time.created_at + interval '12 hours',
   fixed_time.created_at
 from generate_series(1, 4) as series(value)
 cross join fixed_time;
@@ -341,13 +346,14 @@ insert into public.share_links (
 with fixed_time as (select clock_timestamp() as value)
 insert into public.visitor_responses (
   id, share_link_id, pack_version_id, relationship_code, known_since_code,
-  status, session_token_hash, session_expires_at, created_at
+  status, session_token_hash, session_expires_at, management_token_hash,
+  submitted_at, created_at
 ) select
   '23300000-0000-4000-8000-000000000005',
   '23100000-0000-4000-8000-000000000004',
   '15151515-1515-4515-8515-151515151515',
   'other', 'not_sure', 'submitted', decode(repeat('72', 32), 'hex'),
-  value + interval '24 hours', value
+  value + interval '24 hours', decode(repeat('74', 32), 'hex'), value, value
 from fixed_time;
 insert into public.visitor_assignments (
   response_id, pack_version_id, card_id, stage, position
@@ -647,6 +653,10 @@ select is(
   'session hash collision rolls back the attempted response and quota'
 );
 
+alter table public.share_links
+  drop constraint share_links_consumed_response_binding_fkey;
+alter table public.visitor_responses
+  drop constraint visitor_responses_id_share_link_key;
 alter table public.visitor_responses
   drop constraint visitor_responses_id_pack_version_key cascade;
 select is(

@@ -18,7 +18,11 @@ const ALLOWED_RPC_EXPORTS = new Map([
   ["revokeOwnerPlaySession", "revoke_owner_play_session"],
   ["getInviteMetadata", "get_invite_metadata"],
   ["recordOwnerShareAction", "record_owner_share_action"],
-  ["startResponse", "start_response"],
+  ["startResponse", "start_required_response"],
+  ["getVisitorResponse", "get_visitor_response"],
+  ["saveResponseAnswer", "save_response_answer"],
+  ["submitResponse", "submit_response"],
+  ["recordVisitorResponseEvent", "record_visitor_response_event"],
   ["deleteAuthUser", "prepare_auth_deletion_call"],
   ["resolveNotificationRecipient", "resolve_notification_recipient_identity"],
 ]);

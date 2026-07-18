@@ -18,7 +18,13 @@ import {
   decodeRecordShareActionOutcome,
   decodeRotateShareLinkOutcome,
 } from "../share-links/share-link-state-core.mjs";
-import { decodeStartResponseOutcome } from "../visitor-response/visitor-session-core.mjs";
+import {
+  decodeGetVisitorResponseOutcome,
+  decodeRecordVisitorResponseEventOutcome,
+  decodeSaveResponseAnswerOutcome,
+  decodeStartResponseOutcome,
+  decodeSubmitResponseOutcome,
+} from "../visitor-response/visitor-session-core.mjs";
 
 let internalClient: SupabaseClient<Database> | undefined;
 
@@ -73,23 +79,42 @@ type RecordShareActionResult =
   | (ShareManagementState & Readonly<{ outcome: "recorded" }>)
   | OwnerShareFailure
   | Readonly<{ outcome: "link_not_found" | "link_not_active" }>;
-export type VisitorResponseState = Readonly<{
+type VisitorAssignmentBase = Readonly<{
+  cardId: string;
+  stage: "required";
+  position: 1 | 2 | 3;
+  visitorPrompt: string;
+  optionA: string;
+  optionB: string;
+  isSignature: boolean;
+  visitorChoice: "a" | "b" | null;
+}>;
+type VisitorResponseBase = Readonly<{
   id: string;
-  status: "draft";
   relationshipCode: string;
   knownSinceCode: string;
   sessionExpiresAt: string;
   sessionTtlSeconds: number;
-  assignments: readonly Readonly<{
-    cardId: string;
-    stage: "required";
-    position: 1 | 2 | 3;
-    visitorPrompt: string;
-    optionA: string;
-    optionB: string;
-    isSignature: boolean;
-  }>[];
 }>;
+export type VisitorResponseState =
+  | (VisitorResponseBase &
+      Readonly<{
+        status: "draft";
+        assignments: readonly VisitorAssignmentBase[];
+      }>)
+  | (VisitorResponseBase &
+      Readonly<{
+        status: "submitted";
+        allMatched: boolean;
+        assignments: readonly Readonly<
+          VisitorAssignmentBase & {
+            visitorChoice: "a" | "b";
+            ownerChoice: "a" | "b";
+            matches: boolean;
+            isHighlight: boolean;
+          }
+        >[];
+      }>);
 export type StartResponseResult =
   | Readonly<{
       outcome: "created" | "resumed";
@@ -484,7 +509,7 @@ export async function startResponse(input: {
   ) {
     throw new Error("Invalid response start branch");
   }
-  let query = getInternalClient().rpc("start_response", {
+  let query = getInternalClient().rpc("start_required_response", {
     p_public_id: input.publicId,
     p_secret_hash: bytea(input.secretHash),
     p_intent: input.intent,
@@ -510,4 +535,90 @@ export async function startResponse(input: {
   const { data, error } = await query;
   if (error) throw new Error("Internal visitor response RPC failed");
   return decodeStartResponseOutcome(data) as StartResponseResult;
+}
+
+export type GetVisitorResponseResult =
+  | Readonly<{ outcome: "authorized"; response: VisitorResponseState }>
+  | Readonly<{ outcome: "session_invalid" }>;
+
+export async function getVisitorResponse(input: {
+  responseId: string;
+  sessionTokenHash: Uint8Array;
+  signal?: AbortSignal;
+}): Promise<GetVisitorResponseResult> {
+  let query = getInternalClient().rpc("get_visitor_response", {
+    p_response_id: input.responseId,
+    p_session_hash: bytea(input.sessionTokenHash),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal visitor response RPC failed");
+  return decodeGetVisitorResponseOutcome(data) as GetVisitorResponseResult;
+}
+
+export type SaveResponseAnswerResult =
+  | Readonly<{ outcome: "saved"; response: VisitorResponseState }>
+  | Readonly<{ outcome: "invalid_card" }>
+  | Readonly<{ outcome: "session_invalid" }>
+  | Readonly<{ outcome: "submitted" }>;
+
+export async function saveResponseAnswer(input: {
+  responseId: string;
+  sessionTokenHash: Uint8Array;
+  cardId: string;
+  choice: "a" | "b";
+  signal?: AbortSignal;
+}): Promise<SaveResponseAnswerResult> {
+  let query = getInternalClient().rpc("save_response_answer", {
+    p_response_id: input.responseId,
+    p_session_hash: bytea(input.sessionTokenHash),
+    p_card_id: input.cardId,
+    p_choice: input.choice,
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal visitor response RPC failed");
+  return decodeSaveResponseAnswerOutcome(data) as SaveResponseAnswerResult;
+}
+
+export type SubmitResponseResult =
+  | Readonly<{ outcome: "submitted"; response: VisitorResponseState }>
+  | Readonly<{ outcome: "conflict" }>
+  | Readonly<{ outcome: "incomplete" }>
+  | Readonly<{ outcome: "session_invalid" }>;
+
+export async function submitResponse(input: {
+  responseId: string;
+  sessionTokenHash: Uint8Array;
+  managementHash: Uint8Array;
+  signal?: AbortSignal;
+}): Promise<SubmitResponseResult> {
+  let query = getInternalClient().rpc("submit_response", {
+    p_response_id: input.responseId,
+    p_session_hash: bytea(input.sessionTokenHash),
+    p_management_hash: bytea(input.managementHash),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal visitor response RPC failed");
+  return decodeSubmitResponseOutcome(data) as SubmitResponseResult;
+}
+
+export async function recordVisitorResponseEvent(input: {
+  responseId: string;
+  sessionTokenHash: Uint8Array;
+  event: "comparison_viewed" | "same_pack_start_clicked";
+  signal?: AbortSignal;
+}) {
+  let query = getInternalClient().rpc("record_visitor_response_event", {
+    p_response_id: input.responseId,
+    p_session_hash: bytea(input.sessionTokenHash),
+    p_event_name: input.event,
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal visitor response RPC failed");
+  return decodeRecordVisitorResponseEventOutcome(data) as Readonly<{
+    outcome: "recorded" | "session_invalid";
+  }>;
 }
