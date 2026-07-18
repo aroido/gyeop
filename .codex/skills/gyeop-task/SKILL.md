@@ -53,9 +53,9 @@ scripts/task-harness cleanup <issue-number> <pr-number>
 12. Have an independent `verifier` or `test-engineer` review the spec, diff, and relevant SSOT.
 13. Write QA to `docs/temp/qa/issue-<number>.md` using the QA template.
 14. Fix all P0/P1 QA findings and run `scripts/task-harness qa-check <qa-path>`.
-15. Run `./scripts/run-ai-verify --mode full`.
-16. Create or recover the PR with `scripts/task-harness pr <issue-number>`; the harness rejects ambiguous or mismatched open PRs before and after full verification, verifies a draft before making it ready, preserves uncertain ready transitions for rerun recovery, and requires `Closes #<issue>` as the first line with no other GitHub closing keyword reference.
-17. Merge only after required CI checks, local full verification, unchanged QA artifact, and the final PR base/head snapshot checks pass.
+15. Run targeted checks while implementing, then run `./scripts/run-ai-verify --mode full` once on the final clean commit immediately before publishing.
+16. Create or recover the PR with `scripts/task-harness pr <issue-number>`; the harness reuses the exact-SHA local verification marker, falls back to one full verification when the marker is missing, rejects ambiguous or mismatched open PRs, verifies a draft before making it ready, preserves uncertain ready transitions for rerun recovery, and requires `Closes #<issue>` as the first line with no other GitHub closing keyword reference.
+17. Merge only after required CI checks, exact-SHA local full verification, unchanged QA artifact, and the final PR base/head snapshot checks pass. The merge gate reuses that verification instead of rerunning the full suite.
 18. Return to the base checkout, then run `scripts/task-harness close <issue-number> <pr-number>` and `scripts/task-harness cleanup <issue-number> <pr-number>`.
 
 Read `references/review-gates.md` before resuming work, changing status, reviewing a spec, starting QA, publishing a PR, or merging.

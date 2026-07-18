@@ -42,7 +42,7 @@ The QA artifact must contain exactly one line-start field for each of `Reviewer 
 - Result: PASS
 ```
 
-The task harness fixes the QA artifact contents before each PR or merge full verification, then requires the file to be byte-for-byte unchanged and the QA gate to still pass afterward.
+The task harness fixes the QA artifact contents before checking or reusing the exact-SHA full verification marker, then requires the file to be byte-for-byte unchanged and the QA gate to still pass afterward.
 
 ## PR and completion gate
 
@@ -50,7 +50,7 @@ The task harness fixes the QA artifact contents before each PR or merge full ver
 - The configured GitHub repository must exactly match every fetch and push URL configured for local `origin` at command start and again immediately before delayed remote or GitHub mutation.
 - A PR body must start with a line whose complete contents are `Closes #<issue-number>` for the expected issue and contain no other GitHub closing keyword reference. `Fixes`, `Resolves`, prose, negations, fenced or quoted examples, cross-repository references, and duplicate lines are not completion evidence.
 - PR creation checks open candidates before full verification and repeats the candidate/repository/remote-head check immediately afterward before push. A rerun may recover exactly one matching open PR; ambiguous, changed, or mismatched candidates fail before local or remote mutation. If ready transition success is uncertain, the PR remains open for the next rerun instead of being closed automatically.
-- Merge fixes both `base.sha` and `head.sha` before full verification, checks them again afterward and immediately before the merge call, and passes the expected head SHA to GitHub. GitHub does not accept an expected base SHA in the merge API, so a base update between the final read and write remains a documented API race.
+- PR and merge reuse a successful local full verification only for the exact immutable `head.sha`; a missing marker runs the suite once as a safe fallback. Merge fixes both `base.sha` and `head.sha`, checks them again immediately before the merge call, and passes the expected head SHA to GitHub. GitHub does not accept an expected base SHA in the merge API, so a base update between the final read and write remains a documented API race.
 - `close <issue-number> <pr-number>` writes one deterministic completion marker before closing. A rerun uses the marker to avoid duplicate completion comments.
 - `cleanup <issue-number> <pr-number>` rejects tracked/untracked changes and ignored paths outside the documented disposable generated allowlist. It snapshots target branch config, moves the exact local branch to a deterministic task-specific quarantine ref that a rerun can recover, rechecks worktree/ref/config state before and after deletion, deletes the quarantine ref with an expected-SHA compare-and-swap, uses an expected-SHA lease for remote deletion, cleans remote-tracking/config state, and treats an already absent remote branch as a safe rerun state.
 - An already merged PR is the only workflow-state exception: after validating its repository, issue relationship, head SHA, and merge SHA, `merge` may return `alreadyMerged: true` without writes even if the issue is closed. This exception must not restore the branch or bypass evidence checks.
