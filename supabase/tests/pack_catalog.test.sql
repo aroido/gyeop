@@ -30,8 +30,8 @@ select is(
     from public.pack_templates
     where id = '11111111-1111-4111-8111-111111111111'
   ),
-  '{"slug":"old-friend","title":"오래된 친구팩","targetRelationship":"old_friend","sensitivity":"low","active":false}'::jsonb,
-  'seed recreates the frozen inactive template'
+  '{"slug":"old-friend","title":"오래된 친구팩","targetRelationship":"old_friend","sensitivity":"low","active":true}'::jsonb,
+  'seed recreates the frozen private-MVP active template'
 );
 
 select ok(
@@ -83,7 +83,18 @@ select is(
   'seed cards exactly match the approved document'
 );
 
-select is(public.get_published_pack('old-friend'), null::jsonb, 'inactive pack is not public');
+select is(
+  (
+    select jsonb_build_object(
+      'slug', pack->'slug',
+      'version', pack->'version',
+      'cardCount', jsonb_array_length(pack->'cards')
+    )
+    from (select public.get_published_pack('old-friend') pack) published
+  ),
+  '{"slug":"old-friend","version":"old-friend-v1","cardCount":10}'::jsonb,
+  'active private-MVP seed exposes the reviewed published pack'
+);
 
 select ok(
   has_function_privilege('service_role', 'public.get_published_pack(text)', 'EXECUTE')

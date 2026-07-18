@@ -37,9 +37,10 @@ function oldFriendSummary(
 
 export default async function Home() {
   noStore();
-  const prototypeEnabled = process.env.NODE_ENV === "development";
-  let published = null;
-  if (!prototypeEnabled) {
+  const development = process.env.NODE_ENV === "development";
+  let published: Parameters<typeof oldFriendSummary>[0] | null =
+    development && oldFriendManifest.active ? oldFriendManifest : null;
+  if (!development) {
     try {
       published = await readPublishedPack("old-friend");
     } catch {
@@ -49,7 +50,6 @@ export default async function Home() {
 
   return (
     <HomeClient
-      prototypeEnabled={prototypeEnabled}
       oldFriendActive={published !== null}
       oldFriend={oldFriendSummary(published ?? oldFriendManifest)}
     />

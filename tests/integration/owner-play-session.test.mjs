@@ -67,7 +67,7 @@ function sql(statement, output = false) {
 
 before(async () => {
   sql(
-    "update public.pack_templates set is_active = false where slug = 'old-friend'",
+    "update public.pack_templates set is_active = false where slug = 'old-friend'; delete from public.rate_limit_buckets where action = 'owner_draft_create'",
   );
   server = spawn(
     "pnpm",
@@ -93,7 +93,7 @@ before(async () => {
 
 after(async () => {
   sql(
-    "update public.pack_templates set is_active = false where slug = 'old-friend'",
+    "update public.pack_templates set is_active = true where slug = 'old-friend'",
   );
   if (!server || server.exitCode !== null) return;
   server.kill("SIGTERM");
@@ -285,6 +285,87 @@ test("owner can create, reload, save ten answers, complete, and cannot edit", as
     message: "완료한 답변은 변경할 수 없습니다.",
   });
   assert.ok(rejectedEdit.headers.get("set-cookie")?.includes("Max-Age=604800"));
+});
+
+test("nine saved answers remain a recoverable draft after incomplete completion", async () => {
+  const created = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.22",
+    body: { packSlug: "old-friend" },
+  });
+  assert.equal(created.status, 201);
+  const body = await created.json();
+  const cookie = cookieFrom(created);
+
+  for (const card of manifest.cards.slice(0, 9)) {
+    const saved = await ownerRequest(
+      `/api/plays/${body.id}/answers/${card.id}`,
+      {
+        method: "PUT",
+        ip: "198.51.100.22",
+        cookie,
+        body: { choice: "a", currentPosition: card.position + 1 },
+      },
+    );
+    assert.equal(saved.status, 200);
+  }
+
+  const incomplete = await ownerRequest(`/api/plays/${body.id}/complete`, {
+    method: "POST",
+    ip: "198.51.100.22",
+    cookie,
+    body: {},
+  });
+  assert.equal(incomplete.status, 409);
+  assert.deepEqual(await incomplete.json(), {
+    code: "OWNER_PLAY_INCOMPLETE",
+    message: "모든 질문에 답한 뒤 완료해 주세요.",
+  });
+
+  const restored = await ownerRequest(`/api/plays/${body.id}`, {
+    ip: "198.51.100.22",
+    cookie,
+  });
+  assert.equal(restored.status, 200);
+  const restoredBody = await restored.json();
+  assert.equal(restoredBody.status, "draft");
+  assert.equal(restoredBody.answers.length, 9);
+});
+
+test("an expired capability converges to the generic terminal response", async () => {
+  const created = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.23",
+    body: { packSlug: "old-friend" },
+  });
+  assert.equal(created.status, 201);
+  const body = await created.json();
+  const cookie = cookieFrom(created);
+  sql(`
+    update public.pack_plays
+    set last_active_at = expired.at,
+        management_expires_at = expired.at + interval '7 days'
+    from (select clock_timestamp() - interval '8 days' as at) expired
+    where id = '${body.id}'
+  `);
+
+  const expired = await ownerRequest(`/api/plays/${body.id}`, {
+    ip: "198.51.100.23",
+    cookie,
+  });
+  assert.equal(expired.status, 404);
+  assert.deepEqual(await expired.json(), {
+    code: "OWNER_PLAY_NOT_FOUND",
+    message: "진행 중인 팩을 찾을 수 없습니다.",
+  });
+  assert.ok(expired.headers.get("set-cookie")?.includes("Max-Age=0"));
+  assert.equal(
+    sql(
+      `select count(*) from public.pack_plays where id = '${body.id}' and management_secret_hash is not null`,
+      true,
+    ),
+    "0",
+  );
 });
 
 test("cross-play preserves a valid cookie while tamper and malformed cookies are deleted", async () => {

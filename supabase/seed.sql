@@ -16,7 +16,7 @@ values (
   '오래된 친구팩',
   'old_friend',
   'low',
-  false
+  true
 );
 
 insert into public.pack_versions (id, template_id, version)
