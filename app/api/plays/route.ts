@@ -1,7 +1,6 @@
 import {
   createOwnerPlayResponse,
   ownerNotFoundResponse,
-  privateNoStore,
   resumeOwnerPlayResponse,
 } from "../../../lib/http/owner-play.ts";
 import { createOwnerPlaySchema } from "../../../lib/http/owner-play-schemas.ts";
@@ -12,7 +11,11 @@ import { parseOwnerCookieHeader } from "../../../lib/owner-play/owner-play-sessi
 export function POST(request: Request) {
   return withPublicRequest(
     request,
-    { schema: createOwnerPlaySchema, maximumBodyBytes: 128 },
+    {
+      schema: createOwnerPlaySchema,
+      maximumBodyBytes: 128,
+      privateNoStore: true,
+    },
     ({ input, networkKey, signal }) => {
       if (!input || typeof input.packSlug !== "string") {
         throw new Error("INTERNAL_ERROR");
@@ -43,7 +46,7 @@ export function POST(request: Request) {
             networkKey,
             signal,
           }),
-      ).then(privateNoStore);
+      );
     },
   );
 }

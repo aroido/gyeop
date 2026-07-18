@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import {
@@ -13,6 +16,18 @@ import {
   serializeDeletedOwnerCookie,
   serializeOwnerCookie,
 } from "../../lib/owner-play/owner-play-session-core.mjs";
+
+const root = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
+const manifest = JSON.parse(
+  readFileSync(path.join(root, "content/packs/old-friend-v1.json"), "utf8"),
+);
+const orderedAnswers = manifest.cards.map((card, index) => ({
+  cardId: card.id,
+  choice: index % 2 === 0 ? "a" : "b",
+}));
 
 function state(overrides = {}) {
   return {
@@ -108,6 +123,14 @@ test("strictly decodes the owner-state allowlist", () => {
   assert.equal(decoded.answers.length, 1);
   assert.ok(Object.isFrozen(decoded));
   assert.ok(Object.isFrozen(decoded.answers));
+  assert.equal(
+    decodeOwnerPlayState(
+      state({
+        managementExpiresAt: "2026-07-25T01:26:53.017077+00:00",
+      }),
+    ).managementExpiresAt,
+    "2026-07-25T01:26:53.017077+00:00",
+  );
 
   for (const invalid of [
     { ...state(), secret: "leak" },
@@ -115,6 +138,10 @@ test("strictly decodes the owner-state allowlist", () => {
     state({ currentPosition: "1" }),
     state({ answers: [{ cardId: "conflict", choice: "A" }] }),
     state({ answers: [{ cardId: "conflict", choice: "a", prompt: "leak" }] }),
+    state({ managementExpiresAt: "1" }),
+    state({ managementExpiresAt: "2026-02-31T00:00:00Z" }),
+    state({ answers: [orderedAnswers[1], orderedAnswers[0]] }),
+    state({ answers: [{ cardId: "unknown-card", choice: "a" }] }),
     state({ status: "completed" }),
   ]) {
     assert.throws(
@@ -122,6 +149,13 @@ test("strictly decodes the owner-state allowlist", () => {
       /Invalid owner play session/,
     );
   }
+
+  assert.equal(
+    decodeOwnerPlayState(
+      state({ status: "completed", answers: orderedAnswers }),
+    ).answers.length,
+    10,
+  );
 });
 
 test("strictly decodes route-specific outcomes", () => {

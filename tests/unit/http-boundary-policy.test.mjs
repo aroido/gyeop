@@ -296,7 +296,7 @@ test("accepts the reviewed create/resume owner branch order", () => {
           import { createOwnerPlayResponse, ownerNotFoundResponse, resumeOwnerPlayResponse } from "../../../lib/http/owner-play";
           import { parseOwnerCookieHeader } from "../../../lib/owner-play/owner-play-session-core.mjs";
           export function POST(request) {
-            return withPublicRequest(request, {}, ({ networkKey, signal }) => {
+            return withPublicRequest(request, { privateNoStore: true }, ({ networkKey, signal }) => {
               const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
               if (cookie.outcome === "absent") return createOwnerPlayResponse();
               if (cookie.outcome === "malformed") return ownerNotFoundResponse();
@@ -307,6 +307,33 @@ test("accepts the reviewed create/resume owner branch order", () => {
       ),
     ),
     [],
+  );
+});
+
+test("requires private no-store on every owner boundary outcome", () => {
+  const findings = verifyHttpBoundarySources(
+    ownerRouteFiles(
+      "app/api/plays/route.ts",
+      `
+        import { withPublicRequest } from "../../../lib/http/request-boundary";
+        import { runRateLimitedDomain } from "../../../lib/http/rate-limit";
+        import { createOwnerPlayResponse, ownerNotFoundResponse, resumeOwnerPlayResponse } from "../../../lib/http/owner-play";
+        import { parseOwnerCookieHeader } from "../../../lib/owner-play/owner-play-session-core.mjs";
+        export function POST(request) {
+          return withPublicRequest(request, {}, ({ networkKey, signal }) => {
+            const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
+            if (cookie.outcome === "absent") return createOwnerPlayResponse();
+            if (cookie.outcome === "malformed") return ownerNotFoundResponse();
+            return runRateLimitedDomain({ keyHash: networkKey, action: "owner_play_access", windowSeconds: 600, limit: 120, signal }, () => resumeOwnerPlayResponse());
+          });
+        }
+      `,
+    ),
+  );
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("owner capability branch order"),
+    ),
   );
 });
 

@@ -1,7 +1,6 @@
 import {
   completeOwnerPlayResponse,
   ownerNotFoundResponse,
-  privateNoStore,
 } from "../../../../../lib/http/owner-play.ts";
 import { emptyOwnerMutationSchema } from "../../../../../lib/http/owner-play-schemas.ts";
 import { runRateLimitedDomain } from "../../../../../lib/http/rate-limit.ts";
@@ -14,7 +13,11 @@ export function POST(
 ) {
   return withPublicRequest(
     request,
-    { schema: emptyOwnerMutationSchema, maximumBodyBytes: 16 },
+    {
+      schema: emptyOwnerMutationSchema,
+      maximumBodyBytes: 16,
+      privateNoStore: true,
+    },
     ({ networkKey, signal }) =>
       runRateLimitedDomain(
         {
@@ -33,6 +36,6 @@ export function POST(
           if (cookie.playId !== playId) return ownerNotFoundResponse();
           return completeOwnerPlayResponse({ cookie, signal });
         },
-      ).then(privateNoStore),
+      ),
   );
 }

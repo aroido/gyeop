@@ -26,6 +26,7 @@ import {
 type BoundaryOptions<Shape extends ZodRawShape> = Readonly<{
   schema?: StrictJsonSchema<Shape>;
   maximumBodyBytes?: number;
+  privateNoStore?: true;
   env?: NodeJS.ProcessEnv;
   now?: Date;
 }>;
@@ -52,6 +53,19 @@ function asBoundaryCode(error: unknown): BoundaryErrorCode {
   return allowed.has(error.message as BoundaryErrorCode)
     ? (error.message as BoundaryErrorCode)
     : "INTERNAL_ERROR";
+}
+
+function finalizePublicResponse(
+  response: Response,
+  requestId: string,
+  env: NodeJS.ProcessEnv,
+  privateNoStore: boolean,
+) {
+  const finalized = finalizeBoundaryResponse(response, requestId, env);
+  if (privateNoStore) {
+    finalized.headers.set("Cache-Control", "private, no-store");
+  }
+  return finalized;
 }
 
 export async function withPublicRequest<Shape extends ZodRawShape>(
@@ -98,12 +112,18 @@ export async function withPublicRequest<Shape extends ZodRawShape>(
     if (!(response instanceof Response)) {
       throw new BoundaryError("INTERNAL_ERROR");
     }
-    return finalizeBoundaryResponse(response, requestId, env);
+    return finalizePublicResponse(
+      response,
+      requestId,
+      env,
+      options.privateNoStore === true,
+    );
   } catch (error) {
-    return finalizeBoundaryResponse(
+    return finalizePublicResponse(
       errorResponse(asBoundaryCode(error)),
       requestId,
       env,
+      options.privateNoStore === true,
     );
   }
 }

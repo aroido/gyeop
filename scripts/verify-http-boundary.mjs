@@ -239,7 +239,7 @@ function isSafeBoundaryOptionValue(expression) {
 function isSafeBoundaryOptions(expression) {
   const options = unwrapExpression(expression);
   if (!ts.isObjectLiteralExpression(options)) return false;
-  const allowed = new Set(["schema", "maximumBodyBytes"]);
+  const allowed = new Set(["schema", "maximumBodyBytes", "privateNoStore"]);
   const seen = new Set();
   return options.properties.every((property) => {
     if (ts.isShorthandPropertyAssignment(property)) {
@@ -254,6 +254,20 @@ function isSafeBoundaryOptions(expression) {
     seen.add(name);
     return isSafeBoundaryOptionValue(property.initializer);
   });
+}
+
+function hasPrivateNoStoreOption(expression) {
+  const options = unwrapExpression(expression);
+  if (!ts.isObjectLiteralExpression(options)) return false;
+  const matches = options.properties.filter(
+    (property) =>
+      ts.isPropertyAssignment(property) &&
+      propertyNameText(property.name) === "privateNoStore",
+  );
+  return (
+    matches.length === 1 &&
+    unwrapExpression(matches[0].initializer).kind === ts.SyntaxKind.TrueKeyword
+  );
 }
 
 function isDeferredBoundaryCallback(expression) {
@@ -636,7 +650,9 @@ function hasSafeOwnerRouteOrder(route, files, contract) {
     handlers[0].node,
     contract.aliases,
   );
-  if (!boundaryCall) return false;
+  if (!boundaryCall || !hasPrivateNoStoreOption(boundaryCall.arguments[1])) {
+    return false;
+  }
   const callback = unwrapExpression(boundaryCall.arguments[2]);
   if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) {
     return false;

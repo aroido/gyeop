@@ -1,6 +1,5 @@
 import {
   ownerNotFoundResponse,
-  privateNoStore,
   saveOwnerAnswerResponse,
 } from "../../../../../../lib/http/owner-play.ts";
 import { saveOwnerAnswerSchema } from "../../../../../../lib/http/owner-play-schemas.ts";
@@ -14,7 +13,11 @@ export function PUT(
 ) {
   return withPublicRequest(
     request,
-    { schema: saveOwnerAnswerSchema, maximumBodyBytes: 96 },
+    {
+      schema: saveOwnerAnswerSchema,
+      maximumBodyBytes: 96,
+      privateNoStore: true,
+    },
     ({ input, networkKey, signal }) =>
       runRateLimitedDomain(
         {
@@ -47,6 +50,6 @@ export function PUT(
             signal,
           });
         },
-      ).then(privateNoStore),
+      ),
   );
 }

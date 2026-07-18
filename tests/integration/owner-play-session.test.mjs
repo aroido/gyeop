@@ -115,16 +115,21 @@ function proxyHeaders(ip, extra = {}) {
   };
 }
 
-function ownerRequest(pathname, { method = "GET", ip, cookie, body } = {}) {
-  const headers = proxyHeaders(ip ?? "198.51.100.1");
+async function ownerRequest(
+  pathname,
+  { method = "GET", ip, cookie, body, headerOverrides = {} } = {},
+) {
+  const headers = proxyHeaders(ip ?? "198.51.100.1", headerOverrides);
   if (cookie) headers.cookie = cookie;
   const options = { method, headers };
   if (body !== undefined) {
-    headers.origin = appUrl;
+    if (!("origin" in headers)) headers.origin = appUrl;
     headers["content-type"] = "application/json";
     options.body = JSON.stringify(body);
   }
-  return fetch(`${appUrl}${pathname}`, options);
+  const response = await fetch(`${appUrl}${pathname}`, options);
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+  return response;
 }
 
 function cookieFrom(response) {
@@ -134,6 +139,30 @@ function cookieFrom(response) {
   assert.ok(value, "response must contain a non-empty owner cookie");
   return `__Host-gyeop-owner=${value}`;
 }
+
+test("owner boundary failures are always private no-store", async () => {
+  const invalidOrigin = await ownerRequest("/api/plays", {
+    method: "POST",
+    body: { packSlug: "old-friend" },
+    headerOverrides: { origin: "https://evil.example" },
+  });
+  assert.equal(invalidOrigin.status, 403);
+
+  const invalidInput = await ownerRequest("/api/plays", {
+    method: "POST",
+    body: { packSlug: "old-friend", extra: true },
+  });
+  assert.equal(invalidInput.status, 400);
+
+  const invalidProxy = await ownerRequest("/api/plays", {
+    method: "POST",
+    body: { packSlug: "old-friend" },
+    headerOverrides: {
+      "x-forwarded-for": "198.51.100.1, 203.0.113.1",
+    },
+  });
+  assert.equal(invalidProxy.status, 400);
+});
 
 test("inactive create returns PACK_NOT_FOUND without a cookie or quota row", async () => {
   const response = await ownerRequest("/api/plays", {
