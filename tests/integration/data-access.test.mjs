@@ -130,6 +130,29 @@ async function tableRequest(method, table, key) {
       },
       update: { owner_prompt: "Blocked update" },
     },
+    pack_plays: {
+      query: "id=eq.17000000-0000-4000-8000-000000000000",
+      insert: {
+        id: "17000000-0000-4000-8000-000000000000",
+        pack_version_id: "15151515-1515-4515-8515-151515151515",
+        management_secret_hash: `\\x${randomBytes(32).toString("hex")}`,
+        last_active_at: now.toISOString(),
+        management_expires_at: new Date(
+          now.getTime() + 7 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+      },
+      update: { current_position: 2 },
+    },
+    self_answers: {
+      query: "card_id=eq.conflict",
+      insert: {
+        pack_play_id: "17000000-0000-4000-8000-000000000000",
+        pack_version_id: "15151515-1515-4515-8515-151515151515",
+        card_id: "conflict",
+        choice: "a",
+      },
+      update: { choice: "b" },
+    },
   };
   const fixture = fixtures[table];
   if (!fixture) throw new Error(`Missing table fixture for ${table}`);
@@ -155,6 +178,8 @@ test("anon and service keys cannot access application tables directly", async ()
       "pack_templates",
       "pack_versions",
       "pack_cards",
+      "pack_plays",
+      "self_answers",
     ]) {
       for (const method of ["GET", "POST", "PATCH", "DELETE"]) {
         const response = await tableRequest(method, table, key);
@@ -185,6 +210,39 @@ test("anon key cannot execute the mutation RPC", async () => {
     [401, 403, 404].includes(response.status),
     `anon RPC must be denied, got ${response.status}`,
   );
+});
+
+test("anon key cannot execute owner play RPCs", async () => {
+  for (const [rpc, body] of [
+    [
+      "create_or_resume_play",
+      {
+        p_pack_slug: "old-friend",
+        p_existing_play_id: null,
+        p_existing_secret_hash: null,
+        p_new_play_id: "17000000-0000-4000-8000-000000000009",
+        p_new_secret_hash: `\\x${randomBytes(32).toString("hex")}`,
+        p_network_key: `\\x${randomBytes(32).toString("hex")}`,
+      },
+    ],
+    [
+      "get_owner_play",
+      {
+        p_play_id: "17000000-0000-4000-8000-000000000009",
+        p_management_secret_hash: `\\x${randomBytes(32).toString("hex")}`,
+      },
+    ],
+  ]) {
+    const response = await fetch(`${local.SUPABASE_URL}/rest/v1/rpc/${rpc}`, {
+      method: "POST",
+      headers: headers(local.SUPABASE_ANON_KEY),
+      body: JSON.stringify(body),
+    });
+    assert.ok(
+      [401, 403, 404].includes(response.status),
+      `anon ${rpc} must be denied, got ${response.status}`,
+    );
+  }
 });
 
 test("anon key cannot execute pack catalog or publication RPCs", async () => {

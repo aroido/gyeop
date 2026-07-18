@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-18 — 비공개 재미 검증은 무이메일 same-browser owner capability로 진행
+
+- 결정: Project #5의 비공개 재미 검증에서는 이메일·표시 이름·전화번호·Supabase Auth owner 계정을 만들지 않는다. owner play 하나에 결합한 256-bit 관리 secret을 `Secure`·`HttpOnly`·`SameSite=Lax` cookie에만 두고 DB에는 domain-separated hash만 저장하며, 같은 play id+hash를 검증한 RPC만 7일 inactivity window를 갱신한다.
+- 이유: 지금 확인할 제품 가설은 계정 복구가 아니라 `주인 10장 → 공유 → 친구 비교·새 주인 전환 → 누적 프로필 재공유`가 실제로 재미있는지다. 이메일·삭제 worker·알림 운영은 이 검증보다 크고 느린 선행 조건을 만든다.
+- 결과: 2026-07-15의 `P0 계정 연결과 알림은 이메일`, `P0 draft 귀속`, `P0 production beta owner 계정 삭제` 결정은 폐기하지 않되 현재 비공개 재미 검증에는 적용하지 않는다. 세 결정은 개인정보·보관·운영 정책과 함께 `production beta 재승인`을 통과할 때만 다시 활성화한다. cookie 유실·만료·로그아웃 뒤 cross-device·이메일·운영자 복구는 제공하지 않는다.
+
 ## 2026-07-18 — 비공개 검증용 오래된 친구팩 v1 동결
 
 - 결정: #46에서 검수한 `old-friend-v1-draft`의 카드 id·순서·주인 질문·A/B 선택지를 유지하고, 자연스러운 방문자 질문을 짝지어 `old-friend-v1` 검증 계약으로 동결한다.

@@ -9,6 +9,7 @@ import {
   validateAppUrl,
   validateProxyRequest,
 } from "../../lib/http/http-boundary-core.mjs";
+import { errorResponse } from "../../lib/http/errors.ts";
 import { withPublicRequest } from "../../lib/http/request-boundary.ts";
 import {
   parseStrictJson,
@@ -280,4 +281,38 @@ test("redacts callback errors, request values, and secrets from the public respo
     code: "INTERNAL_ERROR",
     message: "문제가 발생했습니다. 잠시 후 다시 시도해 주세요.",
   });
+});
+
+test("applies private no-store to boundary, input, and domain failures", async () => {
+  const schema = strictJsonObject({ name: z.string().min(1) });
+  const options = {
+    schema,
+    maximumBodyBytes: 1024,
+    privateNoStore: true,
+    env: env(),
+  };
+  const responses = [
+    await withPublicRequest(
+      request({ name: "겹" }, { origin: "https://evil.example" }),
+      options,
+      () => Response.json({ ok: true }),
+    ),
+    await withPublicRequest(request({ name: "겹", extra: true }), options, () =>
+      Response.json({ ok: true }),
+    ),
+    await withPublicRequest(request(), options, () => {
+      throw new Error("rate limiter transport failed");
+    }),
+    await withPublicRequest(request(), options, () =>
+      errorResponse("INTERNAL_ERROR"),
+    ),
+  ];
+
+  assert.deepEqual(
+    responses.map((response) => response.status),
+    [403, 400, 500, 500],
+  );
+  for (const response of responses) {
+    assert.equal(response.headers.get("cache-control"), "private, no-store");
+  }
 });

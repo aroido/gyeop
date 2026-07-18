@@ -99,6 +99,56 @@ export type Database = {
           },
         ];
       };
+      pack_plays: {
+        Row: {
+          completed_at: string | null;
+          created_at: string;
+          current_position: number;
+          id: string;
+          last_active_at: string;
+          management_expires_at: string;
+          management_revoked_at: string | null;
+          management_secret_hash: string | null;
+          pack_version_id: string;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          completed_at?: string | null;
+          created_at?: string;
+          current_position?: number;
+          id: string;
+          last_active_at: string;
+          management_expires_at: string;
+          management_revoked_at?: string | null;
+          management_secret_hash?: string | null;
+          pack_version_id: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          completed_at?: string | null;
+          created_at?: string;
+          current_position?: number;
+          id?: string;
+          last_active_at?: string;
+          management_expires_at?: string;
+          management_revoked_at?: string | null;
+          management_secret_hash?: string | null;
+          pack_version_id?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pack_plays_pack_version_id_fkey";
+            columns: ["pack_version_id"];
+            isOneToOne: false;
+            referencedRelation: "pack_versions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       pack_templates: {
         Row: {
           created_at: string;
@@ -199,11 +249,57 @@ export type Database = {
         };
         Relationships: [];
       };
+      self_answers: {
+        Row: {
+          card_id: string;
+          choice: string;
+          created_at: string;
+          pack_play_id: string;
+          pack_version_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          card_id: string;
+          choice: string;
+          created_at?: string;
+          pack_play_id: string;
+          pack_version_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          card_id?: string;
+          choice?: string;
+          created_at?: string;
+          pack_play_id?: string;
+          pack_version_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "self_answers_pack_play_id_pack_version_id_fkey";
+            columns: ["pack_play_id", "pack_version_id"];
+            isOneToOne: false;
+            referencedRelation: "pack_plays";
+            referencedColumns: ["id", "pack_version_id"];
+          },
+          {
+            foreignKeyName: "self_answers_pack_version_id_card_id_fkey";
+            columns: ["pack_version_id", "card_id"];
+            isOneToOne: false;
+            referencedRelation: "pack_cards";
+            referencedColumns: ["pack_version_id", "id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
     };
     Functions: {
+      complete_owner_play: {
+        Args: { p_management_secret_hash: string; p_play_id: string };
+        Returns: Json;
+      };
       consume_rate_limit: {
         Args: {
           p_action: string;
@@ -220,10 +316,39 @@ export type Database = {
           window_start: string;
         }[];
       };
+      create_or_resume_play: {
+        Args: {
+          p_existing_play_id: string;
+          p_existing_secret_hash: string;
+          p_network_key: string;
+          p_new_play_id: string;
+          p_new_secret_hash: string;
+          p_pack_slug: string;
+        };
+        Returns: Json;
+      };
+      get_owner_play: {
+        Args: { p_management_secret_hash: string; p_play_id: string };
+        Returns: Json;
+      };
       get_published_pack: { Args: { p_slug: string }; Returns: Json };
       publish_pack_version: {
         Args: { p_pack_version_id: string };
         Returns: string;
+      };
+      revoke_owner_play_session: {
+        Args: { p_management_secret_hash: string; p_play_id: string };
+        Returns: boolean;
+      };
+      save_owner_answer: {
+        Args: {
+          p_card_id: string;
+          p_choice: string;
+          p_current_position: number;
+          p_management_secret_hash: string;
+          p_play_id: string;
+        };
+        Returns: Json;
       };
     };
     Enums: {

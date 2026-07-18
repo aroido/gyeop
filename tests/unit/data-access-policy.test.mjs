@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   collectRepositoryPolicyFiles,
   verifyDataAccessFiles,
+  verifyOwnerCapabilitySql,
   verifyOwnerMutationSql,
   verifySecurityDefinerSql,
 } from "../../scripts/verify-data-access.mjs";
@@ -880,5 +881,71 @@ as $$ begin perform 1 from future_probe; end $$;
       unsafe.replace("from future_probe", "from public.future_probe"),
     ),
     [],
+  );
+});
+
+const capabilitySql = `
+create function private.authorize_owner_play_capability(
+  p_play_id uuid,
+  p_management_secret_hash bytea,
+  p_touch boolean
+) returns jsonb language sql as $$ select '{}'::jsonb $$;
+create function public.create_or_resume_play() returns jsonb language plpgsql as $$
+begin
+  perform private.authorize_owner_play_capability(null, null, false);
+  if false then return jsonb_build_object('outcome', 'pack_not_found'); end if;
+  perform public.consume_rate_limit(null, null, null, null);
+  return '{}'::jsonb;
+end $$;
+create function public.get_owner_play() returns jsonb language plpgsql as $$
+begin perform private.authorize_owner_play_capability(null, null, true); return '{}'::jsonb; end $$;
+create function public.save_owner_answer() returns jsonb language plpgsql as $$
+begin perform private.authorize_owner_play_capability(null, null, false); return '{}'::jsonb; end $$;
+create function public.complete_owner_play() returns jsonb language plpgsql as $$
+begin perform private.authorize_owner_play_capability(null, null, false); return '{}'::jsonb; end $$;
+create function public.revoke_owner_play_session() returns boolean language plpgsql as $$
+begin perform private.authorize_owner_play_capability(null, null, false); return false; end $$;
+`;
+
+test("accepts the complete play-bound owner capability RPC set", () => {
+  assert.deepEqual(verifyOwnerCapabilitySql(capabilitySql), []);
+});
+
+test("rejects missing, duplicated, Auth-anchored, and late owner capability guards", () => {
+  assert.match(
+    verifyOwnerCapabilitySql(
+      capabilitySql.replace(
+        "perform private.authorize_owner_play_capability(null, null, true);",
+        "perform 1;",
+      ),
+    ).join("\n"),
+    /must call the play capability helper exactly once/,
+  );
+  assert.match(
+    verifyOwnerCapabilitySql(
+      capabilitySql.replace(
+        "begin perform private.authorize_owner_play_capability(null, null, false); return '{}'::jsonb; end $$;",
+        "begin perform private.authorize_owner_play_capability(null, null, false); perform private.authorize_owner_play_capability(null, null, false); return '{}'::jsonb; end $$;",
+      ),
+    ).join("\n"),
+    /must call the play capability helper exactly once/,
+  );
+  assert.match(
+    verifyOwnerCapabilitySql(
+      capabilitySql.replace(
+        "begin perform private.authorize_owner_play_capability(null, null, true);",
+        "begin perform private.authorize_owner_play_capability(null, null, true); perform auth.uid();",
+      ),
+    ).join("\n"),
+    /cannot use Auth or a stable owner anchor/,
+  );
+  assert.match(
+    verifyOwnerCapabilitySql(
+      capabilitySql.replace(
+        "if false then return jsonb_build_object('outcome', 'pack_not_found'); end if;\n  perform public.consume_rate_limit",
+        "perform public.consume_rate_limit",
+      ),
+    ).join("\n"),
+    /decide pack_not_found before consuming quota/,
   );
 });

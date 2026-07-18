@@ -11,12 +11,16 @@ const OWNER_ACTOR_CORE_PATH = "lib/db/owner-mutation-actor-core.mjs";
 const ALLOWED_RPC_EXPORTS = new Map([
   ["consumeRateLimit", "consume_rate_limit"],
   ["getPublishedPack", "get_published_pack"],
+  ["createOrResumeOwnerPlay", "create_or_resume_play"],
+  ["getOwnerPlay", "get_owner_play"],
+  ["saveOwnerAnswer", "save_owner_answer"],
+  ["completeOwnerPlay", "complete_owner_play"],
+  ["revokeOwnerPlaySession", "revoke_owner_play_session"],
   ["deleteAuthUser", "prepare_auth_deletion_call"],
   ["resolveNotificationRecipient", "resolve_notification_recipient_identity"],
 ]);
 
 const OWNER_MUTATION_EXPORTS = new Map([
-  ["createOrResumePlay", "create_or_resume_play"],
   ["saveSelfAnswer", "save_self_answer"],
   ["completePlay", "complete_play"],
   ["claimPlay", "claim_play"],
@@ -26,7 +30,6 @@ const OWNER_MUTATION_EXPORTS = new Map([
 ]);
 
 const OWNER_MUTATION_SQL = new Set([
-  "create_or_resume_play",
   "save_self_answer",
   "complete_play",
   "claim_play",
@@ -1253,6 +1256,70 @@ export function verifyOwnerMutationSql(sql, filePath = "migration.sql") {
   return findings;
 }
 
+export function verifyOwnerCapabilitySql(sql, filePath = "migration.sql") {
+  const findings = [];
+  const functions = [
+    "create_or_resume_play",
+    "get_owner_play",
+    "save_owner_answer",
+    "complete_owner_play",
+    "revoke_owner_play_session",
+  ];
+  const present = functions.filter((name) =>
+    new RegExp(`function\\s+public\\.${name}\\s*\\(`, "i").test(sql),
+  );
+  if (present.length === 0) return findings;
+  if (present.length !== functions.length) {
+    findings.push(`${filePath}: owner capability RPC set must be complete`);
+  }
+  if (
+    !/function\s+private\.authorize_owner_play_capability\s*\(\s*p_play_id\s+uuid\s*,\s*p_management_secret_hash\s+bytea\s*,\s*p_touch\s+boolean/i.test(
+      sql,
+    )
+  ) {
+    findings.push(
+      `${filePath}: exact private owner capability helper is required`,
+    );
+  }
+
+  for (const name of present) {
+    const parsed = extractSqlFunctions(sql, name).at(-1);
+    if (!parsed) continue;
+    const body = parsed.body
+      .replace(/--[^\n]*/g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    const calls = [
+      ...body.matchAll(/private\s*\.\s*authorize_owner_play_capability\s*\(/gi),
+    ];
+    if (calls.length !== 1) {
+      findings.push(
+        `${filePath}: ${name} must call the play capability helper exactly once`,
+      );
+    }
+    if (
+      /\b(?:auth\.uid|p_actor_id|p_recovery_actor_candidates|owner_id)\b/i.test(
+        body,
+      )
+    ) {
+      findings.push(
+        `${filePath}: ${name} cannot use Auth or a stable owner anchor`,
+      );
+    }
+  }
+
+  const create = extractSqlFunctions(sql, "create_or_resume_play").at(-1);
+  if (create) {
+    const packNotFound = create.body.indexOf("pack_not_found");
+    const consume = create.body.indexOf("public.consume_rate_limit");
+    if (packNotFound < 0 || consume < 0 || packNotFound > consume) {
+      findings.push(
+        `${filePath}: create must decide pack_not_found before consuming quota`,
+      );
+    }
+  }
+  return findings;
+}
+
 export function verifySecurityDefinerSql(sql, filePath = "migration.sql") {
   const findings = [];
   const functionPattern =
@@ -1422,7 +1489,13 @@ export function verifyDataAccessFiles(files) {
     .map(([filePath, source]) => `\n-- ${filePath}\n${source}`)
     .join("\n");
   findings.push(...verifyOwnerMutationSql(migrations, "supabase/migrations"));
+  findings.push(...verifyOwnerCapabilitySql(migrations, "supabase/migrations"));
   findings.push(...verifySecurityDefinerSql(migrations, "supabase/migrations"));
+
+  const config = files["supabase/config.toml"];
+  if (config && /schemas\s*=\s*\[[^\]]*["']private["']/s.test(config)) {
+    findings.push("supabase/config.toml: private schema cannot be API-exposed");
+  }
 
   const internalRpc = files[INTERNAL_RPC_PATH];
   if (!internalRpc) {
@@ -1511,6 +1584,10 @@ export async function collectRepositoryPolicyFiles(root) {
   }
   await collectSourceDirectory("");
   await collectFiles(root, "supabase/migrations", [".sql"], files);
+  files["supabase/config.toml"] = await readFile(
+    path.join(root, "supabase/config.toml"),
+    "utf8",
+  );
   return files;
 }
 
