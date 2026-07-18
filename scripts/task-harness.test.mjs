@@ -1000,6 +1000,7 @@ function fakeVerifyLines() {
     "#!/usr/bin/env node",
     'const { spawnSync } = require("node:child_process");',
     'const fs = require("node:fs");',
+    'const path = require("node:path");',
     'fs.appendFileSync(process.env.FAKE_CALL_LOG, JSON.stringify({ tool: "verify", cwd: process.cwd() }) + "\\n");',
     'if (process.env.FAKE_VERIFY_MUTATION === "sha") {',
     '  const result = spawnSync("git", ["commit", "--allow-empty", "-m", "verify mutation"], { stdio: "inherit", env: process.env });',
@@ -1032,6 +1033,11 @@ function fakeVerifyLines() {
     '  state.issue = { ...state.issue, labels: [{ name: "status:blocked" }, { name: "blocked-from:qa" }] };',
     "  fs.writeFileSync(process.env.FAKE_GH_STATE, JSON.stringify(state));",
     "}",
+    'const sha = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).stdout.trim();',
+    'const common = spawnSync("git", ["rev-parse", "--git-common-dir"], { encoding: "utf8" }).stdout.trim();',
+    'const markerDir = path.resolve(process.cwd(), common, "gyeop-full-verify");',
+    'fs.mkdirSync(markerDir, { recursive: true });',
+    'fs.writeFileSync(path.join(markerDir, sha), "");',
   ];
 }
 
@@ -1564,6 +1570,17 @@ function mergedPrState(fixture, mergeSha) {
     merged_at: "2026-07-16T00:00:00Z",
     merge_commit_sha: mergeSha,
   };
+}
+
+function writeFullVerifyMarker(fixture) {
+  const common = git(fixture.task, "rev-parse", "--git-common-dir");
+  const directory = path.resolve(
+    fixture.task,
+    common,
+    "gyeop-full-verify",
+  );
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(path.join(directory, fixture.taskSha), "");
 }
 
 function issueWithStatus(number, status, body = "### 선행 이슈\n- 없음\n") {
@@ -3147,6 +3164,7 @@ test("merge checks exact QA after the final origin validation", (t) => {
 
 test("merge sends the verified PR head SHA after rechecking the PR", (t) => {
   const fixture = makeRepoFixture(t);
+  writeFullVerifyMarker(fixture);
   const open = openPr(fixture.taskSha, fixture.baseSha);
   const mergeSha = "c".repeat(40);
   const merged = mergedPrState(fixture, mergeSha);
@@ -3166,7 +3184,7 @@ test("merge sends the verified PR head SHA after rechecking the PR", (t) => {
   );
   const mergeCall = calls[mergeIndex];
   assert.equal(mergeCall.payload.sha, fixture.taskSha);
-  const verifyIndex = calls.findIndex((call) => call.tool === "verify");
+  assert.equal(calls.filter((call) => call.tool === "verify").length, 0);
   const prGetIndexes = calls
     .map((call, index) => ({ call, index }))
     .filter(
@@ -3180,7 +3198,7 @@ test("merge sends the verified PR head SHA after rechecking the PR", (t) => {
     (call) => call.tool === "gh" && call.endpoint.includes("/check-runs"),
   );
   assert.equal(prGetIndexes.length, 4);
-  assert.ok(prGetIndexes[0] < verifyIndex && verifyIndex < prGetIndexes[1]);
+  assert.ok(prGetIndexes[0] < prGetIndexes[1]);
   assert.ok(prGetIndexes[1] < checksIndex && checksIndex < prGetIndexes[2]);
   assert.ok(prGetIndexes[2] < mergeIndex && mergeIndex < prGetIndexes[3]);
   assert.match(result.stdout, /"alreadyMerged": false/);

@@ -25,6 +25,12 @@ fi
 
 cd "$ROOT"
 
+VERIFY_SHA="$(git rev-parse HEAD)"
+VERIFY_CLEAN=0
+if [[ -z "$(git status --porcelain=v1)" ]]; then
+  VERIFY_CLEAN=1
+fi
+
 if ! command -v pnpm >/dev/null 2>&1; then
   echo "pnpm is required. Run: corepack enable && pnpm install --frozen-lockfile" >&2
   exit 1
@@ -50,7 +56,22 @@ trap cleanup EXIT
 
 python3 "$ROOT/scripts/verify_project.py"
 node --check "$ROOT/scripts/task-harness.mjs"
-node --test "$ROOT/scripts/task-harness.test.mjs"
+TASK_HARNESS_PATHS=(
+  scripts/ai-verify
+  scripts/task-harness
+  scripts/task-harness.mjs
+  scripts/task-harness.test.mjs
+)
+VERIFY_BASE_REF="${GYEOP_VERIFY_BASE_REF:-origin/main}"
+if git rev-parse --verify --quiet "${VERIFY_BASE_REF}^{commit}" >/dev/null &&
+  VERIFY_BASE_SHA="$(git merge-base HEAD "$VERIFY_BASE_REF")" &&
+  git diff --quiet "$VERIFY_BASE_SHA" -- "${TASK_HARNESS_PATHS[@]}" &&
+  git diff --quiet -- "${TASK_HARNESS_PATHS[@]}" &&
+  git diff --cached --quiet -- "${TASK_HARNESS_PATHS[@]}"; then
+  echo "Task harness regression tests skipped: no harness changes."
+else
+  node --test "$ROOT/scripts/task-harness.test.mjs"
+fi
 sh -n "$ROOT/scripts/task-harness"
 sh -n "$ROOT/scripts/install-codex-skills"
 sh -n "$ROOT/ops/http-boundary/haproxy-origin-wrapper"
@@ -121,5 +142,15 @@ env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SECRET_KEY pnpm build
 node --test tests/integration/pack-runtime.test.mjs
 pnpm test:e2e --project=mobile-chromium
 pnpm test:e2e:live
+
+if [[ "$VERIFY_CLEAN" == "1" ]] &&
+  [[ "$(git rev-parse HEAD)" == "$VERIFY_SHA" ]] &&
+  [[ -z "$(git status --porcelain=v1)" ]]; then
+  VERIFY_MARKER_DIR="$(git rev-parse --path-format=absolute --git-common-dir)/gyeop-full-verify"
+  mkdir -p "$VERIFY_MARKER_DIR"
+  touch "$VERIFY_MARKER_DIR/$VERIFY_SHA"
+else
+  echo "Full verification passed, but its SHA was not cached because the checkout changed or was dirty."
+fi
 
 echo "GYEOP full verification passed."
