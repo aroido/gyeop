@@ -213,6 +213,34 @@ test("exposes an explicit completion retry after authoritative ten-answer incomp
   ).toHaveLength(2);
 });
 
+test("rehydrates the first missing card after authoritative nine-answer incomplete", async ({
+  page,
+}) => {
+  const api = await installOwnerFlowApi(page, {
+    incompleteCompleteCount: 1,
+    incompleteAnswerCount: 9,
+  });
+  await openOwnerFlow(page, api);
+  for (let index = 0; index < 10; index += 1) {
+    await page.locator('button[data-choice="a"]').click();
+  }
+
+  await expect(
+    page.getByRole("heading", { name: "힘든 날에 나는?" }),
+  ).toBeVisible();
+  await expect(page.locator('button[data-choice="a"]')).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+  await expect(
+    page.getByRole("button", { name: "완료 다시 시도" }),
+  ).toHaveCount(0);
+  expect(api.state.answers).toHaveLength(9);
+  expect(
+    api.calls.filter((call) => call.pathname.endsWith("/complete")),
+  ).toHaveLength(1);
+});
+
 test("distinguishes saved and pending exit guidance", async ({ page }) => {
   const api = await installOwnerFlowApi(page, { saveDelayMs: 400 });
   await openOwnerFlow(page, api);

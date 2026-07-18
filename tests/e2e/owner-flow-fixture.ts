@@ -29,6 +29,7 @@ export type OwnerFlowApi = {
   failSaveCount: number;
   saveDelayMs: number;
   incompleteCompleteCount: number;
+  incompleteAnswerCount: number | null;
   readMissingCount: number;
 };
 
@@ -67,6 +68,7 @@ export async function installOwnerFlowApi(
       | "failSaveCount"
       | "saveDelayMs"
       | "incompleteCompleteCount"
+      | "incompleteAnswerCount"
       | "readMissingCount"
     >
   > = {},
@@ -86,6 +88,7 @@ export async function installOwnerFlowApi(
     failSaveCount: options.failSaveCount ?? 0,
     saveDelayMs: options.saveDelayMs ?? 0,
     incompleteCompleteCount: options.incompleteCompleteCount ?? 0,
+    incompleteAnswerCount: options.incompleteAnswerCount ?? null,
     readMissingCount: options.readMissingCount ?? 0,
   };
 
@@ -155,6 +158,16 @@ export async function installOwnerFlowApi(
     if (method === "POST" && url.pathname === `/api/plays/${playId}/complete`) {
       if (api.incompleteCompleteCount > 0) {
         api.incompleteCompleteCount -= 1;
+        if (api.incompleteAnswerCount !== null) {
+          api.state.answers = api.state.answers.slice(
+            0,
+            api.incompleteAnswerCount,
+          );
+          api.state.currentPosition = Math.min(
+            api.incompleteAnswerCount + 1,
+            manifest.cards.length,
+          );
+        }
         return ownerError(
           route,
           409,
