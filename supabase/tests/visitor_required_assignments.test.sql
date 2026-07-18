@@ -239,6 +239,15 @@ select is(
 );
 select is(
   public.start_response(
+    'DDDDDDDDDDDDDDDDDDDDDQ', decode(repeat('52', 32), 'hex'), 'resume',
+    '23200000-0000-4000-8000-000000000002', decode(repeat('56', 32), 'hex'),
+    null, null, null, null, decode(repeat('57', 32), 'hex')
+  )->>'outcome',
+  'resumed',
+  'one-to-one response resumes through the same stored assignment contract'
+);
+select is(
+  public.start_response(
     'EEEEEEEEEEEEEEEEEEEEEA', decode(repeat('53', 32), 'hex'), 'start',
     null, null,
     '23200000-0000-4000-8000-000000000003',
@@ -490,6 +499,207 @@ select is(
   ),
   jsonb_build_object('responses', 0, 'assignments', 0, 'buckets', 0, 'events', 0),
   'assignment failure rolls back response, assignment, quota, and events'
+);
+
+with fixed_time as (select clock_timestamp() as value)
+insert into public.pack_plays (
+  id, pack_version_id, management_secret_hash, management_expires_at,
+  last_active_at, status, current_position, completed_at
+) select
+  '23600000-0000-4000-8000-000000000001',
+  '23410000-0000-4000-8000-000000000001',
+  decode(repeat('80', 32), 'hex'),
+  value + interval '7 days',
+  value,
+  'completed',
+  10,
+  value
+from fixed_time;
+insert into public.share_links (
+  id, public_id, pack_play_id, kind, secret_hash
+) values (
+  '23610000-0000-4000-8000-000000000001',
+  'HHHHHHHHHHHHHHHHHHHHHA',
+  '23600000-0000-4000-8000-000000000001',
+  'public',
+  decode(repeat('81', 32), 'hex')
+);
+
+select throws_ok(
+  $$
+    select public.start_response(
+      'HHHHHHHHHHHHHHHHHHHHHA', decode(repeat('81', 32), 'hex'), 'start',
+      null, null,
+      '23620000-0000-4000-8000-000000000001',
+      decode(repeat('82', 32), 'hex'),
+      'other', 'not_sure', decode(repeat('83', 32), 'hex')
+    )
+  $$,
+  'P2301',
+  'required assignment invariant failed',
+  'malformed pack cardinality fails closed instead of returning a typed collision'
+);
+select is(
+  (
+    select jsonb_build_object(
+      'responses', count(*) filter (
+        where response.id = '23620000-0000-4000-8000-000000000001'
+      ),
+      'assignments', (
+        select count(*) from public.visitor_assignments
+        where response_id = '23620000-0000-4000-8000-000000000001'
+      ),
+      'buckets', (
+        select count(*) from public.rate_limit_buckets
+        where key_hash = decode(repeat('83', 32), 'hex')
+          and action = 'response_start'
+      ),
+      'events', (
+        select count(*) from public.analytics_events
+        where visitor_response_id = '23620000-0000-4000-8000-000000000001'
+      )
+    )
+    from public.visitor_responses as response
+  ),
+  jsonb_build_object('responses', 0, 'assignments', 0, 'buckets', 0, 'events', 0),
+  'malformed pack failure leaves no partial response, assignment, quota, or event'
+);
+
+with fixed_window as (
+  select date_bin(
+    interval '600 seconds',
+    clock_timestamp(),
+    timestamptz '1970-01-01 00:00:00+00'
+  ) as value
+)
+insert into public.rate_limit_buckets (
+  key_hash, action, window_start, count, expires_at
+) select
+  decode(repeat('84', 32), 'hex'),
+  'response_start',
+  value,
+  10,
+  value + interval '600 seconds'
+from fixed_window;
+select is(
+  public.start_response(
+    'CCCCCCCCCCCCCCCCCCCCCA', decode(repeat('51', 32), 'hex'), 'start',
+    null, null,
+    '23620000-0000-4000-8000-000000000002',
+    decode(repeat('85', 32), 'hex'),
+    'other', 'not_sure', decode(repeat('84', 32), 'hex')
+  )->>'outcome',
+  'rate_limited',
+  'eleventh response start is typed rate limited'
+);
+select is(
+  (
+    select jsonb_build_object(
+      'responses', (
+        select count(*) from public.visitor_responses
+        where id = '23620000-0000-4000-8000-000000000002'
+      ),
+      'assignments', (
+        select count(*) from public.visitor_assignments
+        where response_id = '23620000-0000-4000-8000-000000000002'
+      ),
+      'bucketCount', (
+        select count from public.rate_limit_buckets
+        where key_hash = decode(repeat('84', 32), 'hex')
+          and action = 'response_start'
+      ),
+      'events', (
+        select count(*) from public.analytics_events
+        where visitor_response_id = '23620000-0000-4000-8000-000000000002'
+      )
+    )
+  ),
+  jsonb_build_object('responses', 0, 'assignments', 0, 'bucketCount', 10, 'events', 0),
+  'rate limit rollback keeps bucket ten and leaves no response-side mutation'
+);
+
+select is(
+  public.start_response(
+    'CCCCCCCCCCCCCCCCCCCCCA', decode(repeat('51', 32), 'hex'), 'start',
+    null, null,
+    '23620000-0000-4000-8000-000000000003',
+    decode(repeat('54', 32), 'hex'),
+    'other', 'not_sure', decode(repeat('86', 32), 'hex')
+  )->>'outcome',
+  'collision',
+  'session hash credential constraint is a typed collision'
+);
+select is(
+  (
+    select jsonb_build_object(
+      'responses', (
+        select count(*) from public.visitor_responses
+        where id = '23620000-0000-4000-8000-000000000003'
+      ),
+      'buckets', (
+        select count(*) from public.rate_limit_buckets
+        where key_hash = decode(repeat('86', 32), 'hex')
+          and action = 'response_start'
+      )
+    )
+  ),
+  jsonb_build_object('responses', 0, 'buckets', 0),
+  'session hash collision rolls back the attempted response and quota'
+);
+
+alter table public.visitor_responses
+  drop constraint visitor_responses_id_pack_version_key cascade;
+select is(
+  public.start_response(
+    'CCCCCCCCCCCCCCCCCCCCCA', decode(repeat('51', 32), 'hex'), 'start',
+    null, null,
+    '23200000-0000-4000-8000-000000000001',
+    decode(repeat('87', 32), 'hex'),
+    'other', 'not_sure', decode(repeat('88', 32), 'hex')
+  )->>'outcome',
+  'collision',
+  'response primary-key credential constraint is a typed collision'
+);
+select is(
+  (
+    select count(*) from public.rate_limit_buckets
+    where key_hash = decode(repeat('88', 32), 'hex')
+      and action = 'response_start'
+  ),
+  0::bigint,
+  'response primary-key collision rolls back quota'
+);
+
+alter table public.visitor_responses
+  add constraint visitor_responses_id_pack_version_key
+  unique (id, pack_version_id);
+alter table public.visitor_assignments
+  add constraint visitor_assignments_response_id_pack_version_id_fkey
+  foreign key (response_id, pack_version_id)
+  references public.visitor_responses (id, pack_version_id)
+  on update restrict
+  on delete cascade;
+alter table public.visitor_responses
+  drop constraint visitor_responses_pkey cascade;
+select is(
+  public.start_response(
+    'CCCCCCCCCCCCCCCCCCCCCA', decode(repeat('51', 32), 'hex'), 'start',
+    null, null,
+    '23200000-0000-4000-8000-000000000001',
+    decode(repeat('89', 32), 'hex'),
+    'other', 'not_sure', decode(repeat('8a', 32), 'hex')
+  )->>'outcome',
+  'collision',
+  'response composite credential constraint is a typed collision'
+);
+select is(
+  (
+    select count(*) from public.rate_limit_buckets
+    where key_hash = decode(repeat('8a', 32), 'hex')
+      and action = 'response_start'
+  ),
+  0::bigint,
+  'response composite collision rolls back quota'
 );
 
 select * from finish();

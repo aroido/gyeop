@@ -145,4 +145,68 @@ test("same new response credential commits exactly once under concurrency", asyn
       where key_hash = decode('${rateKey}', 'hex') and action = 'response_start'`),
     "1",
   );
+
+  const resumedResponseId = randomUUID();
+  const resumedSessionHash = randomBytes(32).toString("hex");
+  const resumedRateKey = randomBytes(32).toString("hex");
+  const resume = `select public.start_response(
+    '${publicId}', decode('${shareHash}', 'hex'), 'start',
+    '${responseId}', decode('${sessionHash}', 'hex'),
+    '${resumedResponseId}', decode('${resumedSessionHash}', 'hex'),
+    'family', 'under_one_year', decode('${resumedRateKey}', 'hex')
+  )->'response'->'assignments'`;
+  const resumeBarrierKey = randomInt(5_000_000, 6_000_000);
+  const firstResume = sqlProcess(`
+    begin;
+    ${resume};
+    select pg_advisory_lock(${resumeBarrierKey});
+    select pg_sleep(1.2);
+    commit;
+  `);
+  await waitForAdvisoryHeld(resumeBarrierKey);
+  const secondResume = sqlProcess(resume);
+  const resumeEarly = await Promise.race([
+    secondResume.done.then(() => true),
+    new Promise((resolve) => setTimeout(() => resolve(false), 300)),
+  ]);
+  assert.equal(
+    resumeEarly,
+    false,
+    "second same-session retry must wait for the public-link lock",
+  );
+  const [firstResumeResult, secondResumeResult] = await Promise.all([
+    firstResume.done,
+    secondResume.done,
+  ]);
+  assert.equal(firstResumeResult.code, 0, firstResumeResult.stderr);
+  assert.equal(secondResumeResult.code, 0, secondResumeResult.stderr);
+  const assignmentPayload = (output) =>
+    output.split("\n").find((line) => line.startsWith("["));
+  assert.equal(
+    assignmentPayload(firstResumeResult.stdout),
+    assignmentPayload(secondResumeResult.stdout),
+  );
+  assert.equal(
+    sql(
+      `select count(*) from public.visitor_responses where id in ('${responseId}', '${resumedResponseId}')`,
+    ),
+    "1",
+  );
+  assert.equal(
+    sql(
+      `select count(*) from public.visitor_assignments where response_id = '${responseId}'`,
+    ),
+    "3",
+  );
+  assert.equal(
+    sql(
+      `select count(*) from public.analytics_events where visitor_response_id = '${responseId}'`,
+    ),
+    "2",
+  );
+  assert.equal(
+    sql(`select count(*) from public.rate_limit_buckets
+      where key_hash = decode('${resumedRateKey}', 'hex') and action = 'response_start'`),
+    "0",
+  );
 });
