@@ -16,6 +16,7 @@ const ALLOWED_RPC_EXPORTS = new Map([
   ["saveOwnerAnswer", "save_owner_answer"],
   ["completeOwnerPlay", "complete_owner_play"],
   ["revokeOwnerPlaySession", "revoke_owner_play_session"],
+  ["getInviteMetadata", "get_invite_metadata"],
   ["deleteAuthUser", "prepare_auth_deletion_call"],
   ["resolveNotificationRecipient", "resolve_notification_recipient_identity"],
 ]);
@@ -36,6 +37,13 @@ const OWNER_MUTATION_SQL = new Set([
   "create_share_link",
   "rotate_share_link",
   "disable_share_link",
+]);
+
+const PLAY_CAPABILITY_EXPORTS = new Map([
+  ["createShareLink", "create_share_link"],
+  ["rotateShareLink", "rotate_share_link"],
+  ["disableShareLink", "disable_share_link"],
+  ["listOwnerShareLinks", "list_owner_share_links"],
 ]);
 
 function sourceFile(filePath, source) {
@@ -929,6 +937,64 @@ function verifyOwnerMutationFunction(statement, name, findings) {
   }
 }
 
+function verifyPlayCapabilityFunction(statement, name, findings) {
+  const expectedRpc = PLAY_CAPABILITY_EXPORTS.get(name);
+  const rpcCalls = [];
+  function visit(node) {
+    if (
+      ts.isCallExpression(node) &&
+      isMemberAccess(node.expression) &&
+      memberName(node.expression) === "rpc"
+    ) {
+      rpcCalls.push(node);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(statement);
+  if (
+    statement.parameters.length !== 1 ||
+    statement.parameters[0].name.getText() !== "input"
+  ) {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} must accept one play capability input`,
+    );
+  }
+  if (
+    rpcCalls.length !== 1 ||
+    !ts.isStringLiteral(rpcCalls[0]?.arguments[0]) ||
+    rpcCalls[0].arguments[0].text !== expectedRpc
+  ) {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} must invoke exactly one ${expectedRpc} RPC`,
+    );
+    return;
+  }
+  const args = rpcCalls[0].arguments[1];
+  if (objectPropertyValue(args, "p_play_id") !== "input.playId") {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} must pass input.playId as p_play_id`,
+    );
+  }
+  if (
+    objectPropertyValue(args, "p_management_secret_hash") !==
+    "bytea(input.managementSecretHash)"
+  ) {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} must pass only the hashed play capability`,
+    );
+  }
+  const body = statement.body?.getText() ?? "";
+  if (
+    /\b(?:auth\.uid|actor|ownerId|owner_id|recoveryActorCandidates)\b/.test(
+      body,
+    )
+  ) {
+    findings.push(
+      `${INTERNAL_RPC_PATH}: ${name} cannot use Auth or a stable owner anchor`,
+    );
+  }
+}
+
 function verifyInternalRpc(source, findings) {
   if (!/^import ["']server-only["'];/m.test(source)) {
     findings.push(`${INTERNAL_RPC_PATH}: must import server-only`);
@@ -1059,7 +1125,11 @@ function verifyInternalRpc(source, findings) {
     }
 
     const name = statement.name.text;
-    if (!ALLOWED_RPC_EXPORTS.has(name) && !OWNER_MUTATION_EXPORTS.has(name)) {
+    if (
+      !ALLOWED_RPC_EXPORTS.has(name) &&
+      !OWNER_MUTATION_EXPORTS.has(name) &&
+      !PLAY_CAPABILITY_EXPORTS.has(name)
+    ) {
       findings.push(
         `${INTERNAL_RPC_PATH}: exported function ${name} is not allowlisted`,
       );
@@ -1086,7 +1156,13 @@ function verifyInternalRpc(source, findings) {
         );
       }
     }
-    if (OWNER_MUTATION_EXPORTS.has(name)) {
+    if (
+      PLAY_CAPABILITY_EXPORTS.has(name) &&
+      statement.parameters.length === 1 &&
+      statement.parameters[0].name.getText() === "input"
+    ) {
+      verifyPlayCapabilityFunction(statement, name, findings);
+    } else if (OWNER_MUTATION_EXPORTS.has(name)) {
       const body = statement.body?.getText() ?? "";
       verifyOwnerMutationFunction(statement, name, findings);
       if (
@@ -1101,7 +1177,10 @@ function verifyInternalRpc(source, findings) {
     }
   }
 
-  const allowedRpcNames = new Set(ALLOWED_RPC_EXPORTS.values());
+  const allowedRpcNames = new Set([
+    ...ALLOWED_RPC_EXPORTS.values(),
+    ...PLAY_CAPABILITY_EXPORTS.values(),
+  ]);
   for (const rpcCall of rpcCalls) {
     const rpcName = ts.isStringLiteral(rpcCall.arguments[0])
       ? rpcCall.arguments[0].text
@@ -1178,8 +1257,19 @@ export function verifyOwnerMutationSql(sql, filePath = "migration.sql") {
   const present = [...OWNER_MUTATION_SQL].filter((name) =>
     new RegExp(`function\\s+public\\.${name}\\s*\\(`, "i").test(sql),
   );
+  const guardedPresent = present.filter((name) => {
+    const parsed = extractSqlFunctions(sql, name).at(-1);
+    return !(
+      parsed &&
+      ["create_share_link", "rotate_share_link", "disable_share_link"].includes(
+        name,
+      ) &&
+      /p_play_id\s+uuid/i.test(parsed.signature) &&
+      /p_management_secret_hash\s+bytea/i.test(parsed.signature)
+    );
+  });
   if (
-    present.length > 0 &&
+    guardedPresent.length > 0 &&
     !/function\s+private\.assert_owner_mutation_actor\s*\(/i.test(sql)
   ) {
     findings.push(
@@ -1190,6 +1280,15 @@ export function verifyOwnerMutationSql(sql, filePath = "migration.sql") {
   for (const name of present) {
     const parsed = extractSqlFunctions(sql, name).at(-1);
     if (!parsed) continue;
+    if (
+      ["create_share_link", "rotate_share_link", "disable_share_link"].includes(
+        name,
+      ) &&
+      /p_play_id\s+uuid/i.test(parsed.signature) &&
+      /p_management_secret_hash\s+bytea/i.test(parsed.signature)
+    ) {
+      continue;
+    }
     if (
       !/p_actor_id\s+uuid/i.test(parsed.signature) ||
       !/p_recovery_actor_candidates\s+jsonb/i.test(parsed.signature)
@@ -1317,6 +1416,48 @@ export function verifyOwnerCapabilitySql(sql, filePath = "migration.sql") {
       );
     }
   }
+
+  const shareFunctions = [
+    "create_share_link",
+    "disable_share_link",
+    "rotate_share_link",
+    "list_owner_share_links",
+  ];
+  const presentShareFunctions = shareFunctions.filter((name) =>
+    new RegExp(`function\\s+public\\.${name}\\s*\\(`, "i").test(sql),
+  );
+  if (
+    presentShareFunctions.length > 0 &&
+    presentShareFunctions.length !== shareFunctions.length
+  ) {
+    findings.push(
+      `${filePath}: share link capability RPC set must be complete`,
+    );
+  }
+  for (const name of presentShareFunctions) {
+    const parsed = extractSqlFunctions(sql, name).at(-1);
+    if (!parsed) continue;
+    const body = parsed.body
+      .replace(/--[^\n]*/g, "")
+      .replace(/\/\*[\s\S]*?\*\//g, "");
+    const calls = [
+      ...body.matchAll(/private\s*\.\s*authorize_owner_play_capability\s*\(/gi),
+    ];
+    if (calls.length !== 1) {
+      findings.push(
+        `${filePath}: ${name} must call the play capability helper exactly once`,
+      );
+    }
+    if (
+      /\b(?:auth\.uid|p_actor_id|p_recovery_actor_candidates|owner_id)\b/i.test(
+        body,
+      )
+    ) {
+      findings.push(
+        `${filePath}: ${name} cannot use Auth or a stable owner anchor`,
+      );
+    }
+  }
   return findings;
 }
 
@@ -1351,6 +1492,7 @@ export function verifySecurityDefinerSql(sql, filePath = "migration.sql") {
       /(?:\bfrom|\bjoin|\bupdate(?!\s+set\b)|\binsert\s+into|\bdelete\s+from)\s+([a-z_][a-z0-9_$.]*)/gi;
     for (const relationMatch of body.matchAll(relationPattern)) {
       const relation = relationMatch[1];
+      if (relation.toLowerCase() === "of") continue;
       if (!/^(?:public|private|pg_catalog)\./i.test(relation)) {
         findings.push(
           `${filePath}: ${qualifiedName} uses unqualified relation ${relation}`,

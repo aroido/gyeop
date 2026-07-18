@@ -56,6 +56,8 @@ const REVIEWED_INTERNAL_ADAPTERS = new Set([
   "lib/http/rate-limit.ts",
   "lib/http/owner-play.ts",
   "lib/http/published-pack.ts",
+  "lib/http/share-links.ts",
+  "lib/share-links/share-links.ts",
 ]);
 
 function parseSource(file, source) {

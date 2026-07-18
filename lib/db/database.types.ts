@@ -291,6 +291,50 @@ export type Database = {
           },
         ];
       };
+      share_links: {
+        Row: {
+          created_at: string;
+          expires_at: string | null;
+          id: string;
+          kind: string;
+          pack_play_id: string;
+          public_id: string;
+          secret_hash: string;
+          status: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          expires_at?: string | null;
+          id: string;
+          kind: string;
+          pack_play_id: string;
+          public_id: string;
+          secret_hash: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          expires_at?: string | null;
+          id?: string;
+          kind?: string;
+          pack_play_id?: string;
+          public_id?: string;
+          secret_hash?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "share_links_pack_play_id_fkey";
+            columns: ["pack_play_id"];
+            isOneToOne: false;
+            referencedRelation: "pack_plays";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -327,11 +371,39 @@ export type Database = {
         };
         Returns: Json;
       };
+      create_share_link: {
+        Args: {
+          p_expires_at: string;
+          p_kind: string;
+          p_link_id: string;
+          p_management_secret_hash: string;
+          p_play_id: string;
+          p_public_id: string;
+          p_secret_hash: string;
+        };
+        Returns: Json;
+      };
+      disable_share_link: {
+        Args: {
+          p_link_id: string;
+          p_management_secret_hash: string;
+          p_play_id: string;
+        };
+        Returns: Json;
+      };
+      get_invite_metadata: {
+        Args: { p_public_id: string; p_secret_hash: string };
+        Returns: Json;
+      };
       get_owner_play: {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: Json;
       };
       get_published_pack: { Args: { p_slug: string }; Returns: Json };
+      list_owner_share_links: {
+        Args: { p_management_secret_hash: string; p_play_id: string };
+        Returns: Json;
+      };
       publish_pack_version: {
         Args: { p_pack_version_id: string };
         Returns: string;
@@ -339,6 +411,17 @@ export type Database = {
       revoke_owner_play_session: {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: boolean;
+      };
+      rotate_share_link: {
+        Args: {
+          p_link_id: string;
+          p_management_secret_hash: string;
+          p_new_link_id: string;
+          p_new_public_id: string;
+          p_new_secret_hash: string;
+          p_play_id: string;
+        };
+        Returns: Json;
       };
       save_owner_answer: {
         Args: {

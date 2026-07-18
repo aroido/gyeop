@@ -71,10 +71,10 @@ select ok(
 
 select ok(
   not has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'SELECT')
-  and not has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'INSERT')
+  and has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'INSERT')
   and not has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'UPDATE')
   and not has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'DELETE'),
-  'internal RPC owner has no analytics table access before an event RPC exists'
+  'internal RPC owner can only insert allowlisted analytics events'
 );
 
 select is(
@@ -97,6 +97,7 @@ select is(
       and grantee.rolname = 'gyeop_internal_rpc'
   ),
   array[
+    'analytics_events:INSERT',
     'pack_cards:SELECT',
     'pack_plays:INSERT',
     'pack_plays:SELECT',
@@ -110,7 +111,10 @@ select is(
     'rate_limit_buckets:UPDATE',
     'self_answers:INSERT',
     'self_answers:SELECT',
-    'self_answers:UPDATE'
+    'self_answers:UPDATE',
+    'share_links:INSERT',
+    'share_links:SELECT',
+    'share_links:UPDATE'
   ]::text[],
   'internal RPC owner relation privileges match the exact allowlist'
 );
@@ -243,10 +247,15 @@ select is(
     'complete_owner_play(uuid,bytea)',
     'consume_rate_limit(bytea,text,integer,integer)',
     'create_or_resume_play(text,uuid,bytea,uuid,bytea,bytea)',
+    'create_share_link(uuid,bytea,uuid,text,bytea,text,timestamp with time zone)',
+    'disable_share_link(uuid,bytea,uuid)',
+    'get_invite_metadata(text,bytea)',
     'get_owner_play(uuid,bytea)',
     'get_published_pack(text)',
+    'list_owner_share_links(uuid,bytea)',
     'publish_pack_version(uuid)',
     'revoke_owner_play_session(uuid,bytea)',
+    'rotate_share_link(uuid,bytea,uuid,uuid,text,bytea)',
     'save_owner_answer(uuid,bytea,text,text,smallint)'
   ]::text[],
   'service_role function grants match the exact RPC allowlist'
@@ -297,6 +306,7 @@ select ok(
     where namespace.nspname = 'public'
       and function.prosecdef
       and lower(relation_match[1]) <> 'set'
+      and lower(relation_match[1]) <> 'of'
       and lower(relation_match[1]) !~ '^(public|private|pg_catalog)\.'
       and not exists (
         select 1
