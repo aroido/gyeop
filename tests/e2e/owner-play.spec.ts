@@ -1,0 +1,276 @@
+import { expect, test } from "@playwright/test";
+
+import {
+  installOwnerFlowApi,
+  openOwnerFlow,
+  playId,
+} from "./owner-flow-fixture";
+
+test.beforeEach(async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+});
+
+test("bootstraps once and shows the first server-backed question", async ({
+  page,
+}) => {
+  const api = await installOwnerFlowApi(page);
+  await openOwnerFlow(page, api);
+
+  expect(
+    api.calls.filter(
+      (call) => call.method === "POST" && call.pathname === "/api/plays",
+    ),
+  ).toHaveLength(1);
+  expect(api.calls.slice(0, 3).map((call) => call.pathname)).toEqual([
+    "/api/plays",
+    `/api/plays/${playId}`,
+    "/api/packs/old-friend",
+  ]);
+  await expect(page.locator('main[data-pack="old-friend"]')).toHaveCount(1);
+  await expect(page.getByTestId("question-card")).toHaveCSS(
+    "background-color",
+    "rgb(223, 255, 0)",
+  );
+  await expect(page.locator('[data-state="auto"]')).toBeVisible();
+});
+
+test("rejects a non-UUID play path without an owner API request", async ({
+  page,
+}) => {
+  const api = await installOwnerFlowApi(page);
+  await page.goto("/play/not-a-pack");
+  await expect(
+    page.getByRole("heading", { name: "이 팩을 이어갈 수 없어요" }),
+  ).toBeFocused();
+  expect(api.calls).toHaveLength(0);
+});
+
+test("rejects an unknown bootstrap pack without an API request", async ({
+  page,
+}) => {
+  const api = await installOwnerFlowApi(page);
+  await page.goto("/play/new?pack=unknown");
+  await expect(
+    page.getByRole("heading", { name: "팩을 시작하지 못했어요" }),
+  ).toBeFocused();
+  await expect(page.getByRole("button", { name: "홈으로" })).toBeVisible();
+  expect(api.calls).toHaveLength(0);
+});
+
+test("starts a new pack only after the generic terminal session is cleared", async ({
+  page,
+}) => {
+  const api = await installOwnerFlowApi(page, { readMissingCount: 1 });
+  await page.goto(`/play/${playId}`);
+  await expect(
+    page.getByRole("heading", { name: "이 팩을 이어갈 수 없어요" }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: "새 팩 시작" }).click();
+  await page.waitForURL(`/play/${playId}`);
+  await expect(
+    page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
+  ).toBeVisible();
+  expect(api.calls.slice(0, 4).map((call) => call.method)).toEqual([
+    "GET",
+    "DELETE",
+    "POST",
+    "GET",
+  ]);
+});
+
+test("restores server answers when browser storage is unavailable", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    for (const method of ["getItem", "setItem", "removeItem"] as const) {
+      Object.defineProperty(Storage.prototype, method, {
+        configurable: true,
+        value: () => {
+          throw new Error("storage unavailable");
+        },
+      });
+    }
+  });
+  await openOwnerFlow(page);
+  await page.locator('button[data-choice="a"]').click();
+  await expect(page.locator('[data-state="saved"]')).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "오랜만에 친구를 만나면 나는?" }),
+  ).toBeVisible();
+});
+
+test("moves optimistically within 150ms while a save is delayed", async ({
+  page,
+}) => {
+  await openOwnerFlow(
+    page,
+    await installOwnerFlowApi(page, { saveDelayMs: 400 }),
+  );
+  await page.locator('button[data-choice="a"]').evaluate((button) => {
+    button.addEventListener(
+      "click",
+      () => {
+        (window as typeof window & { ownerClickAt?: number }).ownerClickAt =
+          performance.now();
+      },
+      { once: true },
+    );
+  });
+  await page.locator('button[data-choice="a"]').click();
+  await expect(
+    page.getByRole("heading", { name: "오랜만에 친구를 만나면 나는?" }),
+  ).toBeVisible();
+  const latency = await page.evaluate(
+    () =>
+      performance.now() -
+      ((window as typeof window & { ownerClickAt: number }).ownerClickAt ?? 0),
+  );
+  expect(latency).toBeLessThanOrEqual(150);
+  await expect(page.locator('[data-state="saving"]')).toBeVisible();
+});
+
+test("serializes rapid same-card edits and restores the final choice", async ({
+  page,
+}) => {
+  const api = await installOwnerFlowApi(page, { saveDelayMs: 120 });
+  await openOwnerFlow(page, api);
+
+  await page.locator('button[data-choice="a"]').click();
+  await page.getByRole("button", { name: "이전" }).click();
+  await page.locator('button[data-choice="b"]').click();
+  await expect(page.locator('[data-state="saved"]')).toBeVisible();
+
+  const saves = api.calls.filter((call) => call.method === "PUT");
+  expect(saves.map((call) => (call.body as { choice: string }).choice)).toEqual(
+    ["a", "b"],
+  );
+  expect(api.state.answers[0]).toEqual({ cardId: "conflict", choice: "b" });
+
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "오랜만에 친구를 만나면 나는?" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "이전" }).click();
+  await expect(page.locator('button[data-choice="b"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+});
+
+test("holds all later choices behind a failed save and completes after retry", async ({
+  page,
+}) => {
+  const api = await installOwnerFlowApi(page, { failSaveCount: 1 });
+  await openOwnerFlow(page, api);
+
+  for (let index = 0; index < 10; index += 1) {
+    await page.locator('button[data-choice="a"]').click();
+  }
+  await expect(
+    page.getByRole("button", { name: "저장 실패 · 재시도" }),
+  ).toBeVisible();
+  expect(
+    api.calls.filter((call) => call.pathname.endsWith("/complete")),
+  ).toHaveLength(0);
+
+  await page.getByRole("button", { name: "저장 실패 · 재시도" }).click();
+  await expect(
+    page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
+  ).toBeFocused();
+  expect(api.state.answers).toHaveLength(10);
+  expect(
+    api.calls.filter((call) => call.pathname.endsWith("/complete")),
+  ).toHaveLength(1);
+
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
+  ).toBeVisible();
+  await expect(page.locator("[data-choice]")).toHaveCount(0);
+  await expect(
+    page.getByRole("list", { name: "내 선택 10장" }).getByRole("listitem"),
+  ).toHaveCount(10);
+});
+
+test("exposes an explicit completion retry after authoritative ten-answer incomplete", async ({
+  page,
+}) => {
+  const api = await installOwnerFlowApi(page, { incompleteCompleteCount: 1 });
+  await openOwnerFlow(page, api);
+  for (let index = 0; index < 10; index += 1) {
+    await page.locator('button[data-choice="a"]').click();
+  }
+  await expect(
+    page.getByRole("button", { name: "완료 다시 시도" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "완료 다시 시도" }).click();
+  await expect(
+    page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
+  ).toBeVisible();
+  expect(
+    api.calls.filter((call) => call.pathname.endsWith("/complete")),
+  ).toHaveLength(2);
+});
+
+test("distinguishes saved and pending exit guidance", async ({ page }) => {
+  const api = await installOwnerFlowApi(page, { saveDelayMs: 400 });
+  await openOwnerFlow(page, api);
+
+  await page.getByRole("button", { name: "나가기" }).click();
+  await expect(
+    page.getByRole("heading", { name: "지금까지 자동 저장됐어요" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "계속 답하기" }).click();
+  await expect(page.getByRole("button", { name: "나가기" })).toBeFocused();
+
+  await page.locator('button[data-choice="a"]').click();
+  await page.getByRole("button", { name: "나가기" }).click();
+  await expect(
+    page.getByRole("heading", { name: "아직 저장하지 못한 답이 있어요" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "그래도 나가기" }),
+  ).toBeVisible();
+});
+
+for (const viewport of [
+  { width: 320, height: 800 },
+  { width: 390, height: 844 },
+  { width: 430, height: 932 },
+]) {
+  test(`fits ${viewport.width}px with keyboard, 44px controls, and no storage writes`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await openOwnerFlow(page);
+
+    const layout = await page.evaluate(() => ({
+      overflow:
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+      ownerStorageKeys: [
+        ...Object.keys(localStorage),
+        ...Object.keys(sessionStorage),
+      ].filter((key) => key.toLowerCase().includes("gyeop")),
+    }));
+    expect(layout).toEqual({
+      overflow: false,
+      ownerStorageKeys: [],
+    });
+
+    for (const control of await page
+      .locator("main button:not([disabled])")
+      .all()) {
+      const box = await control.boundingBox();
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+    }
+    await page.keyboard.press("Shift+Tab");
+    await expect(page.getByRole("button", { name: "나가기" })).toBeFocused();
+    await expect(page.getByLabel("질문 진행률")).toHaveAttribute("max", "10");
+    await expect(page.getByTestId("question-card")).toHaveCSS(
+      "transition-duration",
+      "0s",
+    );
+  });
+}

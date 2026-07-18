@@ -27,7 +27,7 @@ export function validatePackManifest(pack) {
   assert.ok(boundedString(pack.title, 80));
   assert.equal(pack.targetRelationship, "old_friend");
   assert.equal(pack.sensitivity, "low");
-  assert.equal(pack.active, false);
+  assert.equal(pack.active, true);
   assert.deepEqual(pack.presentation, {
     moodLabel: "따뜻한 회상",
     estimatedMinutes: 2,
@@ -85,18 +85,6 @@ export function validateCoverSources(homeSource, cssSource) {
   return true;
 }
 
-function appCards(pack) {
-  return pack.cards.map((card, index) => ({
-    id: card.id,
-    position: index + 1,
-    ownerPrompt: card.question,
-    visitorPrompt: card.visitorQuestion,
-    optionA: card.a,
-    optionB: card.b,
-    isSignature: card.signature === true,
-  }));
-}
-
 export async function verifyPackCatalog(root = ROOT) {
   const manifestPath = path.join(root, "content/packs/old-friend-v1.json");
   const manifestBytes = readFileSync(manifestPath);
@@ -115,13 +103,10 @@ export async function verifyPackCatalog(root = ROOT) {
   assert.equal(seed, renderPackSeed(manifest));
   validateCoverSources(homeSource, cssSource);
 
-  const [{ packs }, presentation, labels] = await Promise.all([
-    import(pathToFileURL(path.join(root, "app/play/packs.ts"))),
+  const [presentation, labels] = await Promise.all([
     import(pathToFileURL(path.join(root, "lib/packs/presentation.ts"))),
     import(pathToFileURL(path.join(root, "lib/packs/labels.ts"))),
   ]);
-  assert.equal(packs[manifest.slug].title, manifest.title);
-  assert.deepEqual(appCards(packs[manifest.slug]), manifest.cards);
   const config = presentation.getPackPresentation(manifest.slug);
   assert.equal(Object.isFrozen(config), true);
   assert.equal(Object.isFrozen(config.cover), true);

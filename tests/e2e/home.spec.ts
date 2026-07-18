@@ -1,14 +1,15 @@
 import { expect, test } from "@playwright/test";
 
-const storageKey = "gyeop:old-friend-play:v1";
+import { installOwnerFlowApi, playId } from "./owner-flow-fixture";
 
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
-test("shows GYEOP and multiple pack previews before the owner flow", async ({
+test("shows one active private-MVP pack before the owner flow", async ({
   page,
 }) => {
+  await installOwnerFlowApi(page);
   await page.goto("/");
 
   await expect(
@@ -34,31 +35,20 @@ test("shows GYEOP and multiple pack previews before the owner flow", async ({
   }
 
   const activePacks = page.locator('[data-pack-state="active"]');
-  await expect(activePacks).toHaveCount(4);
+  await expect(activePacks).toHaveCount(1);
   await expect(activePacks.getByText("지금 시작", { exact: true })).toHaveCount(
-    4,
+    1,
   );
   const packLinks = page.getByRole("link", { name: "팩 열어보기" });
-  await expect(packLinks).toHaveCount(4);
-  for (const [index, href] of [
-    "/play/old-friend",
-    "/play/first-impression",
-    "/play/coworker",
-    "/play/honest-self",
-  ].entries()) {
-    await expect(packLinks.nth(index)).toHaveAttribute("href", href);
-  }
+  await expect(packLinks).toHaveCount(1);
+  await expect(packLinks).toHaveAttribute("href", "/play/new?pack=old-friend");
+  await expect(page.getByText("준비 중", { exact: true })).toHaveCount(3);
   await expect(page.getByRole("progressbar")).toHaveCount(0);
   await expect(page.locator("[data-choice]")).toHaveCount(0);
-  expect(
-    await page.evaluate((key) => localStorage.getItem(key), storageKey),
-  ).toBeNull();
 
-  const cta = packLinks.first();
-  await expect(cta).toBeVisible();
-  await cta.click();
+  await packLinks.click();
 
-  await expect(page).toHaveURL(/\/play\/old-friend$/);
+  await expect(page).toHaveURL(`/play/${playId}`);
   await expect(
     page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
   ).toBeVisible();
@@ -105,24 +95,6 @@ test("renders the approved old-friend CSS cover recipe", async ({ page }) => {
     rotation: undefined,
   });
   expect(computed.rotation).toBeCloseTo(-0.7, 5);
-});
-
-test("preserves an existing owner draft", async ({ page }) => {
-  const draft = JSON.stringify({
-    version: 1,
-    currentIndex: 1,
-    answers: { conflict: "a" },
-  });
-  await page.addInitScript(
-    ({ key, value }) => localStorage.setItem(key, value),
-    { key: storageKey, value: draft },
-  );
-
-  await page.goto("/");
-
-  await expect
-    .poll(() => page.evaluate((key) => localStorage.getItem(key), storageKey))
-    .toBe(draft);
 });
 
 for (const viewport of [

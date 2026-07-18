@@ -4,7 +4,7 @@
   "title": "오래된 친구팩",
   "targetRelationship": "old_friend",
   "sensitivity": "low",
-  "active": false,
+  "active": true,
   "presentation": {
     "moodLabel": "따뜻한 회상",
     "estimatedMinutes": 2,

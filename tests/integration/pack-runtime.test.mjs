@@ -101,8 +101,10 @@ async function stopServer(child) {
   if (child.exitCode === null) child.kill("SIGKILL");
 }
 
-async function html(port, pathname = "/") {
-  const response = await fetch(`http://127.0.0.1:${port}${pathname}`);
+async function html(port, pathname = "/", redirect = "follow") {
+  const response = await fetch(`http://127.0.0.1:${port}${pathname}`, {
+    redirect,
+  });
   return { response, body: await response.text() };
 }
 
@@ -116,25 +118,33 @@ test("one production build reflects runtime activation and fails closed", async 
     const inactive = await html(3106);
     assert.equal(inactive.response.status, 200);
     assert.match(inactive.body, /팩 준비 중/);
-    assert.doesNotMatch(inactive.body, /href="\/play\/old-friend"/);
-    assert.equal((await html(3106, "/play/old-friend")).response.status, 404);
+    assert.doesNotMatch(inactive.body, /href="\/play\/new\?pack=old-friend"/);
+    const inactiveLegacy = await html(3106, "/play/old-friend", "manual");
+    assert.equal(inactiveLegacy.response.status, 307);
+    assert.equal(
+      inactiveLegacy.response.headers.get("location"),
+      "/play/new?pack=old-friend",
+    );
 
     setOldFriendActive(true);
     const active = await html(3106);
     assert.equal(active.response.status, 200);
-    assert.match(active.body, /href="\/play\/old-friend"/);
+    assert.match(active.body, /href="\/play\/new\?pack=old-friend"/);
     assert.match(active.body, /오래된 친구/);
     assert.match(active.body, /낮은 민감도/);
-    const play = await html(3106, "/play/old-friend");
+    const play = await html(3106, "/play/new?pack=old-friend");
     assert.equal(play.response.status, 200);
-    assert.match(play.body, /서운한 일이 생기면 나는\?/);
+    assert.match(play.body, /오래된 친구팩을 준비하는 중/);
 
     setOldFriendActive(false);
     const inactiveAgain = await html(3106);
     assert.match(inactiveAgain.body, /팩 준비 중/);
-    assert.doesNotMatch(inactiveAgain.body, /href="\/play\/old-friend"/);
+    assert.doesNotMatch(
+      inactiveAgain.body,
+      /href="\/play\/new\?pack=old-friend"/,
+    );
   } finally {
-    setOldFriendActive(false);
+    setOldFriendActive(true);
     await stopServer(working.child);
   }
 
@@ -147,9 +157,13 @@ test("one production build reflects runtime activation and fails closed", async 
     const fallback = await html(3107);
     assert.equal(fallback.response.status, 200);
     assert.match(fallback.body, /팩 준비 중/);
-    assert.doesNotMatch(fallback.body, /href="\/play\/old-friend"/);
-    assert.equal((await html(3107, "/play/old-friend")).response.status, 404);
+    assert.doesNotMatch(fallback.body, /href="\/play\/new\?pack=old-friend"/);
+    assert.equal(
+      (await html(3107, "/play/old-friend", "manual")).response.status,
+      307,
+    );
   } finally {
+    setOldFriendActive(true);
     await stopServer(broken.child);
   }
 });

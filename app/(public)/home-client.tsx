@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import Link from "next/link";
 
 import styles from "./page.module.css";
 
@@ -50,11 +51,9 @@ const otherPackPreviews = [
 ] as const;
 
 export default function HomeClient({
-  prototypeEnabled,
   oldFriendActive,
   oldFriend,
 }: {
-  prototypeEnabled: boolean;
   oldFriendActive: boolean;
   oldFriend: OldFriendSummary;
 }) {
@@ -131,9 +130,8 @@ export default function HomeClient({
             tabIndex={0}
           >
             {packPreviews.map((pack, index) => {
-              const active =
-                prototypeEnabled || (index === 0 && oldFriendActive);
-              const showDetails = prototypeEnabled || index === 0;
+              const active = index === 0 && oldFriendActive;
+              const showDetails = index === 0;
 
               return (
                 <li key={pack.slug}>
@@ -169,9 +167,12 @@ export default function HomeClient({
                     )}
 
                     {active ? (
-                      <a className={styles.cta} href={`/play/${pack.slug}`}>
+                      <Link
+                        className={styles.cta}
+                        href="/play/new?pack=old-friend"
+                      >
                         팩 열어보기 <span aria-hidden="true">→</span>
-                      </a>
+                      </Link>
                     ) : index === 0 ? (
                       <button className={styles.cta} type="button" disabled>
                         팩 준비 중

@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-18 — 오래된 친구팩 private MVP 진입 활성화
+
+- 결정: 사람 검수를 마친 `old-friend-v1`의 카드·문구·version은 그대로 두고 manifest와 generated seed의 `active`를 `true`로 전환해 비공개 재미 검증의 신규 owner 진입을 연다. 셀프 A/B 조작은 44px 이상 버튼과 키보드를 필수로 하고 swipe는 후속 interaction 검증으로 미룬다.
+- 이유: 지금은 `주인 10장 → 신뢰할 수 있는 저장 → 완료`가 재미있는지 실제 server-backed 화면에서 확인해야 한다. 여러 팩, swipe gesture, public beta rollout을 함께 열면 핵심 가설과 이탈 원인을 구분하기 어렵다.
+- 결과: 홈의 유일한 owner CTA는 `/play/new?pack=old-friend`이고 #17 same-browser capability로만 create/resume한다. `active=true`는 private MVP create gate 승인이지 public beta 배포 승인이 아니다. 다른 팩은 inactive이며 swipe는 핵심 loop 결과 뒤 별도 결정한다.
+
 ## 2026-07-18 — 비공개 재미 검증은 무이메일 same-browser owner capability로 진행
 
 - 결정: Project #5의 비공개 재미 검증에서는 이메일·표시 이름·전화번호·Supabase Auth owner 계정을 만들지 않는다. owner play 하나에 결합한 256-bit 관리 secret을 `Secure`·`HttpOnly`·`SameSite=Lax` cookie에만 두고 DB에는 domain-separated hash만 저장하며, 같은 play id+hash를 검증한 RPC만 7일 inactivity window를 갱신한다.
@@ -10,7 +16,7 @@
 
 - 결정: #46에서 검수한 `old-friend-v1-draft`의 카드 id·순서·주인 질문·A/B 선택지를 유지하고, 자연스러운 방문자 질문을 짝지어 `old-friend-v1` 검증 계약으로 동결한다.
 - 이유: 새 질문을 더 만드는 대신 이미 로컬 플레이를 통과한 한 팩으로 주인 공유, 방문자 비교·전환, 프로필 재공유의 재미를 먼저 확인한다.
-- 결과: `old-friend-v1`은 `active=false`인 비공개 검증팩이며 production에 노출하지 않는다. 공개 베타 발행과 `active=true` 전환은 별도 사람 검수와 승인 전까지 허용하지 않는다.
+- 결과: 당시 `old-friend-v1`은 `active=false`로 동결했다. 이 activation gate는 위의 2026-07-18 private MVP 진입 승인으로 supersede됐지만, public beta 배포는 여전히 별도 rollout 승인이 필요하다.
 
 ## 2026-07-17 — 팩 선택 후 첫 질문 즉시 표시
 
