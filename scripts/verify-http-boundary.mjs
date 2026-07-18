@@ -56,6 +56,7 @@ const PUBLIC_BOUNDARY_FILE = "lib/http/request-boundary.ts";
 const REVIEWED_INTERNAL_ADAPTERS = new Set([
   "lib/http/rate-limit.ts",
   "lib/http/owner-play.ts",
+  "lib/http/owner-profile.ts",
   "lib/http/published-pack.ts",
   "lib/http/share-links.ts",
   "lib/share-links/share-links.ts",
@@ -566,6 +567,36 @@ function isFixedOwnerAccessPolicy(expression) {
 }
 
 const OWNER_ROUTE_CONTRACTS = new Map([
+  [
+    "app/api/me/profile/route.ts",
+    {
+      method: "GET",
+      sequence: [
+        ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
+        [
+          "lib/owner-play/owner-play-session-core.mjs",
+          "parseOwnerCookieHeader",
+        ],
+        ["lib/http/owner-profile.ts", "readOwnerProfileResponse"],
+      ],
+      limited: true,
+    },
+  ],
+  [
+    "app/api/me/profile/events/route.ts",
+    {
+      method: "POST",
+      sequence: [
+        [
+          "lib/owner-play/owner-play-session-core.mjs",
+          "parseOwnerCookieHeader",
+        ],
+        ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
+        ["lib/http/owner-profile.ts", "recordOwnerProfileEventResponse"],
+      ],
+      limited: true,
+    },
+  ],
   [
     "app/api/plays/route.ts",
     {

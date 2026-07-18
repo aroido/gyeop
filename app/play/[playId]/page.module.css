@@ -29,6 +29,7 @@
 .navHeader button,
 .messageActions button,
 .homeButton,
+.profileButton,
 .completionRetry,
 .dialogActions button {
   min-height: 2.75rem;
@@ -202,6 +203,7 @@ button.saveChip {
 .choices button:focus-visible,
 .messageActions button:focus-visible,
 .homeButton:focus-visible,
+.profileButton:focus-visible,
 .completionRetry:focus-visible,
 .dialogActions button:focus-visible {
   outline: 3px solid var(--blue);
@@ -298,6 +300,13 @@ button.saveChip {
   width: 100%;
   margin-top: 1rem;
   border-color: #fff;
+}
+
+.profileButton {
+  width: 100%;
+  margin-top: 0.65rem;
+  border-color: var(--lime);
+  color: var(--lime);
 }
 
 .messageActions {

@@ -238,6 +238,9 @@ test("creates the recommended public link and loses the raw URL on reload", asyn
 
   await expect(page.getByRole("heading", { name: "공유 링크" })).toBeFocused();
   await expect(
+    page.getByRole("link", { name: "내 시선 프로필" }),
+  ).toHaveAttribute("href", "/me");
+  await expect(
     page.getByRole("radio", { name: /여러 친구에게 공개/ }),
   ).toBeChecked();
   await page.getByRole("button", { name: "공유 링크 만들기" }).click();
@@ -565,6 +568,14 @@ for (const viewport of [
       name: /여러 친구에게 공개/,
     });
     await expect(shareHeading).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(
+      page.getByRole("link", { name: "내 시선 프로필" }),
+    ).toBeFocused();
+    await expect(page.getByRole("link", { name: "내 시선 프로필" })).toHaveCSS(
+      "outline-color",
+      "rgb(49, 92, 255)",
+    );
     await page.keyboard.press("Tab");
     await expect(publicRadio).toBeFocused();
     expect(

@@ -37,6 +37,14 @@
   line-height: 1.55;
   word-break: keep-all;
 }
+.profileEntry {
+  display: inline-grid;
+  min-height: 2.75rem;
+  align-items: center;
+  color: var(--lime);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
 .kinds {
   display: grid;
   gap: 0.65rem;
@@ -261,6 +269,7 @@
 .primary:focus-visible,
 .primaryLink:focus-visible,
 .back:focus-visible,
+.profileEntry:focus-visible,
 .kind:focus-within,
 .actions button:focus-visible,
 .secondary:focus-visible,

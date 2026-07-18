@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-18 — 비공개 최소 프로필은 공개 링크 시선만 누적
+
+- 결정: 비공개 재미 검증의 `/me` 전체 시선 수와 질문별 A/B 표본은 `submitted` 공개 링크 응답만 live query로 집계한다. 1:1 응답은 방문자 본인의 즉시 비교에만 남기고 private 프로필 누적에서도 제외한다.
+- 이유: 지금 검증할 세 번째 가설은 공개 링크로 도착한 익명 시선이 쌓여 재공유를 만드는지다. 1:1 owner 비교, 관계별 이중 threshold, 별도 aggregate를 함께 열면 핵심 재공유 동기와 구현 범위가 섞인다.
+- 결과: `/me`는 셀프 10장, 공개 링크 완료 수, 카드별 3표본 threshold, same-browser 새 시선 count watermark, 재공유 CTA만 제공한다. 공개 프로필·관계 레이어·1:1 포함은 production beta 재승인 또는 후속 이슈 전에는 열지 않는다.
+
 ## 2026-07-18 — 오래된 친구팩 private MVP 진입 활성화
 
 - 결정: 사람 검수를 마친 `old-friend-v1`의 카드·문구·version은 그대로 두고 manifest와 generated seed의 `active`를 `true`로 전환해 비공개 재미 검증의 신규 owner 진입을 연다. 셀프 A/B 조작은 44px 이상 버튼과 키보드를 필수로 하고 swipe는 후속 interaction 검증으로 미룬다.

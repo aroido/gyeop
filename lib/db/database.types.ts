@@ -560,6 +560,10 @@ export type Database = {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: Json;
       };
+      get_owner_profile: {
+        Args: { p_management_secret_hash: string; p_play_id: string };
+        Returns: Json;
+      };
       get_published_pack: { Args: { p_slug: string }; Returns: Json };
       get_visitor_response: {
         Args: { p_response_id: string; p_session_hash: string };
@@ -572,6 +576,14 @@ export type Database = {
       publish_pack_version: {
         Args: { p_pack_version_id: string };
         Returns: string;
+      };
+      record_owner_profile_event: {
+        Args: {
+          p_event_name: string;
+          p_management_secret_hash: string;
+          p_play_id: string;
+        };
+        Returns: Json;
       };
       record_owner_share_action: {
         Args: {

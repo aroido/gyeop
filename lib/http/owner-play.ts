@@ -46,20 +46,31 @@ function ownerJson(value: unknown, status = 200) {
   return privateNoStore(Response.json(value, { status }));
 }
 
-function setOwnerCookie(
+export function refreshOwnerCookie(
   response: Response,
   cookieValue: string,
-  play: OwnerPlayState,
+  management: Readonly<{
+    managementTtlSeconds: number;
+    managementExpiresAt: string;
+  }>,
 ) {
   response.headers.set(
     "Set-Cookie",
     serializeOwnerCookie(
       cookieValue,
-      play.managementTtlSeconds,
-      play.managementExpiresAt,
+      management.managementTtlSeconds,
+      management.managementExpiresAt,
     ),
   );
   return response;
+}
+
+function setOwnerCookie(
+  response: Response,
+  cookieValue: string,
+  play: OwnerPlayState,
+) {
+  return refreshOwnerCookie(response, cookieValue, play);
 }
 
 export function ownerNotFoundResponse(deleteCookie = false) {

@@ -1,0 +1,281 @@
+.shell {
+  --lime: #dfff00;
+  --blue: #315cff;
+  display: grid;
+  min-height: 100svh;
+  padding: 1rem 0.85rem 3rem;
+  place-items: start center;
+  overflow-x: clip;
+  background: #050505;
+  color: #fff;
+}
+
+.profile,
+.terminal {
+  width: min(100%, 30rem);
+}
+
+.back {
+  display: inline-grid;
+  min-height: 2.75rem;
+  align-items: center;
+  color: #d8d8d8;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.brand {
+  margin: 0.8rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.profile h1,
+.terminal h1 {
+  margin: 0.35rem 0 0;
+  font-size: clamp(2rem, 10vw, 3.2rem);
+  letter-spacing: -0.07em;
+}
+
+.profile h1:focus,
+.terminal h1:focus {
+  outline: none;
+}
+
+.lead,
+.terminal > p:not(.brand),
+.continue p {
+  color: #bdbdbd;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.summary {
+  display: grid;
+  margin-top: 1.4rem;
+  padding: 1rem;
+  border: 1px solid var(--lime);
+  border-radius: 0.85rem;
+  background: #111;
+  box-shadow: 0.25rem 0.25rem 0 var(--blue);
+}
+
+.summary > p {
+  margin: 0;
+  color: #d2d2d2;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.summary > strong {
+  margin-top: 0.2rem;
+  color: var(--lime);
+  font-size: clamp(3rem, 18vw, 5rem);
+  line-height: 0.95;
+  letter-spacing: -0.08em;
+}
+
+.notice,
+.emptyNotice {
+  width: fit-content;
+  margin-top: 0.8rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: var(--lime);
+  color: #050505;
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.emptyNotice {
+  background: #292929;
+  color: #d8d8d8;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 2rem 0 0.8rem;
+}
+
+.sectionHead p,
+.sectionHead strong {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 950;
+}
+
+.sectionHead strong {
+  color: var(--lime);
+}
+
+.cards {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.card {
+  padding: 0.9rem;
+  border: 1px solid #454545;
+  border-radius: 0.85rem;
+  background: #111;
+}
+
+.position {
+  margin: 0;
+  color: var(--lime);
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.card h2 {
+  margin: 0.3rem 0 0;
+  font-size: 1.08rem;
+  line-height: 1.4;
+  word-break: keep-all;
+}
+
+.choices {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  min-height: 3.3rem;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem;
+  border: 1px solid #555;
+  border-radius: 0.65rem;
+  color: #cfcfcf;
+}
+
+.choice[data-selected="true"] {
+  border-color: var(--lime);
+  color: #fff;
+}
+
+.choice > span {
+  display: grid;
+  width: 1.7rem;
+  height: 1.7rem;
+  place-items: center;
+  border-radius: 50%;
+  background: #292929;
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.choice[data-selected="true"] > span {
+  background: var(--lime);
+  color: #050505;
+}
+
+.choice p {
+  margin: 0;
+  line-height: 1.4;
+  word-break: keep-all;
+}
+
+.choice strong {
+  color: var(--lime);
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+.pending,
+.aggregate {
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px dashed #4b4b4b;
+}
+
+.pending strong,
+.aggregateTitle {
+  color: #d8e0ff;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.pending p {
+  margin: 0.25rem 0 0;
+  color: #929292;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.aggregateTitle {
+  margin: 0 0 0.45rem;
+}
+
+.aggregate > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  padding: 0.45rem 0;
+  color: #cfcfcf;
+  font-size: 0.76rem;
+}
+
+.aggregate > div + div {
+  border-top: 1px solid #292929;
+}
+
+.aggregate span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.aggregate strong {
+  color: var(--lime);
+}
+
+.continue {
+  margin-top: 1.2rem;
+  padding: 1rem;
+  border: 1px solid #4b4b4b;
+  border-radius: 0.85rem;
+  background: #111;
+}
+
+.continue h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.continue p {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+}
+
+.primary {
+  display: grid;
+  width: 100%;
+  min-height: 3.2rem;
+  margin-top: 0.9rem;
+  place-items: center;
+  border-radius: 0.7rem;
+  background: var(--lime);
+  color: #050505;
+  font-weight: 950;
+  text-decoration: none;
+}
+
+.back:focus-visible,
+.primary:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell *,
+  .shell *::before,
+  .shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
