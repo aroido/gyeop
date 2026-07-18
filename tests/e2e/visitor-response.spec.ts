@@ -14,7 +14,46 @@ type ResponseState = {
   knownSinceLabel: string;
   sessionExpiresAt: string;
   sessionTtlSeconds: number;
+  assignments: Array<{
+    cardId: string;
+    stage: "required";
+    position: 1 | 2 | 3;
+    visitorPrompt: string;
+    optionA: string;
+    optionB: string;
+    isSignature: boolean;
+  }>;
 };
+
+const assignments: ResponseState["assignments"] = [
+  {
+    cardId: "conflict",
+    stage: "required",
+    position: 1,
+    visitorPrompt: "친구가 갈등을 풀 때 더 가까운 모습은?",
+    optionA: "바로 이야기한다",
+    optionB: "시간을 두고 이야기한다",
+    isSignature: true,
+  },
+  {
+    cardId: "hard-day",
+    stage: "required",
+    position: 2,
+    visitorPrompt: "친구가 힘든 날 더 원하는 것은?",
+    optionA: "조용히 곁에 있어 주기",
+    optionB: "기분 전환을 도와주기",
+    isSignature: false,
+  },
+  {
+    cardId: "plans",
+    stage: "required",
+    position: 3,
+    visitorPrompt: "친구와 약속을 잡을 때 더 가까운 모습은?",
+    optionA: "미리 계획한다",
+    optionB: "그날 정한다",
+    isSignature: false,
+  },
+];
 
 function json(route: Route, status: number, body: unknown, extra = {}) {
   return route.fulfill({
@@ -81,6 +120,7 @@ async function installVisitorApi(
           : "잘 모르겠어요",
       sessionExpiresAt: "2030-01-02T00:00:00Z",
       sessionTtlSeconds: 86_400,
+      assignments,
     };
     return json(route, 201, saved);
   });

@@ -110,6 +110,24 @@ select jsonb_build_object(
     join public.share_links link on link.id = response.share_link_id
     where link.public_id = :'public_id'
   ),
+  'assignments', (
+    select count(*)
+    from public.visitor_assignments assignment
+    join public.visitor_responses response on response.id = assignment.response_id
+    join public.share_links link on link.id = response.share_link_id
+    where link.public_id = :'public_id'
+  ),
+  'signatureAssignments', (
+    select count(*)
+    from public.visitor_assignments assignment
+    join public.visitor_responses response on response.id = assignment.response_id
+    join public.share_links link on link.id = response.share_link_id
+    join public.pack_cards card
+      on card.pack_version_id = assignment.pack_version_id
+      and card.id = assignment.card_id
+    where link.public_id = :'public_id'
+      and card.is_signature
+  ),
   'contexts', (
     select jsonb_agg(
       jsonb_build_object(
@@ -231,6 +249,28 @@ function expireVisitorResponse(responseId: string) {
   );
 }
 
+function setVisitorLinkStatus(publicId: string, status: "active" | "disabled") {
+  execFileSync(
+    "docker",
+    [
+      "exec",
+      databaseContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      `update public.share_links
+       set status = '${status}', updated_at = clock_timestamp()
+       where public_id = '${publicId}'`,
+    ],
+    { stdio: "ignore" },
+  );
+}
+
 async function postRawVisitorResponse(input: {
   publicId: string;
   secret: string;
@@ -263,6 +303,9 @@ async function postRawVisitorResponse(input: {
     },
   );
   const setCookie = response.headers.get("set-cookie");
+  const sessionCookie = setCookie?.match(
+    /^__Host-gyeop-response=([^;]+);/,
+  )?.[1];
   return {
     fingerprint: {
       status: response.status,
@@ -278,8 +321,68 @@ async function postRawVisitorResponse(input: {
     deletesCookie: setCookie?.startsWith("__Host-gyeop-response=;") ?? false,
     setsSessionCookie:
       setCookie?.startsWith("__Host-gyeop-response=v1.") ?? false,
+    sessionCookie: sessionCookie ?? null,
     retryAfter: response.headers.get("retry-after"),
   };
+}
+
+function expectExactAssignmentResponse(body: string) {
+  const parsed = JSON.parse(body) as Record<string, unknown>;
+  const forbiddenKeys: string[] = [];
+  const scanKeys = (value: unknown) => {
+    if (Array.isArray(value)) {
+      value.forEach(scanKeys);
+      return;
+    }
+    if (value === null || typeof value !== "object") return;
+    for (const [key, child] of Object.entries(value)) {
+      if (
+        /owner|self|choice|sample|packVersionId|playId|linkId|hash|token/i.test(
+          key,
+        )
+      ) {
+        forbiddenKeys.push(key);
+      }
+      scanKeys(child);
+    }
+  };
+  scanKeys(parsed);
+  expect(forbiddenKeys).toEqual([]);
+  expect(Object.keys(parsed).sort()).toEqual([
+    "assignments",
+    "id",
+    "knownSinceCode",
+    "knownSinceLabel",
+    "relationshipCode",
+    "relationshipLabel",
+    "sessionExpiresAt",
+    "sessionTtlSeconds",
+    "status",
+  ]);
+  const assignments = parsed.assignments as Record<string, unknown>[];
+  expect(assignments).toHaveLength(3);
+  expect(assignments.map((assignment) => assignment.position)).toEqual([
+    1, 2, 3,
+  ]);
+  expect(assignments.map((assignment) => assignment.isSignature)).toEqual([
+    true,
+    false,
+    false,
+  ]);
+  expect(new Set(assignments.map((assignment) => assignment.cardId)).size).toBe(
+    3,
+  );
+  for (const assignment of assignments) {
+    expect(Object.keys(assignment).sort()).toEqual([
+      "cardId",
+      "isSignature",
+      "optionA",
+      "optionB",
+      "position",
+      "stage",
+      "visitorPrompt",
+    ]);
+  }
 }
 
 async function postShareAction(
@@ -405,6 +508,9 @@ test.describe("live owner flow", () => {
     await page.getByRole("radio", { name: /한 친구에게 1:1/ }).check();
     await page.getByRole("button", { name: "공유 링크 만들기" }).click();
     await page.getByRole("button", { name: "링크 복사" }).click();
+    const oneToOneInviteUrl = await page
+      .getByLabel("공유 링크 직접 복사")
+      .inputValue();
     await expect(page.getByRole("status")).toContainText("링크를 복사했어요");
     await expect
       .poll(() => readShareActionEvents())
@@ -425,6 +531,39 @@ test.describe("live owner flow", () => {
         },
       ]);
     expect(readRawShareCredentialLeakCount(rawSecretFrom(inviteUrl))).toBe(0);
+
+    const oneToOneInvite = new URL(oneToOneInviteUrl);
+    const oneToOneStart = await postRawVisitorResponse({
+      publicId: oneToOneInvite.pathname.split("/").at(-1)!,
+      secret: rawSecretFrom(oneToOneInviteUrl),
+      ip: "198.51.100.224",
+      body: {
+        intent: "start",
+        secret: rawSecretFrom(oneToOneInviteUrl),
+        relationshipCode: "coworker",
+        knownSinceCode: "three_to_five_years",
+      },
+    });
+    expect(oneToOneStart.fingerprint.status).toBe(201);
+    expect(oneToOneStart.setsSessionCookie).toBe(true);
+    expectExactAssignmentResponse(oneToOneStart.fingerprint.body);
+    const oneToOneResume = await postRawVisitorResponse({
+      publicId: oneToOneInvite.pathname.split("/").at(-1)!,
+      secret: rawSecretFrom(oneToOneInviteUrl),
+      ip: "198.51.100.224",
+      cookie: `__Host-gyeop-response=${oneToOneStart.sessionCookie}`,
+    });
+    expect(oneToOneResume.fingerprint.status).toBe(200);
+    expectExactAssignmentResponse(oneToOneResume.fingerprint.body);
+    expect(JSON.parse(oneToOneResume.fingerprint.body).assignments).toEqual(
+      JSON.parse(oneToOneStart.fingerprint.body).assignments,
+    );
+    const oneToOneInvalidSecret = await postRawVisitorResponse({
+      publicId: oneToOneInvite.pathname.split("/").at(-1)!,
+      secret: rawSecretFrom(inviteUrl),
+      ip: "198.51.100.225",
+    });
+    expect(oneToOneInvalidSecret.fingerprint.status).toBe(404);
 
     await page.evaluate(() => {
       (
@@ -535,6 +674,20 @@ test.describe("live owner flow", () => {
     await tamperedContext.close();
     expect(readShareActionEvents()).toHaveLength(2);
 
+    setVisitorLinkStatus(
+      oneToOneInvite.pathname.split("/").at(-1)!,
+      "disabled",
+    );
+    const oneToOneInactive = await postRawVisitorResponse({
+      publicId: oneToOneInvite.pathname.split("/").at(-1)!,
+      secret: rawSecretFrom(oneToOneInviteUrl),
+      ip: "198.51.100.225",
+    });
+    expect(oneToOneInactive.fingerprint).toEqual(
+      oneToOneInvalidSecret.fingerprint,
+    );
+    setVisitorLinkStatus(oneToOneInvite.pathname.split("/").at(-1)!, "active");
+
     const invite = new URL(inviteUrl);
     const publicId = invite.pathname.split("/").at(-1)!;
     const rawSecret = new URLSearchParams(invite.hash.slice(1)).get("k")!;
@@ -600,11 +753,21 @@ test.describe("live owner flow", () => {
     await expect(
       visitors[0].visitor.getByText("오래된 친구", { exact: true }),
     ).toBeVisible();
+    const publicResume = await postRawVisitorResponse({
+      publicId,
+      secret: rawSecret,
+      cookie: `__Host-gyeop-response=${visitors[0].cookieValue}`,
+      ip: "198.51.100.220",
+    });
+    expect(publicResume.fingerprint.status).toBe(200);
+    expectExactAssignmentResponse(publicResume.fingerprint.body);
     await expect
       .poll(() => readVisitorResponseSummary(publicId))
       .toEqual({
         responses: 2,
         sessionHashes: 2,
+        assignments: 6,
+        signatureAssignments: 2,
         contexts: [
           {
             relationship: "family",
@@ -689,6 +852,7 @@ test.describe("live owner flow", () => {
             result.fingerprint.status === 201 && result.setsSessionCookie,
         ),
     ).toBe(true);
+    expectExactAssignmentResponse(startResults[0].fingerprint.body);
     expect(startResults[10].fingerprint.status).toBe(429);
     expect(Number(startResults[10].retryAfter)).toBeGreaterThan(0);
     expect(startResults[10].setsSessionCookie).toBe(false);

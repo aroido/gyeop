@@ -346,6 +346,48 @@ export type Database = {
           },
         ];
       };
+      visitor_assignments: {
+        Row: {
+          card_id: string;
+          created_at: string;
+          pack_version_id: string;
+          position: number;
+          response_id: string;
+          stage: string;
+        };
+        Insert: {
+          card_id: string;
+          created_at?: string;
+          pack_version_id: string;
+          position: number;
+          response_id: string;
+          stage: string;
+        };
+        Update: {
+          card_id?: string;
+          created_at?: string;
+          pack_version_id?: string;
+          position?: number;
+          response_id?: string;
+          stage?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "visitor_assignments_pack_version_id_card_id_fkey";
+            columns: ["pack_version_id", "card_id"];
+            isOneToOne: false;
+            referencedRelation: "pack_cards";
+            referencedColumns: ["pack_version_id", "id"];
+          },
+          {
+            foreignKeyName: "visitor_assignments_response_id_pack_version_id_fkey";
+            columns: ["response_id", "pack_version_id"];
+            isOneToOne: false;
+            referencedRelation: "visitor_responses";
+            referencedColumns: ["id", "pack_version_id"];
+          },
+        ];
+      };
       visitor_responses: {
         Row: {
           created_at: string;

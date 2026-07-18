@@ -67,6 +67,10 @@ export function verifyVisitorResponse() {
   }
   assert.match(context, /Object\.freeze/);
   assert.match(context, /decodeVisitorResponseHttpState/);
+  assert.match(context, /decodeVisitorAssignment/);
+  assert.match(context, /value\.assignments\.length !== 3/);
+  assert.match(context, /assignment\.position !== index \+ 1/);
+  assert.match(context, /new Set\(assignments\.map/);
   assert.match(context, /Object\.getOwnPropertySymbols/);
 
   const session = source("lib/visitor-response/visitor-session-core.mjs");
@@ -157,6 +161,49 @@ export function verifyVisitorResponse() {
     migration,
     /jsonb_build_object\([^;]*(?:session_token_hash|p_rate_limit_key)/s,
     "analytics and RPC JSON cannot expose session or rate hashes",
+  );
+
+  const assignmentMigration = source(
+    "supabase/migrations/20260718000700_visitor_required_assignments.sql",
+  );
+  for (const contract of [
+    "create table public.visitor_assignments",
+    "visitor_responses_id_pack_version_key",
+    "create or replace function private.assign_required_response_cards",
+    "gyeop-required-assignment-v1",
+    "prior_response.status = 'submitted'",
+    "prior_link.pack_play_id = p_pack_play_id",
+    "card.submitted_sample_count",
+    "card.tie_hash",
+    "perform private.assign_required_response_cards",
+    "v_kind not in ('public', 'one_to_one')",
+    "'visitor_responses_pkey'",
+    "'visitor_responses_id_pack_version_key'",
+    "'visitor_responses_session_token_hash_key'",
+  ]) {
+    assert.ok(
+      assignmentMigration.includes(contract),
+      `missing assignment migration contract: ${contract}`,
+    );
+  }
+  for (const publicField of [
+    "'cardId'",
+    "'stage'",
+    "'position'",
+    "'visitorPrompt'",
+    "'optionA'",
+    "'optionB'",
+    "'isSignature'",
+  ]) {
+    assert.ok(
+      assignmentMigration.includes(publicField),
+      `missing public assignment field: ${publicField}`,
+    );
+  }
+  assert.doesNotMatch(
+    assignmentMigration,
+    /jsonb_build_object\([^;]*(?:owner_prompt|owner_choice|session_token_hash|secret_hash|tie_hash)/s,
+    "assignment API JSON cannot expose owner answers, credentials, or hashes",
   );
 
   const live = source("tests/e2e/owner-play-live.spec.ts");

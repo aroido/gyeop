@@ -48,6 +48,12 @@
 - 이유: 관계·시점은 장기 집계 key이므로 사용자 문구와 stable code를 분리하고, 경계가 겹치지 않아야 같은 선택을 일관되게 해석할 수 있다.
 - 결과: DB와 analytics에는 code만 저장하고 한글 label은 `docs/product/question-pack-spec.md` §7의 검수 registry에서 derive한다. 저장된 시점 code는 선택 당시 구간이며 시간이 지나도 자동 변경하지 않는다. 기존 #9의 code·label 확정 범위는 #22에 흡수한다.
 
+## 2026-07-18 — 방문자 필수 카드는 최소 표본 정렬과 결정적 hash로 배정
+
+- 결정: Signature 1장을 제외한 필수 2장은 같은 팩 플레이의 제출된 필수 카드 표본 수 오름차순으로 고른다. 동률은 `response ID + card ID`의 domain-separated SHA-256 순서로 풀고, 최소 표본 그룹이 1장뿐이면 그 카드와 차순위 최소 표본 카드 1장을 사용한다.
+- 이유: 비-Signature 카드가 9장이라 최소 표본 그룹이 1장만 남을 수 있으므로 “최소 그룹 안에서 2장”만으로는 항상 정확히 2장을 배정할 수 없다. 완전 무작위 대신 표본 우선과 같은 response 재현성을 동시에 보장해야 한다.
+- 결과: draft·withdrawn·invalid는 표본에서 제외하고 submitted 필수 assignment만 센다. 제출 뒤 session이 만료되거나 source link가 비활성화되어도 과거 표본은 유지한다. 배정 결과는 response에 저장하며 reload·재시도 때 다시 계산하지 않는다.
+
 ## 2026-07-15 — 방문자를 다음 주인으로 전환
 
 - 결정: 비교 결과의 Primary CTA는 `나도 이 팩으로 시작하기`다.
