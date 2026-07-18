@@ -62,6 +62,62 @@ function readShareActionEvents() {
   return JSON.parse(output.trim()) as unknown;
 }
 
+function readRawShareCredentialLeakCount(rawSecret: string) {
+  const sql = String.raw`\set raw_secret '${rawSecret}'
+select (
+  select count(*)
+  from public.analytics_events
+  where properties::text like '%' || :'raw_secret' || '%'
+     or properties::text ~ '(#k=|https?://|channel|recipient)'
+) + (
+  select count(*)
+  from public.share_links
+  where to_jsonb(share_links)::text like '%' || :'raw_secret' || '%'
+     or public_id like '%#%'
+);`;
+  const output = execFileSync(
+    "docker",
+    [
+      "exec",
+      "-i",
+      databaseContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-At",
+      "-v",
+      "ON_ERROR_STOP=1",
+    ],
+    { encoding: "utf8", input: sql },
+  );
+  return Number(output.trim());
+}
+
+async function postShareAction(
+  page: import("@playwright/test").Page,
+  playId: string,
+  linkId: string,
+) {
+  return page.evaluate(
+    async ({ playId, linkId }) => {
+      const response = await fetch(`/api/me/plays/${playId}/share-events`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ event: "share_link_copied", linkId }),
+      });
+      return {
+        status: response.status,
+        cacheControl: response.headers.get("cache-control"),
+        retryAfter: response.headers.get("retry-after"),
+      };
+    },
+    { playId, linkId },
+  );
+}
+
 test.use({ trace: "off", screenshot: "off", video: "off" });
 
 test.describe("live owner flow", () => {
@@ -77,9 +133,20 @@ test.describe("live owner flow", () => {
     page,
   }) => {
     await context.addInitScript(() => {
+      const state = { shareMode: "resolve" as "resolve" | "cancel" | "fail" };
+      (
+        window as typeof window & { __gyeopLiveHandoff: typeof state }
+      ).__gyeopLiveHandoff = state;
       Object.defineProperty(navigator, "share", {
         configurable: true,
-        value: async () => undefined,
+        value: async () => {
+          if (state.shareMode === "cancel") {
+            throw new DOMException("cancelled", "AbortError");
+          }
+          if (state.shareMode === "fail") {
+            throw new DOMException("failed", "NotAllowedError");
+          }
+        },
       });
       Object.defineProperty(navigator, "clipboard", {
         configurable: true,
@@ -137,9 +204,11 @@ test.describe("live owner flow", () => {
     ).toBeFocused();
     await page.getByRole("button", { name: "공유 링크 만들기" }).click();
     const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
-    expect(inviteUrl).toMatch(
-      /^http:\/\/127\.0\.0\.1:3000\/i\/[A-Za-z0-9_-]{22}#k=[A-Za-z0-9_-]{43}$/,
-    );
+    expect(
+      /^http:\/\/127\.0\.0\.1:3000\/i\/[A-Za-z0-9_-]{22}#k=[A-Za-z0-9_-]{43}$/.test(
+        inviteUrl,
+      ),
+    ).toBe(true);
     await page.getByRole("button", { name: "친구에게 공유하기" }).click();
     await expect(page.getByRole("status")).toHaveText(
       "공유 메뉴로 링크를 전달했어요.",
@@ -167,6 +236,39 @@ test.describe("live owner flow", () => {
           },
         },
       ]);
+    expect(readRawShareCredentialLeakCount(rawSecretFrom(inviteUrl))).toBe(0);
+
+    await page.evaluate(() => {
+      (
+        window as typeof window & {
+          __gyeopLiveHandoff: { shareMode: "cancel" | "fail" | "resolve" };
+        }
+      ).__gyeopLiveHandoff.shareMode = "cancel";
+    });
+    await page.getByRole("button", { name: "친구에게 공유하기" }).click();
+    await expect(page.getByRole("status")).toHaveText(
+      "공유를 취소했어요. 링크는 그대로 있어요.",
+    );
+    expect(readShareActionEvents()).toHaveLength(2);
+    await page.evaluate(() => {
+      (
+        window as typeof window & {
+          __gyeopLiveHandoff: { shareMode: "cancel" | "fail" | "resolve" };
+        }
+      ).__gyeopLiveHandoff.shareMode = "fail";
+    });
+    await page.getByRole("button", { name: "친구에게 공유하기" }).click();
+    await expect(page.locator("aside").getByRole("alert")).toHaveText(
+      "공유 메뉴를 열지 못했어요. 링크 복사를 사용해 주세요.",
+    );
+    expect(readShareActionEvents()).toHaveLength(2);
+    await page.evaluate(() => {
+      (
+        window as typeof window & {
+          __gyeopLiveHandoff: { shareMode: "cancel" | "fail" | "resolve" };
+        }
+      ).__gyeopLiveHandoff.shareMode = "resolve";
+    });
     const rejectedExtraField = await page.evaluate(async () => {
       const playId = location.pathname.split("/").at(-1);
       const response = await fetch(`/api/me/plays/${playId}/share-events`, {
@@ -188,6 +290,61 @@ test.describe("live owner flow", () => {
       status: 400,
       cacheControl: "private, no-store",
     });
+    expect(readShareActionEvents()).toHaveLength(2);
+
+    const ownerLinks = await page.evaluate(async (playId) => {
+      const response = await fetch(`/api/me/plays/${playId}/links`, {
+        credentials: "same-origin",
+      });
+      return (await response.json()) as {
+        links: { id: string; kind: "public" | "one_to_one"; status: string }[];
+      };
+    }, ownerCookie!.value.split(".")[1]);
+    const activeOneToOne = ownerLinks.links.find(
+      (link) => link.kind === "one_to_one" && link.status === "active",
+    );
+    expect(Boolean(activeOneToOne)).toBe(true);
+
+    const origin = new URL(page.url()).origin;
+    const missingCookieContext = await browser.newContext();
+    const missingCookiePage = await missingCookieContext.newPage();
+    await missingCookiePage.goto(origin);
+    expect(
+      await postShareAction(
+        missingCookiePage,
+        ownerCookie!.value.split(".")[1],
+        activeOneToOne!.id,
+      ),
+    ).toMatchObject({ status: 404, cacheControl: "private, no-store" });
+    await missingCookieContext.close();
+
+    const crossPlay = await postShareAction(
+      page,
+      "18181818-1818-4181-8181-181818181818",
+      activeOneToOne!.id,
+    );
+    expect(crossPlay).toMatchObject({
+      status: 404,
+      cacheControl: "private, no-store",
+    });
+
+    const tamperedContext = await browser.newContext();
+    await tamperedContext.addCookies([
+      {
+        ...ownerCookie!,
+        value: `v1.${ownerCookie!.value.split(".")[1]}.${"A".repeat(43)}`,
+      },
+    ]);
+    const tamperedPage = await tamperedContext.newPage();
+    await tamperedPage.goto(origin);
+    expect(
+      await postShareAction(
+        tamperedPage,
+        ownerCookie!.value.split(".")[1],
+        activeOneToOne!.id,
+      ),
+    ).toMatchObject({ status: 404, cacheControl: "private, no-store" });
+    await tamperedContext.close();
     expect(readShareActionEvents()).toHaveLength(2);
 
     const visitors = await Promise.all(
@@ -257,7 +414,37 @@ test.describe("live owner flow", () => {
     const rotatedUrl = await page
       .getByLabel("공유 링크 직접 복사")
       .inputValue();
-    expect(rotatedUrl).not.toBe(inviteUrl);
+    expect(rotatedUrl !== inviteUrl).toBe(true);
+    await page.getByRole("button", { name: "친구에게 공유하기" }).click();
+    await expect(page.getByRole("status")).toHaveText(
+      "공유 메뉴로 링크를 전달했어요.",
+    );
+    await expect
+      .poll(() => readShareActionEvents())
+      .toEqual([
+        {
+          event: "share_handoff_succeeded",
+          properties: {
+            packVersion: "old-friend-v1",
+            linkKind: "public",
+          },
+        },
+        {
+          event: "share_handoff_succeeded",
+          properties: {
+            packVersion: "old-friend-v1",
+            linkKind: "public",
+          },
+        },
+        {
+          event: "share_link_copied",
+          properties: {
+            packVersion: "old-friend-v1",
+            linkKind: "one_to_one",
+          },
+        },
+      ]);
+    expect(readRawShareCredentialLeakCount(rawSecretFrom(rotatedUrl))).toBe(0);
 
     await visitors[0].visitor.reload();
     await expect(
@@ -275,6 +462,51 @@ test.describe("live owner flow", () => {
       .click();
     await expect(page.getByLabel("공유 링크 직접 복사")).toHaveCount(0);
 
+    const disabledPublic = await page.evaluate(async (playId) => {
+      const response = await fetch(`/api/me/plays/${playId}/links`, {
+        credentials: "same-origin",
+      });
+      const result = (await response.json()) as {
+        links: { id: string; kind: "public"; status: string }[];
+      };
+      return result.links.find(
+        (link) => link.kind === "public" && link.status === "disabled",
+      )?.id;
+    }, ownerCookie!.value.split(".")[1]);
+    expect(Boolean(disabledPublic)).toBe(true);
+    expect(
+      await postShareAction(
+        page,
+        ownerCookie!.value.split(".")[1],
+        disabledPublic!,
+      ),
+    ).toMatchObject({ status: 404, cacheControl: "private, no-store" });
+    expect(readShareActionEvents()).toHaveLength(3);
+
+    let limited:
+      | {
+          status: number;
+          cacheControl: string | null;
+          retryAfter: string | null;
+        }
+      | undefined;
+    for (let request = 0; request < 121 && !limited; request += 1) {
+      const response = await postShareAction(
+        page,
+        ownerCookie!.value.split(".")[1],
+        disabledPublic!,
+      );
+      if (response.status === 429) limited = response;
+    }
+    expect(limited?.status).toBe(429);
+    expect(Number(limited?.retryAfter)).toBeGreaterThan(0);
+    expect(readShareActionEvents()).toHaveLength(3);
+
     for (const { visitorContext } of visitors) await visitorContext.close();
   });
 });
+
+function rawSecretFrom(inviteUrl: string) {
+  const url = new URL(inviteUrl);
+  return new URLSearchParams(url.hash.slice(1)).get("k")!;
+}

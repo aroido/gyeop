@@ -31,8 +31,7 @@ export function POST(
             !input ||
             (input.event !== "share_handoff_succeeded" &&
               input.event !== "share_link_copied") ||
-            typeof input.linkId !== "string" ||
-            !isOwnerPlayId(input.linkId)
+            typeof input.linkId !== "string"
           ) {
             throw new Error("INTERNAL_ERROR");
           }

@@ -639,6 +639,22 @@ const OWNER_ROUTE_CONTRACTS = new Map([
       limited: false,
     },
   ],
+  [
+    "app/api/me/plays/[playId]/share-events/route.ts",
+    {
+      method: "POST",
+      sequence: [
+        ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
+        [
+          "lib/owner-play/owner-play-session-core.mjs",
+          "parseOwnerCookieHeader",
+        ],
+        ["lib/owner-play/owner-play-state-core.mjs", "isOwnerPlayId"],
+        ["lib/http/share-links.ts", "recordShareActionResponse"],
+      ],
+      limited: true,
+    },
+  ],
 ]);
 
 function hasSafeOwnerRouteOrder(route, files, contract) {

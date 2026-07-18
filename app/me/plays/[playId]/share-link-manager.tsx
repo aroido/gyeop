@@ -161,7 +161,7 @@ export default function ShareLinkManager({
   }
 
   async function disable(link: ShareLink) {
-    if (state.kind !== "ready") return;
+    if (state.kind !== "ready" || actionLatchRef.current) return;
     if (
       !window.confirm(
         "이 링크를 비활성화할까요? 더 이상 초대에 사용할 수 없어요.",
@@ -189,7 +189,7 @@ export default function ShareLinkManager({
   }
 
   async function rotate(link: ShareLink) {
-    if (state.kind !== "ready") return;
+    if (state.kind !== "ready" || actionLatchRef.current) return;
     if (
       !window.confirm(
         "새로 발급하면 지금 링크는 바로 비활성화돼요. 계속할까요?",

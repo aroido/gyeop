@@ -188,15 +188,29 @@ insert into public.share_links (
   secret_hash,
   created_at,
   updated_at
-) values (
-  '19300000-0000-4000-8000-000000000003',
-  'GGGGGGGGGGGGGGGGGGGGGg',
-  '19000000-0000-4000-8000-000000000003',
-  'public',
-  decode(repeat('73', 32), 'hex'),
-  timestamptz '2030-01-01 00:00:00+00',
-  timestamptz '2030-01-01 00:00:00+00'
-);
+) values
+  (
+    '19300000-0000-4000-8000-000000000003',
+    'GGGGGGGGGGGGGGGGGGGGGg',
+    '19000000-0000-4000-8000-000000000003',
+    'public',
+    decode(repeat('73', 32), 'hex'),
+    timestamptz '2030-01-01 00:00:00+00',
+    timestamptz '2030-01-01 00:00:00+00'
+  ),
+  (
+    '19300000-0000-4000-8000-000000000004',
+    'HHHHHHHHHHHHHHHHHHHHHA',
+    '19000000-0000-4000-8000-000000000001',
+    'public',
+    decode(repeat('74', 32), 'hex'),
+    timestamptz '2020-01-01 00:00:00+00',
+    timestamptz '2020-01-01 00:00:00+00'
+  );
+
+update public.share_links
+set expires_at = timestamptz '2020-01-02 00:00:00+00'
+where id = '19300000-0000-4000-8000-000000000004';
 
 set local role service_role;
 
@@ -273,16 +287,21 @@ select is(
   'owner override creates a one-to-one share link'
 );
 
-select is(
-  public.record_owner_share_action(
+select ok(
+  result->>'outcome' = 'recorded'
+  and (result->>'managementTtlSeconds')::integer = 604800
+  and (result->>'managementExpiresAt')::timestamptz
+    > clock_timestamp() + interval '6 days 23 hours',
+  'public share handoff records an event and returns a renewed owner TTL'
+)
+from (
+  select public.record_owner_share_action(
     '19000000-0000-4000-8000-000000000001',
     decode(repeat('11', 32), 'hex'),
     '19100000-0000-4000-8000-000000000001',
     'share_handoff_succeeded'
-  )->>'outcome',
-  'recorded',
-  'browser-reported public share handoff records an event'
-);
+  ) as result
+) recorded;
 
 select is(
   public.record_owner_share_action(
@@ -315,6 +334,28 @@ select is(
   )->>'outcome',
   'link_not_found',
   'cross-play action fails closed'
+);
+
+select is(
+  public.record_owner_share_action(
+    '19000000-0000-4000-8000-000000000001',
+    decode(repeat('ff', 32), 'hex'),
+    '19100000-0000-4000-8000-000000000001',
+    'share_link_copied'
+  )->>'outcome',
+  'not_found',
+  'tampered owner capability records no share action'
+);
+
+select is(
+  public.record_owner_share_action(
+    '19000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex'),
+    '19300000-0000-4000-8000-000000000004',
+    'share_link_copied'
+  )->>'outcome',
+  'link_not_active',
+  'expired link converges before recording a share action'
 );
 
 select throws_ok(
@@ -526,6 +567,25 @@ select is(
   ),
   timestamptz '2030-01-08 00:00:00+00',
   'draft share action does not renew owner management TTL'
+);
+
+select ok(
+  (
+    select management_expires_at
+    from public.pack_plays
+    where id = '19000000-0000-4000-8000-000000000001'
+  ) > clock_timestamp() + interval '6 days 23 hours',
+  'successful share actions renew the persisted owner TTL'
+);
+
+select is(
+  (
+    select status
+    from public.share_links
+    where id = '19300000-0000-4000-8000-000000000004'
+  ),
+  'expired',
+  'expired action converges the link status without an event'
 );
 
 select is(

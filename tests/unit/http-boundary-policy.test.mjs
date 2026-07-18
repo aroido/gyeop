@@ -280,10 +280,53 @@ function ownerRouteFiles(routePath, routeSource) {
       export function revokeOwnerPlayResponse() {}
       export function ownerNotFoundResponse() {}
     `,
+    "lib/http/share-links.ts": "export function recordShareActionResponse() {}",
     "lib/owner-play/owner-play-session-core.mjs":
       "export function parseOwnerCookieHeader() {}",
+    "lib/owner-play/owner-play-state-core.mjs":
+      "export function isOwnerPlayId() {}",
   };
 }
+
+test("requires share events to run behind limiter then cookie and path checks", () => {
+  const route = "app/api/me/plays/[playId]/share-events/route.ts";
+  const accepted = `
+    import { withPublicRequest } from "../../../../../../lib/http/request-boundary";
+    import { runRateLimitedDomain } from "../../../../../../lib/http/rate-limit";
+    import { recordShareActionResponse } from "../../../../../../lib/http/share-links";
+    import { parseOwnerCookieHeader } from "../../../../../../lib/owner-play/owner-play-session-core.mjs";
+    import { isOwnerPlayId } from "../../../../../../lib/owner-play/owner-play-state-core.mjs";
+    export function POST(request) {
+      return withPublicRequest(request, { privateNoStore: true }, ({ networkKey, signal }) =>
+        runRateLimitedDomain({ keyHash: networkKey, action: "owner_play_access", windowSeconds: 600, limit: 120, signal }, async () => {
+          const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
+          const validPath = isOwnerPlayId("19000000-0000-4000-8000-000000000001");
+          if (!validPath) return new Response(null, { status: 404 });
+          return recordShareActionResponse({ cookie, signal });
+        })
+      );
+    }
+  `;
+  assert.deepEqual(
+    verifyHttpBoundarySources(ownerRouteFiles(route, accepted)),
+    [],
+  );
+
+  const reordered = accepted
+    .replace(
+      'const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));\n          const validPath = isOwnerPlayId',
+      "const validPath = isOwnerPlayId",
+    )
+    .replace(
+      "if (!validPath) return new Response(null, { status: 404 });",
+      'const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));\n          if (!validPath) return new Response(null, { status: 404 });',
+    );
+  assert.ok(
+    verifyHttpBoundarySources(ownerRouteFiles(route, reordered)).some(
+      (finding) => finding.includes("owner capability branch order"),
+    ),
+  );
+});
 
 test("accepts the reviewed create/resume owner branch order", () => {
   assert.deepEqual(

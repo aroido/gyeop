@@ -155,7 +155,7 @@ async function installBrowserHandoff(
   page: Page,
   options: {
     share: "unsupported" | "resolve" | "cancel" | "fail" | "pending";
-    clipboard: "resolve" | "fail";
+    clipboard: "resolve" | "fail" | "pending";
   },
 ) {
   await page.addInitScript((initial) => {
@@ -165,6 +165,7 @@ async function installBrowserHandoff(
       shareCalls: ShareData[];
       copyCalls: string[];
       resolveShare?: () => void;
+      resolveCopy?: () => void;
     };
     const state: HandoffState = {
       shareMode: initial.share,
@@ -201,6 +202,11 @@ async function installBrowserHandoff(
           state.copyCalls.push(value);
           if (state.clipboardMode === "fail") {
             throw new DOMException("failed", "NotAllowedError");
+          }
+          if (state.clipboardMode === "pending") {
+            await new Promise<void>((resolve) => {
+              state.resolveCopy = resolve;
+            });
           }
         },
       },
@@ -287,6 +293,15 @@ test("hands off the exact public link once despite same-tick activation", async 
   await shareButton.evaluate((button) => {
     (button as HTMLElement).click();
     (button as HTMLElement).click();
+    for (const candidate of document.querySelectorAll("button")) {
+      if (
+        ["공유 링크 만들기", "링크 복사", "새로 발급", "비활성화"].includes(
+          candidate.textContent?.trim() ?? "",
+        )
+      ) {
+        (candidate as HTMLButtonElement).click();
+      }
+    }
   });
   await expect
     .poll(() =>
@@ -300,6 +315,28 @@ test("hands off the exact public link once despite same-tick activation", async 
       ),
     )
     .toBe(1);
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as typeof window & {
+            __gyeopHandoff: { copyCalls: string[] };
+          }
+        ).__gyeopHandoff.copyCalls,
+    ),
+  ).toEqual([]);
+  expect(
+    share.calls.filter(
+      (call) =>
+        call.method !== "GET" && !call.pathname.endsWith("/share-events"),
+    ),
+  ).toEqual([
+    {
+      method: "POST",
+      pathname: `/api/plays/${playId}/links`,
+      body: { kind: "public" },
+    },
+  ]);
   await page.evaluate(() => {
     (
       window as typeof window & {
@@ -381,7 +418,7 @@ test("copies a one-to-one link without a fake share control", async ({
 }) => {
   await installBrowserHandoff(page, {
     share: "unsupported",
-    clipboard: "resolve",
+    clipboard: "pending",
   });
   await completedOwner(page);
   const share = await installShareApi(page);
@@ -392,7 +429,29 @@ test("copies a one-to-one link without a fake share control", async ({
     page.getByRole("button", { name: "친구에게 공유하기" }),
   ).toHaveCount(0);
   const copyButton = page.getByRole("button", { name: "링크 복사" });
-  await copyButton.click();
+  await copyButton.evaluate((button) => {
+    (button as HTMLElement).click();
+    (button as HTMLElement).click();
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __gyeopHandoff: { copyCalls: string[] };
+            }
+          ).__gyeopHandoff.copyCalls.length,
+      ),
+    )
+    .toBe(1);
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __gyeopHandoff: { resolveCopy?: () => void };
+      }
+    ).__gyeopHandoff.resolveCopy?.();
+  });
   await expect(page.getByRole("status")).toContainText("링크를 복사했어요");
   await expect(copyButton).toBeFocused();
   expect(
@@ -486,6 +545,10 @@ for (const viewport of [
   }) => {
     await page.setViewportSize(viewport);
     await page.emulateMedia({ reducedMotion: "reduce" });
+    await installBrowserHandoff(page, {
+      share: "unsupported",
+      clipboard: "resolve",
+    });
     await completedOwner(page);
     await installShareApi(page);
 
@@ -512,6 +575,20 @@ for (const viewport of [
         () =>
           document.documentElement.scrollWidth <= window.innerWidth &&
           window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      ),
+    ).toBe(true);
+
+    await page.getByRole("button", { name: "공유 링크 만들기" }).click();
+    const copyButton = page.getByRole("button", { name: "링크 복사" });
+    const manualUrl = page.getByLabel("공유 링크 직접 복사");
+    expect((await copyButton.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    expect((await manualUrl.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    await copyButton.click();
+    await expect(page.getByRole("status")).toContainText("링크를 복사했어요");
+    await expect(copyButton).toBeFocused();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
       ),
     ).toBe(true);
 
