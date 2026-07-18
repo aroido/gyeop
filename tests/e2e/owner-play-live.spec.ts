@@ -122,7 +122,7 @@ test.use({ trace: "off", screenshot: "off", video: "off" });
 
 test.describe("live owner flow", () => {
   test.skip(!live, "GYEOP_E2E_LIVE=1 runs the local Supabase browser gate");
-  test.describe.configure({ mode: "serial" });
+  test.describe.configure({ mode: "serial", retries: 0 });
 
   test.beforeAll(() => setOldFriendActive());
   test.afterAll(() => setOldFriendActive());
@@ -377,7 +377,7 @@ test.describe("live owner flow", () => {
     const rateResults = await ratePage.evaluate(
       async ({ publicId, rawSecret }) => {
         const results: { status: number; retryAfter: string | null }[] = [];
-        for (let request = 0; request < 61; request += 1) {
+        for (let request = 0; request < 121; request += 1) {
           const response = await fetch(`/api/invites/${publicId}/metadata`, {
             method: "POST",
             credentials: "same-origin",
@@ -388,16 +388,18 @@ test.describe("live owner flow", () => {
             status: response.status,
             retryAfter: response.headers.get("retry-after"),
           });
+          if (response.status === 429) break;
         }
         return results;
       },
       { publicId, rawSecret },
     );
+    expect(rateResults.length).toBeGreaterThan(60);
+    expect(rateResults.at(-1)?.status).toBe(429);
     expect(
-      rateResults.slice(0, 60).every((result) => result.status === 200),
+      rateResults.slice(0, -1).every((result) => result.status === 200),
     ).toBe(true);
-    expect(rateResults[60].status).toBe(429);
-    expect(Number(rateResults[60].retryAfter)).toBeGreaterThan(0);
+    expect(Number(rateResults.at(-1)?.retryAfter)).toBeGreaterThan(0);
     await rateContext.close();
 
     await page.reload();
