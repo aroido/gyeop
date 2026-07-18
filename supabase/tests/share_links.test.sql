@@ -2,6 +2,8 @@ begin;
 
 select no_plan();
 
+delete from public.analytics_events;
+
 select has_table('public', 'share_links', 'share link table exists');
 select has_function(
   'public',
@@ -169,12 +171,29 @@ where id in (
 
 set local role service_role;
 
+select throws_ok(
+  $$
+    select public.create_share_link(
+      '19000000-0000-4000-8000-000000000001',
+      decode(repeat('11', 32), 'hex'),
+      '19100000-0000-4000-8000-000000000005',
+      'AAAAAAAAAAAAAAAAAAAAAB',
+      decode(repeat('a5', 32), 'hex'),
+      'public',
+      null
+    )
+  $$,
+  '22023',
+  'invalid share link input',
+  'non-canonical 22-character public ids are rejected'
+);
+
 select is(
   public.create_share_link(
     '19000000-0000-4000-8000-000000000003',
     decode(repeat('33', 32), 'hex'),
     '19100000-0000-4000-8000-000000000003',
-    'CCCCCCCCCCCCCCCCCCCCCC',
+    'CCCCCCCCCCCCCCCCCCCCCg',
     decode(repeat('c3', 32), 'hex'),
     'public',
     null
@@ -188,7 +207,7 @@ select is(
     '19000000-0000-4000-8000-000000000001',
     decode(repeat('ff', 32), 'hex'),
     '19100000-0000-4000-8000-000000000004',
-    'DDDDDDDDDDDDDDDDDDDDDD',
+    'DDDDDDDDDDDDDDDDDDDDDw',
     decode(repeat('d4', 32), 'hex'),
     'public',
     null
@@ -216,7 +235,7 @@ select is(
     '19000000-0000-4000-8000-000000000001',
     decode(repeat('11', 32), 'hex'),
     '19100000-0000-4000-8000-000000000002',
-    'BBBBBBBBBBBBBBBBBBBBBB',
+    'BBBBBBBBBBBBBBBBBBBBBQ',
     decode(repeat('b2', 32), 'hex'),
     'one_to_one',
     null
@@ -282,7 +301,7 @@ select is(
     decode(repeat('11', 32), 'hex'),
     '19100000-0000-4000-8000-000000000001',
     '19200000-0000-4000-8000-000000000001',
-    'EEEEEEEEEEEEEEEEEEEEEE',
+    'EEEEEEEEEEEEEEEEEEEEEA',
     decode(repeat('e5', 32), 'hex')
   )->>'outcome',
   'rotated',
@@ -295,7 +314,7 @@ select is(
     decode(repeat('11', 32), 'hex'),
     '19100000-0000-4000-8000-000000000001',
     '19200000-0000-4000-8000-000000000002',
-    'FFFFFFFFFFFFFFFFFFFFFF',
+    'FFFFFFFFFFFFFFFFFFFFFQ',
     decode(repeat('f6', 32), 'hex')
   )->>'outcome',
   'link_not_active',
@@ -324,7 +343,7 @@ select is(
 
 select is(
   public.get_invite_metadata(
-    'EEEEEEEEEEEEEEEEEEEEEE',
+    'EEEEEEEEEEEEEEEEEEEEEA',
     decode(repeat('e5', 32), 'hex')
   )->>'outcome',
   'unavailable',

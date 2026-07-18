@@ -3,7 +3,7 @@ begin;
 create table public.share_links (
   id uuid primary key,
   public_id text not null unique
-    check (public_id ~ '^[A-Za-z0-9_-]{22}$'),
+    check (public_id ~ '^[A-Za-z0-9_-]{21}[AQgw]$'),
   pack_play_id uuid not null
     references public.pack_plays (id)
     on update restrict
@@ -103,7 +103,7 @@ begin
     or octet_length(p_management_secret_hash) <> 32
     or p_link_id is null
     or p_public_id is null
-    or p_public_id !~ '^[A-Za-z0-9_-]{22}$'
+    or p_public_id !~ '^[A-Za-z0-9_-]{21}[AQgw]$'
     or p_secret_hash is null
     or octet_length(p_secret_hash) <> 32
     or p_kind not in ('public', 'one_to_one')
@@ -286,7 +286,7 @@ begin
     or p_link_id is null
     or p_new_link_id is null
     or p_new_public_id is null
-    or p_new_public_id !~ '^[A-Za-z0-9_-]{22}$'
+    or p_new_public_id !~ '^[A-Za-z0-9_-]{21}[AQgw]$'
     or p_new_secret_hash is null
     or octet_length(p_new_secret_hash) <> 32
   then
@@ -481,7 +481,7 @@ declare
   v_status text;
 begin
   if p_public_id is null
-    or p_public_id !~ '^[A-Za-z0-9_-]{22}$'
+    or p_public_id !~ '^[A-Za-z0-9_-]{21}[AQgw]$'
     or p_secret_hash is null
     or octet_length(p_secret_hash) <> 32
   then

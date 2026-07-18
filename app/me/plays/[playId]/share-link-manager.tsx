@@ -22,10 +22,7 @@ type State =
   | { kind: "ready"; packTitle: string; links: readonly ShareLink[] };
 
 async function readManagerState(playId: string): Promise<State> {
-  const [{ play, pack }, links] = await Promise.all([
-    loadOwnerFlow(playId),
-    listShareLinks(playId),
-  ]);
+  const { play, pack } = await loadOwnerFlow(playId);
   if (
     play.status !== "completed" ||
     play.packSlug !== "old-friend" ||
@@ -34,6 +31,7 @@ async function readManagerState(playId: string): Promise<State> {
   ) {
     throw new Error("terminal");
   }
+  const links = await listShareLinks(playId);
   return { kind: "ready", packTitle: pack.title, links };
 }
 

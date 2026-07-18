@@ -9,6 +9,7 @@ import {
 import {
   decodeInviteMetadataOutcome,
   decodeShareLinkList,
+  isSharePublicId,
 } from "../../lib/share-links/share-link-state-core.mjs";
 
 const secret = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8";
@@ -60,6 +61,11 @@ const link = Object.freeze({
 
 test("strictly decodes sanitized unique owner link rows", () => {
   assert.deepEqual(decodeShareLinkList([link]), [link]);
+  assert.equal(isSharePublicId("AAAAAAAAAAAAAAAAAAAAAA"), true);
+  assert.equal(isSharePublicId("AAAAAAAAAAAAAAAAAAAAAB"), false);
+  assert.throws(() =>
+    decodeShareLinkList([{ ...link, publicId: "AAAAAAAAAAAAAAAAAAAAAB" }]),
+  );
   assert.throws(() => decodeShareLinkList([link, link]));
   assert.throws(() => decodeShareLinkList([{ ...link, secretHash: "no" }]));
   assert.throws(() =>

@@ -207,3 +207,68 @@ test("reads only an exact fragment and renders generic invite states", async ({
   ).toBeFocused();
   expect(inviteCalls()).toHaveLength(1);
 });
+
+for (const viewport of [
+  { width: 320, height: 800 },
+  { width: 390, height: 844 },
+  { width: 430, height: 932 },
+]) {
+  test(`keeps share and invite flows accessible at ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await completedOwner(page);
+    await installShareApi(page);
+
+    await page.goto(`/me/plays/${playId}`);
+    const shareHeading = page.getByRole("heading", { name: "공유 링크" });
+    const publicRadio = page.getByRole("radio", {
+      name: /여러 친구에게 공개/,
+    });
+    await expect(shareHeading).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(publicRadio).toBeFocused();
+    expect(
+      (await publicRadio.locator("..").boundingBox())?.height,
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      (
+        await page
+          .getByRole("button", { name: "공유 링크 만들기" })
+          .boundingBox()
+      )?.height,
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <= window.innerWidth &&
+          window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+      ),
+    ).toBe(true);
+
+    await page.goto(`/i/${publicIds[0]}#k=${secret}`);
+    await expect(
+      page.getByRole("heading", { name: "친구가 먼저 답한 질문팩이에요" }),
+    ).toBeFocused();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+
+    await page.goto(`/i/${publicIds[0]}#k=${secret}&x=1`);
+    await expect(
+      page.getByRole("heading", { name: "이 초대는 지금 참여할 수 없어요" }),
+    ).toBeFocused();
+    expect(
+      (await page.getByRole("link", { name: "겹 둘러보기" }).boundingBox())
+        ?.height,
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+  });
+}
