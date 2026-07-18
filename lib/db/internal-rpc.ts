@@ -10,8 +10,63 @@ import { decodeOwnerPlayOutcome } from "../owner-play/owner-play-session-core.mj
 import type { OwnerPlayState } from "../owner-play/owner-play-session.ts";
 import { decodePublishedPack } from "../packs/published-pack-core.mjs";
 import type { PublishedPack } from "../packs/published-pack.ts";
+import {
+  decodeCreateShareLinkOutcome,
+  decodeDisableShareLinkOutcome,
+  decodeInviteMetadataOutcome,
+  decodeListShareLinksOutcome,
+  decodeRotateShareLinkOutcome,
+} from "../share-links/share-link-state-core.mjs";
 
 let internalClient: SupabaseClient<Database> | undefined;
+
+type ShareLinkState = Readonly<{
+  id: string;
+  publicId: string;
+  kind: "public" | "one_to_one";
+  status: "active" | "disabled" | "expired";
+  expiresAt: string | null;
+  consumedAt: null;
+}>;
+type ShareManagementState = Readonly<{
+  managementExpiresAt: string;
+  managementTtlSeconds: 604800;
+}>;
+type OwnerShareFailure = Readonly<{
+  outcome: "expired" | "not_found" | "not_completed";
+}>;
+type CreateShareLinkResult =
+  | (ShareManagementState &
+      Readonly<{ outcome: "created"; link: ShareLinkState }>)
+  | OwnerShareFailure
+  | Readonly<{ outcome: "collision" }>;
+type DisableShareLinkResult =
+  | (ShareManagementState &
+      Readonly<{ outcome: "disabled"; link: ShareLinkState }>)
+  | OwnerShareFailure
+  | Readonly<{ outcome: "link_not_found" }>;
+type RotateShareLinkResult =
+  | (ShareManagementState &
+      Readonly<{ outcome: "rotated"; link: ShareLinkState }>)
+  | OwnerShareFailure
+  | Readonly<{
+      outcome: "collision" | "link_not_found" | "link_not_active";
+    }>;
+type ListShareLinksResult =
+  | (ShareManagementState &
+      Readonly<{ outcome: "listed"; links: readonly ShareLinkState[] }>)
+  | OwnerShareFailure;
+type InviteMetadataResult =
+  | Readonly<{
+      outcome: "active";
+      metadata: Readonly<{
+        packSlug: string;
+        packVersion: string;
+        packTitle: string;
+        kind: "public" | "one_to_one";
+      }>;
+    }>
+  | Readonly<{ outcome: "invalid" | "unavailable" }>;
 
 function requiredServerEnv(name: string) {
   const value = process.env[name];
@@ -99,7 +154,7 @@ export async function getPublishedPack(input: {
 }
 
 function bytea(value: Uint8Array) {
-  if (value.byteLength !== 32) throw new Error("Owner hash must be 32 bytes");
+  if (value.byteLength !== 32) throw new Error("Hash must be 32 bytes");
   return `\\x${Buffer.from(value).toString("hex")}`;
 }
 
@@ -259,4 +314,98 @@ export async function revokeOwnerPlaySession(input: {
     throw new Error("Internal owner play RPC failed");
   }
   return data;
+}
+
+export async function createShareLink(input: {
+  playId: string;
+  managementSecretHash: Uint8Array;
+  linkId: string;
+  publicId: string;
+  secretHash: Uint8Array;
+  kind: "public" | "one_to_one";
+  signal?: AbortSignal;
+}): Promise<CreateShareLinkResult> {
+  let query = getInternalClient().rpc("create_share_link", {
+    p_play_id: input.playId,
+    p_management_secret_hash: bytea(input.managementSecretHash),
+    p_link_id: input.linkId,
+    p_public_id: input.publicId,
+    p_secret_hash: bytea(input.secretHash),
+    p_kind: input.kind,
+    p_expires_at: nullableRpcString(null),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal share link RPC failed");
+  return decodeCreateShareLinkOutcome(data) as CreateShareLinkResult;
+}
+
+export async function disableShareLink(input: {
+  playId: string;
+  managementSecretHash: Uint8Array;
+  linkId: string;
+  signal?: AbortSignal;
+}): Promise<DisableShareLinkResult> {
+  let query = getInternalClient().rpc("disable_share_link", {
+    p_play_id: input.playId,
+    p_management_secret_hash: bytea(input.managementSecretHash),
+    p_link_id: input.linkId,
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal share link RPC failed");
+  return decodeDisableShareLinkOutcome(data) as DisableShareLinkResult;
+}
+
+export async function rotateShareLink(input: {
+  playId: string;
+  managementSecretHash: Uint8Array;
+  linkId: string;
+  linkIdNew: string;
+  publicId: string;
+  secretHash: Uint8Array;
+  signal?: AbortSignal;
+}): Promise<RotateShareLinkResult> {
+  let query = getInternalClient().rpc("rotate_share_link", {
+    p_play_id: input.playId,
+    p_management_secret_hash: bytea(input.managementSecretHash),
+    p_link_id: input.linkId,
+    p_new_link_id: input.linkIdNew,
+    p_new_public_id: input.publicId,
+    p_new_secret_hash: bytea(input.secretHash),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal share link RPC failed");
+  return decodeRotateShareLinkOutcome(data) as RotateShareLinkResult;
+}
+
+export async function listOwnerShareLinks(input: {
+  playId: string;
+  managementSecretHash: Uint8Array;
+  signal?: AbortSignal;
+}): Promise<ListShareLinksResult> {
+  let query = getInternalClient().rpc("list_owner_share_links", {
+    p_play_id: input.playId,
+    p_management_secret_hash: bytea(input.managementSecretHash),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal share link RPC failed");
+  return decodeListShareLinksOutcome(data) as ListShareLinksResult;
+}
+
+export async function getInviteMetadata(input: {
+  publicId: string;
+  secretHash: Uint8Array;
+  signal?: AbortSignal;
+}): Promise<InviteMetadataResult> {
+  let query = getInternalClient().rpc("get_invite_metadata", {
+    p_public_id: input.publicId,
+    p_secret_hash: bytea(input.secretHash),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal invite metadata RPC failed");
+  return decodeInviteMetadataOutcome(data) as InviteMetadataResult;
 }

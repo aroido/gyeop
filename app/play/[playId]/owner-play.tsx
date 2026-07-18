@@ -453,9 +453,9 @@ export default function OwnerPlay({ playId }: { playId: string | null }) {
           </ol>
           <button
             className={styles.homeButton}
-            onClick={() => router.push("/")}
+            onClick={() => router.push(`/me/plays/${flow.play.id}`)}
           >
-            홈으로
+            친구에게 공유하기
           </button>
         </section>
       </main>
