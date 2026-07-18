@@ -658,11 +658,16 @@ function Comparison({
               <div className={styles.resultHeader}>
                 <span>{assignment.position}번째 질문</span>
                 <strong>
-                  {assignment.matches
-                    ? "겹침"
-                    : assignment.isHighlight
-                      ? "가장 다른 답"
-                      : "다름"}
+                  <span className={styles.resultMarker} aria-hidden="true">
+                    {assignment.matches ? "●" : "◆"}
+                  </span>
+                  <span>
+                    {assignment.matches
+                      ? "겹침"
+                      : assignment.isHighlight
+                        ? "가장 다른 답"
+                        : "다름"}
+                  </span>
                 </strong>
               </div>
               <h2>{assignment.visitorPrompt}</h2>

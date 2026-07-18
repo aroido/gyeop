@@ -329,7 +329,15 @@
   font-size: 0.68rem;
 }
 .resultHeader strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   color: var(--lime);
+}
+.resultMarker {
+  width: 0.8rem;
+  text-align: center;
+  line-height: 1;
 }
 .resultCard h2,
 .highlight h2 {

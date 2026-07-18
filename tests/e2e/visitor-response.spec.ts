@@ -319,6 +319,15 @@ test("public invite completes three cards, compares, copies, and reloads", async
   await page.getByRole("button", { name: /^A / }).click();
   await expect(page.getByText("3장 비교 완료")).toBeVisible();
   await expect(page.getByText("가장 다른 답", { exact: true })).toBeVisible();
+  await expect(page.getByText("◆", { exact: true })).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
+  await expect(page.getByText("●", { exact: true })).toHaveCount(2);
+  await expect(page.getByText("●", { exact: true }).first()).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
   await expect(
     page.getByRole("link", { name: "나도 이 팩으로 시작하기" }),
   ).toHaveAttribute("href", "/play/new?pack=old-friend&source=same_pack_cta");
