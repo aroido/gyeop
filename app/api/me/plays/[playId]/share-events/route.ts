@@ -14,7 +14,7 @@ export function POST(
     request,
     {
       schema: recordShareActionSchema,
-      maximumBodyBytes: 128,
+      maximumBodyBytes: 256,
       privateNoStore: true,
     },
     ({ input, networkKey, signal }) =>
