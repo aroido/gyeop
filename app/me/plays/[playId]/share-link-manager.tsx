@@ -83,6 +83,7 @@ export default function ShareLinkManager({
     () => false,
   );
   const actionLatchRef = useRef(false);
+  const focusAfterActionRef = useRef<"share" | "copy" | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const readyHeadingRef = useRef<HTMLHeadingElement>(null);
   const manualUrlRef = useRef<HTMLInputElement>(null);
@@ -134,6 +135,14 @@ export default function ShareLinkManager({
   useEffect(() => {
     if (readyLink) readyHeadingRef.current?.focus();
   }, [readyLink]);
+
+  useEffect(() => {
+    if (busy !== null || focusAfterActionRef.current === null) return;
+    const target = focusAfterActionRef.current;
+    focusAfterActionRef.current = null;
+    if (target === "share") shareButtonRef.current?.focus();
+    if (target === "copy") copyButtonRef.current?.focus();
+  }, [busy, feedback]);
 
   async function create() {
     if (!playId || state.kind !== "ready" || !beginAction("create")) return;
@@ -262,8 +271,8 @@ export default function ShareLinkManager({
             },
       );
     } finally {
+      focusAfterActionRef.current = "share";
       endAction();
-      requestAnimationFrame(() => shareButtonRef.current?.focus());
     }
   }
 
@@ -294,10 +303,10 @@ export default function ShareLinkManager({
       manualUrlRef.current?.focus();
       manualUrlRef.current?.select();
     } finally {
-      endAction();
       if (!manualFallback) {
-        requestAnimationFrame(() => copyButtonRef.current?.focus());
+        focusAfterActionRef.current = "copy";
       }
+      endAction();
     }
   }
 
