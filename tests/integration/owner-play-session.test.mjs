@@ -1,0 +1,358 @@
+import assert from "node:assert/strict";
+import { execFileSync, spawn } from "node:child_process";
+import { Buffer } from "node:buffer";
+import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import test, { after, before } from "node:test";
+
+const root = path.resolve(new URL("../../", import.meta.url).pathname);
+const manifest = JSON.parse(
+  readFileSync(path.join(root, "content/packs/old-friend-v1.json"), "utf8"),
+);
+
+function localSupabase() {
+  const output = execFileSync(
+    "pnpm",
+    ["exec", "supabase", "status", "-o", "env"],
+    { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+  );
+  const values = {};
+  for (const line of output.split("\n")) {
+    const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
+    if (match) values[match[1]] = JSON.parse(match[2]);
+  }
+  for (const name of ["API_URL", "SECRET_KEY"]) {
+    if (!values[name]) throw new Error(`Local Supabase did not report ${name}`);
+  }
+  return values;
+}
+
+const local = localSupabase();
+const proxySecret = Buffer.alloc(32, 28).toString("base64url");
+const rateSecret = randomBytes(32).toString("base64url");
+const appUrl = "http://127.0.0.1:3106";
+const serverEnv = {
+  ...process.env,
+  APP_URL: appUrl,
+  ORIGIN_PROXY_SECRET: proxySecret,
+  RATE_LIMIT_SECRET: rateSecret,
+  NEXT_PUBLIC_SUPABASE_URL: local.API_URL,
+  SUPABASE_SECRET_KEY: local.SECRET_KEY,
+};
+let server;
+let serverLog = "";
+
+function sql(statement, output = false) {
+  const result = execFileSync(
+    "docker",
+    [
+      "exec",
+      "supabase_db_gyeop",
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-v",
+      "ON_ERROR_STOP=1",
+      ...(output ? ["-At"] : []),
+      "-c",
+      statement,
+    ],
+    { cwd: root, encoding: "utf8", stdio: output ? "pipe" : "ignore" },
+  );
+  return typeof result === "string" ? result.trim() : "";
+}
+
+before(async () => {
+  sql(
+    "update public.pack_templates set is_active = false where slug = 'old-friend'",
+  );
+  server = spawn(
+    "pnpm",
+    ["exec", "next", "dev", "--hostname", "127.0.0.1", "--port", "3106"],
+    { cwd: root, env: serverEnv, stdio: ["ignore", "pipe", "pipe"] },
+  );
+  for (const stream of [server.stdout, server.stderr]) {
+    stream.on("data", (chunk) => {
+      serverLog = (serverLog + chunk.toString()).slice(-12000);
+    });
+  }
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    try {
+      const response = await fetch(appUrl);
+      if (response.ok) return;
+    } catch {
+      // The dev server is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`Owner play server did not start:\n${serverLog}`);
+});
+
+after(async () => {
+  sql(
+    "update public.pack_templates set is_active = false where slug = 'old-friend'",
+  );
+  if (!server || server.exitCode !== null) return;
+  server.kill("SIGTERM");
+  await Promise.race([
+    new Promise((resolve) => server.once("exit", resolve)),
+    new Promise((resolve) => setTimeout(resolve, 5000)),
+  ]);
+  if (server.exitCode === null) server.kill("SIGKILL");
+});
+
+function proxyHeaders(ip, extra = {}) {
+  return {
+    "x-forwarded-for": ip,
+    "x-forwarded-host": "127.0.0.1",
+    "x-forwarded-proto": "https",
+    "x-forwarded-port": "443",
+    "x-gyeop-origin-verify": proxySecret,
+    ...extra,
+  };
+}
+
+function ownerRequest(pathname, { method = "GET", ip, cookie, body } = {}) {
+  const headers = proxyHeaders(ip ?? "198.51.100.1");
+  if (cookie) headers.cookie = cookie;
+  const options = { method, headers };
+  if (body !== undefined) {
+    headers.origin = appUrl;
+    headers["content-type"] = "application/json";
+    options.body = JSON.stringify(body);
+  }
+  return fetch(`${appUrl}${pathname}`, options);
+}
+
+function cookieFrom(response) {
+  const header = response.headers.get("set-cookie");
+  assert.ok(header, "response must set the owner cookie");
+  const value = header.match(/__Host-gyeop-owner=([^;]*)/)?.[1];
+  assert.ok(value, "response must contain a non-empty owner cookie");
+  return `__Host-gyeop-owner=${value}`;
+}
+
+test("inactive create returns PACK_NOT_FOUND without a cookie or quota row", async () => {
+  const response = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.20",
+    body: { packSlug: "old-friend" },
+  });
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), {
+    code: "PACK_NOT_FOUND",
+    message: "팩을 찾을 수 없습니다.",
+  });
+  assert.equal(response.headers.get("set-cookie"), null);
+  assert.equal(
+    sql(
+      "select count(*) from public.rate_limit_buckets where action = 'owner_draft_create'",
+      true,
+    ),
+    "0",
+  );
+});
+
+test("owner can create, reload, save ten answers, complete, and cannot edit", async () => {
+  sql(
+    "update public.pack_templates set is_active = true where slug = 'old-friend'",
+  );
+  const created = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.21",
+    body: { packSlug: "old-friend" },
+  });
+  assert.equal(created.status, 201, serverLog);
+  const createdBody = await created.json();
+  assert.deepEqual(Object.keys(createdBody).sort(), [
+    "answers",
+    "currentPosition",
+    "id",
+    "managementExpiresAt",
+    "managementTtlSeconds",
+    "packSlug",
+    "packVersion",
+    "status",
+  ]);
+  assert.equal(createdBody.answers.length, 0);
+  assert.equal(createdBody.managementTtlSeconds, 604800);
+  const cookie = cookieFrom(created);
+  const setCookie = created.headers.get("set-cookie");
+  for (const attribute of [
+    "Path=/",
+    "Max-Age=604800",
+    "HttpOnly",
+    "Secure",
+    "SameSite=Lax",
+  ]) {
+    assert.ok(setCookie.includes(attribute));
+  }
+  assert.equal(setCookie.includes("Domain="), false);
+
+  const resumed = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.21",
+    cookie,
+    body: { packSlug: "old-friend" },
+  });
+  assert.equal(resumed.status, 200);
+  assert.equal((await resumed.json()).id, createdBody.id);
+
+  for (const card of manifest.cards) {
+    const saved = await ownerRequest(
+      `/api/plays/${createdBody.id}/answers/${card.id}`,
+      {
+        method: "PUT",
+        ip: "198.51.100.21",
+        cookie,
+        body: {
+          choice: card.position % 2 === 0 ? "b" : "a",
+          currentPosition: card.position,
+        },
+      },
+    );
+    assert.equal(saved.status, 200, `${card.id}: ${serverLog}`);
+  }
+
+  const restored = await ownerRequest(`/api/plays/${createdBody.id}`, {
+    ip: "198.51.100.21",
+    cookie,
+  });
+  assert.equal(restored.status, 200);
+  const restoredBody = await restored.json();
+  assert.equal(restoredBody.answers.length, 10);
+  assert.deepEqual(
+    restoredBody.answers.map((answer) => answer.cardId),
+    manifest.cards.map((card) => card.id),
+  );
+
+  const completed = await ownerRequest(
+    `/api/plays/${createdBody.id}/complete`,
+    {
+      method: "POST",
+      ip: "198.51.100.21",
+      cookie,
+      body: {},
+    },
+  );
+  assert.equal(completed.status, 200);
+  assert.equal((await completed.json()).status, "completed");
+
+  const rejectedEdit = await ownerRequest(
+    `/api/plays/${createdBody.id}/answers/${manifest.cards[0].id}`,
+    {
+      method: "PUT",
+      ip: "198.51.100.21",
+      cookie,
+      body: { choice: "b", currentPosition: 10 },
+    },
+  );
+  assert.equal(rejectedEdit.status, 409);
+  assert.deepEqual(await rejectedEdit.json(), {
+    code: "OWNER_PLAY_COMPLETED",
+    message: "완료한 답변은 변경할 수 없습니다.",
+  });
+  assert.ok(rejectedEdit.headers.get("set-cookie")?.includes("Max-Age=604800"));
+});
+
+test("cross-play preserves a valid cookie while tamper and malformed cookies are deleted", async () => {
+  const first = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.31",
+    body: { packSlug: "old-friend" },
+  });
+  const firstBody = await first.json();
+  const firstCookie = cookieFrom(first);
+  const second = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.32",
+    body: { packSlug: "old-friend" },
+  });
+  const secondCookie = cookieFrom(second);
+
+  const crossPlay = await ownerRequest(`/api/plays/${firstBody.id}`, {
+    ip: "198.51.100.32",
+    cookie: secondCookie,
+  });
+  assert.equal(crossPlay.status, 404);
+  assert.deepEqual(await crossPlay.json(), {
+    code: "OWNER_PLAY_NOT_FOUND",
+    message: "진행 중인 팩을 찾을 수 없습니다.",
+  });
+  assert.equal(crossPlay.headers.get("set-cookie"), null);
+
+  const tamperedCookie = firstCookie.replace(/.$/, (last) =>
+    last === "a" ? "b" : "a",
+  );
+  const tampered = await ownerRequest(`/api/plays/${firstBody.id}`, {
+    ip: "198.51.100.31",
+    cookie: tamperedCookie,
+  });
+  assert.equal(tampered.status, 404);
+  assert.ok(tampered.headers.get("set-cookie")?.includes("Max-Age=0"));
+
+  const malformed = await ownerRequest(`/api/plays/${firstBody.id}`, {
+    ip: "198.51.100.31",
+    cookie: "__Host-gyeop-owner=malformed",
+  });
+  assert.equal(malformed.status, 404);
+  assert.ok(malformed.headers.get("set-cookie")?.includes("Max-Age=0"));
+});
+
+test("create quota commits five orphan plays and the sixth response is 429", async () => {
+  const responses = [];
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    responses.push(
+      await ownerRequest("/api/plays", {
+        method: "POST",
+        ip: "203.0.113.99",
+        body: { packSlug: "old-friend" },
+      }),
+    );
+  }
+  assert.deepEqual(
+    responses.map((response) => response.status),
+    [201, 201, 201, 201, 201, 429],
+  );
+  assert.match(responses[5].headers.get("retry-after"), /^[1-9][0-9]*$/);
+  assert.deepEqual(await responses[5].json(), {
+    code: "RATE_LIMITED",
+    message: "잠시 후 다시 시도해 주세요.",
+  });
+});
+
+test("logout revokes the DB capability, clears the cookie, and is idempotent", async () => {
+  const created = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.41",
+    body: { packSlug: "old-friend" },
+  });
+  const body = await created.json();
+  const cookie = cookieFrom(created);
+  const logout = await ownerRequest("/api/me/session", {
+    method: "DELETE",
+    ip: "198.51.100.41",
+    cookie,
+    body: {},
+  });
+  assert.equal(logout.status, 204);
+  assert.ok(logout.headers.get("set-cookie")?.includes("Max-Age=0"));
+
+  const revoked = await ownerRequest(`/api/plays/${body.id}`, {
+    ip: "198.51.100.41",
+    cookie,
+  });
+  assert.equal(revoked.status, 404);
+  assert.ok(revoked.headers.get("set-cookie")?.includes("Max-Age=0"));
+
+  const repeated = await ownerRequest("/api/me/session", {
+    method: "DELETE",
+    ip: "198.51.100.41",
+    body: {},
+  });
+  assert.equal(repeated.status, 204);
+  assert.ok(repeated.headers.get("set-cookie")?.includes("Max-Age=0"));
+});

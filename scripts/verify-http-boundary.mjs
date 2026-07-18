@@ -27,6 +27,7 @@ const REQUIRED_FILES = [
   "ops/http-boundary/haproxy-origin-wrapper",
   "scripts/render-http-boundary-ops.mjs",
   "supabase/tests/http_boundary_atomic_contract.test.sql",
+  "supabase/tests/owner_play_session.test.sql",
   "tests/integration/http-boundary-host.test.sh",
 ];
 
@@ -53,6 +54,7 @@ const HTTP_METHODS = new Set([
 const PUBLIC_BOUNDARY_FILE = "lib/http/request-boundary.ts";
 const REVIEWED_INTERNAL_ADAPTERS = new Set([
   "lib/http/rate-limit.ts",
+  "lib/http/owner-play.ts",
   "lib/http/published-pack.ts",
 ]);
 
@@ -369,6 +371,27 @@ function exactNamedImportAliases(parsed, route, files, target, importedName) {
   return aliases;
 }
 
+function namedImportAliases(parsed, route, files, target, importedName) {
+  const loads = moduleLoadsTarget(parsed, route, files, target);
+  if (loads.length !== 1 || !ts.isImportDeclaration(loads[0])) return undefined;
+  const clause = loads[0].importClause;
+  if (
+    !clause ||
+    clause.isTypeOnly ||
+    clause.name ||
+    !clause.namedBindings ||
+    !ts.isNamedImports(clause.namedBindings)
+  ) {
+    return undefined;
+  }
+  const bindings = clause.namedBindings.elements.filter(
+    (binding) =>
+      !binding.isTypeOnly &&
+      (binding.propertyName ?? binding.name).text === importedName,
+  );
+  return bindings.length === 1 ? new Set([bindings[0].name.text]) : undefined;
+}
+
 function identifierUses(node, aliases) {
   const uses = [];
   function visit(current) {
@@ -398,6 +421,32 @@ function singleDirectImportedCall(parsed, aliases) {
     !parent.questionDotToken
     ? parent
     : undefined;
+}
+
+function isDescendantOf(node, ancestor) {
+  let current = node;
+  while (current) {
+    if (current === ancestor) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+function isInsideLoop(node, boundary) {
+  let current = node.parent;
+  while (current && current !== boundary) {
+    if (
+      ts.isForStatement(current) ||
+      ts.isForInStatement(current) ||
+      ts.isForOfStatement(current) ||
+      ts.isWhileStatement(current) ||
+      ts.isDoStatement(current)
+    ) {
+      return true;
+    }
+    current = current.parent;
+  }
+  return false;
 }
 
 function directlyReturnedCall(handler, aliases) {
@@ -453,6 +502,183 @@ function isFixedPackCatalogPolicy(expression) {
     limit.text === "60" &&
     isExactIdentifier(values.get("signal"), "signal")
   );
+}
+
+function isFixedOwnerAccessPolicy(expression) {
+  const policy = unwrapExpression(expression);
+  if (!ts.isObjectLiteralExpression(policy)) return false;
+  const values = new Map();
+  for (const property of policy.properties) {
+    if (ts.isShorthandPropertyAssignment(property)) {
+      if (
+        values.has(property.name.text) ||
+        property.objectAssignmentInitializer
+      ) {
+        return false;
+      }
+      values.set(property.name.text, property.name);
+      continue;
+    }
+    if (!ts.isPropertyAssignment(property)) return false;
+    const name = propertyNameText(property.name);
+    if (!name || values.has(name)) return false;
+    values.set(name, property.initializer);
+  }
+  if (
+    values.size !== 5 ||
+    !["keyHash", "action", "windowSeconds", "limit", "signal"].every((name) =>
+      values.has(name),
+    )
+  ) {
+    return false;
+  }
+  const action = unwrapExpression(values.get("action"));
+  const windowSeconds = unwrapExpression(values.get("windowSeconds"));
+  const limit = unwrapExpression(values.get("limit"));
+  return (
+    isExactIdentifier(values.get("keyHash"), "networkKey") &&
+    ts.isStringLiteral(action) &&
+    action.text === "owner_play_access" &&
+    ts.isNumericLiteral(windowSeconds) &&
+    windowSeconds.text === "600" &&
+    ts.isNumericLiteral(limit) &&
+    limit.text === "120" &&
+    isExactIdentifier(values.get("signal"), "signal")
+  );
+}
+
+const OWNER_ROUTE_CONTRACTS = new Map([
+  [
+    "app/api/plays/route.ts",
+    {
+      method: "POST",
+      sequence: [
+        [
+          "lib/owner-play/owner-play-session-core.mjs",
+          "parseOwnerCookieHeader",
+        ],
+        ["lib/http/owner-play.ts", "createOwnerPlayResponse"],
+        ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
+        ["lib/http/owner-play.ts", "resumeOwnerPlayResponse"],
+      ],
+      limited: true,
+    },
+  ],
+  [
+    "app/api/plays/[playId]/route.ts",
+    {
+      method: "GET",
+      sequence: [
+        ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
+        [
+          "lib/owner-play/owner-play-session-core.mjs",
+          "parseOwnerCookieHeader",
+        ],
+        ["lib/http/owner-play.ts", "readOwnerPlayResponse"],
+      ],
+      limited: true,
+    },
+  ],
+  [
+    "app/api/plays/[playId]/answers/[cardId]/route.ts",
+    {
+      method: "PUT",
+      sequence: [
+        ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
+        [
+          "lib/owner-play/owner-play-session-core.mjs",
+          "parseOwnerCookieHeader",
+        ],
+        ["lib/http/owner-play.ts", "saveOwnerAnswerResponse"],
+      ],
+      limited: true,
+    },
+  ],
+  [
+    "app/api/plays/[playId]/complete/route.ts",
+    {
+      method: "POST",
+      sequence: [
+        ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
+        [
+          "lib/owner-play/owner-play-session-core.mjs",
+          "parseOwnerCookieHeader",
+        ],
+        ["lib/http/owner-play.ts", "completeOwnerPlayResponse"],
+      ],
+      limited: true,
+    },
+  ],
+  [
+    "app/api/me/session/route.ts",
+    {
+      method: "DELETE",
+      sequence: [
+        [
+          "lib/owner-play/owner-play-session-core.mjs",
+          "parseOwnerCookieHeader",
+        ],
+        ["lib/http/owner-play.ts", "revokeOwnerPlayResponse"],
+      ],
+      limited: false,
+    },
+  ],
+]);
+
+function hasSafeOwnerRouteOrder(route, files, contract) {
+  const expected = OWNER_ROUTE_CONTRACTS.get(route);
+  if (!expected) return true;
+  const handlers = contract.handlers.filter(
+    ({ name }) => name === expected.method,
+  );
+  if (handlers.length !== 1) return false;
+  const boundaryCall = reviewedBoundaryCallFromHandler(
+    handlers[0].node,
+    contract.aliases,
+  );
+  if (!boundaryCall) return false;
+  const callback = unwrapExpression(boundaryCall.arguments[2]);
+  if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) {
+    return false;
+  }
+
+  const calls = [];
+  for (const [target, importedName] of expected.sequence) {
+    const aliases = namedImportAliases(
+      contract.parsed,
+      route,
+      files,
+      target,
+      importedName,
+    );
+    const call = aliases && singleDirectImportedCall(contract.parsed, aliases);
+    if (
+      !call ||
+      !isDescendantOf(call, callback.body) ||
+      isInsideLoop(call, callback.body)
+    ) {
+      return false;
+    }
+    calls.push(call);
+  }
+  for (let index = 1; index < calls.length; index += 1) {
+    if (calls[index - 1].getStart() >= calls[index].getStart()) return false;
+  }
+
+  const rateIndex = expected.sequence.findIndex(
+    ([, importedName]) => importedName === "runRateLimitedDomain",
+  );
+  if (expected.limited) {
+    const rateCall = calls[rateIndex];
+    if (!rateCall || !isFixedOwnerAccessPolicy(rateCall.arguments[0]))
+      return false;
+  } else if (
+    moduleLoadsTarget(contract.parsed, route, files, "lib/http/rate-limit.ts")
+      .length > 0
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function isNonRepeatedCallbackCall(call, callback) {
@@ -684,6 +910,14 @@ export function verifyHttpBoundarySources(inputFiles) {
           `${route}: published pack read must run once behind the fixed pack_catalog_read rate limit`,
         );
       }
+    }
+    if (
+      OWNER_ROUTE_CONTRACTS.has(route) &&
+      !hasSafeOwnerRouteOrder(route, files, contract)
+    ) {
+      findings.push(
+        `${route}: owner capability branch order or fixed access limiter is invalid`,
+      );
     }
 
     for (const file of reachable) {
@@ -929,10 +1163,12 @@ export function verifyRepository() {
       readFileSync(path.join(ROOT, "supabase/migrations", file), "utf8"),
     )
     .join("\n");
-  const atomicTest = readFileSync(
-    path.join(ROOT, "supabase/tests/http_boundary_atomic_contract.test.sql"),
-    "utf8",
-  );
+  const atomicTest = [
+    "supabase/tests/http_boundary_atomic_contract.test.sql",
+    "supabase/tests/owner_play_session.test.sql",
+  ]
+    .map((file) => readFileSync(path.join(ROOT, file), "utf8"))
+    .join("\n");
   for (const functionName of ["create_or_resume_play", "start_response"]) {
     if (
       new RegExp(

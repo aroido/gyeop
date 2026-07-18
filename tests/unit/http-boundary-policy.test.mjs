@@ -266,6 +266,127 @@ test("rejects a named limiter callback that can recursively read the pack", () =
   );
 });
 
+function ownerRouteFiles(routePath, routeSource) {
+  return {
+    [routePath]: routeSource,
+    "lib/http/request-boundary.ts": "export function withPublicRequest() {}",
+    "lib/http/rate-limit.ts": "export function runRateLimitedDomain() {}",
+    "lib/http/owner-play.ts": `
+      export function createOwnerPlayResponse() {}
+      export function resumeOwnerPlayResponse() {}
+      export function readOwnerPlayResponse() {}
+      export function saveOwnerAnswerResponse() {}
+      export function completeOwnerPlayResponse() {}
+      export function revokeOwnerPlayResponse() {}
+      export function ownerNotFoundResponse() {}
+    `,
+    "lib/owner-play/owner-play-session-core.mjs":
+      "export function parseOwnerCookieHeader() {}",
+  };
+}
+
+test("accepts the reviewed create/resume owner branch order", () => {
+  assert.deepEqual(
+    verifyHttpBoundarySources(
+      ownerRouteFiles(
+        "app/api/plays/route.ts",
+        `
+          import { withPublicRequest } from "../../../lib/http/request-boundary";
+          import { runRateLimitedDomain } from "../../../lib/http/rate-limit";
+          import { createOwnerPlayResponse, ownerNotFoundResponse, resumeOwnerPlayResponse } from "../../../lib/http/owner-play";
+          import { parseOwnerCookieHeader } from "../../../lib/owner-play/owner-play-session-core.mjs";
+          export function POST(request) {
+            return withPublicRequest(request, {}, ({ networkKey, signal }) => {
+              const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
+              if (cookie.outcome === "absent") return createOwnerPlayResponse();
+              if (cookie.outcome === "malformed") return ownerNotFoundResponse();
+              return runRateLimitedDomain({ keyHash: networkKey, action: "owner_play_access", windowSeconds: 600, limit: 120, signal }, () => resumeOwnerPlayResponse());
+            });
+          }
+        `,
+      ),
+    ),
+    [],
+  );
+});
+
+test("rejects owner resume before cookie branch selection and repeated create calls", () => {
+  const reversed = verifyHttpBoundarySources(
+    ownerRouteFiles(
+      "app/api/plays/route.ts",
+      `
+        import { withPublicRequest } from "../../../lib/http/request-boundary";
+        import { runRateLimitedDomain } from "../../../lib/http/rate-limit";
+        import { createOwnerPlayResponse, resumeOwnerPlayResponse } from "../../../lib/http/owner-play";
+        import { parseOwnerCookieHeader } from "../../../lib/owner-play/owner-play-session-core.mjs";
+        export function POST(request) {
+          return withPublicRequest(request, {}, ({ networkKey, signal }) =>
+            runRateLimitedDomain({ keyHash: networkKey, action: "owner_play_access", windowSeconds: 600, limit: 120, signal }, () => {
+              const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
+              createOwnerPlayResponse();
+              return resumeOwnerPlayResponse(cookie);
+            })
+          );
+        }
+      `,
+    ),
+  );
+  assert.ok(
+    reversed.some((finding) =>
+      finding.includes("owner capability branch order"),
+    ),
+  );
+
+  const repeated = verifyHttpBoundarySources(
+    ownerRouteFiles(
+      "app/api/plays/route.ts",
+      `
+        import { withPublicRequest } from "../../../lib/http/request-boundary";
+        import { runRateLimitedDomain } from "../../../lib/http/rate-limit";
+        import { createOwnerPlayResponse, resumeOwnerPlayResponse } from "../../../lib/http/owner-play";
+        import { parseOwnerCookieHeader } from "../../../lib/owner-play/owner-play-session-core.mjs";
+        export function POST(request) {
+          return withPublicRequest(request, {}, ({ networkKey, signal }) => {
+            const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
+            for (const value of [1, 2]) createOwnerPlayResponse(value);
+            return runRateLimitedDomain({ keyHash: networkKey, action: "owner_play_access", windowSeconds: 600, limit: 120, signal }, () => resumeOwnerPlayResponse(cookie));
+          });
+        }
+      `,
+    ),
+  );
+  assert.ok(
+    repeated.some((finding) =>
+      finding.includes("owner capability branch order"),
+    ),
+  );
+});
+
+test("requires logout to parse then revoke without an external limiter", () => {
+  const findings = verifyHttpBoundarySources(
+    ownerRouteFiles(
+      "app/api/me/session/route.ts",
+      `
+        import { withPublicRequest } from "../../../../lib/http/request-boundary";
+        import { runRateLimitedDomain } from "../../../../lib/http/rate-limit";
+        import { revokeOwnerPlayResponse } from "../../../../lib/http/owner-play";
+        import { parseOwnerCookieHeader } from "../../../../lib/owner-play/owner-play-session-core.mjs";
+        export function DELETE(request) {
+          return withPublicRequest(request, {}, ({ networkKey, signal }) => {
+            const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
+            return runRateLimitedDomain({ keyHash: networkKey, action: "owner_play_access", windowSeconds: 600, limit: 120, signal }, () => revokeOwnerPlayResponse(cookie));
+          });
+        }
+      `,
+    ),
+  );
+  assert.ok(
+    findings.some((finding) =>
+      finding.includes("owner capability branch order"),
+    ),
+  );
+});
+
 test("rejects an additional pack read hidden in a reachable helper", () => {
   const findings = packCatalogFindings({
     extraRouteImports: 'import { readAgain } from "@/lib/example/read-again";',

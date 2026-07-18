@@ -106,6 +106,8 @@ node scripts/verify-supabase-types.mjs
 node --test tests/integration/data-access.test.mjs
 node --test tests/integration/pack-catalog.test.mjs
 node --test tests/integration/pack-publication-concurrency.test.mjs
+node --test tests/integration/owner-play-session.test.mjs
+node --test tests/integration/owner-play-concurrency.test.mjs
 env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SECRET_KEY pnpm build
 node --test tests/integration/pack-runtime.test.mjs
 pnpm test:e2e --project=mobile-chromium

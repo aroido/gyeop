@@ -98,13 +98,19 @@ select is(
   ),
   array[
     'pack_cards:SELECT',
+    'pack_plays:INSERT',
+    'pack_plays:SELECT',
+    'pack_plays:UPDATE',
     'pack_templates:SELECT',
     'pack_templates:UPDATE',
     'pack_versions:SELECT',
     'pack_versions:UPDATE',
     'rate_limit_buckets:INSERT',
     'rate_limit_buckets:SELECT',
-    'rate_limit_buckets:UPDATE'
+    'rate_limit_buckets:UPDATE',
+    'self_answers:INSERT',
+    'self_answers:SELECT',
+    'self_answers:UPDATE'
   ]::text[],
   'internal RPC owner relation privileges match the exact allowlist'
 );
@@ -234,9 +240,14 @@ select is(
       )
   ),
   array[
+    'complete_owner_play(uuid,bytea)',
     'consume_rate_limit(bytea,text,integer,integer)',
+    'create_or_resume_play(text,uuid,bytea,uuid,bytea,bytea)',
+    'get_owner_play(uuid,bytea)',
     'get_published_pack(text)',
-    'publish_pack_version(uuid)'
+    'publish_pack_version(uuid)',
+    'revoke_owner_play_session(uuid,bytea)',
+    'save_owner_answer(uuid,bytea,text,text,smallint)'
   ]::text[],
   'service_role function grants match the exact RPC allowlist'
 );
