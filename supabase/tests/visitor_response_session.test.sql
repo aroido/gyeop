@@ -154,8 +154,8 @@ select is(
     'BBBBBBBBBBBBBBBBBBBBBQ', decode(repeat('12', 32), 'hex'), 'resume',
     null, null, null, null, null, null, decode(repeat('20', 32), 'hex')
   )->>'outcome',
-  'unavailable',
-  'one-to-one links remain unavailable in issue 22'
+  'no_session',
+  'active one-to-one links accept the response session contract'
 );
 
 select is(

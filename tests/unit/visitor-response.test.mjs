@@ -26,6 +26,35 @@ import {
 const id = "22000000-0000-4000-8000-000000000001";
 const secret = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8";
 const cookieValue = `v1.${id}.${secret}`;
+const assignments = Object.freeze([
+  Object.freeze({
+    cardId: "conflict",
+    stage: "required",
+    position: 1,
+    visitorPrompt: "친구가 갈등을 풀 때 더 가까운 모습은?",
+    optionA: "바로 이야기한다",
+    optionB: "시간을 두고 이야기한다",
+    isSignature: true,
+  }),
+  Object.freeze({
+    cardId: "hard-day",
+    stage: "required",
+    position: 2,
+    visitorPrompt: "친구가 힘든 날 더 원하는 것은?",
+    optionA: "조용히 곁에 있어 주기",
+    optionB: "기분 전환을 도와주기",
+    isSignature: false,
+  }),
+  Object.freeze({
+    cardId: "plans",
+    stage: "required",
+    position: 3,
+    visitorPrompt: "친구와 약속을 잡을 때 더 가까운 모습은?",
+    optionA: "미리 계획한다",
+    optionB: "그날 정한다",
+    isSignature: false,
+  }),
+]);
 const state = Object.freeze({
   id,
   status: "draft",
@@ -33,6 +62,7 @@ const state = Object.freeze({
   knownSinceCode: "ten_years_or_more",
   sessionExpiresAt: "2030-01-02T00:00:00Z",
   sessionTtlSeconds: 86_400,
+  assignments,
 });
 
 test("freezes the exact relationship and known-since registries", () => {
@@ -92,6 +122,31 @@ test("strictly decodes DB and browser response state", () => {
   assert.throws(() =>
     decodeVisitorResponseHttpState(http, Date.parse(state.sessionExpiresAt)),
   );
+});
+
+test("rejects malformed or privacy-leaking assignment payloads", () => {
+  const invalidAssignments = [
+    assignments.slice(0, 2),
+    [assignments[0], assignments[1], { ...assignments[2], position: 2 }],
+    [assignments[0], assignments[1], { ...assignments[2], cardId: "hard-day" }],
+    [{ ...assignments[0], isSignature: false }, assignments[1], assignments[2]],
+    [assignments[0], { ...assignments[1], isSignature: true }, assignments[2]],
+    [
+      { ...assignments[0], ownerPrompt: "비공개 자기 질문" },
+      assignments[1],
+      assignments[2],
+    ],
+    [
+      assignments[0],
+      { ...assignments[1], optionB: assignments[1].optionA },
+      assignments[2],
+    ],
+  ];
+  for (const candidate of invalidAssignments) {
+    assert.throws(() =>
+      decodeVisitorResponseState({ ...state, assignments: candidate }),
+    );
+  }
 });
 
 test("uses the exact response credential and rate-key vectors", () => {

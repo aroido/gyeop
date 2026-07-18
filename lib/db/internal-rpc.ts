@@ -80,6 +80,15 @@ export type VisitorResponseState = Readonly<{
   knownSinceCode: string;
   sessionExpiresAt: string;
   sessionTtlSeconds: number;
+  assignments: readonly Readonly<{
+    cardId: string;
+    stage: "required";
+    position: 1 | 2 | 3;
+    visitorPrompt: string;
+    optionA: string;
+    optionB: string;
+    isSignature: boolean;
+  }>[];
 }>;
 export type StartResponseResult =
   | Readonly<{

@@ -882,6 +882,28 @@ as $$ begin perform 1 from future_probe; end $$;
     ),
     [],
   );
+  const safeCte = `
+create function public.future_probe() returns void
+language plpgsql security definer set search_path = ''
+as $$ begin
+  perform 1
+  from (
+    with qualified_rows as (
+      select id from public.future_probe
+    ), selected_rows as (
+      select id from qualified_rows
+    )
+    select id from selected_rows
+  ) as result;
+end $$;
+`;
+  assert.deepEqual(verifySecurityDefinerSql(safeCte), []);
+  assert.match(
+    verifySecurityDefinerSql(
+      safeCte.replace("from public.future_probe", "from future_probe"),
+    ).join("\n"),
+    /uses unqualified relation future_probe/,
+  );
 });
 
 const capabilitySql = `

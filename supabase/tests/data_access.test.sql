@@ -115,6 +115,8 @@ select is(
     'share_links:INSERT',
     'share_links:SELECT',
     'share_links:UPDATE',
+    'visitor_assignments:INSERT',
+    'visitor_assignments:SELECT',
     'visitor_responses:INSERT',
     'visitor_responses:SELECT',
     'visitor_responses:UPDATE'

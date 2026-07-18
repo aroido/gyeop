@@ -124,6 +124,23 @@ test("same new response credential commits exactly once under concurrency", asyn
     "2",
   );
   assert.equal(
+    sql(
+      `select count(*) from public.visitor_assignments where response_id = '${responseId}'`,
+    ),
+    "3",
+  );
+  assert.equal(
+    sql(`select count(*)
+      from public.visitor_assignments as assignment
+      join public.pack_cards as card
+        on card.pack_version_id = assignment.pack_version_id
+        and card.id = assignment.card_id
+      where assignment.response_id = '${responseId}'
+        and assignment.position = 1
+        and card.is_signature`),
+    "1",
+  );
+  assert.equal(
     sql(`select count from public.rate_limit_buckets
       where key_hash = decode('${rateKey}', 'hex') and action = 'response_start'`),
     "1",

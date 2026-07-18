@@ -110,6 +110,24 @@ select jsonb_build_object(
     join public.share_links link on link.id = response.share_link_id
     where link.public_id = :'public_id'
   ),
+  'assignments', (
+    select count(*)
+    from public.visitor_assignments assignment
+    join public.visitor_responses response on response.id = assignment.response_id
+    join public.share_links link on link.id = response.share_link_id
+    where link.public_id = :'public_id'
+  ),
+  'signatureAssignments', (
+    select count(*)
+    from public.visitor_assignments assignment
+    join public.visitor_responses response on response.id = assignment.response_id
+    join public.share_links link on link.id = response.share_link_id
+    join public.pack_cards card
+      on card.pack_version_id = assignment.pack_version_id
+      and card.id = assignment.card_id
+    where link.public_id = :'public_id'
+      and card.is_signature
+  ),
   'contexts', (
     select jsonb_agg(
       jsonb_build_object(
@@ -282,6 +300,45 @@ async function postRawVisitorResponse(input: {
   };
 }
 
+function expectExactAssignmentResponse(body: string) {
+  const parsed = JSON.parse(body) as Record<string, unknown>;
+  expect(Object.keys(parsed).sort()).toEqual([
+    "assignments",
+    "id",
+    "knownSinceCode",
+    "knownSinceLabel",
+    "relationshipCode",
+    "relationshipLabel",
+    "sessionExpiresAt",
+    "sessionTtlSeconds",
+    "status",
+  ]);
+  const assignments = parsed.assignments as Record<string, unknown>[];
+  expect(assignments).toHaveLength(3);
+  expect(assignments.map((assignment) => assignment.position)).toEqual([
+    1, 2, 3,
+  ]);
+  expect(assignments.map((assignment) => assignment.isSignature)).toEqual([
+    true,
+    false,
+    false,
+  ]);
+  expect(new Set(assignments.map((assignment) => assignment.cardId)).size).toBe(
+    3,
+  );
+  for (const assignment of assignments) {
+    expect(Object.keys(assignment).sort()).toEqual([
+      "cardId",
+      "isSignature",
+      "optionA",
+      "optionB",
+      "position",
+      "stage",
+      "visitorPrompt",
+    ]);
+  }
+}
+
 async function postShareAction(
   page: import("@playwright/test").Page,
   playId: string,
@@ -405,6 +462,9 @@ test.describe("live owner flow", () => {
     await page.getByRole("radio", { name: /한 친구에게 1:1/ }).check();
     await page.getByRole("button", { name: "공유 링크 만들기" }).click();
     await page.getByRole("button", { name: "링크 복사" }).click();
+    const oneToOneInviteUrl = await page
+      .getByLabel("공유 링크 직접 복사")
+      .inputValue();
     await expect(page.getByRole("status")).toContainText("링크를 복사했어요");
     await expect
       .poll(() => readShareActionEvents())
@@ -425,6 +485,22 @@ test.describe("live owner flow", () => {
         },
       ]);
     expect(readRawShareCredentialLeakCount(rawSecretFrom(inviteUrl))).toBe(0);
+
+    const oneToOneInvite = new URL(oneToOneInviteUrl);
+    const oneToOneStart = await postRawVisitorResponse({
+      publicId: oneToOneInvite.pathname.split("/").at(-1)!,
+      secret: rawSecretFrom(oneToOneInviteUrl),
+      ip: "198.51.100.224",
+      body: {
+        intent: "start",
+        secret: rawSecretFrom(oneToOneInviteUrl),
+        relationshipCode: "coworker",
+        knownSinceCode: "three_to_five_years",
+      },
+    });
+    expect(oneToOneStart.fingerprint.status).toBe(201);
+    expect(oneToOneStart.setsSessionCookie).toBe(true);
+    expectExactAssignmentResponse(oneToOneStart.fingerprint.body);
 
     await page.evaluate(() => {
       (
@@ -605,6 +681,8 @@ test.describe("live owner flow", () => {
       .toEqual({
         responses: 2,
         sessionHashes: 2,
+        assignments: 6,
+        signatureAssignments: 2,
         contexts: [
           {
             relationship: "family",
@@ -689,6 +767,7 @@ test.describe("live owner flow", () => {
             result.fingerprint.status === 201 && result.setsSessionCookie,
         ),
     ).toBe(true);
+    expectExactAssignmentResponse(startResults[0].fingerprint.body);
     expect(startResults[10].fingerprint.status).toBe(429);
     expect(Number(startResults[10].retryAfter)).toBeGreaterThan(0);
     expect(startResults[10].setsSessionCookie).toBe(false);
