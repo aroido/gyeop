@@ -1,6 +1,6 @@
 # Issue 21 구현 스펙: [프론트엔드] 공개 링크 외부 공유·복사 흐름 구현
 
-Status: Draft
+Status: Reviewed
 Issue: https://github.com/aroido/gyeop/issues/21
 
 ## 목표
@@ -274,9 +274,9 @@ record_owner_share_action(
 
 ## 스펙 검토
 
-Reviewer Agent:
-Review Status: FAIL
-P0/P1 Findings:
+Reviewer Agent: issue21_spec_review
+Review Status: PASS
+P0/P1 Findings: 0
 
 ## 리스크와 미결정 사항
 
