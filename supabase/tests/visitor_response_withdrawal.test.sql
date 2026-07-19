@@ -2,6 +2,34 @@ begin;
 
 select no_plan();
 
+create temporary table withdrawal_baseline (
+  key text primary key,
+  value bigint not null
+) on commit drop;
+
+insert into withdrawal_baseline (key, value)
+values
+  (
+    'visitor_funnel',
+    coalesce(
+      (
+        select subjects
+        from private.core_funnel_stage_counts
+        where funnel = 'visitor_same_pack'
+          and stage = 'visitor_required_submitted'
+      ),
+      0
+    )
+  ),
+  (
+    'withdrawn_events',
+    (
+      select count(*)
+      from public.analytics_events
+      where event_name = 'response_withdrawn'
+    )
+  );
+
 select has_function(
   'public',
   'withdraw_response',
@@ -134,6 +162,64 @@ select id, event_name, occurred_at
 from public.analytics_events
 where visitor_response_id = '26200000-0000-4000-8000-000000000001';
 
+select throws_ok(
+  $$
+    update public.analytics_events
+    set event_name = 'tampered_event'
+    where id = (
+      select id
+      from withdrawal_event_snapshot
+      order by id
+      limit 1
+    )
+  $$,
+  '42501',
+  'analytics withdrawal denied',
+  'analytics scrub guard keeps the event name immutable'
+);
+select throws_ok(
+  $$
+    update public.analytics_events
+    set occurred_at = occurred_at + interval '1 second'
+    where id = (
+      select id
+      from withdrawal_event_snapshot
+      order by id
+      limit 1
+    )
+  $$,
+  '42501',
+  'analytics withdrawal denied',
+  'analytics scrub guard keeps the event time immutable'
+);
+select throws_ok(
+  $$
+    update public.analytics_events
+    set owner_play_id = null,
+        share_link_id = null,
+        visitor_response_id = null,
+        properties = '{"leak":true}'::jsonb
+    where event_name = 'relationship_selected'
+      and visitor_response_id = '26200000-0000-4000-8000-000000000001'
+  $$,
+  '42501',
+  'analytics withdrawal denied',
+  'analytics scrub guard rejects non-empty properties'
+);
+select throws_ok(
+  $$
+    update public.analytics_events
+    set share_link_id = null,
+        visitor_response_id = null,
+        properties = '{}'::jsonb
+    where event_name = 'pack_opened'
+      and visitor_response_id = '26200000-0000-4000-8000-000000000001'
+  $$,
+  '42501',
+  'analytics withdrawal denied',
+  'analytics scrub guard rejects a retained owner subject'
+);
+
 set local role service_role;
 
 select is(
@@ -154,7 +240,11 @@ select is(
     where funnel = 'visitor_same_pack'
       and stage = 'visitor_required_submitted'
   ),
-  1::bigint,
+  (
+    select value + 1
+    from withdrawal_baseline
+    where key = 'visitor_funnel'
+  ),
   'submitted response contributes one visitor funnel subject before withdrawal'
 );
 
@@ -255,7 +345,11 @@ select is(
       and visitor_response_id is null
       and properties = '{}'::jsonb
   ),
-  1::bigint,
+  (
+    select value + 1
+    from withdrawal_baseline
+    where key = 'withdrawn_events'
+  ),
   'withdrawal emits one subjectless counter event'
 );
 
@@ -279,7 +373,11 @@ select is(
     where funnel = 'visitor_same_pack'
       and stage = 'visitor_required_submitted'
   ),
-  0::bigint,
+  (
+    select value
+    from withdrawal_baseline
+    where key = 'visitor_funnel'
+  ),
   'withdrawal immediately removes the visitor funnel subject'
 );
 
