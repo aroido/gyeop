@@ -207,6 +207,7 @@
   margin-top: 1.5rem;
 }
 .signature,
+.optionalKicker,
 .resultKicker {
   display: inline-flex;
   min-height: 1.65rem;
@@ -376,6 +377,49 @@
   margin-top: 1.2rem;
   background: var(--lime);
   font-size: 1rem;
+}
+.card .secondaryCta {
+  min-height: 3rem;
+  margin-top: 0.7rem;
+  border: 1px solid var(--lime);
+  background: transparent;
+  color: var(--lime);
+  font-size: 0.9rem;
+}
+.card .secondaryCta:disabled {
+  border-color: #555;
+  background: #171717;
+  color: #999;
+}
+.optionalComplete {
+  display: grid;
+  min-height: 3rem;
+  margin: 0.7rem 0 0;
+  place-items: center;
+  border: 1px solid #555;
+  border-radius: 0.65rem;
+  color: #ddd;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+.optionalResults {
+  margin-top: 1.4rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid #3f3f3f;
+}
+.optionalResults h2 {
+  margin: 0.65rem 0 0;
+  font-size: 1.2rem;
+}
+.optionalKicker {
+  background: #fff;
+}
+.card .optionalBack {
+  min-height: 2.75rem;
+  margin-top: 1rem;
+  border: 1px solid #666;
+  background: #202020;
+  color: #fff;
 }
 .managementBox {
   margin-top: 1rem;

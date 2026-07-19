@@ -7,6 +7,7 @@ import {
 } from "../visitor-response/visitor-session-core.mjs";
 import type { ParsedVisitorResponseCookie } from "../visitor-response/visitor-response-session.ts";
 import {
+  assignVisitorOptionalCards,
   getVisitorResponseSession,
   recordVisitorEvent,
   resumeVisitorResponseSession,
@@ -164,6 +165,26 @@ export async function saveVisitorAnswer(input: {
   if (result.outcome === "submitted") {
     return conflictResponse("VISITOR_RESPONSE_CONFLICT");
   }
+  return responseState(
+    input.cookie,
+    result.response,
+    result.response.sessionTtlSeconds,
+    result.response.sessionExpiresAt,
+  );
+}
+
+export async function continueVisitorAnswers(input: {
+  cookie: ValidCookie;
+  signal: AbortSignal;
+}) {
+  const result = await assignVisitorOptionalCards(input);
+  if (result.outcome === "session_invalid") {
+    return deletedUnavailableResponse();
+  }
+  if (result.outcome === "not_submitted") {
+    return conflictResponse("VISITOR_RESPONSE_CONFLICT");
+  }
+  if (result.outcome !== "assigned") throw new Error("INTERNAL_ERROR");
   return responseState(
     input.cookie,
     result.response,

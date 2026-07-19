@@ -21,6 +21,7 @@ import {
   RELATIONSHIP_OPTIONS,
 } from "@/lib/visitor-response/visitor-context-core.mjs";
 import {
+  continueVisitorResponse,
   readVisitorResponse,
   recordVisitorEvent,
   resumeVisitorResponse,
@@ -551,13 +552,240 @@ function ResponseFlow({
   );
 }
 
-function Comparison({
+type SubmittedResponse = Extract<VisitorResponse, { status: "submitted" }>;
+type SubmittedAssignment = SubmittedResponse["assignments"][number];
+type ComparedAssignment = SubmittedAssignment & {
+  visitorChoice: "a" | "b";
+  ownerChoice: "a" | "b";
+  matches: boolean;
+};
+
+function isComparedAssignment(
+  assignment: SubmittedAssignment,
+): assignment is ComparedAssignment {
+  return (
+    assignment.visitorChoice !== null &&
+    assignment.ownerChoice !== null &&
+    assignment.matches !== null
+  );
+}
+
+function ResultCard({
+  assignment,
+  label,
+}: {
+  assignment: ComparedAssignment;
+  label: string;
+}) {
+  return (
+    <article
+      className={assignment.isHighlight ? styles.highlight : styles.resultCard}
+    >
+      <div className={styles.resultHeader}>
+        <span>{label}</span>
+        <strong>
+          <span className={styles.resultMarker} aria-hidden="true">
+            {assignment.matches ? "●" : "◆"}
+          </span>
+          <span>
+            {assignment.matches
+              ? "겹침"
+              : assignment.isHighlight
+                ? "가장 다른 답"
+                : "다름"}
+          </span>
+        </strong>
+      </div>
+      <h2>{assignment.visitorPrompt}</h2>
+      <dl>
+        <div>
+          <dt>내가 본 이 사람</dt>
+          <dd>
+            {assignment.visitorChoice === "a"
+              ? assignment.optionA
+              : assignment.optionB}
+          </dd>
+        </div>
+        <div>
+          <dt>이 사람의 실제 답</dt>
+          <dd>
+            {assignment.ownerChoice === "a"
+              ? assignment.optionA
+              : assignment.optionB}
+          </dd>
+        </div>
+      </dl>
+    </article>
+  );
+}
+
+function OptionalQuestions({
   response,
   headingRef,
+  onResponse,
+  onBack,
 }: {
-  response: Extract<VisitorResponse, { status: "submitted" }>;
+  response: SubmittedResponse;
+  headingRef: React.RefObject<HTMLHeadingElement | null>;
+  onResponse: (response: SubmittedResponse) => void;
+  onBack: () => void;
+}) {
+  const assignments = response.assignments.filter(
+    ({ stage }) => stage === "optional",
+  );
+  const [choices, setChoices] = useState<Record<string, DraftChoice>>(() =>
+    Object.fromEntries(
+      assignments.flatMap((assignment) =>
+        assignment.visitorChoice
+          ? [[assignment.cardId, assignment.visitorChoice]]
+          : [],
+      ),
+    ),
+  );
+  const [position, setPosition] = useState(() => {
+    const first = assignments.findIndex(
+      ({ visitorChoice }) => visitorChoice === null,
+    );
+    return first === -1 ? 1 : first;
+  });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const pending = useRef<PendingAnswer | null>(null);
+
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, [headingRef, position]);
+
+  async function save(answer: PendingAnswer) {
+    if (saving) return;
+    setSaving(true);
+    setSaveError(false);
+    try {
+      const saved = await saveVisitorAnswer(
+        response.id,
+        answer.cardId,
+        answer.choice,
+      );
+      if (saved.status !== "submitted") throw new Error("INVALID_RESPONSE");
+      pending.current = null;
+      onResponse(saved);
+      const optional = saved.assignments.filter(
+        ({ stage }) => stage === "optional",
+      );
+      const complete =
+        optional.length === 2 &&
+        optional.every(({ visitorChoice }) => visitorChoice !== null);
+      if (!complete) setPosition((current) => Math.min(1, current + 1));
+    } catch {
+      setSaveError(true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function choose(cardId: string, choice: DraftChoice) {
+    if (saving || saveError) return;
+    setChoices((current) => ({ ...current, [cardId]: choice }));
+    pending.current = { cardId, choice };
+    void save(pending.current);
+  }
+
+  const assignment = assignments[position];
+  const answered = Object.keys(choices).length;
+  if (!assignment) throw new Error("Invalid optional assignment state");
+
+  return (
+    <main className={styles.shell}>
+      <section className={styles.card} data-kind="optional-response">
+        <p className={styles.brand}>겹 · {response.packTitle}</p>
+        <div
+          className={styles.progressRow}
+          role="progressbar"
+          aria-label="추가 답변 진행"
+          aria-valuemin={0}
+          aria-valuemax={2}
+          aria-valuenow={answered}
+          aria-valuetext={`2장 중 ${answered}장 답변 완료`}
+        >
+          <strong>{position + 1} / 2</strong>
+          <span>두 장만 더 맞춰봐요</span>
+        </div>
+        <div className={styles.progressTrack} aria-hidden="true">
+          <span style={{ width: `${(answered / 2) * 100}%` }} />
+        </div>
+        <div className={styles.question}>
+          <span className={styles.optionalKicker}>추가 질문</span>
+          <h1 ref={headingRef} tabIndex={-1}>
+            {assignment.visitorPrompt}
+          </h1>
+          <div className={styles.answerGrid}>
+            {(["a", "b"] as const).map((choice) => (
+              <button
+                className={styles.answer}
+                type="button"
+                key={choice}
+                onClick={() => choose(assignment.cardId, choice)}
+                disabled={saving || saveError}
+                aria-pressed={choices[assignment.cardId] === choice}
+              >
+                <small>{choice.toUpperCase()}</small>
+                <span>
+                  {choice === "a" ? assignment.optionA : assignment.optionB}
+                </span>
+              </button>
+            ))}
+          </div>
+          <p className={styles.inlineStatus} aria-live="polite">
+            {saveError
+              ? "저장 실패 · 재시도"
+              : saving
+                ? "저장 중…"
+                : "자동 저장"}
+          </p>
+          {saveError ? (
+            <div className={styles.inlineError} role="alert">
+              <p>추가 답변을 저장하지 못했어요.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  if (pending.current) void save(pending.current);
+                }}
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : null}
+          <button
+            className={styles.optionalBack}
+            type="button"
+            onClick={onBack}
+            disabled={saving}
+          >
+            비교로 돌아가기
+          </button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function Comparison({
+  response: initialResponse,
+  headingRef,
+}: {
+  response: SubmittedResponse;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
 }) {
+  const [response, setResponse] = useState(initialResponse);
+  const initialOptional = initialResponse.assignments.filter(
+    ({ stage }) => stage === "optional",
+  );
+  const [showOptional, setShowOptional] = useState(
+    initialOptional.length === 2 &&
+      initialOptional.some(({ visitorChoice }) => visitorChoice === null),
+  );
+  const [startingOptional, setStartingOptional] = useState(false);
+  const [optionalError, setOptionalError] = useState(false);
   const [copyState, setCopyState] = useState<
     "idle" | "copied" | "manual" | "missing"
   >("idle");
@@ -606,6 +834,60 @@ function Comparison({
     }
   }
 
+  async function startOptional() {
+    const existing = response.assignments.filter(
+      ({ stage }) => stage === "optional",
+    );
+    if (existing.length === 2) {
+      setShowOptional(true);
+      return;
+    }
+    setStartingOptional(true);
+    setOptionalError(false);
+    try {
+      const assigned = await continueVisitorResponse(response.id);
+      if (assigned.status !== "submitted") throw new Error("INVALID_RESPONSE");
+      setResponse(assigned);
+      setShowOptional(true);
+    } catch {
+      setOptionalError(true);
+    } finally {
+      setStartingOptional(false);
+    }
+  }
+
+  function acceptOptionalResponse(next: SubmittedResponse) {
+    setResponse(next);
+    const optional = next.assignments.filter(
+      ({ stage }) => stage === "optional",
+    );
+    const complete =
+      optional.length === 2 &&
+      optional.every(({ visitorChoice }) => visitorChoice !== null);
+    if (complete) setShowOptional(false);
+  }
+
+  if (showOptional) {
+    return (
+      <OptionalQuestions
+        response={response}
+        headingRef={headingRef}
+        onResponse={acceptOptionalResponse}
+        onBack={() => setShowOptional(false)}
+      />
+    );
+  }
+
+  const required = response.assignments.filter(
+    ({ stage }) => stage === "required",
+  );
+  const optional = response.assignments.filter(
+    ({ stage }) => stage === "optional",
+  );
+  const comparedOptional = optional.filter(isComparedAssignment);
+  const optionalComplete =
+    optional.length === 2 && comparedOptional.length === 2;
+
   return (
     <main className={styles.shell}>
       <section
@@ -635,48 +917,12 @@ function Comparison({
           </div>
         </dl>
         <div className={styles.comparisonList}>
-          {response.assignments.map((assignment) => (
-            <article
-              className={
-                assignment.isHighlight ? styles.highlight : styles.resultCard
-              }
+          {required.filter(isComparedAssignment).map((assignment) => (
+            <ResultCard
+              assignment={assignment}
+              label={`${assignment.position}번째 질문`}
               key={assignment.cardId}
-            >
-              <div className={styles.resultHeader}>
-                <span>{assignment.position}번째 질문</span>
-                <strong>
-                  <span className={styles.resultMarker} aria-hidden="true">
-                    {assignment.matches ? "●" : "◆"}
-                  </span>
-                  <span>
-                    {assignment.matches
-                      ? "겹침"
-                      : assignment.isHighlight
-                        ? "가장 다른 답"
-                        : "다름"}
-                  </span>
-                </strong>
-              </div>
-              <h2>{assignment.visitorPrompt}</h2>
-              <dl>
-                <div>
-                  <dt>내가 본 이 사람</dt>
-                  <dd>
-                    {assignment.visitorChoice === "a"
-                      ? assignment.optionA
-                      : assignment.optionB}
-                  </dd>
-                </div>
-                <div>
-                  <dt>이 사람의 실제 답</dt>
-                  <dd>
-                    {assignment.ownerChoice === "a"
-                      ? assignment.optionA
-                      : assignment.optionB}
-                  </dd>
-                </div>
-              </dl>
-            </article>
+            />
           ))}
         </div>
         <Link
@@ -691,6 +937,43 @@ function Comparison({
         >
           나도 이 팩으로 시작하기
         </Link>
+        {optionalComplete ? (
+          <p className={styles.optionalComplete}>2장 추가 비교 완료</p>
+        ) : (
+          <button
+            className={styles.secondaryCta}
+            type="button"
+            onClick={() => void startOptional()}
+            disabled={startingOptional}
+            aria-busy={startingOptional}
+          >
+            {startingOptional
+              ? "추가 질문 여는 중…"
+              : optional.length === 2
+                ? "2장 이어서 답하기"
+                : "2장 더 답하기"}
+          </button>
+        )}
+        {optionalError ? (
+          <p className={styles.error} role="alert">
+            추가 질문을 열지 못했어요. 다시 시도해 주세요.
+          </p>
+        ) : null}
+        {optionalComplete ? (
+          <section className={styles.optionalResults}>
+            <span className={styles.optionalKicker}>추가로 본 두 장</span>
+            <h2>조금 더 선명해진 비교</h2>
+            <div className={styles.comparisonList}>
+              {comparedOptional.map((assignment) => (
+                <ResultCard
+                  assignment={assignment}
+                  label={`추가 ${assignment.position}번째 질문`}
+                  key={assignment.cardId}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
         <div className={styles.managementBox}>
           <h2>내 답변을 다시 보려면</h2>
           <p>

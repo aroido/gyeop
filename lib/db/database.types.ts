@@ -521,6 +521,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      assign_optional_cards: {
+        Args: { p_response_id: string; p_session_hash: string };
+        Returns: Json;
+      };
       complete_owner_play: {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: Json;

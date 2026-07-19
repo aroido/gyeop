@@ -10,7 +10,7 @@ const SECRET = /^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
 
 type VisitorAssignmentBase = Readonly<{
   cardId: string;
-  stage: "required";
+  stage: "required" | "optional";
   position: 1 | 2 | 3;
   visitorPrompt: string;
   optionA: string;
@@ -43,9 +43,9 @@ export type VisitorResponse =
         assignments: readonly Readonly<
           VisitorAssignmentBase & {
             packPosition: number;
-            visitorChoice: "a" | "b";
-            ownerChoice: "a" | "b";
-            matches: boolean;
+            visitorChoice: "a" | "b" | null;
+            ownerChoice: "a" | "b" | null;
+            matches: boolean | null;
             isHighlight: boolean;
           }
         >[];
@@ -303,6 +303,14 @@ export function submitVisitorAnswers(
   return fetch(
     `/api/responses/${encodeURIComponent(responseId)}/submit`,
     mutation("POST", { managementSecret }),
+  ).then(stateResponse);
+}
+
+export function continueVisitorResponse(responseId: string) {
+  if (!isVisitorResponseId(responseId)) invalidInput();
+  return fetch(
+    `/api/responses/${encodeURIComponent(responseId)}/continue`,
+    mutation("POST", {}),
   ).then(stateResponse);
 }
 
