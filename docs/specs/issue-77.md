@@ -1,6 +1,6 @@
 # Issue 77 구현 스펙: [프론트엔드] 검수된 3개 질문팩을 전체 공유 루프에 연결
 
-Status: Draft
+Status: Reviewed
 Issue: https://github.com/aroido/gyeop/issues/77
 
 ## 목표
@@ -120,8 +120,8 @@ Issue: https://github.com/aroido/gyeop/issues/77
 ## 스펙 검토
 
 Reviewer Agent: issue77_spec_review
-Review Status: FAIL
-P0/P1 Findings: 4 (제품 SSOT, 배포 DB materialization, 롤링 호환, 4팩 실DB 검증을 반영해 재검토 요청)
+Review Status: PASS
+P0/P1 Findings: 0
 
 ## 리스크와 미결정 사항
 
