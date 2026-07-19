@@ -7,6 +7,7 @@ const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
 const proxyKey = Buffer.alloc(32, 8).toString("base64url");
 const visitorManagementSecret = Buffer.alloc(32, 6).toString("base64url");
+const e2eBaseUrl = `http://127.0.0.1:${process.env.GYEOP_E2E_PORT ?? "3000"}`;
 const visitorHeaders = {
   "x-forwarded-for": "198.51.100.219",
   "x-forwarded-host": "127.0.0.1",
@@ -252,7 +253,7 @@ async function rawVisitorAction(
     method: input.method,
     headers: {
       cookie: `__Host-gyeop-response=${input.cookieValue}`,
-      origin: "http://127.0.0.1:3000",
+      origin: e2eBaseUrl,
     },
     data: input.body,
   });
@@ -455,13 +456,13 @@ async function postRawVisitorResponse(input: {
 }) {
   const headers: Record<string, string> = {
     ...visitorHeaders,
-    origin: "http://127.0.0.1:3000",
+    origin: e2eBaseUrl,
     "content-type": "application/json",
   };
   if (input.ip) headers["x-forwarded-for"] = input.ip;
   if (input.cookie) headers.cookie = input.cookie;
   const response = await fetch(
-    `http://127.0.0.1:3000/api/invites/${input.publicId}/responses`,
+    `${e2eBaseUrl}/api/invites/${input.publicId}/responses`,
     {
       method: "POST",
       headers,
@@ -708,7 +709,7 @@ test.describe("live owner flow", () => {
     await page.getByRole("button", { name: "공유 링크 만들기" }).click();
     const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
     expect(
-      /^http:\/\/127\.0\.0\.1:3000\/i\/[A-Za-z0-9_-]{22}#k=[A-Za-z0-9_-]{43}$/.test(
+      /^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}\/i\/[A-Za-z0-9_-]{22}#k=[A-Za-z0-9_-]{43}$/.test(
         inviteUrl,
       ),
     ).toBe(true);
