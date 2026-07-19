@@ -103,7 +103,18 @@ export function verifyOwnerFlow(root = ROOT) {
     path.join(root, "app/(public)/home-client.tsx"),
     "utf8",
   );
-  assert.match(home, /href="\/play\/new\?pack=old-friend"/);
+  assert.match(
+    home,
+    /href=\{`\/play\/new\?pack=\$\{encodeURIComponent\(pack\.slug\)\}`\}/,
+  );
+  for (const slug of [
+    "old-friend",
+    "first-impression",
+    "coworker",
+    "honest-self",
+  ]) {
+    assert.ok(home.includes(`"${slug}"`) || home.includes(`${slug}:`));
+  }
   assert.doesNotMatch(home, /href=\{`\/play\/\$\{/);
 
   const legacy = readFileSync(

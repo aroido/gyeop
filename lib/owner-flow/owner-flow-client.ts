@@ -5,7 +5,12 @@ import {
 } from "../owner-play/owner-play-state-core.mjs";
 import { decodePublishedPack } from "../packs/published-pack-core.mjs";
 
-const PACK_SLUG = "old-friend";
+const PACK_SLUGS = new Set([
+  "old-friend",
+  "first-impression",
+  "coworker",
+  "honest-self",
+]);
 const CARD_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ERROR_CODES = new Set([
   "INTERNAL_ERROR",
@@ -111,11 +116,13 @@ function ownerPlayPath(playId: string) {
 }
 
 export function createOrResumeOwnerPlay(
+  packSlug: string,
   entrySource: "home" | "same_pack_cta" = "home",
 ): Promise<OwnerPlayState> {
+  if (!PACK_SLUGS.has(packSlug)) invalidResponse(400);
   return fetch(
     "/api/plays",
-    jsonRequest("POST", { packSlug: PACK_SLUG, entrySource }),
+    jsonRequest("POST", { packSlug, entrySource }),
   ).then(ownerStateResponse);
 }
 
@@ -125,11 +132,11 @@ export function bootstrapOwnerPlay(
   packSlug: string,
   entrySource: "home" | "same_pack_cta",
 ): Promise<OwnerPlayState> {
-  if (packSlug !== PACK_SLUG) invalidResponse(400);
+  if (!PACK_SLUGS.has(packSlug)) invalidResponse(400);
   const key = `${packSlug}\0${entrySource}`;
   const existing = bootstrapRequests.get(key);
   if (existing) return existing;
-  const request = createOrResumeOwnerPlay(entrySource);
+  const request = createOrResumeOwnerPlay(packSlug, entrySource);
   bootstrapRequests.set(key, request);
   const clear = () => {
     if (bootstrapRequests.get(key) === request) {
@@ -172,7 +179,7 @@ export function loadOwnerFlow(
 }
 
 export async function readOwnerPack(packSlug: string): Promise<OwnerPack> {
-  if (packSlug !== PACK_SLUG) invalidResponse(400);
+  if (!PACK_SLUGS.has(packSlug)) invalidResponse(400);
   const response = await fetch(`/api/packs/${encodeURIComponent(packSlug)}`, {
     method: "GET",
     cache: "no-store",

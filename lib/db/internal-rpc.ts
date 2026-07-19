@@ -598,6 +598,92 @@ export type GetVisitorResponseResult =
   | Readonly<{ outcome: "authorized"; response: VisitorResponseState }>
   | Readonly<{ outcome: "session_invalid" }>;
 
+export type VisitorResponsePackMetadata = Readonly<{
+  packSlug: string;
+  packVersion: string;
+  packTitle: string;
+}>;
+
+export type GetVisitorResponsePackMetadataResult =
+  | Readonly<{
+      outcome: "authorized";
+      metadata: VisitorResponsePackMetadata;
+    }>
+  | Readonly<{ outcome: "session_invalid" | "legacy_missing" }>;
+
+const packMetadata = Object.freeze({
+  "old-friend": Object.freeze({
+    packVersion: "old-friend-v1",
+    packTitle: "우리 아직 통할까?",
+  }),
+  "first-impression": Object.freeze({
+    packVersion: "first-impression-v1",
+    packTitle: "나, 첫눈에 어땠어?",
+  }),
+  coworker: Object.freeze({
+    packVersion: "coworker-v1",
+    packTitle: "같이 일할 때 나는?",
+  }),
+  "honest-self": Object.freeze({
+    packVersion: "honest-self-v1",
+    packTitle: "가까운 사람만 아는 나",
+  }),
+});
+
+function decodeVisitorResponsePackMetadata(
+  value: unknown,
+): GetVisitorResponsePackMetadataResult {
+  if (
+    value === null ||
+    typeof value !== "object" ||
+    Array.isArray(value) ||
+    typeof (value as { outcome?: unknown }).outcome !== "string"
+  ) {
+    throw new Error("Internal visitor response metadata RPC failed");
+  }
+  const record = value as {
+    outcome: string;
+    metadata?: {
+      packSlug?: unknown;
+      packVersion?: unknown;
+      packTitle?: unknown;
+    };
+  };
+  if (
+    record.outcome === "session_invalid" &&
+    Object.keys(record).join("\0") === "outcome"
+  ) {
+    return Object.freeze({ outcome: "session_invalid" });
+  }
+  const metadata = record.metadata;
+  const expected =
+    metadata &&
+    typeof metadata.packSlug === "string" &&
+    Object.prototype.hasOwnProperty.call(packMetadata, metadata.packSlug)
+      ? packMetadata[metadata.packSlug as keyof typeof packMetadata]
+      : undefined;
+  if (
+    record.outcome !== "authorized" ||
+    Object.keys(record).sort().join("\0") !== "metadata\0outcome" ||
+    !metadata ||
+    Object.keys(metadata).sort().join("\0") !==
+      "packSlug\0packTitle\0packVersion" ||
+    !expected ||
+    metadata.packVersion !== expected.packVersion ||
+    metadata.packTitle !== expected.packTitle
+  ) {
+    throw new Error("Internal visitor response metadata RPC failed");
+  }
+  return Object.freeze({
+    outcome: "authorized",
+    metadata: Object.freeze({
+      packSlug: metadata.packSlug as string,
+      packVersion: metadata.packVersion as string,
+      packTitle: metadata.packTitle as string,
+    }),
+  });
+}
+
 export async function getVisitorResponse(input: {
   responseId: string;
   sessionTokenHash: Uint8Array;
@@ -611,6 +697,26 @@ export async function getVisitorResponse(input: {
   const { data, error } = await query;
   if (error) throw new Error("Internal visitor response RPC failed");
   return decodeGetVisitorResponseOutcome(data) as GetVisitorResponseResult;
+}
+
+export async function getVisitorResponsePackMetadata(input: {
+  responseId: string;
+  sessionTokenHash: Uint8Array;
+  signal?: AbortSignal;
+}): Promise<GetVisitorResponsePackMetadataResult> {
+  let query = getInternalClient().rpc("get_visitor_response_pack_metadata", {
+    p_response_id: input.responseId,
+    p_session_hash: bytea(input.sessionTokenHash),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) {
+    if (error.code === "PGRST202" || error.code === "42883") {
+      return Object.freeze({ outcome: "legacy_missing" });
+    }
+    throw new Error("Internal visitor response metadata RPC failed");
+  }
+  return decodeVisitorResponsePackMetadata(data);
 }
 
 export type SaveResponseAnswerResult =

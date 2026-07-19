@@ -149,7 +149,7 @@ async function installShareApi(
       return json(route, 200, {
         packSlug: "old-friend",
         packVersion: "old-friend-v1",
-        packTitle: "오래된 친구팩",
+        packTitle: "우리 아직 통할까?",
         kind: "public",
       });
     }
@@ -368,8 +368,8 @@ test("attributes profile-entry share once despite same-tick activation", async (
         ).__gyeopHandoff.shareCalls[0],
     ),
   ).toEqual({
-    title: "겹 · 오래된 친구팩",
-    text: "내가 먼저 답한 오래된 친구팩이야. 너는 나를 어떻게 보는지 3장만 골라줘.",
+    title: "겹 · 우리 아직 통할까?",
+    text: '내가 먼저 답한 "우리 아직 통할까?" 질문이야. 너는 나를 어떻게 보는지 3장만 골라줘.',
     url: `http://127.0.0.1:3000/i/${publicIds[0]}#k=${secret}`,
   });
   await expect

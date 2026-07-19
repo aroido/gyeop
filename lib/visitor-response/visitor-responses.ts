@@ -2,11 +2,11 @@ import "server-only";
 
 import {
   getVisitorResponse,
+  getVisitorResponsePackMetadata,
   recordVisitorResponseEvent,
   saveResponseAnswer,
   startResponse,
   submitResponse,
-  type StartResponseResult,
   type VisitorResponseState,
 } from "../db/internal-rpc.ts";
 import type { ParsedVisitorResponseCookie } from "./visitor-response-session.ts";
@@ -16,6 +16,37 @@ import {
 } from "./visitor-session-core.mjs";
 
 type Existing = Extract<ParsedVisitorResponseCookie, { outcome: "valid" }>;
+type VisitorResponseWithPack = VisitorResponseState &
+  Readonly<{
+    packSlug: string;
+    packVersion: string;
+    packTitle: string;
+  }>;
+
+const LEGACY_OLD_FRIEND = Object.freeze({
+  packSlug: "old-friend",
+  packVersion: "old-friend-v1",
+  packTitle: "우리 아직 통할까?",
+});
+
+async function attachPackMetadata(
+  response: VisitorResponseState,
+  sessionTokenHash: Uint8Array,
+  signal?: AbortSignal,
+): Promise<VisitorResponseWithPack> {
+  const result = await getVisitorResponsePackMetadata({
+    responseId: response.id,
+    sessionTokenHash,
+    signal,
+  });
+  if (result.outcome === "session_invalid") {
+    throw new Error("Internal visitor response metadata RPC failed");
+  }
+  return Object.freeze({
+    ...response,
+    ...(result.outcome === "authorized" ? result.metadata : LEGACY_OLD_FRIEND),
+  });
+}
 
 export type VisitorSessionResult =
   | Readonly<{ outcome: "rate_limited"; retryAfterSeconds: number }>
@@ -24,10 +55,7 @@ export type VisitorSessionResult =
     }>
   | Readonly<{
       outcome: "created" | "resumed";
-      response: Extract<
-        StartResponseResult,
-        { outcome: "created" | "resumed" }
-      >["response"];
+      response: VisitorResponseWithPack;
       cookieValue: string;
     }>;
 
@@ -74,7 +102,11 @@ export async function resumeVisitorResponseSession(input: {
   if (!input.existing) throw new Error("Internal visitor response RPC failed");
   return Object.freeze({
     outcome: "resumed",
-    response: result.response,
+    response: await attachPackMetadata(
+      result.response,
+      input.existing.sessionTokenHash,
+      input.signal,
+    ),
     cookieValue: input.existing.value,
   });
 }
@@ -108,7 +140,11 @@ export async function startVisitorResponseSession(input: {
     if (result.outcome === "created") {
       return Object.freeze({
         outcome: "created",
-        response: result.response,
+        response: await attachPackMetadata(
+          result.response,
+          credential.sessionTokenHash,
+          input.signal,
+        ),
         cookieValue: credential.value,
       });
     }
@@ -118,7 +154,11 @@ export async function startVisitorResponseSession(input: {
       }
       return Object.freeze({
         outcome: "resumed",
-        response: result.response,
+        response: await attachPackMetadata(
+          result.response,
+          input.existing.sessionTokenHash,
+          input.signal,
+        ),
         cookieValue: input.existing.value,
       });
     }
@@ -141,17 +181,26 @@ export async function startVisitorResponseSession(input: {
 }
 
 export type VisitorResponseAccessResult =
-  | Readonly<{ outcome: "authorized"; response: VisitorResponseState }>
+  | Readonly<{ outcome: "authorized"; response: VisitorResponseWithPack }>
   | Readonly<{ outcome: "session_invalid" }>;
 
 export async function getVisitorResponseSession(input: {
   cookie: Existing;
   signal?: AbortSignal;
 }): Promise<VisitorResponseAccessResult> {
-  return getVisitorResponse({
+  const result = await getVisitorResponse({
     responseId: input.cookie.responseId,
     sessionTokenHash: input.cookie.sessionTokenHash,
     signal: input.signal,
+  });
+  if (result.outcome !== "authorized") return result;
+  return Object.freeze({
+    outcome: "authorized",
+    response: await attachPackMetadata(
+      result.response,
+      input.cookie.sessionTokenHash,
+      input.signal,
+    ),
   });
 }
 
@@ -161,12 +210,21 @@ export async function saveVisitorResponseAnswer(input: {
   choice: "a" | "b";
   signal?: AbortSignal;
 }) {
-  return saveResponseAnswer({
+  const result = await saveResponseAnswer({
     responseId: input.cookie.responseId,
     sessionTokenHash: input.cookie.sessionTokenHash,
     cardId: input.cardId,
     choice: input.choice,
     signal: input.signal,
+  });
+  if (result.outcome !== "saved") return result;
+  return Object.freeze({
+    outcome: "saved",
+    response: await attachPackMetadata(
+      result.response,
+      input.cookie.sessionTokenHash,
+      input.signal,
+    ),
   });
 }
 
@@ -175,11 +233,20 @@ export async function submitVisitorResponse(input: {
   managementSecret: string;
   signal?: AbortSignal;
 }) {
-  return submitResponse({
+  const result = await submitResponse({
     responseId: input.cookie.responseId,
     sessionTokenHash: input.cookie.sessionTokenHash,
     managementHash: hashVisitorManagementSecret(input.managementSecret),
     signal: input.signal,
+  });
+  if (result.outcome !== "submitted") return result;
+  return Object.freeze({
+    outcome: "submitted",
+    response: await attachPackMetadata(
+      result.response,
+      input.cookie.sessionTokenHash,
+      input.signal,
+    ),
   });
 }
 

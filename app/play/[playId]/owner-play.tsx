@@ -137,7 +137,7 @@ function TerminalScreen({
     setClearFailed(false);
     try {
       await clearOwnerSession();
-      router.replace("/play/new?pack=old-friend");
+      router.replace("/");
     } catch {
       setClearing(false);
       setClearFailed(true);
@@ -145,9 +145,9 @@ function TerminalScreen({
   }
 
   return (
-    <main className={styles.shell} data-pack="old-friend">
+    <main className={styles.shell}>
       <section className={styles.message} aria-labelledby="ended-title">
-        <p className={styles.brand}>겹 · 오래된 친구팩</p>
+        <p className={styles.brand}>겹 · 질문팩</p>
         <h1 id="ended-title" ref={headingRef} tabIndex={-1}>
           이 팩을 이어갈 수 없어요
         </h1>
@@ -159,7 +159,7 @@ function TerminalScreen({
             </button>
           ) : null}
           <button type="button" onClick={startNew} disabled={clearing}>
-            {clearing ? "새 팩을 준비하는 중…" : "새 팩 시작"}
+            {clearing ? "홈으로 이동하는 중…" : "다른 팩 고르기"}
           </button>
         </div>
         {clearFailed ? (
@@ -398,7 +398,7 @@ export default function OwnerPlay({ playId }: { playId: string | null }) {
 
   if (load.kind === "loading") {
     return (
-      <main className={styles.shell} data-pack="old-friend">
+      <main className={styles.shell}>
         <p className={styles.loading} role="status">
           저장한 답을 불러오는 중…
         </p>

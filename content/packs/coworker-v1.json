@@ -1,0 +1,106 @@
+{
+  "slug": "coworker",
+  "version": "coworker-v1",
+  "title": "같이 일할 때 나는?",
+  "targetRelationship": "coworker",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "담백한 관찰",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "coworker-card-v1"
+  },
+  "cards": [
+    {
+      "id": "unclear-task",
+      "position": 1,
+      "ownerPrompt": "업무가 애매하게 주어지면 나는?",
+      "visitorPrompt": "업무가 애매하게 주어지면 이 사람은?",
+      "optionA": "먼저 기준을 질문한다",
+      "optionB": "가능한 안을 만들어 확인한다",
+      "isSignature": true
+    },
+    {
+      "id": "meeting",
+      "position": 2,
+      "ownerPrompt": "회의에서 의견이 생기면 나는?",
+      "visitorPrompt": "회의에서 의견이 생기면 이 사람은?",
+      "optionA": "떠오른 때 바로 말한다",
+      "optionB": "정리한 뒤 차례에 말한다",
+      "isSignature": false
+    },
+    {
+      "id": "focus",
+      "position": 3,
+      "ownerPrompt": "집중이 필요할 때 나는?",
+      "visitorPrompt": "집중이 필요할 때 이 사람은?",
+      "optionA": "주변을 정돈하고 몰입한다",
+      "optionB": "장소나 일을 바꿔 리듬을 만든다",
+      "isSignature": false
+    },
+    {
+      "id": "deadline",
+      "position": 4,
+      "ownerPrompt": "마감이 있는 일을 할 때 나는?",
+      "visitorPrompt": "마감이 있는 일을 할 때 이 사람은?",
+      "optionA": "여유 있게 나눠 진행한다",
+      "optionB": "집중할 시간을 잡아 한 번에 진행한다",
+      "isSignature": false
+    },
+    {
+      "id": "feedback",
+      "position": 5,
+      "ownerPrompt": "피드백을 받으면 나는?",
+      "visitorPrompt": "피드백을 받으면 이 사람은?",
+      "optionA": "바로 질문하며 이해한다",
+      "optionB": "혼자 정리한 뒤 반영한다",
+      "isSignature": false
+    },
+    {
+      "id": "new-colleague",
+      "position": 6,
+      "ownerPrompt": "새 동료와 가까워질 때 나는 먼저?",
+      "visitorPrompt": "새 동료와 가까워질 때 이 사람은 먼저?",
+      "optionA": "말을 걸고 함께 다닌다",
+      "optionB": "업무 중 필요한 순간을 돕는다",
+      "isSignature": false
+    },
+    {
+      "id": "break",
+      "position": 7,
+      "ownerPrompt": "점심이나 쉬는 시간에 나는?",
+      "visitorPrompt": "점심이나 쉬는 시간에 이 사람은?",
+      "optionA": "동료와 함께 쉬며 충전한다",
+      "optionB": "혼자만의 시간으로 충전한다",
+      "isSignature": false
+    },
+    {
+      "id": "plan-change",
+      "position": 8,
+      "ownerPrompt": "계획이 갑자기 바뀌면 나는 먼저?",
+      "visitorPrompt": "계획이 갑자기 바뀌면 이 사람은 먼저?",
+      "optionA": "새 우선순위를 정한다",
+      "optionB": "영향받는 사람과 일을 확인한다",
+      "isSignature": false
+    },
+    {
+      "id": "ask-help",
+      "position": 9,
+      "ownerPrompt": "동료의 도움이 필요할 때 나는?",
+      "visitorPrompt": "동료의 도움이 필요할 때 이 사람은?",
+      "optionA": "상황을 설명하고 바로 요청한다",
+      "optionB": "내가 해본 뒤 막힌 부분을 묻는다",
+      "isSignature": false
+    },
+    {
+      "id": "share-work",
+      "position": 10,
+      "ownerPrompt": "일을 마친 뒤 나는?",
+      "visitorPrompt": "일을 마친 뒤 이 사람은?",
+      "optionA": "바로 공유하고 의견을 받는다",
+      "optionB": "한 번 더 점검한 뒤 공유한다",
+      "isSignature": false
+    }
+  ]
+}

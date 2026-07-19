@@ -138,7 +138,8 @@ export function verifyVisitorResponse() {
     "친구 답과 맞춰보는 중…",
     "3장 비교 완료",
     "내 관리 링크 복사",
-    "/play/new?pack=old-friend&source=same_pack_cta",
+    "encodeURIComponent(response.packSlug)",
+    "&source=same_pack_cta",
   ]) {
     assert.ok(
       entry.includes(contract),

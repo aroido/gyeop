@@ -1,5 +1,12 @@
 import BootstrapOwnerPlay from "./bootstrap";
 
+const supportedPacks = new Set([
+  "old-friend",
+  "first-impression",
+  "coworker",
+  "honest-self",
+]);
+
 export default async function NewOwnerPlayPage({
   searchParams,
 }: {
@@ -14,7 +21,7 @@ export default async function NewOwnerPlayPage({
     query.source === "same_pack_cta" ? "same_pack_cta" : "home";
   return (
     <BootstrapOwnerPlay
-      pack={pack === "old-friend" ? pack : null}
+      pack={typeof pack === "string" && supportedPacks.has(pack) ? pack : null}
       entrySource={entrySource}
     />
   );

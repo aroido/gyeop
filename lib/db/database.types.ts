@@ -603,6 +603,10 @@ export type Database = {
         Args: { p_response_id: string; p_session_hash: string };
         Returns: Json;
       };
+      get_visitor_response_pack_metadata: {
+        Args: { p_response_id: string; p_session_hash: string };
+        Returns: Json;
+      };
       list_owner_share_links: {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: Json;

@@ -5,8 +5,10 @@ import Link from "next/link";
 
 import styles from "./page.module.css";
 
-export type OldFriendSummary = Readonly<{
+export type PackSummary = Readonly<{
+  slug: string;
   title: string;
+  active: boolean;
   relationship: string;
   sensitivity: string;
   questionCount: number;
@@ -17,70 +19,18 @@ export type OldFriendSummary = Readonly<{
   coverStyle: Readonly<CSSProperties>;
 }>;
 
-const otherPackPreviews = [
-  {
-    slug: "first-impression",
-    title: "첫인상팩",
-    style: "blueCard",
-    number: "02",
-    relationship: "새로 알게 된 사이",
-    mood: "가벼운 첫 만남",
-    sensitivity: "낮은 민감도",
-    sharing: "공개 공유 추천",
-  },
-  {
-    slug: "coworker",
-    title: "직장동료팩",
-    style: "redCard",
-    number: "03",
-    relationship: "직장 동료",
-    mood: "담백한 관찰",
-    sensitivity: "낮은 민감도",
-    sharing: "공개 공유 추천",
-  },
-  {
-    slug: "honest-self",
-    title: "솔직한 나팩",
-    style: "blackCard",
-    number: "04",
-    relationship: "가까운 사이",
-    mood: "차분한 솔직함",
-    sensitivity: "중간 민감도",
-    sharing: "1:1 공유 추천",
-  },
-] as const;
+const cardClasses: Readonly<Record<string, string>> = Object.freeze({
+  "old-friend": "activeCard",
+  "first-impression": "blueCard",
+  coworker: "redCard",
+  "honest-self": "blackCard",
+});
 
 export default function HomeClient({
-  oldFriendActive,
-  oldFriend,
+  packs,
 }: {
-  oldFriendActive: boolean;
-  oldFriend: OldFriendSummary;
+  packs: readonly PackSummary[];
 }) {
-  const packPreviews = [
-    {
-      slug: "old-friend",
-      title: oldFriend.title,
-      style: "activeCard",
-      number: "01",
-      relationship: oldFriend.relationship,
-      mood: oldFriend.mood,
-      sensitivity: oldFriend.sensitivity,
-      sharing: oldFriend.sharing,
-      questionCount: oldFriend.questionCount,
-      estimatedMinutes: oldFriend.estimatedMinutes,
-      coverRecipe: oldFriend.coverRecipe,
-      coverStyle: oldFriend.coverStyle,
-    },
-    ...otherPackPreviews.map((pack) => ({
-      ...pack,
-      questionCount: 10,
-      estimatedMinutes: 2,
-      coverRecipe: undefined,
-      coverStyle: undefined,
-    })),
-  ];
-
   return (
     <main className={styles.shell}>
       <div className={styles.frame}>
@@ -129,59 +79,43 @@ export default function HomeClient({
             }}
             tabIndex={0}
           >
-            {packPreviews.map((pack, index) => {
-              const active = index === 0 && oldFriendActive;
-              const showDetails = index === 0;
+            {packs.map((pack, index) => (
+              <li key={pack.slug}>
+                <article
+                  className={`${styles.packCard} ${styles[cardClasses[pack.slug] ?? "activeCard"]}`}
+                  data-pack-state={pack.active ? "active" : "upcoming"}
+                  data-cover-variant={pack.coverRecipe}
+                  style={pack.coverStyle}
+                >
+                  <div className={styles.cardTopline}>
+                    <span>{pack.active ? "지금 시작" : "준비 중"}</span>
+                    <b>{String(index + 1).padStart(2, "0")}</b>
+                  </div>
+                  <h3>{pack.title}</h3>
+                  <p className={styles.relationship}>{pack.relationship}</p>
+                  <div className={styles.packMeta}>
+                    <span>질문 {pack.questionCount}장</span>
+                    <span>약 {pack.estimatedMinutes}분</span>
+                    <span>{pack.mood}</span>
+                    <span>{pack.sensitivity}</span>
+                    <span>{pack.sharing}</span>
+                  </div>
 
-              return (
-                <li key={pack.slug}>
-                  <article
-                    className={`${styles.packCard} ${styles[pack.style]}`}
-                    data-pack-state={active ? "active" : "upcoming"}
-                    data-cover-variant={pack.coverRecipe}
-                    style={pack.coverStyle}
-                  >
-                    <div className={styles.cardTopline}>
-                      <span>{active ? "지금 시작" : "준비 중"}</span>
-                      <b>{pack.number}</b>
-                    </div>
-                    <h3>{pack.title}</h3>
-
-                    {showDetails ? (
-                      <>
-                        <p className={styles.relationship}>
-                          {pack.relationship}
-                        </p>
-                        <div className={styles.packMeta}>
-                          <span>질문 {pack.questionCount}장</span>
-                          <span>약 {pack.estimatedMinutes}분</span>
-                          <span>{pack.mood}</span>
-                          <span>{pack.sensitivity}</span>
-                          <span>{pack.sharing}</span>
-                        </div>
-                      </>
-                    ) : (
-                      <span className={styles.cardMark} aria-hidden="true">
-                        ✳
-                      </span>
-                    )}
-
-                    {active ? (
-                      <Link
-                        className={styles.cta}
-                        href="/play/new?pack=old-friend"
-                      >
-                        팩 열어보기 <span aria-hidden="true">→</span>
-                      </Link>
-                    ) : index === 0 ? (
-                      <button className={styles.cta} type="button" disabled>
-                        팩 준비 중
-                      </button>
-                    ) : null}
-                  </article>
-                </li>
-              );
-            })}
+                  {pack.active ? (
+                    <Link
+                      className={styles.cta}
+                      href={`/play/new?pack=${encodeURIComponent(pack.slug)}`}
+                    >
+                      질문 시작하기 <span aria-hidden="true">→</span>
+                    </Link>
+                  ) : (
+                    <button className={styles.cta} type="button" disabled>
+                      준비 중
+                    </button>
+                  )}
+                </article>
+              </li>
+            ))}
           </ul>
         </section>
       </div>

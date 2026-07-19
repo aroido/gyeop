@@ -294,7 +294,7 @@ test.describe("core MVP live gate", () => {
     const manualUrl = page.getByLabel("공유 링크 직접 복사");
     const inviteUrl = await manualUrl.inputValue();
     expect(
-      /^http:\/\/127\.0\.0\.1:3000\/i\/[A-Za-z0-9_-]{22}#k=[A-Za-z0-9_-]{43}$/.test(
+      /^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}\/i\/[A-Za-z0-9_-]{22}#k=[A-Za-z0-9_-]{43}$/.test(
         inviteUrl,
       ),
     ).toBe(true);
@@ -459,5 +459,36 @@ test.describe("core MVP live gate", () => {
       });
 
     for (const visitor of visitors) await visitor.context.close();
+  });
+
+  test("completes a newly added pack through the real browser path", async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/");
+
+    const packCard = page.locator("article").filter({
+      has: page.getByRole("heading", { name: "나, 첫눈에 어땠어?" }),
+    });
+    await packCard.getByRole("link", { name: "질문 시작하기" }).click();
+    await page.waitForURL(/\/play\/[0-9a-f-]{36}$/);
+    await expect(
+      page.getByRole("heading", { name: "처음 만난 자리에서 나는?" }),
+    ).toBeFocused();
+
+    for (let position = 1; position <= 10; position += 1) {
+      await page.locator('button[data-choice="a"]').click();
+    }
+    await expect(
+      page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: "친구에게 공유하기" }).click();
+    await expect(page.getByText("겹 · 나, 첫눈에 어땠어?")).toBeVisible();
+
+    await page.goto("/me");
+    await expect(page.getByText("겹 · 나, 첫눈에 어땠어?")).toBeVisible();
+    await expect(page.locator("article")).toHaveCount(10);
   });
 });

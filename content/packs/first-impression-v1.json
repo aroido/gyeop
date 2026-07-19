@@ -1,0 +1,106 @@
+{
+  "slug": "first-impression",
+  "version": "first-impression-v1",
+  "title": "나, 첫눈에 어땠어?",
+  "targetRelationship": "new_connection",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "가벼운 첫 만남",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "first-impression-card-v1"
+  },
+  "cards": [
+    {
+      "id": "first-move",
+      "position": 1,
+      "ownerPrompt": "처음 만난 자리에서 나는?",
+      "visitorPrompt": "처음 만난 자리에서 이 사람은?",
+      "optionA": "먼저 말을 건다",
+      "optionB": "상대가 말을 걸면 자연스럽게 이어 간다",
+      "isSignature": true
+    },
+    {
+      "id": "first-topic",
+      "position": 2,
+      "ownerPrompt": "처음 대화를 시작할 때 나는?",
+      "visitorPrompt": "처음 대화를 시작할 때 이 사람은?",
+      "optionA": "공통점을 먼저 찾는다",
+      "optionB": "지금 상황에서 소재를 찾는다",
+      "isSignature": false
+    },
+    {
+      "id": "group-entry",
+      "position": 3,
+      "ownerPrompt": "낯선 사람들이 모인 자리에 가면 나는?",
+      "visitorPrompt": "낯선 사람들이 모인 자리에 가면 이 사람은?",
+      "optionA": "여러 사람에게 두루 인사한다",
+      "optionB": "한두 사람과 먼저 친해진다",
+      "isSignature": false
+    },
+    {
+      "id": "silence",
+      "position": 4,
+      "ownerPrompt": "대화가 잠시 끊기면 나는?",
+      "visitorPrompt": "대화가 잠시 끊기면 이 사람은?",
+      "optionA": "새 화제를 꺼낸다",
+      "optionB": "잠깐의 침묵도 편하게 둔다",
+      "isSignature": false
+    },
+    {
+      "id": "interest",
+      "position": 5,
+      "ownerPrompt": "상대 이야기에 관심을 보일 때 나는 주로?",
+      "visitorPrompt": "상대 이야기에 관심을 보일 때 이 사람은 주로?",
+      "optionA": "표정과 맞장구로 보여 준다",
+      "optionB": "이어지는 질문으로 보여 준다",
+      "isSignature": false
+    },
+    {
+      "id": "humor",
+      "position": 6,
+      "ownerPrompt": "처음 만난 자리에서 웃음이 생길 때 나는 주로?",
+      "visitorPrompt": "처음 만난 자리에서 웃음이 생길 때 이 사람은 주로?",
+      "optionA": "먼저 농담을 꺼낸다",
+      "optionB": "상대 농담에 크게 반응한다",
+      "isSignature": false
+    },
+    {
+      "id": "warm-up",
+      "position": 7,
+      "ownerPrompt": "새로운 사람과 가까워질 때 나는?",
+      "visitorPrompt": "새로운 사람과 가까워질 때 이 사람은?",
+      "optionA": "짧은 시간에도 금방 편해진다",
+      "optionB": "몇 번 만나며 천천히 편해진다",
+      "isSignature": false
+    },
+    {
+      "id": "meet-again",
+      "position": 8,
+      "ownerPrompt": "처음 만난 사람을 다시 만나면 나는 먼저?",
+      "visitorPrompt": "처음 만난 사람을 다시 만나면 이 사람은 먼저?",
+      "optionA": "전에 나눈 이야기를 꺼낸다",
+      "optionB": "새로운 근황을 묻는다",
+      "isSignature": false
+    },
+    {
+      "id": "follow-up",
+      "position": 9,
+      "ownerPrompt": "처음 만난 뒤 연락할 때 나는?",
+      "visitorPrompt": "처음 만난 뒤 연락할 때 이 사람은?",
+      "optionA": "먼저 짧게 안부를 보낸다",
+      "optionB": "다음에 만날 계기가 생기면 연락한다",
+      "isSignature": false
+    },
+    {
+      "id": "outfit",
+      "position": 10,
+      "ownerPrompt": "처음 만나는 날 옷을 고를 때 나는?",
+      "visitorPrompt": "처음 만나는 날 옷을 고를 때 이 사람은?",
+      "optionA": "눈에 띄는 포인트를 더한다",
+      "optionB": "익숙하고 편한 옷을 고른다",
+      "isSignature": false
+    }
+  ]
+}

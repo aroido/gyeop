@@ -20,6 +20,9 @@ type VisitorAssignmentBase = Readonly<{
 }>;
 type VisitorResponseBase = Readonly<{
   id: string;
+  packSlug: string;
+  packVersion: string;
+  packTitle: string;
   relationshipCode: string;
   relationshipLabel: string;
   knownSinceCode: string;

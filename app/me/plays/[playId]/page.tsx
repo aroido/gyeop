@@ -1,4 +1,3 @@
-import { getPackPresentation } from "@/lib/packs/presentation";
 import { isOwnerPlayId } from "@/lib/owner-play/owner-play-state-core.mjs";
 import { parseShareEntrySource } from "@/lib/share-links/share-link-state-core.mjs";
 
@@ -16,7 +15,6 @@ export default async function ShareLinksPage({
   return (
     <ShareLinkManager
       playId={isOwnerPlayId(playId) ? playId : null}
-      defaultShareKind={getPackPresentation("old-friend").defaultShareKind}
       entrySource={parseShareEntrySource(entrySource)}
     />
   );
