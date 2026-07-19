@@ -127,15 +127,117 @@ select is(
   'required response submits before optional assignment'
 );
 
-select is(
-  public.record_visitor_response_event(
-    '25200000-0000-4000-8000-000000000001',
-    decode(repeat('21', 32), 'hex'),
-    'comparison_viewed'
-  )->>'outcome',
-  'recorded',
-  'comparison precedes optional funnel'
+create temporary table expected_optional_cards (
+  card_id text primary key,
+  position smallint not null unique
+) on commit drop;
+
+insert into expected_optional_cards (card_id, position)
+select ranked.id, ranked.selection_position::smallint
+from (
+  select
+    card.id,
+    row_number() over (
+      order by
+        pg_catalog.sha256(
+          convert_to('gyeop-optional-assignment-v1', 'UTF8')
+          || decode('00', 'hex')
+          || convert_to('25200000-0000-4000-8000-000000000001', 'UTF8')
+          || decode('00', 'hex')
+          || convert_to(card.id, 'UTF8')
+        ),
+        card.position,
+        card.id
+    ) as selection_position
+  from public.pack_cards as card
+  where card.pack_version_id = '15151515-1515-4515-8515-151515151515'
+    and not exists (
+      select 1
+      from public.visitor_assignments as assignment
+      where assignment.response_id = '25200000-0000-4000-8000-000000000001'
+        and assignment.card_id = card.id
+    )
+) as ranked
+where ranked.selection_position <= 3;
+
+with fixed_time as (select clock_timestamp() as value)
+insert into public.pack_plays (
+  id,
+  pack_version_id,
+  management_secret_hash,
+  management_expires_at,
+  last_active_at,
+  status,
+  current_position,
+  completed_at
+) select
+  '25000000-0000-4000-8000-000000000002',
+  '15151515-1515-4515-8515-151515151515',
+  decode(repeat('12', 32), 'hex'),
+  value + interval '7 days',
+  value,
+  'completed',
+  10,
+  value
+from fixed_time;
+
+insert into public.share_links (
+  id,
+  public_id,
+  pack_play_id,
+  kind,
+  secret_hash,
+  status
+) values (
+  '25100000-0000-4000-8000-000000000002',
+  'LLLLLLLLLLLLLLLLLLLLLA',
+  '25000000-0000-4000-8000-000000000002',
+  'public',
+  decode(repeat('13', 32), 'hex'),
+  'active'
 );
+
+with fixed_time as (select clock_timestamp() as value)
+insert into public.visitor_responses (
+  id,
+  share_link_id,
+  pack_version_id,
+  relationship_code,
+  known_since_code,
+  status,
+  session_token_hash,
+  session_expires_at,
+  management_token_hash,
+  created_at,
+  submitted_at
+) select
+  '25200000-0000-4000-8000-000000000002',
+  '25100000-0000-4000-8000-000000000002',
+  '15151515-1515-4515-8515-151515151515',
+  'coworker',
+  'one_to_three_years',
+  'submitted',
+  decode(repeat('22', 32), 'hex'),
+  value + interval '24 hours',
+  decode(repeat('42', 32), 'hex'),
+  value,
+  value
+from fixed_time;
+
+insert into public.visitor_assignments (
+  response_id,
+  pack_version_id,
+  card_id,
+  stage,
+  position
+)
+select
+  '25200000-0000-4000-8000-000000000002',
+  '15151515-1515-4515-8515-151515151515',
+  expected.card_id,
+  'required',
+  expected.position
+from expected_optional_cards as expected;
 
 select is(
   public.assign_optional_cards(
@@ -153,6 +255,31 @@ select is(
   )->>'outcome',
   'assigned',
   'submitted response receives optional assignments'
+);
+
+select is(
+  public.record_visitor_response_event(
+    '25200000-0000-4000-8000-000000000001',
+    decode(repeat('21', 32), 'hex'),
+    'comparison_viewed'
+  )->>'outcome',
+  'recorded',
+  'late comparison event still records after the optional start request'
+);
+
+select is(
+  (
+    select array_agg(assignment.card_id order by assignment.position)
+    from public.visitor_assignments as assignment
+    where assignment.response_id = '25200000-0000-4000-8000-000000000001'
+      and assignment.stage = 'optional'
+  ),
+  (
+    select array_agg(expected.card_id order by expected.position)
+    from expected_optional_cards as expected
+    where expected.position <= 2
+  ),
+  'another owner play sample history cannot change optional selection'
 );
 
 select is(

@@ -817,7 +817,6 @@ visitor_optional_started as (
   from visitor_compared as compared
   join public.analytics_events as event
     on event.visitor_response_id = compared.visitor_response_id
-   and event.occurred_at >= compared.compared_at
   where event.event_name = 'optional_answers_started'
   group by compared.visitor_response_id, compared.pack_version
 ),
