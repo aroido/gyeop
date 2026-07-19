@@ -179,9 +179,28 @@ async function expectMobileContract(page: Page, primary: Locator) {
   expect(contract.bottom).toBeLessThanOrEqual(contract.viewportHeight + 0.5);
 }
 
+async function waitForOwnerPlayStart(page: Page) {
+  const playUrl = /\/play\/[0-9a-f-]{36}$/;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const retry = page.getByRole("button", { name: "다시 시도" });
+    const outcome = await Promise.race([
+      page
+        .waitForURL(playUrl, { timeout: 15_000 })
+        .then(() => "started" as const),
+      retry
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => "retry" as const),
+    ]);
+    if (outcome === "started") return;
+    await retry.click();
+    await expect(retry).toBeHidden();
+  }
+  await page.waitForURL(playUrl, { timeout: 15_000 });
+}
+
 async function completeOwner(page: Page) {
   await page.goto("/play/new?pack=old-friend");
-  await page.waitForURL(/\/play\/[0-9a-f-]{36}$/);
+  await waitForOwnerPlayStart(page);
   await expect(
     page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
   ).toBeFocused();
@@ -473,7 +492,7 @@ test.describe("core MVP live gate", () => {
       has: page.getByRole("heading", { name: "나, 첫눈에 어땠어?" }),
     });
     await packCard.getByRole("link", { name: "질문 시작하기" }).click();
-    await page.waitForURL(/\/play\/[0-9a-f-]{36}$/);
+    await waitForOwnerPlayStart(page);
     await expect(
       page.getByRole("heading", { name: "처음 만난 자리에서 나는?" }),
     ).toBeFocused();

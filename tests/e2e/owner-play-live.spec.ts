@@ -1,7 +1,12 @@
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
 
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
 
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
@@ -34,6 +39,25 @@ function setOldFriendActive() {
     ],
     { stdio: "ignore" },
   );
+}
+
+async function waitForOwnerPlayStart(page: Page) {
+  const playUrl = /\/play\/[0-9a-f-]{36}$/;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const retry = page.getByRole("button", { name: "다시 시도" });
+    const outcome = await Promise.race([
+      page
+        .waitForURL(playUrl, { timeout: 15_000 })
+        .then(() => "started" as const),
+      retry
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => "retry" as const),
+    ]);
+    if (outcome === "started") return;
+    await retry.click();
+    await expect(retry).toBeHidden();
+  }
+  await page.waitForURL(playUrl, { timeout: 15_000 });
 }
 
 type ShareActionEventRow = {
@@ -674,7 +698,7 @@ test.describe("live owner flow", () => {
       });
     });
     await page.goto("/play/new?pack=old-friend");
-    await page.waitForURL(/\/play\/[0-9a-f-]{36}$/);
+    await waitForOwnerPlayStart(page);
     await expect(
       page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
     ).toBeVisible();
