@@ -1,0 +1,116 @@
+.shell {
+  --lime: #dfff00;
+  --blue: #315cff;
+  display: grid;
+  min-height: 100svh;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem
+    max(1rem, env(safe-area-inset-bottom));
+  place-items: center;
+  overflow-x: clip;
+  background: #050505;
+  color: #fff;
+}
+
+.card {
+  width: min(100%, 28rem);
+  padding: clamp(1.1rem, 5vw, 1.5rem);
+  border: 1px solid #fff;
+  border-top: 0.65rem solid var(--lime);
+  border-radius: 1rem;
+  background: #0d0d0d;
+}
+
+.brand {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.card h1 {
+  margin: 0.7rem 0 0;
+  font-size: clamp(2rem, 10vw, 3rem);
+  line-height: 1.06;
+  letter-spacing: -0.07em;
+  word-break: keep-all;
+}
+
+.card h1:focus {
+  outline: none;
+}
+
+.card > p:not(.brand) {
+  margin: 0.9rem 0 1.2rem;
+  color: #c5c5c5;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.confirmation {
+  display: grid;
+  min-height: 3.5rem;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #666;
+  border-radius: 0.7rem;
+  background: #171717;
+  cursor: pointer;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.confirmation input {
+  width: 1.2rem;
+  height: 1.2rem;
+  margin: 0;
+  accent-color: var(--lime);
+}
+
+.confirmation:has(input:focus-visible) {
+  outline: 3px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.card a,
+.card button {
+  display: grid;
+  width: 100%;
+  min-height: 3rem;
+  margin-top: 1rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0.65rem;
+  background: var(--lime);
+  color: #050505;
+  font: inherit;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.card button:disabled {
+  background: #4b4b4b;
+  color: #a8a8a8;
+  cursor: not-allowed;
+}
+
+.card .secondary {
+  background: transparent;
+  color: #ddd;
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
+.card a:focus-visible,
+.card button:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card * {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}

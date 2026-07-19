@@ -255,6 +255,7 @@ export function startVisitorResponse(
     send(publicId, "start", {
       intent: "start",
       secret,
+      eligibilityConfirmed: true,
       relationshipCode,
       knownSinceCode,
     }),

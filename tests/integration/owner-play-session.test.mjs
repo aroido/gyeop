@@ -158,20 +158,33 @@ function visitorCookieFrom(response) {
 test("owner boundary failures are always private no-store", async () => {
   const invalidOrigin = await ownerRequest("/api/plays", {
     method: "POST",
-    body: { packSlug: "old-friend", entrySource: "home" },
+    body: {
+      packSlug: "old-friend",
+      entrySource: "home",
+      eligibilityConfirmed: true,
+    },
     headerOverrides: { origin: "https://evil.example" },
   });
   assert.equal(invalidOrigin.status, 403);
 
   const invalidInput = await ownerRequest("/api/plays", {
     method: "POST",
-    body: { packSlug: "old-friend", entrySource: "home", extra: true },
+    body: {
+      packSlug: "old-friend",
+      entrySource: "home",
+      eligibilityConfirmed: true,
+      extra: true,
+    },
   });
   assert.equal(invalidInput.status, 400);
 
   const invalidProxy = await ownerRequest("/api/plays", {
     method: "POST",
-    body: { packSlug: "old-friend", entrySource: "home" },
+    body: {
+      packSlug: "old-friend",
+      entrySource: "home",
+      eligibilityConfirmed: true,
+    },
     headerOverrides: {
       "x-forwarded-for": "198.51.100.1, 203.0.113.1",
     },
@@ -179,11 +192,62 @@ test("owner boundary failures are always private no-store", async () => {
   assert.equal(invalidProxy.status, 400);
 });
 
+test("new owner rejects eligibility bypasses without side effects", async () => {
+  const before = sql(
+    "select json_build_array((select count(*) from public.pack_plays), (select count(*) from public.analytics_events), (select count(*) from public.rate_limit_buckets))",
+    true,
+  );
+  const bodies = [
+    { packSlug: "first-impression", entrySource: "home" },
+    {
+      packSlug: "first-impression",
+      entrySource: "home",
+      eligibilityConfirmed: false,
+    },
+    {
+      packSlug: "first-impression",
+      entrySource: "home",
+      eligibilityConfirmed: "true",
+    },
+    {
+      packSlug: "first-impression",
+      entrySource: "home",
+      eligibilityConfirmed: 1,
+    },
+    {
+      packSlug: "first-impression",
+      entrySource: "home",
+      eligibilityConfirmed: true,
+      extra: true,
+    },
+  ];
+  for (const [index, body] of bodies.entries()) {
+    const response = await ownerRequest("/api/plays", {
+      method: "POST",
+      ip: `198.51.100.${120 + index}`,
+      body,
+    });
+    assert.equal(response.status, 400);
+    assert.equal(response.headers.get("set-cookie"), null);
+  }
+  assert.equal(
+    sql(
+      "select json_build_array((select count(*) from public.pack_plays), (select count(*) from public.analytics_events), (select count(*) from public.rate_limit_buckets))",
+      true,
+    ),
+    before,
+  );
+});
+
 test("inactive create returns PACK_NOT_FOUND without a cookie or quota row", async () => {
   const response = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.20",
-    body: { packSlug: "old-friend", entrySource: "home" },
+    body: {
+      packSlug: "old-friend",
+      entrySource: "home",
+      eligibilityConfirmed: true,
+    },
   });
   assert.equal(response.status, 404);
   assert.deepEqual(await response.json(), {
@@ -214,7 +278,11 @@ test("each additional pack completes the real owner, share, visitor, and profile
     const created = await ownerRequest("/api/plays", {
       method: "POST",
       ip,
-      body: { packSlug: pack.slug, entrySource: "home" },
+      body: {
+        packSlug: pack.slug,
+        entrySource: "home",
+        eligibilityConfirmed: true,
+      },
     });
     assert.equal(created.status, 201, `${pack.slug}: ${serverLog}`);
     const play = await created.json();
@@ -282,12 +350,76 @@ test("each additional pack completes the real owner, share, visitor, and profile
       kind,
     });
 
+    if (index === 0) {
+      const before = sql(
+        "select json_build_array((select count(*) from public.visitor_responses), (select count(*) from public.analytics_events), (select count(*) from public.rate_limit_buckets))",
+        true,
+      );
+      const bodies = [
+        {
+          intent: "start",
+          secret,
+          relationshipCode: "old_friend",
+          knownSinceCode: "ten_years_or_more",
+        },
+        {
+          intent: "start",
+          secret,
+          eligibilityConfirmed: false,
+          relationshipCode: "old_friend",
+          knownSinceCode: "ten_years_or_more",
+        },
+        {
+          intent: "start",
+          secret,
+          eligibilityConfirmed: "true",
+          relationshipCode: "old_friend",
+          knownSinceCode: "ten_years_or_more",
+        },
+        {
+          intent: "start",
+          secret,
+          eligibilityConfirmed: 1,
+          relationshipCode: "old_friend",
+          knownSinceCode: "ten_years_or_more",
+        },
+        {
+          intent: "start",
+          secret,
+          eligibilityConfirmed: true,
+          relationshipCode: "old_friend",
+          knownSinceCode: "ten_years_or_more",
+          extra: true,
+        },
+      ];
+      for (const body of bodies) {
+        const rejected = await ownerRequest(
+          `/api/invites/${publicId}/responses`,
+          {
+            method: "POST",
+            ip: "203.0.113.220",
+            body,
+          },
+        );
+        assert.equal(rejected.status, 400);
+        assert.equal(rejected.headers.get("set-cookie"), null);
+      }
+      assert.equal(
+        sql(
+          "select json_build_array((select count(*) from public.visitor_responses), (select count(*) from public.analytics_events), (select count(*) from public.rate_limit_buckets))",
+          true,
+        ),
+        before,
+      );
+    }
+
     const response = await ownerRequest(`/api/invites/${publicId}/responses`, {
       method: "POST",
       ip: `203.0.113.${41 + index}`,
       body: {
         intent: "start",
         secret,
+        eligibilityConfirmed: true,
         relationshipCode: "old_friend",
         knownSinceCode: "ten_years_or_more",
       },
@@ -357,7 +489,11 @@ test("each additional pack completes the real owner, share, visitor, and profile
       method: "POST",
       ip: `203.0.113.${41 + index}`,
       cookie: visitorCookie,
-      body: { packSlug: pack.slug, entrySource: "same_pack_cta" },
+      body: {
+        packSlug: pack.slug,
+        entrySource: "same_pack_cta",
+        eligibilityConfirmed: true,
+      },
     });
     assert.equal(converted.status, 201, `${pack.slug}: ${serverLog}`);
     const convertedBody = await converted.json();
@@ -385,7 +521,11 @@ test("owner can create, reload, save ten answers, complete, and cannot edit", as
   const created = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.21",
-    body: { packSlug: "old-friend", entrySource: "home" },
+    body: {
+      packSlug: "old-friend",
+      entrySource: "home",
+      eligibilityConfirmed: true,
+    },
   });
   assert.equal(created.status, 201, serverLog);
   const createdBody = await created.json();
@@ -484,7 +624,11 @@ test("nine saved answers remain a recoverable draft after incomplete completion"
   const created = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.22",
-    body: { packSlug: "old-friend", entrySource: "home" },
+    body: {
+      packSlug: "old-friend",
+      entrySource: "home",
+      eligibilityConfirmed: true,
+    },
   });
   assert.equal(created.status, 201);
   const body = await created.json();
@@ -529,7 +673,11 @@ test("an expired capability converges to the generic terminal response", async (
   const created = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.23",
-    body: { packSlug: "old-friend", entrySource: "home" },
+    body: {
+      packSlug: "old-friend",
+      entrySource: "home",
+      eligibilityConfirmed: true,
+    },
   });
   assert.equal(created.status, 201);
   const body = await created.json();
@@ -565,14 +713,22 @@ test("cross-play preserves a valid cookie while tamper and malformed cookies are
   const first = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.31",
-    body: { packSlug: "old-friend", entrySource: "home" },
+    body: {
+      packSlug: "old-friend",
+      entrySource: "home",
+      eligibilityConfirmed: true,
+    },
   });
   const firstBody = await first.json();
   const firstCookie = cookieFrom(first);
   const second = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.32",
-    body: { packSlug: "old-friend", entrySource: "home" },
+    body: {
+      packSlug: "old-friend",
+      entrySource: "home",
+      eligibilityConfirmed: true,
+    },
   });
   const secondCookie = cookieFrom(second);
 
@@ -612,7 +768,11 @@ test("create quota commits five orphan plays and the sixth response is 429", asy
       await ownerRequest("/api/plays", {
         method: "POST",
         ip: "203.0.113.99",
-        body: { packSlug: "old-friend", entrySource: "home" },
+        body: {
+          packSlug: "old-friend",
+          entrySource: "home",
+          eligibilityConfirmed: true,
+        },
       }),
     );
   }
@@ -631,7 +791,11 @@ test("logout revokes the DB capability, clears the cookie, and is idempotent", a
   const created = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.41",
-    body: { packSlug: "old-friend", entrySource: "home" },
+    body: {
+      packSlug: "old-friend",
+      entrySource: "home",
+      eligibilityConfirmed: true,
+    },
   });
   const body = await created.json();
   const cookie = cookieFrom(created);

@@ -331,6 +331,25 @@
   transform: rotate(12deg);
 }
 
+.ageNotice {
+  margin: 0;
+  color: #bdbdbd;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
+.ageNotice a {
+  color: #fff;
+  font-weight: 850;
+  text-underline-offset: 0.18rem;
+}
+
+.ageNotice a:focus-visible {
+  outline: 3px solid #315cff;
+  outline-offset: 3px;
+}
+
 @media (max-width: 21rem) {
   .frame {
     padding-inline: 0.75rem;
@@ -357,6 +376,10 @@
   }
 
   .brand {
+    grid-column: 1 / -1;
+  }
+
+  .ageNotice {
     grid-column: 1 / -1;
   }
 

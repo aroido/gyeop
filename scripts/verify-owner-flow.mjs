@@ -69,6 +69,24 @@ export function verifyOwnerFlow(root = ROOT) {
   }
   assert.match(client, /ownerFlowLoads\s*=\s*new Map/);
   assert.match(client, /bootstrapRequests\s*=\s*new Map/);
+  assert.match(client, /eligibilityConfirmed/);
+
+  const createRoute = readFileSync(
+    path.join(root, "app/api/plays/route.ts"),
+    "utf8",
+  );
+  assert.match(createRoute, /input\.eligibilityConfirmed !== true/);
+  const eligibility = readFileSync(
+    path.join(root, "app/components/eligibility-gate.tsx"),
+    "utf8",
+  );
+  for (const copy of [
+    "겹은 만 19세 이상만 이용할 수 있어요",
+    "만 19세 이상이며 대한민국에서 이용 중이에요.",
+    "답변이나 프로필은 저장되지 않았어요.",
+  ]) {
+    assert.ok(eligibility.includes(copy), `missing eligibility copy: ${copy}`);
+  }
 
   const stateCorePath = path.join(
     root,

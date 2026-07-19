@@ -696,10 +696,12 @@ test("browser client uses the exact read, save, submit, and event routes", async
 test("browser start single-flight sends one same-tick HTTP request", async () => {
   const originalFetch = globalThis.fetch;
   let calls = 0;
+  let requestBody;
   let release;
   try {
-    globalThis.fetch = () => {
+    globalThis.fetch = (_url, init) => {
       calls += 1;
+      requestBody = JSON.parse(init.body);
       return new Promise((resolve) => {
         release = () =>
           resolve(
@@ -723,6 +725,13 @@ test("browser start single-flight sends one same-tick HTTP request", async () =>
       "ten_years_or_more",
     );
     assert.equal(calls, 1);
+    assert.deepEqual(requestBody, {
+      intent: "start",
+      secret,
+      eligibilityConfirmed: true,
+      relationshipCode: "old_friend",
+      knownSinceCode: "ten_years_or_more",
+    });
     release();
     assert.deepEqual(await Promise.all([first, second]), [
       httpState,

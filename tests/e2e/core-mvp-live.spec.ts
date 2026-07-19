@@ -13,6 +13,7 @@ import {
 } from "@playwright/test";
 
 import { hashVisitorManagementSecret } from "../../lib/visitor-response/visitor-session-core.mjs";
+import { confirmEligibility } from "./eligibility-fixture";
 
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
@@ -251,6 +252,7 @@ async function waitForOwnerPlayStart(page: Page) {
 
 async function completeOwner(page: Page) {
   await page.goto("/play/new?pack=old-friend");
+  await confirmEligibility(page);
   await waitForOwnerPlayStart(page);
   await expect(
     page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
@@ -293,6 +295,7 @@ async function completeVisitor(
   });
   const page = await context.newPage();
   await page.goto(inviteUrl);
+  await confirmEligibility(page);
   await expect(
     page.getByRole("heading", { name: "이 사람과 어떤 사이인가요?" }),
   ).toBeFocused();
