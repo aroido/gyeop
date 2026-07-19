@@ -1,5 +1,12 @@
 # 제품 의사결정 기록
 
+## 2026-07-20 — 링크·사용자 데이터의 보관·완전 삭제 상한 확정
+
+- 결정: public link 30일, 1:1 link 7일 또는 첫 제출, 비로그인 owner inactivity 7일, visitor draft activity 24시간, submitted response와 로그인 owner inactivity 1년을 기본 보유 상한으로 정한다. 보유 종료부터 운영 DB hard-delete는 24시간, backup 잔존은 hard-delete부터 30일을 넘지 않는다. Auth adoption grace는 7일이고 owner-request·unclaimed Auth provider 삭제는 eligible 시점부터 24시간 안에 완료한다.
+- 이유: 같은-browser 비공개 핵심 루프의 복구 약속은 지키되 목적이 끝난 답변·token·식별자를 무기한 남기지 않고, 후속 schema·cleanup·계정 삭제·알림 구현이 공유할 하나의 수치 계약이 필요하다.
+- 결과: 철회 tombstone은 최소 4개 필드만 30일 유지하고, raw analytics는 30일, 비식별 집계는 1년 유지한다. rate-limit bucket은 window 종료+24시간에 cleanup eligible이 되고 다음 24시간 안에 삭제한다. notification은 terminal 직접 ID 제거→24시간 최소 tombstone→payload row→key reader 순서로 정리한다. 승인 일일 peak와 2배 staging fixture, reason별 overdue 0, 50% 경보·70% 재검토·4시간 catch-up을 release 기준으로 삼는다. 상세 SSOT는 `docs/product/data-retention-and-deletion-policy.md`다.
+- 출시 조건: 이 결정은 비공개 MVP의 잠정 제품 승인이다. 현행 한국 개인정보 법률 서면 검토, provider backup 30일 증빙, 2배 peak cleanup·격리 restore drill, 공개 privacy 연락 채널이 없으면 production beta를 열지 않는다.
+
 ## 2026-07-19 — 대한민국 우선 베타는 만 19세 이상만 참여
 
 - 결정: private MVP 모집과 production beta의 주인·무가입 방문자를 모두 `대한민국에서 이용하는 만 19세 이상`으로 제한한다. 보호자 동의 흐름을 제공하지 않고 생년월일·신분증·보호자 정보·IP geolocation을 수집하지 않으며, 새 play/response 생성 직전 exact 자기확인만 받는다.
@@ -148,4 +155,4 @@
 
 - 결정: 인증된 팩 주인이 자신의 계정과 연결된 live application 데이터를 삭제할 수 있어야 production beta를 연다.
 - 이유: 셀프 응답, 공유 링크, 방문자 응답이 한 owner의 팩 플레이에 연결되므로 계정만 비활성화하고 내용을 남기면 삭제 기대를 충족하지 못한다.
-- 결과: 정확한 데이터별 보관 기간과 backup 완전 삭제 시한은 별도 정책 결정으로 확정한다. 이 결정 전 계정 삭제 구현과 production release는 차단 상태를 유지한다.
+- 결과: 당시 미정이던 데이터별 보관 기간과 backup 완전 삭제 시한은 2026-07-20 결정과 `docs/product/data-retention-and-deletion-policy.md`로 확정했다. 계정 삭제 구현은 그 수치를 따르고 production release는 법률·provider·restore 증거가 마련될 때까지 차단한다.
