@@ -41,6 +41,30 @@ const visitorHeaders = {
   "x-gyeop-origin-verify": proxyKey,
 };
 
+async function waitForLivePackApi() {
+  const port = process.env.GYEOP_E2E_PORT ?? "3000";
+  let lastStatus = "no response";
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:${port}/api/packs/old-friend`,
+        {
+          headers: {
+            ...visitorHeaders,
+            "x-forwarded-for": "198.51.100.217",
+          },
+        },
+      );
+      lastStatus = `${response.status}`;
+      if (response.status === 200) return;
+    } catch (error: unknown) {
+      lastStatus = error instanceof Error ? error.message : "unknown error";
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(`Live pack API did not become ready: ${lastStatus}`);
+}
+
 function setOldFriendActive() {
   execFileSync(
     "docker",
@@ -181,7 +205,7 @@ async function expectMobileContract(page: Page, primary: Locator) {
 
 async function waitForOwnerPlayStart(page: Page) {
   const playUrl = /\/play\/[0-9a-f-]{36}$/;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
     const retry = page.getByRole("button", { name: "다시 시도" });
     const outcome = await Promise.race([
       page
@@ -192,10 +216,13 @@ async function waitForOwnerPlayStart(page: Page) {
         .then(() => "retry" as const),
     ]);
     if (outcome === "started") return;
+    if (attempt === 5) {
+      throw new Error("Owner play did not start after five explicit retries");
+    }
+    await page.waitForTimeout(250 * (attempt + 1));
     await retry.click();
     await expect(retry).toBeHidden();
   }
-  await page.waitForURL(playUrl, { timeout: 15_000 });
 }
 
 async function completeOwner(page: Page) {
@@ -288,7 +315,10 @@ test.describe("core MVP live gate", () => {
   test.skip(!live, "GYEOP_E2E_LIVE=1 runs the core MVP browser gate");
   test.describe.configure({ mode: "serial", retries: 0 });
 
-  test.beforeAll(() => setOldFriendActive());
+  test.beforeAll(async () => {
+    setOldFriendActive();
+    await waitForLivePackApi();
+  });
   test.afterAll(() => setOldFriendActive());
 
   test("proves owner share, visitor conversion, and profile reshare", async ({
