@@ -481,11 +481,14 @@ test.describe("core MVP live gate", () => {
   });
 
   test("completes a newly added pack through the real browser path", async ({
+    browser,
+    context,
     page,
   }) => {
-    test.setTimeout(90_000);
+    test.setTimeout(150_000);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ reducedMotion: "reduce" });
+    await installFailedClipboard(context);
     await page.goto("/");
 
     const packCard = page.locator("article").filter({
@@ -506,8 +509,33 @@ test.describe("core MVP live gate", () => {
     await page.getByRole("button", { name: "친구에게 공유하기" }).click();
     await expect(page.getByText("겹 · 나, 첫눈에 어땠어?")).toBeVisible();
 
+    await page.getByRole("button", { name: "공유 링크 만들기" }).click();
+    const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
+    expect(inviteUrl).toContain("/i/");
+
+    const visitor = await completeVisitor(browser, inviteUrl, {
+      ip: "198.51.100.240",
+      viewport: { width: 390, height: 844 },
+      relationship: "오래된 친구",
+      knownSince: "10년 이상이에요",
+    });
+    await expect(
+      visitor.page.getByText("겹 · 나, 첫눈에 어땠어?"),
+    ).toBeVisible();
+    const samePack = visitor.page.getByRole("link", {
+      name: "나도 이 팩으로 시작하기",
+    });
+    await samePack.click();
+    await waitForOwnerPlayStart(visitor.page);
+    await expect(
+      visitor.page.getByRole("heading", {
+        name: "처음 만난 자리에서 나는?",
+      }),
+    ).toBeFocused();
+
     await page.goto("/me");
     await expect(page.getByText("겹 · 나, 첫눈에 어땠어?")).toBeVisible();
     await expect(page.locator("article")).toHaveCount(10);
+    await visitor.context.close();
   });
 });

@@ -140,8 +140,8 @@ node --test tests/integration/share-link-concurrency.test.mjs
 node --test tests/integration/visitor-response-concurrency.test.mjs
 env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SECRET_KEY pnpm build
 node --test tests/integration/pack-runtime.test.mjs
-GYEOP_E2E_PORT=3110 pnpm test:e2e --project=mobile-chromium
 GYEOP_E2E_PORT=3110 pnpm test:e2e:live
+GYEOP_E2E_PORT=3110 pnpm test:e2e --project=mobile-chromium
 
 if [[ "$VERIFY_CLEAN" == "1" ]] &&
   [[ "$(git rev-parse HEAD)" == "$VERIFY_SHA" ]] &&
