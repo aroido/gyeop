@@ -23,8 +23,10 @@ function isRetryable(error: unknown) {
 
 export default function BootstrapOwnerPlay({
   pack,
+  entrySource,
 }: {
   pack: "old-friend" | null;
+  entrySource: "home" | "same_pack_cta";
 }) {
   const router = useRouter();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -35,7 +37,7 @@ export default function BootstrapOwnerPlay({
   useEffect(() => {
     if (!pack) return;
     let active = true;
-    void bootstrapOwnerPlay(pack)
+    void bootstrapOwnerPlay(pack, entrySource)
       .then((play) => {
         if (active) router.replace(`/play/${encodeURIComponent(play.id)}`);
       })
@@ -45,7 +47,7 @@ export default function BootstrapOwnerPlay({
     return () => {
       active = false;
     };
-  }, [attempt, pack, router]);
+  }, [attempt, entrySource, pack, router]);
 
   useEffect(() => {
     if (state !== "loading") headingRef.current?.focus();

@@ -16,11 +16,14 @@ test("bootstraps once and shows the first server-backed question", async ({
   const api = await installOwnerFlowApi(page);
   await openOwnerFlow(page, api);
 
-  expect(
-    api.calls.filter(
-      (call) => call.method === "POST" && call.pathname === "/api/plays",
-    ),
-  ).toHaveLength(1);
+  const createCalls = api.calls.filter(
+    (call) => call.method === "POST" && call.pathname === "/api/plays",
+  );
+  expect(createCalls).toHaveLength(1);
+  expect(createCalls[0]?.body).toEqual({
+    packSlug: "old-friend",
+    entrySource: "home",
+  });
   expect(api.calls.slice(0, 3).map((call) => call.pathname)).toEqual([
     "/api/plays",
     `/api/plays/${playId}`,
@@ -32,6 +35,18 @@ test("bootstraps once and shows the first server-backed question", async ({
     "rgb(223, 255, 0)",
   );
   await expect(page.locator('[data-state="auto"]')).toBeVisible();
+});
+
+test("reports the reviewed same-pack entry source", async ({ page }) => {
+  const api = await installOwnerFlowApi(page);
+  await page.goto("/play/new?pack=old-friend&source=same_pack_cta");
+  await page.waitForURL(`/play/${playId}`);
+
+  expect(
+    api.calls.find(
+      (call) => call.method === "POST" && call.pathname === "/api/plays",
+    )?.body,
+  ).toEqual({ packSlug: "old-friend", entrySource: "same_pack_cta" });
 });
 
 test("rejects a non-UUID play path without an owner API request", async ({

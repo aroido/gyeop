@@ -39,24 +39,44 @@ export type Database = {
           event_name: string;
           id: string;
           occurred_at: string;
+          owner_play_id: string | null;
           properties: Json;
+          share_link_id: string | null;
           visitor_response_id: string | null;
         };
         Insert: {
           event_name: string;
           id?: string;
           occurred_at?: string;
+          owner_play_id?: string | null;
           properties?: Json;
+          share_link_id?: string | null;
           visitor_response_id?: string | null;
         };
         Update: {
           event_name?: string;
           id?: string;
           occurred_at?: string;
+          owner_play_id?: string | null;
           properties?: Json;
+          share_link_id?: string | null;
           visitor_response_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "analytics_events_owner_play_id_fkey";
+            columns: ["owner_play_id"];
+            isOneToOne: false;
+            referencedRelation: "pack_plays";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "analytics_events_share_link_id_fkey";
+            columns: ["share_link_id"];
+            isOneToOne: false;
+            referencedRelation: "share_links";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "analytics_events_visitor_response_id_fkey";
             columns: ["visitor_response_id"];
@@ -529,6 +549,20 @@ export type Database = {
           p_new_play_id: string;
           p_new_secret_hash: string;
           p_pack_slug: string;
+        };
+        Returns: Json;
+      };
+      create_or_resume_play_with_source: {
+        Args: {
+          p_entry_source: string;
+          p_existing_play_id: string;
+          p_existing_secret_hash: string;
+          p_network_key: string;
+          p_new_play_id: string;
+          p_new_secret_hash: string;
+          p_pack_slug: string;
+          p_source_response_id: string;
+          p_source_session_hash: string;
         };
         Returns: Json;
       };

@@ -911,6 +911,41 @@ test("accepts the complete play-bound owner capability RPC set", () => {
   assert.deepEqual(verifyOwnerCapabilitySql(capabilitySql), []);
 });
 
+test("accepts only the reviewed event-wrapper delegation", () => {
+  const delegated = `${capabilitySql}
+alter function public.create_or_resume_play() set schema private;
+alter function private.create_or_resume_play() rename to create_or_resume_play_core;
+create function public.create_or_resume_play_with_source() returns jsonb language plpgsql as $$
+begin return private.create_or_resume_play_core(); end $$;
+create function public.create_or_resume_play() returns jsonb language sql as $$
+  select public.create_or_resume_play_with_source();
+$$;
+alter function public.complete_owner_play() set schema private;
+alter function private.complete_owner_play() rename to complete_owner_play_core;
+create function public.complete_owner_play() returns jsonb language plpgsql as $$
+begin return private.complete_owner_play_core(); end $$;
+`;
+  assert.deepEqual(verifyOwnerCapabilitySql(delegated), []);
+  assert.match(
+    verifyOwnerCapabilitySql(
+      delegated.replace(
+        "begin return private.create_or_resume_play_core(); end $$;",
+        "begin return '{}'::jsonb; end $$;",
+      ),
+    ).join("\n"),
+    /must call the play capability helper exactly once/,
+  );
+  assert.match(
+    verifyOwnerCapabilitySql(
+      delegated.replace(
+        "begin return private.complete_owner_play_core(); end $$;",
+        "begin perform 1; return private.complete_owner_play_core(); end $$;",
+      ),
+    ).join("\n"),
+    /must call the play capability helper exactly once/,
+  );
+});
+
 test("rejects missing, duplicated, Auth-anchored, and late owner capability guards", () => {
   assert.match(
     verifyOwnerCapabilitySql(

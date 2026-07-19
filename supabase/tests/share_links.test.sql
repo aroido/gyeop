@@ -674,13 +674,15 @@ select ok(
       and bool_and(position('share_link_copied' in policy.with_check) > 0)
       and bool_and(position('packVersion' in policy.with_check) > 0)
       and bool_and(position('linkKind' in policy.with_check) > 0)
+      and bool_and(position('owner_play_id IS NOT NULL' in policy.with_check) > 0)
+      and bool_and(position('share_link_id IS NOT NULL' in policy.with_check) > 0)
       and bool_and(position('properties - ARRAY[''packVersion''' in policy.with_check) > 0)
     from pg_catalog.pg_policies policy
     where policy.schemaname = 'public'
       and policy.tablename = 'analytics_events'
-      and policy.policyname = 'analytics_core_visitor_flow_internal_insert'
+      and policy.policyname = 'analytics_internal_insert_allowlist'
   ),
-  'analytics RLS retains the four share events and exact property keys'
+  'analytics RLS retains subject-aware share events and exact property keys'
 );
 
 select ok(
@@ -688,17 +690,16 @@ select ok(
     select count(*) = 1
       and bool_and(policy.roles = array['gyeop_internal_rpc']::name[])
       and bool_and(policy.cmd = 'INSERT')
-      and bool_and(position('profile_reshare_clicked' in policy.with_check) > 0)
-      and bool_and(position('profile_reshare' in policy.with_check) > 0)
-      and bool_and(position('entrySource' in policy.with_check) > 0)
-      and bool_and(position('share_handoff_succeeded' in policy.with_check) > 0)
-      and bool_and(position('share_link_copied' in policy.with_check) > 0)
+      and bool_and(policy.permissive = 'RESTRICTIVE')
+      and bool_and(position('relationshipCode' in policy.with_check) > 0)
+      and bool_and(position('knownSinceCode' in policy.with_check) > 0)
+      and bool_and(position('choice' in policy.with_check) > 0)
     from pg_catalog.pg_policies policy
     where policy.schemaname = 'public'
       and policy.tablename = 'analytics_events'
-      and policy.policyname = 'analytics_profile_reshare_internal_insert'
+      and policy.policyname = 'analytics_forbidden_payload_contract'
   ),
-  'profile reshare analytics policy is the exact additional allowlist'
+  'analytics RLS adds the exact restrictive privacy contract'
 );
 
 select * from finish();

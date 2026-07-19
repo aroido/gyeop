@@ -11,7 +11,7 @@ const OWNER_ACTOR_CORE_PATH = "lib/db/owner-mutation-actor-core.mjs";
 const ALLOWED_RPC_EXPORTS = new Map([
   ["consumeRateLimit", "consume_rate_limit"],
   ["getPublishedPack", "get_published_pack"],
-  ["createOrResumeOwnerPlay", "create_or_resume_play"],
+  ["createOrResumeOwnerPlay", "create_or_resume_play_with_source"],
   ["getOwnerPlay", "get_owner_play"],
   ["saveOwnerAnswer", "save_owner_answer"],
   ["completeOwnerPlay", "complete_owner_play"],
@@ -1287,7 +1287,8 @@ export function verifyOwnerMutationSql(sql, filePath = "migration.sql") {
   }
 
   for (const name of present) {
-    const parsed = extractSqlFunctions(sql, name).at(-1);
+    const definitions = extractSqlFunctions(sql, name);
+    const parsed = definitions.at(-1);
     if (!parsed) continue;
     if (
       ["create_share_link", "rotate_share_link", "disable_share_link"].includes(
@@ -1391,7 +1392,8 @@ export function verifyOwnerCapabilitySql(sql, filePath = "migration.sql") {
   }
 
   for (const name of present) {
-    const parsed = extractSqlFunctions(sql, name).at(-1);
+    const definitions = extractSqlFunctions(sql, name);
+    const parsed = definitions.at(-1);
     if (!parsed) continue;
     const body = parsed.body
       .replace(/--[^\n]*/g, "")
@@ -1399,7 +1401,40 @@ export function verifyOwnerCapabilitySql(sql, filePath = "migration.sql") {
     const calls = [
       ...body.matchAll(/private\s*\.\s*authorize_owner_play_capability\s*\(/gi),
     ];
-    if (calls.length !== 1) {
+    const priorGuarded = definitions.slice(0, -1).some((definition) => {
+      const priorCalls = definition.body.match(
+        /private\s*\.\s*authorize_owner_play_capability\s*\(/gi,
+      );
+      return priorCalls?.length === 1;
+    });
+    const sourceCreate = extractSqlFunctions(
+      sql,
+      "create_or_resume_play_with_source",
+    ).at(-1);
+    const delegated =
+      (name === "create_or_resume_play" &&
+        priorGuarded &&
+        /public\s*\.\s*create_or_resume_play_with_source\s*\(/i.test(body) &&
+        /private\s*\.\s*create_or_resume_play_core\s*\(/i.test(
+          sourceCreate?.body ?? "",
+        ) &&
+        /alter\s+function\s+public\.create_or_resume_play\s*\([\s\S]*?set\s+schema\s+private/i.test(
+          sql,
+        ) &&
+        /rename\s+to\s+create_or_resume_play_core/i.test(sql)) ||
+      (name === "complete_owner_play" &&
+        priorGuarded &&
+        /begin\s+(?:v_result\s*:=|return)\s+private\s*\.\s*complete_owner_play_core\s*\(/i.test(
+          body,
+        ) &&
+        /alter\s+function\s+public\.complete_owner_play\s*\([\s\S]*?set\s+schema\s+private/i.test(
+          sql,
+        ) &&
+        /rename\s+to\s+complete_owner_play_core/i.test(sql));
+    if (
+      (delegated && calls.length !== 0) ||
+      (!delegated && calls.length !== 1)
+    ) {
       findings.push(
         `${filePath}: ${name} must call the play capability helper exactly once`,
       );
@@ -1415,7 +1450,10 @@ export function verifyOwnerCapabilitySql(sql, filePath = "migration.sql") {
     }
   }
 
-  const create = extractSqlFunctions(sql, "create_or_resume_play").at(-1);
+  const creates = extractSqlFunctions(sql, "create_or_resume_play");
+  const create = [...creates]
+    .reverse()
+    .find((candidate) => candidate.body.includes("public.consume_rate_limit"));
   if (create) {
     const packNotFound = create.body.indexOf("pack_not_found");
     const consume = create.body.indexOf("public.consume_rate_limit");
@@ -1446,6 +1484,12 @@ export function verifyOwnerCapabilitySql(sql, filePath = "migration.sql") {
   const guardedShareFunctions = [
     ...presentShareFunctions,
     ...(new RegExp(
+      "function\\s+public\\.record_owner_share_action_with_source\\s*\\(",
+      "i",
+    ).test(sql)
+      ? ["record_owner_share_action_with_source"]
+      : []),
+    ...(new RegExp(
       "function\\s+public\\.record_owner_share_action\\s*\\(",
       "i",
     ).test(sql)
@@ -1461,7 +1505,20 @@ export function verifyOwnerCapabilitySql(sql, filePath = "migration.sql") {
     const calls = [
       ...body.matchAll(/private\s*\.\s*authorize_owner_play_capability\s*\(/gi),
     ];
-    if (calls.length !== 1) {
+    const delegatedTarget = extractSqlFunctions(
+      sql,
+      "record_owner_share_action_with_source",
+    ).at(-1);
+    const delegated =
+      name === "record_owner_share_action" &&
+      /public\s*\.\s*record_owner_share_action_with_source\s*\(/i.test(body) &&
+      (delegatedTarget?.body.match(
+        /private\s*\.\s*authorize_owner_play_capability\s*\(/gi,
+      )?.length ?? 0) === 1;
+    if (
+      (delegated && calls.length !== 0) ||
+      (!delegated && calls.length !== 1)
+    ) {
       findings.push(
         `${filePath}: ${name} must call the play capability helper exactly once`,
       );

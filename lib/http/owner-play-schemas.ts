@@ -15,6 +15,7 @@ const canonicalUuidV4 = z
 
 export const createOwnerPlaySchema = strictJsonObject({
   packSlug: lowerKebab,
+  entrySource: z.enum(["home", "same_pack_cta"]),
 });
 
 export const saveOwnerAnswerSchema = strictJsonObject({
