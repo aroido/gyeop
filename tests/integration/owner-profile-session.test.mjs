@@ -327,6 +327,12 @@ test("current-cookie-only profile auth is private and generic", async () => {
 });
 
 test("submitted public sights refresh live and reveal only at three samples", async () => {
+  const initialProfileViewCount = Number(
+    sql(
+      "select count(*) from public.analytics_events where event_name = 'profile_viewed'",
+      true,
+    ),
+  );
   const initialProfileReshareCount = Number(
     sql(
       "select count(*) from public.analytics_events where event_name = 'profile_reshare_clicked'",
@@ -379,6 +385,26 @@ test("submitted public sights refresh live and reveal only at three samples", as
       true,
     ),
     String(initialProfileReshareCount + 1),
+  );
+  assert.equal(
+    sql(
+      "select count(*) from public.analytics_events where event_name = 'profile_viewed'",
+      true,
+    ),
+    String(initialProfileViewCount + 1),
+  );
+  assert.equal(
+    sql(
+      `select min(viewed.occurred_at) <= min(clicked.occurred_at)
+       from public.analytics_events viewed
+       cross join public.analytics_events clicked
+       where viewed.event_name = 'profile_viewed'
+         and viewed.owner_play_id = '${owner.playId}'
+         and clicked.event_name = 'profile_reshare_clicked'
+         and clicked.owner_play_id = '${owner.playId}'`,
+      true,
+    ),
+    "t",
   );
 
   insertSubmittedResponse(publicLink, "a");

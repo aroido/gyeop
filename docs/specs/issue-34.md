@@ -24,6 +24,7 @@ Issue: https://github.com/aroido/gyeop/issues/34
 - `package.json`의 live E2E 명령과 `scripts/ai-verify`를 연결해 이 fixture 실패가 전체 검증·PR CI를 실패시킨다.
 - `docs/engineering/core-mvp-e2e-gate.md`에 자동 검증 범위와 키보드·focus·reduced motion 모바일 체크 기록을 남긴다.
 - gate가 발견한 비교 화면 focus 회귀는 `ResponseFlow`의 기존 heading ref를 사용해 최소 수정하고 mocked regression test로 고정한다.
+- CI에서 드러난 profile render-event·CTA click 경합은 click RPC가 같은 transaction에서 `profile_viewed`를 먼저 기록하도록 보강해 ordered funnel의 실제 사용자 race를 제거한다.
 
 ## 제외 범위
 
@@ -77,6 +78,7 @@ Issue: https://github.com/aroido/gyeop/issues/34
 8. stage count delta가 `owner_share=1/1/1`, `visitor_same_pack=4/4/1/1`, `profile_reshare=1/1/1/1`인지 확인한다. 네 번째 visitor도 required submit과 comparison cohort에 포함되므로 visitor 첫 두 stage는 4다.
 9. live E2E script와 full verifier에 새 gate를 연결하고 QA 체크 문서를 작성한다.
 10. live gate가 검출한 비교 화면 heading focus 누락을 수정하고 mocked visitor E2E에도 같은 assertion을 추가한다.
+11. 기존 owner live와 새 MVP live를 연속 실행해 profile CTA의 render/click 경합을 재현하고, profile click RPC의 원자적 view 선행과 통합 테스트로 고정한다.
 
 ## 완료 기준
 
@@ -84,6 +86,7 @@ Issue: https://github.com/aroido/gyeop/issues/34
 - [ ] 320/390/430px 모두 document 가로 overflow가 없고 확인한 primary CTA가 viewport에서 잘리지 않으며 interactive target이 44×44px 이상이다.
 - [ ] 관계 선택, 질문 이동, 비교 CTA, 프로필 재공유의 heading/focus 순서와 최소 한 번의 keyboard activation이 통과한다.
 - [ ] 방문자 제출 직후와 제출 완료 응답 reload 뒤 비교 결과 h1이 focus를 받는다.
+- [ ] profile render event 요청 완료 전에 CTA를 눌러도 `profile_viewed → profile_reshare_clicked` 순서가 같은 DB transaction에서 보장된다.
 - [ ] fixture context가 `prefers-reduced-motion: reduce`를 사용하고 앱이 이를 인식한다.
 - [ ] 핵심 owner/share/visitor/comparison/profile 화면의 axe `critical`/`serious` 위반이 0이다.
 - [ ] native share 미지원과 clipboard 실패가 성공 event를 만들지 않고 raw 링크를 유지하며, 같은 화면의 재시도 복사가 성공한다.

@@ -731,6 +731,18 @@ begin
     return jsonb_build_object('outcome', 'not_eligible');
   end if;
 
+  if p_event_name = 'profile_reshare_clicked' then
+    insert into public.analytics_events (
+      event_name,
+      owner_play_id,
+      properties
+    ) values (
+      'profile_viewed',
+      p_play_id,
+      jsonb_build_object('packVersion', v_pack_version)
+    );
+  end if;
+
   insert into public.analytics_events (
     event_name,
     owner_play_id,
