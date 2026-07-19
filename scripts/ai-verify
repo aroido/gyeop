@@ -48,9 +48,37 @@ cleanup() {
 }
 trap cleanup EXIT
 
+harness_tests_required() {
+  local base=""
+  local merge_base=""
+  local candidate=""
+
+  if [[ -n "$(git status --porcelain -- scripts/task-harness.mjs scripts/task-harness.test.mjs)" ]]; then
+    return 0
+  fi
+
+  for candidate in "${GYEOP_VERIFY_BASE_REF:-}" origin/main main; do
+    [[ -n "$candidate" ]] || continue
+    if git rev-parse --verify --quiet "$candidate" >/dev/null; then
+      base="$candidate"
+      break
+    fi
+  done
+  [[ -n "$base" ]] || return 0
+
+  merge_base="$(git merge-base "$base" HEAD)" || return 0
+  ! git diff --quiet "$merge_base" HEAD -- \
+    scripts/task-harness.mjs \
+    scripts/task-harness.test.mjs
+}
+
 python3 "$ROOT/scripts/verify_project.py"
 node --check "$ROOT/scripts/task-harness.mjs"
-node --test "$ROOT/scripts/task-harness.test.mjs"
+if harness_tests_required; then
+  node --test "$ROOT/scripts/task-harness.test.mjs"
+else
+  echo "Skipping unchanged task-harness regression tests."
+fi
 sh -n "$ROOT/scripts/task-harness"
 sh -n "$ROOT/scripts/install-codex-skills"
 

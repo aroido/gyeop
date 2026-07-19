@@ -1676,16 +1676,6 @@ function qaFailures(file) {
     failures.push("QA must contain one exact `P0/P1 Findings: 0` field");
   }
   if (/\[(P0|P1)\]/.test(text)) failures.push("P0/P1 findings block merge");
-  const fullVerifyResults = [
-    ...text.matchAll(
-      /^- Command:[ \t]*\.\/scripts\/run-ai-verify --mode full[ \t]*\r?\n- Result:[ \t]*([^\r\n]*)$/gm,
-    ),
-  ].map((match) => match[1].trim());
-  if (fullVerifyResults.length !== 1 || fullVerifyResults[0] !== "PASS") {
-    failures.push(
-      "QA must contain one exact full verification command block with `Result: PASS`",
-    );
-  }
   return failures;
 }
 
@@ -1876,6 +1866,16 @@ function checkStateFailures(checkRuns = [], statuses = []) {
       );
     }
   }
+  if (
+    !checkRuns.some(
+      (check) =>
+        check.name === "verify" &&
+        check.status === "completed" &&
+        check.conclusion === "success",
+    )
+  ) {
+    failures.push("required verify CI check is missing or not successful");
+  }
   return failures;
 }
 
@@ -1897,6 +1897,15 @@ function closingIssueNumbers(body) {
   return [Number(explicit)];
 }
 
+function verificationShaFromBody(body) {
+  const matches = [
+    ...String(body || "").matchAll(
+      /^- 검증 HEAD:[ \t]*`?([0-9a-f]{40,64})`?[ \t]*$/gim,
+    ),
+  ].map((match) => match[1].toLowerCase());
+  return matches.length === 1 ? matches[0] : "";
+}
+
 function prRelationFailures(pr, expected) {
   const failures = [];
   if (pr.base?.ref !== expected.mainBranch)
@@ -1912,6 +1921,12 @@ function prRelationFailures(pr, expected) {
     failures.push(`PR head branch must be ${expected.branch}`);
   if (expected.sha && pr.head?.sha !== expected.sha)
     failures.push(`PR head SHA must be ${expected.sha}`);
+  if (
+    expected.verifiedSha &&
+    verificationShaFromBody(pr.body) !== expected.verifiedSha
+  ) {
+    failures.push(`PR body must record verified SHA ${expected.verifiedSha}`);
+  }
   const closingNumbers = closingIssueNumbers(pr.body);
   if (
     closingNumbers.length !== 1 ||
@@ -2093,20 +2108,6 @@ function createPr(issueNumber) {
   const qaFile = qaPathForIssue(issue);
   assertGate("spec", specFile, specFailures(specFile));
   assertGate("qa", qaFile, qaFailures(qaFile));
-  const body = [
-    `Closes #${issue.number}`,
-    "",
-    "## 요약",
-    `- 이슈 #${issue.number} 작업을 스펙 -> 구현 -> QA -> 전체 검증 흐름으로 처리했습니다.`,
-    "",
-    "## 산출물",
-    `- 스펙: ${specFile}`,
-    `- QA: ${qaFile}`,
-    "- 검증: `./scripts/run-ai-verify --mode full`",
-    "",
-    "## 메모",
-    "- `scripts/task-harness pr`로 생성했습니다.",
-  ].join("\n");
   const expected = {
     repo,
     mainBranch,
@@ -2139,13 +2140,37 @@ function createPr(issueNumber) {
     );
   }
   run("git", ["branch", "--set-upstream-to", `origin/${branch}`, branch]);
-  const verifiedExpected = { ...expected, sha: verifiedSha };
+  const body = [
+    `Closes #${issue.number}`,
+    "",
+    "## 요약",
+    `- 이슈 #${issue.number} 작업을 스펙 -> 구현 -> QA -> 전체 검증 흐름으로 처리했습니다.`,
+    "",
+    "## 산출물",
+    `- 스펙: ${specFile}`,
+    `- QA: ${qaFile}`,
+    "- 검증: `./scripts/run-ai-verify --mode full`",
+    `- 검증 HEAD: \`${verifiedSha}\``,
+    "",
+    "## 메모",
+    "- `scripts/task-harness pr`로 생성했습니다.",
+  ].join("\n");
+  const verifiedExpected = {
+    ...expected,
+    sha: verifiedSha,
+    verifiedSha,
+  };
 
   let pr;
   let reused = false;
   if (recheckedExisting) {
     const refreshed = ghApi("GET", prEndpoint(recheckedExisting.number));
-    pr = readyVerifiedPr(refreshed, verifiedExpected);
+    assertReusablePr(refreshed, { ...expected, sha: verifiedSha });
+    pr =
+      verificationShaFromBody(refreshed.body) === verifiedSha
+        ? refreshed
+        : ghApi("PATCH", prEndpoint(refreshed.number), { body });
+    pr = readyVerifiedPr(pr, verifiedExpected);
     reused = true;
   } else {
     assertOriginRepo();
@@ -2251,13 +2276,16 @@ function mergePr(prNumber) {
   assertIssueStatus(issue, "status:qa");
   const baseSha = pr.base?.sha;
   if (!baseSha) throw new Error("PR base SHA is missing");
+  const verifiedSha = pr.head?.sha;
+  if (!verifiedSha) throw new Error("PR head SHA is missing");
   assertPrRelation(pr, {
     repo,
     mainBranch,
     baseSha,
     issueNumber: issue.number,
     branch,
-    sha: pr.head?.sha,
+    sha: verifiedSha,
+    verifiedSha,
     requireOpen: true,
     requireMergeable: true,
   });
@@ -2266,10 +2294,11 @@ function mergePr(prNumber) {
   assertGate("spec", specFile, specFailures(specFile));
   assertGate("qa", qaFile, qaFailures(qaFile));
   const guardedFiles = [specFile, qaFile];
-  const verifiedSha = verifyCheckout(
-    { branch, sha: pr.head.sha },
+  const guardedSnapshot = fileSnapshot(guardedFiles);
+  assertCheckout(
+    checkoutState(),
+    { branch, sha: verifiedSha },
     "merge checkout",
-    guardedFiles,
   );
   assertIssueStatus(getIssue(issue.number), "status:qa");
   assertGate("spec", specFile, specFailures(specFile));
@@ -2283,6 +2312,7 @@ function mergePr(prNumber) {
     issueNumber: issue.number,
     branch,
     sha: verifiedSha,
+    verifiedSha,
     requireOpen: true,
     requireMergeable: true,
   });
@@ -2303,12 +2333,21 @@ function mergePr(prNumber) {
     issueNumber: issue.number,
     branch,
     sha: verifiedSha,
+    verifiedSha,
     requireOpen: true,
     requireMergeable: true,
   });
 
   assertOriginRepo();
   assertIssueStatus(getIssue(issue.number), "status:qa");
+  assertCheckout(
+    checkoutState(),
+    { branch, sha: verifiedSha },
+    "merge checkout before merge",
+  );
+  assertFilesUnchanged(guardedSnapshot, "merge checkout");
+  assertGate("spec", specFile, specFailures(specFile));
+  assertGate("qa", qaFile, qaFailures(qaFile));
   const merged = ghApi("PUT", `${prEndpoint(prNumber)}/merge`, {
     merge_method: "squash",
     commit_title: pr.title,
@@ -2327,6 +2366,7 @@ function mergePr(prNumber) {
     issueNumber: issue.number,
     branch,
     sha: verifiedSha,
+    verifiedSha,
     requireMerged: true,
   });
   if (mergedPr.merge_commit_sha !== merged.sha) {
