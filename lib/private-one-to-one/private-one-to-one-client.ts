@@ -2,6 +2,8 @@ import {
   decodePrivateOneToOneComparison,
   decodePrivateOneToOneList,
 } from "./private-one-to-one-core.mjs";
+import { isOwnerPlayId } from "../owner-play/owner-play-state-core.mjs";
+import { isVisitorResponseId } from "../visitor-response/visitor-context-core.mjs";
 import type {
   PrivateOneToOneComparison,
   PrivateOneToOneResponseRow,
@@ -27,6 +29,9 @@ const pendingComparisons = new Map<
 >();
 
 async function readJson(response: Response) {
+  if (response.headers.get("cache-control") !== "private, no-store") {
+    throw new PrivateOneToOneHttpError(response.status);
+  }
   if (!response.ok) throw new PrivateOneToOneHttpError(response.status);
   try {
     return await response.json();
@@ -38,11 +43,14 @@ async function readJson(response: Response) {
 export function listPrivateOneToOneResponses(
   playId: string,
 ): Promise<readonly PrivateOneToOneResponseRow[]> {
+  if (!isOwnerPlayId(playId)) {
+    return Promise.reject(new PrivateOneToOneHttpError(400));
+  }
   const existing = pendingLists.get(playId);
   if (existing) return existing;
   const request = fetch(
     `/api/me/plays/${encodeURIComponent(playId)}/responses?kind=one_to_one`,
-    { method: "GET", cache: "no-store" },
+    { method: "GET", cache: "no-store", credentials: "same-origin" },
   )
     .then(readJson)
     .then((value) => decodePrivateOneToOneList(value).responses)
@@ -54,11 +62,15 @@ export function listPrivateOneToOneResponses(
 export function getPrivateOneToOneComparison(
   responseId: string,
 ): Promise<PrivateOneToOneComparison> {
+  if (!isVisitorResponseId(responseId)) {
+    return Promise.reject(new PrivateOneToOneHttpError(400));
+  }
   const existing = pendingComparisons.get(responseId);
   if (existing) return existing;
   const request = fetch(`/api/me/responses/${encodeURIComponent(responseId)}`, {
     method: "GET",
     cache: "no-store",
+    credentials: "same-origin",
   })
     .then(readJson)
     .then((value) => decodePrivateOneToOneComparison(value))

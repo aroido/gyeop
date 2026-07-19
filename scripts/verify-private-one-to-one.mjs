@@ -68,6 +68,10 @@ export function verifyPrivateOneToOne() {
   assert.match(core, /requiredCount !== 3/);
   assert.match(core, /highlightCount !== \(mismatchCount === 0 \? 0 : 1\)/);
 
+  const client = source("lib/private-one-to-one/private-one-to-one-client.ts");
+  assert.match(client, /cache-control.*private, no-store/s);
+  assert.match(client, /credentials: "same-origin"/);
+
   const panel = source("app/me/plays/[playId]/private-one-to-one-panel.tsx");
   for (const copy of [
     "1:1로 본 우리",

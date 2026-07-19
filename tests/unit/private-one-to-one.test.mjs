@@ -114,6 +114,12 @@ test("strictly decodes sanitized list rows and withdrawn tombstones", () => {
     { responses: [{ ...submitted, relationshipCode: null }] },
     { responses: [{ ...withdrawn, relationshipCode: "old_friend" }] },
     { responses: [withdrawn, submitted] },
+    {
+      responses: [
+        { ...withdrawn, submittedAt: submitted.submittedAt },
+        submitted,
+      ],
+    },
     { responses: [submitted, submitted] },
   ]) {
     assert.throws(() => decodePrivateOneToOneList(invalid));
@@ -207,7 +213,11 @@ test("uses exact no-store endpoints and single-flights browser reads", async () 
     assert.deepEqual(await first, [submitted]);
     assert.deepEqual(calls[0], {
       url: "/api/me/plays/27000000-0000-4000-8000-000000000001/responses?kind=one_to_one",
-      init: { method: "GET", cache: "no-store" },
+      init: {
+        method: "GET",
+        cache: "no-store",
+        credentials: "same-origin",
+      },
     });
 
     const detail = getPrivateOneToOneComparison(responseId);
@@ -221,13 +231,41 @@ test("uses exact no-store endpoints and single-flights browser reads", async () 
 
 test("maps private read failures to status-only errors", async () => {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = async () => Response.json({}, { status: 404 });
+  globalThis.fetch = async () =>
+    Response.json(
+      {},
+      {
+        status: 404,
+        headers: { "Cache-Control": "private, no-store" },
+      },
+    );
   try {
     await assert.rejects(
       getPrivateOneToOneComparison(responseId),
       (error) =>
         error instanceof PrivateOneToOneHttpError && error.status === 404,
     );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("rejects invalid identifiers and cacheable responses before decoding", async () => {
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return Response.json({ responses: [] });
+  };
+  try {
+    await assert.rejects(listPrivateOneToOneResponses("bad-id"));
+    await assert.rejects(getPrivateOneToOneComparison("bad-id"));
+    assert.equal(calls, 0);
+    await assert.rejects(
+      listPrivateOneToOneResponses("27000000-0000-4000-8000-000000000001"),
+      (error) => error instanceof PrivateOneToOneHttpError,
+    );
+    assert.equal(calls, 1);
   } finally {
     globalThis.fetch = originalFetch;
   }
