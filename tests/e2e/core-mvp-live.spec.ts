@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
+import { randomBytes, randomUUID } from "node:crypto";
 
 import AxeBuilder from "@axe-core/playwright";
 import {
@@ -10,6 +11,8 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
+
+import { hashVisitorManagementSecret } from "../../lib/visitor-response/visitor-session-core.mjs";
 
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
@@ -83,6 +86,27 @@ function setOldFriendActive() {
     ],
     { stdio: "ignore" },
   );
+}
+
+function sql(query: string) {
+  return execFileSync(
+    "docker",
+    [
+      "exec",
+      databaseContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-At",
+      "-c",
+      query,
+    ],
+    { encoding: "utf8" },
+  ).trim();
 }
 
 function readCoreFunnelStageCounts() {
@@ -580,5 +604,194 @@ test.describe("core MVP live gate", () => {
     await expect(page.getByText("겹 · 처음 만난 너의 시선")).toBeVisible();
     await expect(page.locator("article")).toHaveCount(10);
     await visitor.context.close();
+  });
+
+  test("withdraws a visitor response through its copied management link", async ({
+    browser,
+    context,
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await installFailedClipboard(context);
+    await completeOwner(page);
+    await page.getByRole("button", { name: "공유 링크 만들기" }).click();
+    const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
+
+    const visitor = await completeVisitor(browser, inviteUrl, {
+      ip: "198.51.100.241",
+      viewport: { width: 390, height: 844 },
+      relationship: "가족",
+      knownSince: "1년 이상 · 3년 미만",
+    });
+    await visitor.page.evaluate(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: async () => {
+            throw new Error("clipboard failed");
+          },
+        },
+      });
+    });
+    const responseId = await visitor.page.evaluate(() => {
+      const key = Object.keys(localStorage).find((candidate) =>
+        candidate.startsWith("gyeop:visitor-management:v1:"),
+      );
+      return key?.slice("gyeop:visitor-management:v1:".length) ?? null;
+    });
+    expect(responseId).toMatch(/^[0-9a-f-]{36}$/);
+    await visitor.page
+      .getByRole("button", { name: "내 관리 링크 복사" })
+      .click();
+    const managementUrl = await visitor.page
+      .getByRole("textbox", { name: "직접 복사하기" })
+      .inputValue();
+    expect(managementUrl).toMatch(/\/responses\/manage#token=/);
+
+    await page.goto("/me");
+    await expect(page.getByText("시선을 모으는 중 · 1/3")).toHaveCount(3);
+
+    await visitor.page.goto(managementUrl);
+    await expect(
+      visitor.page.getByRole("heading", { name: "이 답변을 지울까요?" }),
+    ).toBeVisible();
+    expect(visitor.page.url()).not.toContain("#token=");
+    await visitor.page
+      .getByRole("button", { name: "이 답변 철회하기" })
+      .click();
+    await expect(
+      visitor.page.getByRole("heading", { name: "답변을 철회했어요" }),
+    ).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByText("시선을 모으는 중 · 0/3")).toHaveCount(10);
+
+    const oldSession = await visitor.context.request.get(
+      `/api/responses/${responseId}`,
+    );
+    expect(oldSession.status()).toBe(404);
+    expect((await oldSession.json()).code).toBe("INVITE_UNAVAILABLE");
+
+    await visitor.page.goto(managementUrl);
+    await visitor.page
+      .getByRole("button", { name: "이 답변 철회하기" })
+      .click();
+    await expect(
+      visitor.page.getByRole("heading", {
+        name: "이 관리 링크는 사용할 수 없어요",
+      }),
+    ).toBeVisible();
+    await visitor.context.close();
+  });
+
+  test("rate limits before resolving a valid withdrawal capability", async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    const playId = randomUUID();
+    const linkId = randomUUID();
+    const responseId = randomUUID();
+    const publicId = randomBytes(16).toString("base64url");
+    const ownerHash = randomBytes(32).toString("hex");
+    const shareHash = randomBytes(32).toString("hex");
+    const sessionHash = randomBytes(32).toString("hex");
+    const managementToken = randomBytes(32).toString("base64url");
+    const managementHash =
+      hashVisitorManagementSecret(managementToken).toString("hex");
+    const wrongTokens = Array.from({ length: 5 }, () =>
+      randomBytes(32).toString("base64url"),
+    );
+
+    sql(`
+      delete from public.rate_limit_buckets
+      where action = 'response_withdraw';
+      with fixed_time as (select clock_timestamp() as value)
+      insert into public.pack_plays (
+        id, pack_version_id, management_secret_hash, management_expires_at,
+        last_active_at, status, current_position, completed_at
+      ) select '${playId}', '15151515-1515-4515-8515-151515151515',
+        decode('${ownerHash}', 'hex'), value + interval '7 days', value,
+        'completed', 10, value
+      from fixed_time;
+      insert into public.share_links (
+        id, public_id, pack_play_id, kind, secret_hash
+      ) values (
+        '${linkId}', '${publicId}', '${playId}', 'public',
+        decode('${shareHash}', 'hex')
+      );
+      with fixed_time as (select clock_timestamp() as value)
+      insert into public.visitor_responses (
+        id, share_link_id, pack_version_id, relationship_code,
+        known_since_code, status, session_token_hash, session_expires_at,
+        management_token_hash, created_at, submitted_at
+      ) select '${responseId}', '${linkId}',
+        '15151515-1515-4515-8515-151515151515', 'old_friend',
+        'ten_years_or_more', 'submitted', decode('${sessionHash}', 'hex'),
+        value + interval '24 hours', decode('${managementHash}', 'hex'),
+        value, value
+      from fixed_time;
+    `);
+
+    await page.goto("/");
+    const outcomes = await page.evaluate(async (tokens) => {
+      const values = [];
+      for (const token of tokens) {
+        const response = await fetch("/api/responses/withdraw", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+        values.push({
+          status: response.status,
+          code: (await response.json()).code as string,
+        });
+      }
+      return values;
+    }, wrongTokens);
+    expect(outcomes).toEqual(
+      wrongTokens.map(() => ({
+        status: 404,
+        code: "RESPONSE_MANAGEMENT_UNAVAILABLE",
+      })),
+    );
+
+    const limited = await page.evaluate(async (token) => {
+      const response = await fetch("/api/responses/withdraw", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      return {
+        status: response.status,
+        code: (await response.json()).code as string,
+        retryAfter: response.headers.get("retry-after"),
+      };
+    }, managementToken);
+    expect(limited.status).toBe(429);
+    expect(limited.code).toBe("RATE_LIMITED");
+    expect(limited.retryAfter).toMatch(/^[1-9][0-9]*$/);
+    expect(
+      sql(`
+        select status || ':' || (management_token_hash is not null)::text
+        from public.visitor_responses
+        where id = '${responseId}'
+      `),
+    ).toBe("submitted:true");
+
+    sql(`
+      delete from public.rate_limit_buckets
+      where action = 'response_withdraw'
+    `);
+    const withdrawn = await page.evaluate(async (token) => {
+      const response = await fetch("/api/responses/withdraw", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      return response.status;
+    }, managementToken);
+    expect(withdrawn).toBe(204);
   });
 });

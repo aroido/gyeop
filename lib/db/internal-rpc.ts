@@ -33,6 +33,7 @@ import {
   decodeSaveResponseAnswerOutcome,
   decodeStartResponseOutcome,
   decodeSubmitResponseOutcome,
+  decodeWithdrawResponseOutcome,
 } from "../visitor-response/visitor-session-core.mjs";
 
 let internalClient: SupabaseClient<Database> | undefined;
@@ -803,5 +804,20 @@ export async function recordVisitorResponseEvent(input: {
   if (error) throw new Error("Internal visitor response RPC failed");
   return decodeRecordVisitorResponseEventOutcome(data) as Readonly<{
     outcome: "recorded" | "session_invalid";
+  }>;
+}
+
+export async function withdrawResponse(input: {
+  managementHash: Uint8Array;
+  signal?: AbortSignal;
+}) {
+  let query = getInternalClient().rpc("withdraw_response", {
+    p_management_hash: bytea(input.managementHash),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal visitor withdrawal RPC failed");
+  return decodeWithdrawResponseOutcome(data) as Readonly<{
+    outcome: "withdrawn" | "unavailable";
   }>;
 }

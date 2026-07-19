@@ -458,13 +458,13 @@ export type Database = {
       };
       visitor_responses: {
         Row: {
-          created_at: string;
+          created_at: string | null;
           id: string;
           known_since_code: string | null;
           management_token_hash: string | null;
-          pack_version_id: string;
+          pack_version_id: string | null;
           relationship_code: string | null;
-          session_expires_at: string;
+          session_expires_at: string | null;
           session_token_hash: string | null;
           share_link_id: string;
           status: string;
@@ -472,13 +472,13 @@ export type Database = {
           withdrawn_at: string | null;
         };
         Insert: {
-          created_at?: string;
+          created_at?: string | null;
           id: string;
           known_since_code?: string | null;
           management_token_hash?: string | null;
-          pack_version_id: string;
+          pack_version_id?: string | null;
           relationship_code?: string | null;
-          session_expires_at: string;
+          session_expires_at?: string | null;
           session_token_hash?: string | null;
           share_link_id: string;
           status?: string;
@@ -486,13 +486,13 @@ export type Database = {
           withdrawn_at?: string | null;
         };
         Update: {
-          created_at?: string;
+          created_at?: string | null;
           id?: string;
           known_since_code?: string | null;
           management_token_hash?: string | null;
-          pack_version_id?: string;
+          pack_version_id?: string | null;
           relationship_code?: string | null;
-          session_expires_at?: string;
+          session_expires_at?: string | null;
           session_token_hash?: string | null;
           share_link_id?: string;
           status?: string;
@@ -726,6 +726,7 @@ export type Database = {
         };
         Returns: Json;
       };
+      withdraw_response: { Args: { p_management_hash: string }; Returns: Json };
     };
     Enums: {
       [_ in never]: never;

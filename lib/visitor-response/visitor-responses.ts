@@ -8,6 +8,7 @@ import {
   saveResponseAnswer,
   startResponse,
   submitResponse,
+  withdrawResponse,
   type VisitorResponseState,
 } from "../db/internal-rpc.ts";
 import type { ParsedVisitorResponseCookie } from "./visitor-response-session.ts";
@@ -280,6 +281,16 @@ export async function recordVisitorEvent(input: {
     responseId: input.cookie.responseId,
     sessionTokenHash: input.cookie.sessionTokenHash,
     event: input.event,
+    signal: input.signal,
+  });
+}
+
+export function withdrawVisitorResponse(input: {
+  managementSecret: string;
+  signal?: AbortSignal;
+}) {
+  return withdrawResponse({
+    managementHash: hashVisitorManagementSecret(input.managementSecret),
     signal: input.signal,
   });
 }

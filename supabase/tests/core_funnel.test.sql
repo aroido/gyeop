@@ -286,12 +286,15 @@ select ok(
   'same-pack click transaction commits comparison first'
 );
 
-update public.visitor_responses
-set status = 'withdrawn',
-    session_token_hash = null,
-    management_token_hash = null,
-    withdrawn_at = clock_timestamp()
-where id = '31200000-0000-4000-8000-000000000001';
+set local role service_role;
+
+select is(
+  public.withdraw_response(decode(repeat('05', 32), 'hex'))->>'outcome',
+  'withdrawn',
+  'withdrawal uses the private management capability'
+);
+
+reset role;
 
 select is(
   (

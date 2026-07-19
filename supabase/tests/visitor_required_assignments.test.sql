@@ -24,7 +24,7 @@ select ok(
   has_table_privilege('gyeop_internal_rpc', 'public.visitor_assignments', 'SELECT')
   and has_table_privilege('gyeop_internal_rpc', 'public.visitor_assignments', 'INSERT')
   and not has_table_privilege('gyeop_internal_rpc', 'public.visitor_assignments', 'UPDATE')
-  and not has_table_privilege('gyeop_internal_rpc', 'public.visitor_assignments', 'DELETE'),
+  and has_table_privilege('gyeop_internal_rpc', 'public.visitor_assignments', 'DELETE'),
   'internal role has the exact visitor assignment table allowlist'
 );
 select ok(
@@ -53,6 +53,7 @@ select is(
       and tablename = 'visitor_assignments'
   ),
   array[
+    'visitor_assignments_internal_delete',
     'visitor_assignments_internal_insert',
     'visitor_assignments_internal_select'
   ]::name[],
