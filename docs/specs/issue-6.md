@@ -37,7 +37,7 @@ Issue: https://github.com/aroido/gyeop/issues/6
 - 대한민국 `개인정보 보호법` 제22조의2: 만 14세 미만 아동의 개인정보 처리에 동의가 필요한 경우 법정대리인 동의와 그 확인을 요구하고, 아동 고지는 이해하기 쉬운 언어를 요구한다.
   - https://www.law.go.kr/LSW/lsSideInfoP.do?docCls=jo&joBrNo=02&joNo=0022&lsiSeq=270351&urlMode=lsScJoRltInfoR
 - 대한민국 `개인정보 보호법 시행령` 제17조의2: 법정대리인 동의를 확인하는 구체적 방법을 둔다. 2026-07-19에 `[시행 2026. 5. 19.] [대통령령 제36340호]` 현재 통합 조문을 확인했다.
-  - https://law.go.kr/lsLinkCommonInfo.do?chrClsCd=010202&lspttninfSeq=143411
+  - https://www.law.go.kr/LSW/lsSideInfoP.do?docCls=jo&joBrNo=02&joNo=0017&lsiSeq=286175&urlMode=lsScJoRltInfoR
 - 대한민국 `민법` 제4조: 사람은 19세로 성년에 이른다.
   - https://www.law.go.kr/lsLinkCommonInfo.do?chrClsCd=010202&lsJoLnkSeq=1026056227
 
