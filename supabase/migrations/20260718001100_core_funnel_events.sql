@@ -408,6 +408,47 @@ begin
 end
 $function$;
 
+alter function public.record_visitor_response_event(uuid, bytea, text)
+  set schema private;
+alter function private.record_visitor_response_event(uuid, bytea, text)
+  rename to record_visitor_response_event_core;
+
+revoke execute on function private.record_visitor_response_event_core(
+  uuid, bytea, text
+) from public, anon, authenticated, service_role;
+
+create function public.record_visitor_response_event(
+  p_response_id uuid,
+  p_session_hash bytea,
+  p_event_name text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_result jsonb;
+begin
+  if p_event_name = 'same_pack_start_clicked' then
+    v_result := private.record_visitor_response_event_core(
+      p_response_id,
+      p_session_hash,
+      'comparison_viewed'
+    );
+    if v_result->>'outcome' <> 'recorded' then
+      return v_result;
+    end if;
+  end if;
+
+  return private.record_visitor_response_event_core(
+    p_response_id,
+    p_session_hash,
+    p_event_name
+  );
+end
+$function$;
+
 create or replace function public.create_share_link(
   p_play_id uuid,
   p_management_secret_hash bytea,
@@ -936,6 +977,7 @@ visitor_clicked as (
   from visitor_compared as compared
   join public.analytics_events as event
     on event.visitor_response_id = compared.visitor_response_id
+   and event.occurred_at >= compared.compared_at
   cross join marker
   where event.event_name = 'same_pack_start_clicked'
     and event.occurred_at >= marker.started_at
@@ -1049,6 +1091,8 @@ alter function public.record_owner_share_action_with_source(
 ) owner to gyeop_internal_rpc;
 alter function public.record_owner_share_action(uuid, bytea, uuid, text)
   owner to gyeop_internal_rpc;
+alter function public.record_visitor_response_event(uuid, bytea, text)
+  owner to gyeop_internal_rpc;
 
 revoke execute on function public.create_or_resume_play_with_source(
   text, uuid, bytea, uuid, bytea, bytea, text, uuid, bytea
@@ -1058,6 +1102,9 @@ revoke execute on function public.create_or_resume_play(
 ) from public, anon, authenticated;
 revoke execute on function public.complete_owner_play(uuid, bytea)
   from public, anon, authenticated;
+revoke execute on function public.record_visitor_response_event(
+  uuid, bytea, text
+) from public, anon, authenticated;
 
 grant execute on function public.create_or_resume_play_with_source(
   text, uuid, bytea, uuid, bytea, bytea, text, uuid, bytea
@@ -1067,6 +1114,9 @@ grant execute on function public.create_or_resume_play(
 ) to service_role;
 grant execute on function public.complete_owner_play(uuid, bytea)
   to service_role;
+grant execute on function public.record_visitor_response_event(
+  uuid, bytea, text
+) to service_role;
 
 revoke create on schema public from gyeop_internal_rpc;
 revoke create on schema private from gyeop_internal_rpc;

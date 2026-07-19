@@ -262,12 +262,28 @@ select throws_ok(
   'forbidden analytics payloads fail closed'
 );
 
-insert into public.analytics_events (
-  event_name, visitor_response_id, properties
-) values (
-  'comparison_viewed',
-  '31200000-0000-4000-8000-000000000001',
-  jsonb_build_object('packVersion', 'old-friend-v1', 'linkKind', 'public')
+set local role service_role;
+
+select is(
+  public.record_visitor_response_event(
+    '31200000-0000-4000-8000-000000000001',
+    decode(repeat('04', 32), 'hex'),
+    'same_pack_start_clicked'
+  )->>'outcome',
+  'recorded',
+  'same-pack click records without waiting for navigation'
+);
+
+reset role;
+
+select ok(
+  (
+    select min(occurred_at) filter (where event_name = 'comparison_viewed')
+      <= min(occurred_at) filter (where event_name = 'same_pack_start_clicked')
+    from public.analytics_events
+    where visitor_response_id = '31200000-0000-4000-8000-000000000001'
+  ),
+  'same-pack click transaction commits comparison first'
 );
 
 update public.visitor_responses
@@ -281,10 +297,12 @@ select is(
   (
     select count(*)
     from public.analytics_events
-    where event_name in ('relationship_selected', 'comparison_viewed')
+    where event_name in (
+      'relationship_selected', 'comparison_viewed', 'same_pack_start_clicked'
+    )
       and visitor_response_id is null
   ),
-  2::bigint,
+  3::bigint,
   'response withdrawal scrubs every analytics subject binding'
 );
 
