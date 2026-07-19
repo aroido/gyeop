@@ -280,8 +280,22 @@ test("creates a one-to-one link, rotates it, and disables the replacement", asyn
   await expect(page.getByText("공유 링크가 준비됐어요")).toBeVisible();
   await expect(page.getByText("비활성", { exact: true })).toBeVisible();
 
+  await page.reload();
+  await expect(page.getByLabel("공유 링크 직접 복사")).toHaveCount(0);
+  const activeOneToOne = page
+    .getByRole("listitem")
+    .filter({ hasText: "1:1 친구" })
+    .filter({ hasText: "사용 중" });
+  await expect(activeOneToOne).toHaveCount(1);
+  await expect(
+    page
+      .getByRole("listitem")
+      .filter({ hasText: "1:1 친구" })
+      .filter({ has: page.getByText("비활성", { exact: true }) }),
+  ).toHaveCount(1);
+
   page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "비활성화" }).click();
+  await activeOneToOne.getByRole("button", { name: "비활성화" }).click();
   await expect(page.getByLabel("공유 링크 직접 복사")).toHaveCount(0);
   await expect(page.getByText("사용 중")).toHaveCount(0);
 });

@@ -58,7 +58,7 @@ Issue: https://github.com/aroido/gyeop/issues/20
 
 ## 구현 계획
 
-1. `supabase/tests/share_links.test.sql`에 1:1 전용 재발급 fixture와 검증을 추가한다. 먼저 active 1:1 원본에 기존 ID·public ID·secret hash와 충돌하는 replacement를 넣어 `collision`을 받고 원본 active·새 행 0건·analytics 증가 0건을 확인한다. 이어 non-colliding 재발급에서 새 행 kind가 `one_to_one`, 원본이 `disabled`인지 확인하고, 원본 재발급 재시도가 새 행을 만들지 않으며 replacement 비활성화 뒤 invite가 `unavailable`인지 검증한다.
+1. `supabase/tests/share_links.test.sql`에 1:1 전용 재발급 fixture와 검증을 추가한다. 먼저 active 1:1 원본에 새 replacement ID와 기존 public ID·secret hash를 넣어 `collision`을 받고 원본 active·새 행 0건·analytics 증가 0건을 확인한다. 이어 같은 replacement ID의 non-colliding 재발급에서 새 행 kind가 `one_to_one`, 원본이 `disabled`인지 확인하고, 원본 재발급 재시도가 새 행을 만들지 않으며 replacement 비활성화 뒤 invite가 `unavailable`인지 검증한다.
 2. `tests/e2e/share-links.spec.ts`의 1:1 lifecycle 시나리오에 재발급 뒤 reload를 넣고 목록의 종류·상태가 유지되는지 확인한 뒤 replacement를 비활성화한다.
 3. 기존 live owner E2E의 실제 1:1 생성, exact analytics payload, raw credential DB leak 0건과 owner profile pgTAP의 공개 집계 제외를 focused 검증으로 재실행한다.
 4. GitHub 이슈 #20 설명을 현재 비공개 MVP owner capability 경계와 실제 남은 완료 기준으로 정정한다.

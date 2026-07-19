@@ -496,6 +496,53 @@ select is(
   public.rotate_share_link(
     '19000000-0000-4000-8000-000000000001',
     decode(repeat('11', 32), 'hex'),
+    '19100000-0000-4000-8000-000000000002',
+    '19200000-0000-4000-8000-000000000003',
+    'AAAAAAAAAAAAAAAAAAAAAA',
+    decode(repeat('a1', 32), 'hex')
+  )->>'outcome',
+  'collision',
+  'one-to-one rotate collision rolls back before disabling the original'
+);
+
+reset role;
+
+select is(
+  (
+    select status
+    from public.share_links
+    where id = '19100000-0000-4000-8000-000000000002'
+  ),
+  'active',
+  'one-to-one original remains active after a replacement collision'
+);
+
+select is(
+  (
+    select count(*)
+    from public.share_links
+    where id = '19200000-0000-4000-8000-000000000003'
+  ),
+  0::bigint,
+  'one-to-one replacement collision creates no partial row'
+);
+
+select is(
+  (
+    select count(*)
+    from public.analytics_events
+    where event_name = 'share_link_created'
+  ),
+  2::bigint,
+  'one-to-one replacement collision creates no analytics event'
+);
+
+set local role service_role;
+
+select is(
+  public.rotate_share_link(
+    '19000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex'),
     '19100000-0000-4000-8000-000000000001',
     '19200000-0000-4000-8000-000000000001',
     'EEEEEEEEEEEEEEEEEEEEEA',
@@ -558,6 +605,71 @@ select is(
   'disabled invite is unavailable'
 );
 
+select is(
+  jsonb_build_object(
+    'outcome', result->>'outcome',
+    'kind', result->'link'->>'kind',
+    'status', result->'link'->>'status'
+  ),
+  jsonb_build_object(
+    'outcome', 'rotated',
+    'kind', 'one_to_one',
+    'status', 'active'
+  ),
+  'one-to-one rotate preserves kind and returns an active replacement'
+)
+from (
+  select public.rotate_share_link(
+    '19000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex'),
+    '19100000-0000-4000-8000-000000000002',
+    '19200000-0000-4000-8000-000000000003',
+    'GGGGGGGGGGGGGGGGGGGGGA',
+    decode(repeat('b7', 32), 'hex')
+  ) as result
+) rotated;
+
+select is(
+  public.get_invite_metadata(
+    'BBBBBBBBBBBBBBBBBBBBBQ',
+    decode(repeat('b2', 32), 'hex')
+  )->>'outcome',
+  'unavailable',
+  'rotated one-to-one original is unavailable'
+);
+
+select is(
+  public.rotate_share_link(
+    '19000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex'),
+    '19100000-0000-4000-8000-000000000002',
+    '19200000-0000-4000-8000-000000000004',
+    'HHHHHHHHHHHHHHHHHHHHHQ',
+    decode(repeat('c8', 32), 'hex')
+  )->>'outcome',
+  'link_not_active',
+  'a second one-to-one rotate cannot create another replacement'
+);
+
+select is(
+  public.disable_share_link(
+    '19000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex'),
+    '19200000-0000-4000-8000-000000000003'
+  )->>'outcome',
+  'disabled',
+  'owner disables the one-to-one replacement'
+);
+
+select is(
+  public.get_invite_metadata(
+    'GGGGGGGGGGGGGGGGGGGGGA',
+    decode(repeat('b7', 32), 'hex')
+  )->>'outcome',
+  'unavailable',
+  'disabled one-to-one replacement is unavailable'
+);
+
 reset role;
 
 select is(
@@ -567,7 +679,8 @@ select is(
     where id in (
       '19100000-0000-4000-8000-000000000003',
       '19100000-0000-4000-8000-000000000004',
-      '19200000-0000-4000-8000-000000000002'
+      '19200000-0000-4000-8000-000000000002',
+      '19200000-0000-4000-8000-000000000004'
     )
   ),
   0::bigint,
@@ -583,7 +696,8 @@ select is(
   '[
     {"packVersion":"old-friend-v1","linkKind":"public"},
     {"packVersion":"old-friend-v1","linkKind":"one_to_one"},
-    {"packVersion":"old-friend-v1","linkKind":"public"}
+    {"packVersion":"old-friend-v1","linkKind":"public"},
+    {"packVersion":"old-friend-v1","linkKind":"one_to_one"}
   ]'::jsonb,
   'share creation events contain only pack version and kind'
 );
