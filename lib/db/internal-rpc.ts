@@ -16,6 +16,14 @@ import type {
   OwnerProfileEventResult,
   OwnerProfileResult,
 } from "../owner-profile/owner-profile.ts";
+import {
+  decodeOwnerOneToOneComparisonOutcome,
+  decodeOwnerOneToOneListOutcome,
+} from "../private-one-to-one/private-one-to-one-core.mjs";
+import type {
+  PrivateOneToOneComparison,
+  PrivateOneToOneResponseRow,
+} from "../private-one-to-one/private-one-to-one.ts";
 import { decodePublishedPack } from "../packs/published-pack-core.mjs";
 import type { PublishedPack } from "../packs/published-pack.ts";
 import {
@@ -333,6 +341,67 @@ export async function getOwnerProfile(input: {
   const { data, error } = await query;
   if (error) throw new Error("Internal owner profile RPC failed");
   return decodeOwnerProfileOutcome(data) as OwnerProfileResult;
+}
+
+type OwnerCapabilityFailure = Readonly<{
+  outcome: "expired" | "not_found" | "not_completed";
+}>;
+
+export type ListOwnerOneToOneResponsesResult =
+  | Readonly<{
+      outcome: "listed";
+      managementExpiresAt: string;
+      managementTtlSeconds: 604800;
+      responses: readonly PrivateOneToOneResponseRow[];
+    }>
+  | OwnerCapabilityFailure;
+
+export async function listOwnerOneToOneResponses(input: {
+  playId: string;
+  managementSecretHash: Uint8Array;
+  signal?: AbortSignal;
+}): Promise<ListOwnerOneToOneResponsesResult> {
+  let query = getInternalClient().rpc("list_owner_1to1_responses", {
+    p_play_id: input.playId,
+    p_management_secret_hash: bytea(input.managementSecretHash),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal private one-to-one list RPC failed");
+  return decodeOwnerOneToOneListOutcome(
+    data,
+  ) as ListOwnerOneToOneResponsesResult;
+}
+
+export type GetPrivateOneToOneComparisonResult =
+  | Readonly<{
+      outcome: "authorized";
+      managementExpiresAt: string;
+      managementTtlSeconds: 604800;
+      comparison: PrivateOneToOneComparison;
+    }>
+  | OwnerCapabilityFailure
+  | Readonly<{ outcome: "response_not_found" }>;
+
+export async function getPrivateOneToOneComparison(input: {
+  playId: string;
+  managementSecretHash: Uint8Array;
+  responseId: string;
+  signal?: AbortSignal;
+}): Promise<GetPrivateOneToOneComparisonResult> {
+  let query = getInternalClient().rpc("get_private_1to1_comparison", {
+    p_play_id: input.playId,
+    p_management_secret_hash: bytea(input.managementSecretHash),
+    p_response_id: input.responseId,
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) {
+    throw new Error("Internal private one-to-one comparison RPC failed");
+  }
+  return decodeOwnerOneToOneComparisonOutcome(
+    data,
+  ) as GetPrivateOneToOneComparisonResult;
 }
 
 export async function recordOwnerProfileEvent(input: {

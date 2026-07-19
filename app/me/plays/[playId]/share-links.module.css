@@ -266,6 +266,178 @@
   border-color: #ff7a70;
   color: #ffd3cf;
 }
+.privateComparison {
+  margin-top: 2rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid #353535;
+}
+.privateComparison h2 {
+  margin: 0.25rem 0 0;
+  font-size: 1.35rem;
+  letter-spacing: -0.04em;
+}
+.privateComparison h2:focus {
+  outline: none;
+}
+.privateKicker {
+  margin: 0;
+  color: var(--lime) !important;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+.privateLead,
+.comparisonSummary,
+.privateContext {
+  margin: 0.45rem 0 0;
+  color: #bdbdbd;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+.privateContext {
+  color: #e3e3e3;
+  font-weight: 800;
+}
+.privateEmpty {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px dashed #555;
+  border-radius: 0.75rem;
+  color: #aaa;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  text-align: center;
+}
+.privateEmpty p {
+  margin: 0;
+}
+.privateEmpty button,
+.privateList button {
+  min-height: 2.75rem;
+  border: 1px solid var(--lime);
+  border-radius: 0.6rem;
+  background: transparent;
+  color: var(--lime);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+.privateEmpty button {
+  width: 100%;
+  margin-top: 0.7rem;
+}
+.privateList {
+  display: grid;
+  gap: 0.7rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+.privateList li {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.85rem;
+  border: 1px solid #484848;
+  border-radius: 0.75rem;
+  background: #111;
+}
+.privateList li[data-status="withdrawn"] {
+  border-style: dashed;
+  color: #999;
+}
+.privateList li > div {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.privateList strong {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  word-break: keep-all;
+}
+.privateList span {
+  flex: 0 0 auto;
+  color: #999;
+  font-size: 0.7rem;
+}
+.privateList p {
+  margin: 0;
+  color: #999;
+  font-size: 0.76rem;
+}
+.privateList button {
+  width: 100%;
+}
+.privateList button:disabled {
+  opacity: 0.55;
+}
+.comparisonList {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1.2rem;
+}
+.comparisonCard,
+.comparisonHighlight {
+  min-width: 0;
+  padding: 0.9rem;
+  border: 1px solid #444;
+  border-radius: 0.8rem;
+  background: #171717;
+}
+.comparisonHighlight {
+  border: 2px solid var(--lime);
+  background: #232600;
+}
+.comparisonHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: #aaa;
+  font-size: 0.68rem;
+}
+.comparisonHeader strong {
+  color: var(--lime);
+}
+.comparisonCard h3,
+.comparisonHighlight h3 {
+  margin: 0.65rem 0;
+  font-size: 1.05rem;
+  line-height: 1.35;
+  word-break: keep-all;
+}
+.comparisonCard dl,
+.comparisonHighlight dl {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+}
+.comparisonCard dl div,
+.comparisonHighlight dl div {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  gap: 0.55rem;
+}
+.comparisonCard dt,
+.comparisonHighlight dt {
+  color: #aaa;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.comparisonCard dd,
+.comparisonHighlight dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 850;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.privateComparison > .secondary {
+  width: 100%;
+  margin-top: 1rem;
+}
 .primary:focus-visible,
 .primaryLink:focus-visible,
 .back:focus-visible,
@@ -273,7 +445,9 @@
 .kind:focus-within,
 .actions button:focus-visible,
 .secondary:focus-visible,
-.manualUrl:focus-visible {
+.manualUrl:focus-visible,
+.privateEmpty button:focus-visible,
+.privateList button:focus-visible {
   outline: 3px solid var(--blue);
   outline-offset: 3px;
 }
