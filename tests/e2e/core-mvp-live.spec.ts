@@ -44,7 +44,7 @@ const visitorHeaders = {
 async function waitForLivePackApi() {
   const port = process.env.GYEOP_E2E_PORT ?? "3000";
   let lastStatus = "no response";
-  for (let attempt = 0; attempt < 40; attempt += 1) {
+  for (let attempt = 0; attempt < 180; attempt += 1) {
     try {
       const response = await fetch(
         `http://127.0.0.1:${port}/api/packs/old-friend`,
@@ -60,7 +60,7 @@ async function waitForLivePackApi() {
     } catch (error: unknown) {
       lastStatus = error instanceof Error ? error.message : "unknown error";
     }
-    await new Promise((resolve) => setTimeout(resolve, 250));
+    await new Promise((resolve) => setTimeout(resolve, 500));
   }
   throw new Error(`Live pack API did not become ready: ${lastStatus}`);
 }
