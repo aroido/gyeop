@@ -708,8 +708,8 @@ select is(
     from public.analytics_events
     where event_name = 'invite_opened'
   ),
-  1::bigint,
-  'only valid active invite metadata records an opened event'
+  0::bigint,
+  'invite metadata remains read-only before eligibility confirmation'
 );
 
 select is(

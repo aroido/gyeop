@@ -79,6 +79,7 @@ sh -n "$ROOT/ops/http-boundary/gyeop-loopback-firewall-restore"
 sh -n "$ROOT/ops/http-boundary/gyeop-loopback-firewall-probe"
 sh -n "$ROOT/tests/integration/http-boundary-host.test.sh"
 sh -n "$ROOT/tests/integration/visitor-assignment-upgrade.test.sh"
+sh -n "$ROOT/tests/integration/eligibility-cutover-upgrade.test.sh"
 
 VALIDATOR="${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py"
 if [[ -f "$VALIDATOR" ]]; then
@@ -127,6 +128,7 @@ if ! pnpm supabase:start >/dev/null; then
   exit 1
 fi
 tests/integration/visitor-assignment-upgrade.test.sh
+tests/integration/eligibility-cutover-upgrade.test.sh
 pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
 pnpm test:db
 pnpm supabase:lint

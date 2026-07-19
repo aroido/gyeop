@@ -69,7 +69,9 @@ end
 $legacy$;
 SQL
 
-pnpm exec supabase migration up --local >/dev/null
+docker exec -i "$DATABASE_CONTAINER" psql \
+  -U supabase_admin -d postgres -v ON_ERROR_STOP=1 >/dev/null \
+  <"$ROOT/supabase/migrations/20260718000700_visitor_required_assignments.sql"
 
 docker exec -i "$DATABASE_CONTAINER" psql \
   -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null <<'SQL'

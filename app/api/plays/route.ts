@@ -28,6 +28,9 @@ export function POST(request: Request) {
       const packSlug = input.packSlug;
       const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
       if (cookie.outcome === "absent") {
+        if (input.eligibilityConfirmed !== true) {
+          throw new Error("INVALID_INPUT");
+        }
         const responseCookie = parseVisitorResponseCookie(
           request.headers.get("cookie"),
         );

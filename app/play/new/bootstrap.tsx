@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import EligibilityGate from "@/app/components/eligibility-gate";
 import {
   bootstrapOwnerPlay,
   clearOwnerSession,
@@ -11,7 +12,7 @@ import {
 
 import styles from "../[playId]/page.module.css";
 
-type State = "loading" | "retryable" | "terminal";
+type State = "eligibility" | "loading" | "retryable" | "terminal";
 const packTitles: Readonly<Record<string, string>> = Object.freeze({
   "old-friend": "오래 본 너의 시선",
   "first-impression": "처음 만난 너의 시선",
@@ -30,21 +31,30 @@ function isRetryable(error: unknown) {
 export default function BootstrapOwnerPlay({
   pack,
   entrySource,
+  requiresEligibility,
 }: {
   pack: string | null;
   entrySource: "home" | "same_pack_cta";
+  requiresEligibility: boolean;
 }) {
   const router = useRouter();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [attempt, setAttempt] = useState(0);
-  const [state, setState] = useState<State>(pack ? "loading" : "terminal");
+  const [state, setState] = useState<State>(
+    pack ? (requiresEligibility ? "eligibility" : "loading") : "terminal",
+  );
+  const [eligibilityConfirmed, setEligibilityConfirmed] = useState(false);
   const [clearing, setClearing] = useState(false);
   const packTitle = pack ? packTitles[pack] : null;
 
   useEffect(() => {
-    if (!pack) return;
+    if (!pack || state !== "loading") return;
     let active = true;
-    void bootstrapOwnerPlay(pack, entrySource)
+    void bootstrapOwnerPlay(
+      pack,
+      entrySource,
+      eligibilityConfirmed ? true : undefined,
+    )
       .then((play) => {
         if (active) router.replace(`/play/${encodeURIComponent(play.id)}`);
       })
@@ -54,10 +64,12 @@ export default function BootstrapOwnerPlay({
     return () => {
       active = false;
     };
-  }, [attempt, entrySource, pack, router]);
+  }, [attempt, eligibilityConfirmed, entrySource, pack, router, state]);
 
   useEffect(() => {
-    if (state !== "loading") headingRef.current?.focus();
+    if (state !== "loading" && state !== "eligibility") {
+      headingRef.current?.focus();
+    }
   }, [state]);
 
   async function startNew() {
@@ -66,12 +78,23 @@ export default function BootstrapOwnerPlay({
     try {
       await clearOwnerSession();
       setClearing(false);
-      setState("loading");
-      setAttempt((value) => value + 1);
+      setEligibilityConfirmed(false);
+      setState("eligibility");
     } catch {
       setClearing(false);
       setState("terminal");
     }
+  }
+
+  if (state === "eligibility") {
+    return (
+      <EligibilityGate
+        onConfirm={() => {
+          setEligibilityConfirmed(true);
+          setState("loading");
+        }}
+      />
+    );
   }
 
   if (state === "loading") {

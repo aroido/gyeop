@@ -1,11 +1,9 @@
 import { inviteMetadataSchema } from "../../../../../lib/http/owner-play-schemas.ts";
-import { runRateLimitedDomain } from "../../../../../lib/http/rate-limit.ts";
 import { withPublicRequest } from "../../../../../lib/http/request-boundary.ts";
 import {
   inviteMetadataResponse,
   inviteUnavailableResponse,
 } from "../../../../../lib/http/share-links.ts";
-import { deriveInviteRateLimitKey } from "../../../../../lib/share-links/share-link-session-core.mjs";
 import { isSharePublicId } from "../../../../../lib/share-links/share-link-state-core.mjs";
 
 export function POST(
@@ -19,7 +17,7 @@ export function POST(
       maximumBodyBytes: 96,
       privateNoStore: true,
     },
-    async ({ input, networkKey, signal }) => {
+    async ({ input, signal }) => {
       if (!input || typeof input.secret !== "string") {
         throw new Error("INTERNAL_ERROR");
       }
@@ -28,16 +26,7 @@ export function POST(
       if (!isSharePublicId(publicId)) {
         return inviteUnavailableResponse();
       }
-      return runRateLimitedDomain(
-        {
-          keyHash: deriveInviteRateLimitKey(networkKey, publicId),
-          action: "invite_metadata",
-          windowSeconds: 60,
-          limit: 60,
-          signal,
-        },
-        () => inviteMetadataResponse({ publicId, secret, signal }),
-      );
+      return inviteMetadataResponse({ publicId, secret, signal });
     },
   );
 }

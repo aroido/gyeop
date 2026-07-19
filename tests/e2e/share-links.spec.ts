@@ -1,6 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { installOwnerFlowApi, playId } from "./owner-flow-fixture";
+import { confirmEligibility } from "./eligibility-fixture";
 
 const secret = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8";
 const publicIds = [
@@ -551,6 +552,7 @@ test("reads only an exact fragment and renders generic invite states", async ({
   await completedOwner(page);
   const share = await installShareApi(page);
   await page.goto(`/i/${publicIds[0]}#k=${secret}`);
+  await confirmEligibility(page);
   await expect(
     page.getByRole("heading", { name: "이 사람과 어떤 사이인가요?" }),
   ).toBeFocused();
@@ -632,6 +634,7 @@ for (const viewport of [
     ).toBe(true);
 
     await page.goto(`/i/${publicIds[0]}#k=${secret}`);
+    await confirmEligibility(page);
     await expect(
       page.getByRole("heading", { name: "이 사람과 어떤 사이인가요?" }),
     ).toBeFocused();

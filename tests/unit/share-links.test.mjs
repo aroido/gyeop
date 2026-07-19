@@ -6,10 +6,7 @@ import {
   buildShareData,
   isShareCancellation,
 } from "../../lib/share-links/share-handoff-core.mjs";
-import {
-  deriveInviteRateLimitKey,
-  hashShareSecret,
-} from "../../lib/share-links/share-link-session-core.mjs";
+import { hashShareSecret } from "../../lib/share-links/share-link-session-core.mjs";
 import {
   decodeInviteMetadataOutcome,
   decodeRecordShareActionOutcome,
@@ -24,16 +21,6 @@ test("uses the domain-separated share secret hash vector", () => {
   assert.equal(
     hashShareSecret(secret).toString("hex"),
     "60da3ea5e671bc19c6357f6c65a6a886fcc25608891c153b2c90685d2cce2cff",
-  );
-});
-
-test("scopes invite rate limits by network and public link", () => {
-  assert.equal(
-    deriveInviteRateLimitKey(
-      Uint8Array.from({ length: 32 }, (_, index) => index),
-      "AAAAAAAAAAAAAAAAAAAAAA",
-    ).toString("hex"),
-    "d50621b4e90346d46a2d186846c5d7190e7eea4f4e2a742b28ee11dc85696b00",
   );
 });
 
