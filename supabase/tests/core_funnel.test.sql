@@ -383,11 +383,11 @@ insert into public.analytics_events (
     clock_timestamp() - interval '35 seconds'),
   ('same_pack_start_clicked', null, null, '31200000-0000-4000-8000-000000000003',
     '{"packVersion":"old-friend-v1","linkKind":"public"}',
-    clock_timestamp() - interval '30 seconds'),
+    clock_timestamp() - interval '25 seconds'),
   ('pack_opened', '31000000-0000-4000-8000-000000000003', null,
     '31200000-0000-4000-8000-000000000003',
     '{"packVersion":"old-friend-v1","entrySource":"same_pack_cta"}',
-    clock_timestamp() - interval '25 seconds'),
+    clock_timestamp() - interval '30 seconds'),
   ('visitor_required_submitted', null, null,
     '31200000-0000-4000-8000-000000000004',
     '{"packVersion":"old-friend-v1","linkKind":"public"}',
@@ -454,7 +454,7 @@ select is(
   (select subjects from private.core_funnel_stage_counts
    where funnel = 'visitor_same_pack' and stage = 'new_owner_pack_opened'),
   1::bigint,
-  'new owner pack-open counts only after the ordered click'
+  'new owner pack-open tolerates click and navigation arrival order'
 );
 select is(
   (select subjects from private.core_funnel_stage_counts

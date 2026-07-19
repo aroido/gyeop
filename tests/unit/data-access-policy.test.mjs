@@ -935,6 +935,15 @@ begin return private.complete_owner_play_core(); end $$;
     ).join("\n"),
     /must call the play capability helper exactly once/,
   );
+  assert.match(
+    verifyOwnerCapabilitySql(
+      delegated.replace(
+        "begin return private.complete_owner_play_core(); end $$;",
+        "begin perform 1; return private.complete_owner_play_core(); end $$;",
+      ),
+    ).join("\n"),
+    /must call the play capability helper exactly once/,
+  );
 });
 
 test("rejects missing, duplicated, Auth-anchored, and late owner capability guards", () => {

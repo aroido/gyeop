@@ -1424,7 +1424,9 @@ export function verifyOwnerCapabilitySql(sql, filePath = "migration.sql") {
         /rename\s+to\s+create_or_resume_play_core/i.test(sql)) ||
       (name === "complete_owner_play" &&
         priorGuarded &&
-        /private\s*\.\s*complete_owner_play_core\s*\(/i.test(body) &&
+        /begin\s+(?:v_result\s*:=|return)\s+private\s*\.\s*complete_owner_play_core\s*\(/i.test(
+          body,
+        ) &&
         /alter\s+function\s+public\.complete_owner_play\s*\([\s\S]*?set\s+schema\s+private/i.test(
           sql,
         ) &&

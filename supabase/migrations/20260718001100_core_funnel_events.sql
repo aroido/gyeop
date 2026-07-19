@@ -374,21 +374,15 @@ security definer
 set search_path = ''
 as $function$
 declare
-  v_before_status text;
   v_pack_version text;
   v_result jsonb;
 begin
-  select play.status
-  into v_before_status
-  from public.pack_plays as play
-  where play.id = p_play_id;
-
   v_result := private.complete_owner_play_core(
     p_play_id,
     p_management_secret_hash
   );
 
-  if v_before_status = 'draft' and v_result->>'outcome' = 'completed' then
+  if v_result->>'outcome' = 'completed' then
     select version.version
     into v_pack_version
     from public.pack_plays as play
@@ -938,13 +932,13 @@ visitor_compared as (
 visitor_clicked as (
   select
     compared.visitor_response_id,
-    compared.pack_version,
-    min(event.occurred_at) as clicked_at
+    compared.pack_version
   from visitor_compared as compared
   join public.analytics_events as event
     on event.visitor_response_id = compared.visitor_response_id
-   and event.occurred_at >= compared.compared_at
+  cross join marker
   where event.event_name = 'same_pack_start_clicked'
+    and event.occurred_at >= marker.started_at
   group by compared.visitor_response_id, compared.pack_version
 ),
 visitor_new_owner as (
@@ -952,9 +946,10 @@ visitor_new_owner as (
   from visitor_clicked as clicked
   join public.analytics_events as event
     on event.visitor_response_id = clicked.visitor_response_id
-   and event.occurred_at >= clicked.clicked_at
+  cross join marker
   where event.event_name = 'pack_opened'
     and event.owner_play_id is not null
+    and event.occurred_at >= marker.started_at
     and event.properties->>'entrySource' = 'same_pack_cta'
     and event.properties->>'packVersion' = clicked.pack_version
   group by clicked.visitor_response_id
