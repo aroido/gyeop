@@ -23,10 +23,11 @@ Issue: https://github.com/aroido/gyeop/issues/34
 - 실행 전후 `private.core_funnel_stage_counts` delta를 읽어 UI로 일으킨 행동과 세 funnel stage 수가 일치하는지 확인한다.
 - `package.json`의 live E2E 명령과 `scripts/ai-verify`를 연결해 이 fixture 실패가 전체 검증·PR CI를 실패시킨다.
 - `docs/engineering/core-mvp-e2e-gate.md`에 자동 검증 범위와 키보드·focus·reduced motion 모바일 체크 기록을 남긴다.
+- gate가 발견한 비교 화면 focus 회귀는 `ResponseFlow`의 기존 heading ref를 사용해 최소 수정하고 mocked regression test로 고정한다.
 
 ## 제외 범위
 
-- 제품 화면, 문구, 레이아웃, API, RPC, migration, analytics schema 변경
+- 제품 문구·레이아웃·시각 디자인, API, RPC, migration, analytics schema 변경
 - 기존 `owner-play-live.spec.ts`가 소유한 보안·rate limit·1:1 링크·credential 경계의 재구현
 - desktop 최적화, 성능 부하 시험, production 배포, 독립 보안 감사
 - 선택 2장, 이메일, 응답 철회, 계정 삭제
@@ -45,7 +46,7 @@ Issue: https://github.com/aroido/gyeop/issues/34
 
 ## 사용자 흐름 영향
 
-- 사용자에게 보이는 동작은 바뀌지 않는다.
+- 시각적 동작은 바뀌지 않는다. 방문자 제출 뒤 keyboard·screen reader focus가 비교 결과 h1으로 이동하도록 기존 의도를 복구한다.
 - 자동 fixture가 실제 사용자의 핵심 loop를 그대로 수행해 다음 세 질문을 독립적으로 증명한다.
   1. 첫 사용자가 팩을 완료하고 공개 링크를 공유할 수 있는가.
   2. 공유받은 친구가 3장에 답해 비교하고 같은 팩의 새 owner가 될 수 있는가.
@@ -75,12 +76,14 @@ Issue: https://github.com/aroido/gyeop/issues/34
 7. 프로필 재공유 entry source로 공유 관리 화면에 진입하고, raw secret을 복원하지 않은 채 active 공개 링크를 UI에서 안전하게 재발급한다. replacement URL을 재공유한 뒤 네 번째 visitor가 그 링크에서 3장 제출과 비교 화면까지 완료한다.
 8. stage count delta가 `owner_share=1/1/1`, `visitor_same_pack=4/4/1/1`, `profile_reshare=1/1/1/1`인지 확인한다. 네 번째 visitor도 required submit과 comparison cohort에 포함되므로 visitor 첫 두 stage는 4다.
 9. live E2E script와 full verifier에 새 gate를 연결하고 QA 체크 문서를 작성한다.
+10. live gate가 검출한 비교 화면 heading focus 누락을 수정하고 mocked visitor E2E에도 같은 assertion을 추가한다.
 
 ## 완료 기준
 
 - [ ] 하나의 독립 live E2E test가 owner→공개 공유→방문자 3명→same-pack 새 owner→프로필 3시선→재공유→후속 visitor 제출을 완주한다.
 - [ ] 320/390/430px 모두 document 가로 overflow가 없고 확인한 primary CTA가 viewport에서 잘리지 않으며 interactive target이 44×44px 이상이다.
 - [ ] 관계 선택, 질문 이동, 비교 CTA, 프로필 재공유의 heading/focus 순서와 최소 한 번의 keyboard activation이 통과한다.
+- [ ] 방문자 제출 직후와 제출 완료 응답 reload 뒤 비교 결과 h1이 focus를 받는다.
 - [ ] fixture context가 `prefers-reduced-motion: reduce`를 사용하고 앱이 이를 인식한다.
 - [ ] 핵심 owner/share/visitor/comparison/profile 화면의 axe `critical`/`serious` 위반이 0이다.
 - [ ] native share 미지원과 clipboard 실패가 성공 event를 만들지 않고 raw 링크를 유지하며, 같은 화면의 재시도 복사가 성공한다.
@@ -111,7 +114,7 @@ Issue: https://github.com/aroido/gyeop/issues/34
 
 ## 롤아웃과 복구
 
-- production runtime 변경이 없는 test-only PR이다.
+- production runtime의 시각·데이터 계약은 바뀌지 않으며, 비교 화면 heading focus 복구만 포함한다.
 - 새 gate가 flaky하면 제품 코드를 완화하지 않고 fixture의 대기 조건·context 격리·고유 IP를 수정한다.
 - 복구는 live script에서 새 spec 연결을 제거하고 test/doc/dependency 파일을 되돌리는 것이다.
 - gate는 로컬 full verify와 PR CI에서 동일한 명령으로 실행한다.

@@ -318,6 +318,9 @@ test("public invite completes three cards, compares, copies, and reloads", async
   await page.getByRole("button", { name: /^B / }).click();
   await page.getByRole("button", { name: /^A / }).click();
   await expect(page.getByText("3장 비교 완료")).toBeVisible();
+  await expect(
+    page.locator('section[data-kind="comparison"] h1'),
+  ).toBeFocused();
   await expect(page.getByText("가장 다른 답", { exact: true })).toBeVisible();
   await expect(page.getByText("◆", { exact: true })).toHaveAttribute(
     "aria-hidden",
@@ -345,6 +348,9 @@ test("public invite completes three cards, compares, copies, and reloads", async
 
   await page.reload();
   await expect(page.getByText("3장 비교 완료")).toBeVisible();
+  await expect(
+    page.locator('section[data-kind="comparison"] h1'),
+  ).toBeFocused();
   expect(api.starts()).toBe(1);
   expect(
     await page.evaluate(

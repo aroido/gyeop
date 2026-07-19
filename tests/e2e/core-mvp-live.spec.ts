@@ -139,6 +139,16 @@ async function expectNoHighImpactA11yViolations(page: Page) {
   ).toEqual([]);
 }
 
+async function expectNoMotionTransition(target: Locator) {
+  expect(
+    await target.evaluate((element) =>
+      getComputedStyle(element)
+        .transitionDuration.split(",")
+        .every((duration) => duration.trim() === "0s"),
+    ),
+  ).toBe(true);
+}
+
 async function expectMobileContract(page: Page, primary: Locator) {
   await expect(primary).toBeVisible();
   await primary.scrollIntoViewIfNeeded();
@@ -174,9 +184,10 @@ async function completeOwner(page: Page) {
   await page.waitForURL(/\/play\/[0-9a-f-]{36}$/);
   await expect(
     page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
-  ).toBeVisible();
+  ).toBeFocused();
   const choice = page.locator('button[data-choice="a"]');
   await expectMobileContract(page, choice);
+  await expectNoMotionTransition(page.getByTestId("question-card"));
   await expectNoHighImpactA11yViolations(page);
 
   for (let position = 1; position <= 10; position += 1) {
@@ -228,6 +239,11 @@ async function completeVisitor(
 
   const question = page.getByRole("heading", { level: 1 });
   await expect(question).toBeFocused();
+  await expectNoMotionTransition(
+    page.locator(
+      'section[data-kind="response"] [role="progressbar"] + div span',
+    ),
+  );
   for (const [index, choice] of ["B", "A", "A"].entries()) {
     const prompt = await question.textContent();
     await page.getByRole("button", { name: new RegExp(`^${choice} `) }).click();
@@ -236,6 +252,9 @@ async function completeVisitor(
   await expect(page.getByText("3장 비교 완료")).toBeVisible({
     timeout: 15_000,
   });
+  await expect(
+    page.locator('section[data-kind="comparison"] h1'),
+  ).toBeFocused();
   const samePack = page.getByRole("link", {
     name: "나도 이 팩으로 시작하기",
   });
@@ -274,9 +293,11 @@ test.describe("core MVP live gate", () => {
     await createLink.click();
     const manualUrl = page.getByLabel("공유 링크 직접 복사");
     const inviteUrl = await manualUrl.inputValue();
-    expect(inviteUrl).toMatch(
-      /^http:\/\/127\.0\.0\.1:3000\/i\/[A-Za-z0-9_-]{22}#k=[A-Za-z0-9_-]{43}$/,
-    );
+    expect(
+      /^http:\/\/127\.0\.0\.1:3000\/i\/[A-Za-z0-9_-]{22}#k=[A-Za-z0-9_-]{43}$/.test(
+        inviteUrl,
+      ),
+    ).toBe(true);
 
     const copy = page.getByRole("button", { name: "링크 복사" });
     await copy.click();
@@ -347,8 +368,30 @@ test.describe("core MVP live gate", () => {
 
     await page.setViewportSize({ width: 430, height: 932 });
     await page.goto("/me");
-    await expect(page.getByLabel("친구 시선 3개")).toHaveCount(1);
-    await expect(page.getByText(/시선을 모으는 중 · [0-2]\/3/)).toHaveCount(9);
+    const signatureHeading = page.getByRole("heading", {
+      name: "서운한 일이 생기면 나는?",
+    });
+    const signatureCard = page.locator("article").filter({
+      has: signatureHeading,
+    });
+    const signatureAggregate = signatureCard.getByLabel("친구 시선 3개");
+    await expect(signatureAggregate).toHaveCount(1);
+    await expect(
+      signatureAggregate.getByText("A · 바로 이야기한다"),
+    ).toBeVisible();
+    await expect(signatureAggregate.getByText("0명")).toBeVisible();
+    await expect(
+      signatureAggregate.getByText("B · 생각을 정리한 뒤 말한다"),
+    ).toBeVisible();
+    await expect(signatureAggregate.getByText("3명")).toBeVisible();
+    const lockedCards = page.locator("article").filter({
+      hasNot: signatureHeading,
+    });
+    await expect(lockedCards).toHaveCount(9);
+    await expect(
+      lockedCards.getByText(/시선을 모으는 중 · [0-2]\/3/),
+    ).toHaveCount(9);
+    await expect(lockedCards.getByLabel("친구 시선 3개")).toHaveCount(0);
     await expectMobileContract(page, collectMore);
     await expectNoHighImpactA11yViolations(page);
 
@@ -382,7 +425,7 @@ test.describe("core MVP live gate", () => {
     const replacementUrl = await page
       .getByLabel("공유 링크 직접 복사")
       .inputValue();
-    expect(replacementUrl).not.toBe(inviteUrl);
+    expect(replacementUrl !== inviteUrl).toBe(true);
     await allowClipboard(page);
     const profileCopy = page.getByRole("button", { name: "링크 복사" });
     await profileCopy.click();
