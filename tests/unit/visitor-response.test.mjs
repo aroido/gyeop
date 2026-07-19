@@ -83,6 +83,11 @@ const state = Object.freeze({
   sessionTtlSeconds: 86_400,
   assignments,
 });
+const packMetadata = Object.freeze({
+  packSlug: "old-friend",
+  packVersion: "old-friend-v1",
+  packTitle: "우리 아직 통할까?",
+});
 const submittedState = Object.freeze({
   ...state,
   status: "submitted",
@@ -132,9 +137,10 @@ test("freezes the exact relationship and known-since registries", () => {
 
 test("strictly decodes DB and browser response state", () => {
   assert.deepEqual(decodeVisitorResponseState(state), state);
-  const http = visitorResponseHttpState(state);
+  const http = visitorResponseHttpState({ ...state, ...packMetadata });
   assert.deepEqual(http, {
     ...state,
+    ...packMetadata,
     relationshipLabel: "오래된 친구",
     knownSinceLabel: "10년 이상이에요",
   });
@@ -414,12 +420,14 @@ test("persists one exact browser-only management record", () => {
 
 const httpState = Object.freeze({
   ...state,
+  ...packMetadata,
   sessionExpiresAt: "2099-01-02T00:00:00Z",
   relationshipLabel: "오래된 친구",
   knownSinceLabel: "10년 이상이에요",
 });
 const submittedHttpState = Object.freeze({
   ...submittedState,
+  ...packMetadata,
   sessionExpiresAt: "2099-01-02T00:00:00Z",
   relationshipLabel: "오래된 친구",
   knownSinceLabel: "10년 이상이에요",

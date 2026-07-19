@@ -99,7 +99,8 @@ export function verifyShareLinks() {
     "utf8",
   );
   assert.doesNotMatch(handoff, /from\s+["']node:/);
-  assert.match(handoff, /겹 · 오래된 친구팩/);
+  assert.match(handoff, /겹 · \$\{packTitle\}/);
+  assert.match(handoff, /\$\{packTitle\}.*질문이야/);
   assert.match(handoff, /너는 나를 어떻게 보는지 3장만 골라줘/);
 
   const manager = readFileSync(

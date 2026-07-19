@@ -13,7 +13,7 @@ export type OwnerProfileCard = Readonly<{
 
 export type OwnerProfile = Readonly<{
   playId: string;
-  packSlug: "old-friend";
+  packSlug: string;
   packVersion: string;
   packTitle: string;
   sightCount: number;

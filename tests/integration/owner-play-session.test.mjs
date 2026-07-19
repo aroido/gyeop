@@ -7,9 +7,16 @@ import path from "node:path";
 import test, { after, before } from "node:test";
 
 const root = path.resolve(new URL("../../", import.meta.url).pathname);
-const manifest = JSON.parse(
-  readFileSync(path.join(root, "content/packs/old-friend-v1.json"), "utf8"),
+const manifestFiles = [
+  "old-friend-v1.json",
+  "first-impression-v1.json",
+  "coworker-v1.json",
+  "honest-self-v1.json",
+];
+const manifests = manifestFiles.map((file) =>
+  JSON.parse(readFileSync(path.join(root, "content/packs", file), "utf8")),
 );
+const manifest = manifests[0];
 
 function localSupabase() {
   const output = execFileSync(
@@ -140,6 +147,14 @@ function cookieFrom(response) {
   return `__Host-gyeop-owner=${value}`;
 }
 
+function visitorCookieFrom(response) {
+  const header = response.headers.get("set-cookie");
+  assert.ok(header, "response must set the visitor cookie");
+  const value = header.match(/__Host-gyeop-response=([^;]*)/)?.[1];
+  assert.ok(value, "response must contain a non-empty visitor cookie");
+  return `__Host-gyeop-response=${value}`;
+}
+
 test("owner boundary failures are always private no-store", async () => {
   const invalidOrigin = await ownerRequest("/api/plays", {
     method: "POST",
@@ -183,6 +198,184 @@ test("inactive create returns PACK_NOT_FOUND without a cookie or quota row", asy
     ),
     "0",
   );
+});
+
+test("each additional pack completes the real owner, share, visitor, and profile path", async () => {
+  for (const [index, pack] of manifests.slice(1).entries()) {
+    const ip = `198.51.100.${41 + index}`;
+    const catalog = await fetch(`${appUrl}/api/packs/${pack.slug}`, {
+      headers: proxyHeaders(ip),
+    });
+    assert.equal(catalog.status, 200, `${pack.slug}: ${serverLog}`);
+    const catalogBody = await catalog.json();
+    assert.equal(catalogBody.title, pack.title);
+    assert.equal(catalogBody.cards.length, 10);
+
+    const created = await ownerRequest("/api/plays", {
+      method: "POST",
+      ip,
+      body: { packSlug: pack.slug, entrySource: "home" },
+    });
+    assert.equal(created.status, 201, `${pack.slug}: ${serverLog}`);
+    const play = await created.json();
+    assert.equal(play.packSlug, pack.slug);
+    assert.equal(play.packVersion, pack.version);
+    const cookie = cookieFrom(created);
+
+    for (const card of pack.cards) {
+      const saved = await ownerRequest(
+        `/api/plays/${play.id}/answers/${card.id}`,
+        {
+          method: "PUT",
+          ip,
+          cookie,
+          body: { choice: "a", currentPosition: card.position },
+        },
+      );
+      assert.equal(saved.status, 200, `${pack.slug}/${card.id}: ${serverLog}`);
+    }
+
+    const completed = await ownerRequest(`/api/plays/${play.id}/complete`, {
+      method: "POST",
+      ip,
+      cookie,
+      body: {},
+    });
+    assert.equal(completed.status, 200, `${pack.slug}: ${serverLog}`);
+    assert.equal((await completed.json()).status, "completed");
+
+    const profile = await ownerRequest("/api/me/profile", {
+      ip,
+      cookie,
+    });
+    assert.equal(profile.status, 200, `${pack.slug}: ${serverLog}`);
+    const profileBody = await profile.json();
+    assert.equal(profileBody.packSlug, pack.slug);
+    assert.equal(profileBody.packTitle, pack.title);
+    assert.equal(profileBody.cards.length, 10);
+
+    const kind = pack.presentation.defaultShareKind;
+    const shared = await ownerRequest(`/api/plays/${play.id}/links`, {
+      method: "POST",
+      ip,
+      cookie,
+      body: { kind },
+    });
+    assert.equal(shared.status, 201, `${pack.slug}: ${serverLog}`);
+    const shareBody = await shared.json();
+    assert.equal(shareBody.link.kind, kind);
+    const inviteUrl = new URL(shareBody.inviteUrl);
+    const publicId = inviteUrl.pathname.split("/").at(-1);
+    const secret = inviteUrl.hash.slice("#k=".length);
+    assert.ok(publicId && secret);
+
+    const metadata = await ownerRequest(`/api/invites/${publicId}/metadata`, {
+      method: "POST",
+      ip: `203.0.113.${41 + index}`,
+      body: { secret },
+    });
+    assert.equal(metadata.status, 200, `${pack.slug}: ${serverLog}`);
+    assert.deepEqual(await metadata.json(), {
+      packSlug: pack.slug,
+      packVersion: pack.version,
+      packTitle: pack.title,
+      kind,
+    });
+
+    const response = await ownerRequest(`/api/invites/${publicId}/responses`, {
+      method: "POST",
+      ip: `203.0.113.${41 + index}`,
+      body: {
+        intent: "start",
+        secret,
+        relationshipCode: "old_friend",
+        knownSinceCode: "ten_years_or_more",
+      },
+    });
+    assert.equal(response.status, 201, `${pack.slug}: ${serverLog}`);
+    const responseBody = await response.json();
+    assert.equal(responseBody.packSlug, pack.slug);
+    assert.equal(responseBody.packVersion, pack.version);
+    assert.equal(responseBody.packTitle, pack.title);
+    assert.equal(responseBody.assignments.length, 3);
+
+    const visitorCookie = visitorCookieFrom(response);
+    for (const assignment of responseBody.assignments) {
+      const saved = await ownerRequest(
+        `/api/responses/${responseBody.id}/answers/${assignment.cardId}`,
+        {
+          method: "PUT",
+          ip: `203.0.113.${41 + index}`,
+          cookie: visitorCookie,
+          body: { choice: "b" },
+        },
+      );
+      assert.equal(
+        saved.status,
+        200,
+        `${pack.slug}/${assignment.cardId}: ${serverLog}`,
+      );
+    }
+
+    const submitted = await ownerRequest(
+      `/api/responses/${responseBody.id}/submit`,
+      {
+        method: "POST",
+        ip: `203.0.113.${41 + index}`,
+        cookie: visitorCookie,
+        body: { managementSecret: `${"A".repeat(42)}${"AEI"[index]}` },
+      },
+    );
+    assert.equal(submitted.status, 200, `${pack.slug}: ${serverLog}`);
+    const submittedBody = await submitted.json();
+    assert.equal(submittedBody.status, "submitted");
+    assert.equal(submittedBody.packSlug, pack.slug);
+    assert.equal(submittedBody.packTitle, pack.title);
+    assert.equal(submittedBody.assignments.length, 3);
+    assert.ok(
+      submittedBody.assignments.every(
+        (assignment) =>
+          assignment.visitorChoice === "b" &&
+          typeof assignment.matches === "boolean",
+      ),
+    );
+
+    for (const event of ["comparison_viewed", "same_pack_start_clicked"]) {
+      const recorded = await ownerRequest(
+        `/api/responses/${responseBody.id}/events`,
+        {
+          method: "POST",
+          ip: `203.0.113.${41 + index}`,
+          cookie: visitorCookie,
+          body: { event },
+        },
+      );
+      assert.equal(recorded.status, 204, `${pack.slug}/${event}: ${serverLog}`);
+    }
+
+    const converted = await ownerRequest("/api/plays", {
+      method: "POST",
+      ip: `203.0.113.${41 + index}`,
+      cookie: visitorCookie,
+      body: { packSlug: pack.slug, entrySource: "same_pack_cta" },
+    });
+    assert.equal(converted.status, 201, `${pack.slug}: ${serverLog}`);
+    const convertedBody = await converted.json();
+    assert.equal(convertedBody.packSlug, pack.slug);
+    assert.equal(convertedBody.packVersion, pack.version);
+    assert.equal(
+      sql(
+        `select count(*) from public.analytics_events
+         where event_name = 'pack_opened'
+           and visitor_response_id = '${responseBody.id}'
+           and owner_play_id = '${convertedBody.id}'
+           and properties->>'entrySource' = 'same_pack_cta'
+           and properties->>'packVersion' = '${pack.version}'`,
+        true,
+      ),
+      "1",
+    );
+  }
 });
 
 test("owner can create, reload, save ten answers, complete, and cannot edit", async () => {

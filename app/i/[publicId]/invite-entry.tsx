@@ -44,13 +44,6 @@ type State =
   | { kind: "unavailable" }
   | { kind: "retryable" };
 
-const CONSUMED_INVITE_METADATA: InviteMetadata = Object.freeze({
-  packSlug: "old-friend",
-  packVersion: "v1",
-  packTitle: "오래된 친구팩",
-  kind: "one_to_one",
-});
-
 function unavailable(error: unknown) {
   return (
     (error instanceof ShareLinkHttpError && error.status === 404) ||
@@ -95,7 +88,15 @@ export default function InviteEntry({ publicId }: { publicId: string | null }) {
           return { metadata, response };
         } catch (error: unknown) {
           if (response && unavailable(error)) {
-            return { metadata: CONSUMED_INVITE_METADATA, response };
+            return {
+              metadata: Object.freeze({
+                packSlug: response.packSlug,
+                packVersion: response.packVersion,
+                packTitle: response.packTitle,
+                kind: "one_to_one" as const,
+              }),
+              response,
+            };
           }
           throw error;
         }
@@ -216,11 +217,7 @@ export default function InviteEntry({ publicId }: { publicId: string | null }) {
 
   if (state.response) {
     return (
-      <ResponseFlow
-        initialResponse={state.response}
-        packTitle={state.metadata.packTitle}
-        headingRef={headingRef}
-      />
+      <ResponseFlow initialResponse={state.response} headingRef={headingRef} />
     );
   }
 
@@ -302,11 +299,9 @@ type PendingAnswer = Readonly<{ cardId: string; choice: DraftChoice }>;
 
 function ResponseFlow({
   initialResponse,
-  packTitle,
   headingRef,
 }: {
   initialResponse: VisitorResponse;
-  packTitle: string;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
 }) {
   const initialChoices = Object.fromEntries(
@@ -433,13 +428,7 @@ function ResponseFlow({
   }, [finish, managementError, response.status, saving]);
 
   if (response.status === "submitted") {
-    return (
-      <Comparison
-        response={response}
-        packTitle={packTitle}
-        headingRef={headingRef}
-      />
-    );
+    return <Comparison response={response} headingRef={headingRef} />;
   }
 
   const answered = Object.keys(choices).length;
@@ -449,7 +438,7 @@ function ResponseFlow({
   return (
     <main className={styles.shell}>
       <section className={styles.card} data-kind="response">
-        <p className={styles.brand}>겹 · {packTitle}</p>
+        <p className={styles.brand}>겹 · {response.packTitle}</p>
         <div
           className={styles.progressRow}
           role="progressbar"
@@ -564,11 +553,9 @@ function ResponseFlow({
 
 function Comparison({
   response,
-  packTitle,
   headingRef,
 }: {
   response: Extract<VisitorResponse, { status: "submitted" }>;
-  packTitle: string;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
 }) {
   const [copyState, setCopyState] = useState<
@@ -625,7 +612,7 @@ function Comparison({
         className={`${styles.card} ${styles.comparison}`}
         data-kind="comparison"
       >
-        <p className={styles.brand}>겹 · {packTitle}</p>
+        <p className={styles.brand}>겹 · {response.packTitle}</p>
         <span className={styles.resultKicker}>3장 비교 완료</span>
         <h1 ref={headingRef} tabIndex={-1}>
           {response.allMatched
@@ -694,7 +681,7 @@ function Comparison({
         </div>
         <Link
           className={styles.primaryCta}
-          href="/play/new?pack=old-friend&source=same_pack_cta"
+          href={`/play/new?pack=${encodeURIComponent(response.packSlug)}&source=same_pack_cta`}
           onClick={() => {
             void recordVisitorEvent(
               response.id,

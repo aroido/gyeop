@@ -261,6 +261,7 @@ select is(
     'get_owner_play(uuid,bytea)',
     'get_owner_profile(uuid,bytea)',
     'get_published_pack(text)',
+    'get_visitor_response_pack_metadata(uuid,bytea)',
     'get_visitor_response(uuid,bytea)',
     'list_owner_share_links(uuid,bytea)',
     'publish_pack_version(uuid)',

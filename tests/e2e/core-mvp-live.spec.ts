@@ -41,6 +41,30 @@ const visitorHeaders = {
   "x-gyeop-origin-verify": proxyKey,
 };
 
+async function waitForLivePackApi() {
+  const port = process.env.GYEOP_E2E_PORT ?? "3000";
+  let lastStatus = "no response";
+  for (let attempt = 0; attempt < 180; attempt += 1) {
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:${port}/api/packs/old-friend`,
+        {
+          headers: {
+            ...visitorHeaders,
+            "x-forwarded-for": "198.51.100.217",
+          },
+        },
+      );
+      lastStatus = `${response.status}`;
+      if (response.status === 200) return;
+    } catch (error: unknown) {
+      lastStatus = error instanceof Error ? error.message : "unknown error";
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`Live pack API did not become ready: ${lastStatus}`);
+}
+
 function setOldFriendActive() {
   execFileSync(
     "docker",
@@ -179,9 +203,31 @@ async function expectMobileContract(page: Page, primary: Locator) {
   expect(contract.bottom).toBeLessThanOrEqual(contract.viewportHeight + 0.5);
 }
 
+async function waitForOwnerPlayStart(page: Page) {
+  const playUrl = /\/play\/[0-9a-f-]{36}$/;
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const retry = page.getByRole("button", { name: "다시 시도" });
+    const outcome = await Promise.race([
+      page
+        .waitForURL(playUrl, { timeout: 15_000 })
+        .then(() => "started" as const),
+      retry
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => "retry" as const),
+    ]);
+    if (outcome === "started") return;
+    if (attempt === 5) {
+      throw new Error("Owner play did not start after five explicit retries");
+    }
+    await page.waitForTimeout(250 * (attempt + 1));
+    await retry.click();
+    await expect(retry).toBeHidden();
+  }
+}
+
 async function completeOwner(page: Page) {
   await page.goto("/play/new?pack=old-friend");
-  await page.waitForURL(/\/play\/[0-9a-f-]{36}$/);
+  await waitForOwnerPlayStart(page);
   await expect(
     page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
   ).toBeFocused();
@@ -269,7 +315,10 @@ test.describe("core MVP live gate", () => {
   test.skip(!live, "GYEOP_E2E_LIVE=1 runs the core MVP browser gate");
   test.describe.configure({ mode: "serial", retries: 0 });
 
-  test.beforeAll(() => setOldFriendActive());
+  test.beforeAll(async () => {
+    setOldFriendActive();
+    await waitForLivePackApi();
+  });
   test.afterAll(() => setOldFriendActive());
 
   test("proves owner share, visitor conversion, and profile reshare", async ({
@@ -294,7 +343,7 @@ test.describe("core MVP live gate", () => {
     const manualUrl = page.getByLabel("공유 링크 직접 복사");
     const inviteUrl = await manualUrl.inputValue();
     expect(
-      /^http:\/\/127\.0\.0\.1:3000\/i\/[A-Za-z0-9_-]{22}#k=[A-Za-z0-9_-]{43}$/.test(
+      /^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}\/i\/[A-Za-z0-9_-]{22}#k=[A-Za-z0-9_-]{43}$/.test(
         inviteUrl,
       ),
     ).toBe(true);
@@ -459,5 +508,64 @@ test.describe("core MVP live gate", () => {
       });
 
     for (const visitor of visitors) await visitor.context.close();
+  });
+
+  test("completes a newly added pack through the real browser path", async ({
+    browser,
+    context,
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await installFailedClipboard(context);
+    await page.goto("/");
+
+    const packCard = page.locator("article").filter({
+      has: page.getByRole("heading", { name: "나, 첫눈에 어땠어?" }),
+    });
+    await packCard.getByRole("link", { name: "질문 시작하기" }).click();
+    await waitForOwnerPlayStart(page);
+    await expect(
+      page.getByRole("heading", { name: "처음 만난 자리에서 나는?" }),
+    ).toBeFocused();
+
+    for (let position = 1; position <= 10; position += 1) {
+      await page.locator('button[data-choice="a"]').click();
+    }
+    await expect(
+      page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await page.getByRole("button", { name: "친구에게 공유하기" }).click();
+    await expect(page.getByText("겹 · 나, 첫눈에 어땠어?")).toBeVisible();
+
+    await page.getByRole("button", { name: "공유 링크 만들기" }).click();
+    const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
+    expect(inviteUrl.includes("/i/")).toBe(true);
+
+    const visitor = await completeVisitor(browser, inviteUrl, {
+      ip: "198.51.100.240",
+      viewport: { width: 390, height: 844 },
+      relationship: "오래된 친구",
+      knownSince: "10년 이상이에요",
+    });
+    await expect(
+      visitor.page.getByText("겹 · 나, 첫눈에 어땠어?"),
+    ).toBeVisible();
+    const samePack = visitor.page.getByRole("link", {
+      name: "나도 이 팩으로 시작하기",
+    });
+    await samePack.click();
+    await waitForOwnerPlayStart(visitor.page);
+    await expect(
+      visitor.page.getByRole("heading", {
+        name: "처음 만난 자리에서 나는?",
+      }),
+    ).toBeFocused();
+
+    await page.goto("/me");
+    await expect(page.getByText("겹 · 나, 첫눈에 어땠어?")).toBeVisible();
+    await expect(page.locator("article")).toHaveCount(10);
+    await visitor.context.close();
   });
 });

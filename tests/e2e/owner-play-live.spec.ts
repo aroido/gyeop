@@ -1,12 +1,18 @@
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
 
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type Page,
+} from "@playwright/test";
 
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
 const proxyKey = Buffer.alloc(32, 8).toString("base64url");
 const visitorManagementSecret = Buffer.alloc(32, 6).toString("base64url");
+const e2eBaseUrl = `http://127.0.0.1:${process.env.GYEOP_E2E_PORT ?? "3000"}`;
 const visitorHeaders = {
   "x-forwarded-for": "198.51.100.219",
   "x-forwarded-host": "127.0.0.1",
@@ -33,6 +39,25 @@ function setOldFriendActive() {
     ],
     { stdio: "ignore" },
   );
+}
+
+async function waitForOwnerPlayStart(page: Page) {
+  const playUrl = /\/play\/[0-9a-f-]{36}$/;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const retry = page.getByRole("button", { name: "다시 시도" });
+    const outcome = await Promise.race([
+      page
+        .waitForURL(playUrl, { timeout: 15_000 })
+        .then(() => "started" as const),
+      retry
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => "retry" as const),
+    ]);
+    if (outcome === "started") return;
+    await retry.click();
+    await expect(retry).toBeHidden();
+  }
+  await page.waitForURL(playUrl, { timeout: 15_000 });
 }
 
 type ShareActionEventRow = {
@@ -252,7 +277,7 @@ async function rawVisitorAction(
     method: input.method,
     headers: {
       cookie: `__Host-gyeop-response=${input.cookieValue}`,
-      origin: "http://127.0.0.1:3000",
+      origin: e2eBaseUrl,
     },
     data: input.body,
   });
@@ -455,13 +480,13 @@ async function postRawVisitorResponse(input: {
 }) {
   const headers: Record<string, string> = {
     ...visitorHeaders,
-    origin: "http://127.0.0.1:3000",
+    origin: e2eBaseUrl,
     "content-type": "application/json",
   };
   if (input.ip) headers["x-forwarded-for"] = input.ip;
   if (input.cookie) headers.cookie = input.cookie;
   const response = await fetch(
-    `http://127.0.0.1:3000/api/invites/${input.publicId}/responses`,
+    `${e2eBaseUrl}/api/invites/${input.publicId}/responses`,
     {
       method: "POST",
       headers,
@@ -519,12 +544,20 @@ function expectExactAssignmentResponse(body: string) {
     "id",
     "knownSinceCode",
     "knownSinceLabel",
+    "packSlug",
+    "packTitle",
+    "packVersion",
     "relationshipCode",
     "relationshipLabel",
     "sessionExpiresAt",
     "sessionTtlSeconds",
     "status",
   ]);
+  expect(parsed).toMatchObject({
+    packSlug: "old-friend",
+    packVersion: "old-friend-v1",
+    packTitle: "우리 아직 통할까?",
+  });
   const assignments = parsed.assignments as Record<string, unknown>[];
   expect(assignments).toHaveLength(3);
   expect(assignments.map((assignment) => assignment.position)).toEqual([
@@ -561,12 +594,20 @@ function expectExactSubmittedResponse(body: string) {
     "id",
     "knownSinceCode",
     "knownSinceLabel",
+    "packSlug",
+    "packTitle",
+    "packVersion",
     "relationshipCode",
     "relationshipLabel",
     "sessionExpiresAt",
     "sessionTtlSeconds",
     "status",
   ]);
+  expect(parsed).toMatchObject({
+    packSlug: "old-friend",
+    packVersion: "old-friend-v1",
+    packTitle: "우리 아직 통할까?",
+  });
   expect(parsed.status).toBe("submitted");
   expect(typeof parsed.allMatched).toBe("boolean");
   const submittedAssignments = parsed.assignments as Record<string, unknown>[];
@@ -657,7 +698,7 @@ test.describe("live owner flow", () => {
       });
     });
     await page.goto("/play/new?pack=old-friend");
-    await page.waitForURL(/\/play\/[0-9a-f-]{36}$/);
+    await waitForOwnerPlayStart(page);
     await expect(
       page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
     ).toBeVisible();
@@ -708,7 +749,7 @@ test.describe("live owner flow", () => {
     await page.getByRole("button", { name: "공유 링크 만들기" }).click();
     const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
     expect(
-      /^http:\/\/127\.0\.0\.1:3000\/i\/[A-Za-z0-9_-]{22}#k=[A-Za-z0-9_-]{43}$/.test(
+      /^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}\/i\/[A-Za-z0-9_-]{22}#k=[A-Za-z0-9_-]{43}$/.test(
         inviteUrl,
       ),
     ).toBe(true);

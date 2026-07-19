@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { loadOwnerFlow } from "@/lib/owner-flow/owner-flow-client";
-import type { ShareKind } from "@/lib/packs/presentation";
+import { getPackPresentation, type ShareKind } from "@/lib/packs/presentation";
 import {
   buildShareData,
   isShareCancellation,
@@ -25,7 +25,12 @@ import styles from "./share-links.module.css";
 type State =
   | { kind: "loading" }
   | { kind: "terminal" }
-  | { kind: "ready"; packTitle: string; links: readonly ShareLink[] };
+  | {
+      kind: "ready";
+      packTitle: string;
+      defaultShareKind: ShareKind;
+      links: readonly ShareLink[];
+    };
 type ReadyLink = Readonly<{
   linkId: string;
   kind: "public" | "one_to_one";
@@ -36,18 +41,24 @@ type Feedback = Readonly<{
   message: string;
 }>;
 
-async function readManagerState(playId: string): Promise<State> {
+async function readManagerState(
+  playId: string,
+): Promise<Extract<State, { kind: "ready" }>> {
   const { play, pack } = await loadOwnerFlow(playId);
   if (
     play.status !== "completed" ||
-    play.packSlug !== "old-friend" ||
-    pack.slug !== "old-friend" ||
+    pack.slug !== play.packSlug ||
     pack.version !== play.packVersion
   ) {
     throw new Error("terminal");
   }
   const links = await listShareLinks(playId);
-  return { kind: "ready", packTitle: pack.title, links };
+  return {
+    kind: "ready",
+    packTitle: pack.title,
+    defaultShareKind: getPackPresentation(pack.slug).defaultShareKind,
+    links,
+  };
 }
 
 function replaceLink(links: readonly ShareLink[], next: ShareLink) {
@@ -66,17 +77,15 @@ function readShareSupport() {
 
 export default function ShareLinkManager({
   playId,
-  defaultShareKind,
   entrySource,
 }: {
   playId: string | null;
-  defaultShareKind: ShareKind;
   entrySource: ShareEntrySource;
 }) {
   const [state, setState] = useState<State>(
     playId ? { kind: "loading" } : { kind: "terminal" },
   );
-  const [selectedKind, setSelectedKind] = useState<ShareKind>(defaultShareKind);
+  const [selectedKind, setSelectedKind] = useState<ShareKind>("public");
   const [readyLink, setReadyLink] = useState<ReadyLink | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -110,7 +119,9 @@ export default function ShareLinkManager({
     setState({ kind: "loading" });
     setReadyLink(null);
     try {
-      setState(await readManagerState(playId));
+      const next = await readManagerState(playId);
+      setSelectedKind(next.defaultShareKind);
+      setState(next);
     } catch {
       setState({ kind: "terminal" });
     }
@@ -121,7 +132,10 @@ export default function ShareLinkManager({
     let active = true;
     void readManagerState(playId)
       .then((next) => {
-        if (active) setState(next);
+        if (active) {
+          setSelectedKind(next.defaultShareKind);
+          setState(next);
+        }
       })
       .catch(() => {
         if (active) setState({ kind: "terminal" });
@@ -248,10 +262,19 @@ export default function ShareLinkManager({
   }
 
   async function shareReadyLink() {
-    if (!playId || !readyLink || !canShare || !beginAction("share")) return;
+    if (
+      !playId ||
+      !readyLink ||
+      state.kind !== "ready" ||
+      !canShare ||
+      !beginAction("share")
+    )
+      return;
     setFeedback(null);
     try {
-      await navigator.share(buildShareData(readyLink.inviteUrl));
+      await navigator.share(
+        buildShareData(readyLink.inviteUrl, state.packTitle),
+      );
       setFeedback({
         tone: "status",
         message: "공유 메뉴로 링크를 전달했어요.",
@@ -326,7 +349,7 @@ export default function ShareLinkManager({
     return (
       <main className={styles.shell}>
         <section className={styles.panel}>
-          <p className={styles.brand}>겹 · 오래된 친구팩</p>
+          <p className={styles.brand}>겹 · 질문팩</p>
           <h1 ref={headingRef} tabIndex={-1}>
             이 팩을 이어갈 수 없어요
           </h1>
@@ -386,7 +409,7 @@ export default function ShareLinkManager({
               />
               <span>
                 <strong>{title}</strong>
-                {kind === defaultShareKind ? <em>추천</em> : null}
+                {kind === state.defaultShareKind ? <em>추천</em> : null}
                 <small>{copy}</small>
               </span>
             </label>

@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
-test("shows one active private-MVP pack before the owner flow", async ({
+test("shows four active private-MVP packs before the owner flow", async ({
   page,
 }) => {
   await installOwnerFlowApi(page);
@@ -24,10 +24,10 @@ test("shows one active private-MVP pack before the owner flow", async ({
   ).toBeVisible();
 
   for (const title of [
-    "오래된 친구팩",
-    "첫인상팩",
-    "직장동료팩",
-    "솔직한 나팩",
+    "우리 아직 통할까?",
+    "나, 첫눈에 어땠어?",
+    "같이 일할 때 나는?",
+    "가까운 사람만 아는 나",
   ]) {
     await expect(
       page.getByRole("heading", { level: 3, name: title }),
@@ -35,18 +35,21 @@ test("shows one active private-MVP pack before the owner flow", async ({
   }
 
   const activePacks = page.locator('[data-pack-state="active"]');
-  await expect(activePacks).toHaveCount(1);
+  await expect(activePacks).toHaveCount(4);
   await expect(activePacks.getByText("지금 시작", { exact: true })).toHaveCount(
-    1,
+    4,
   );
-  const packLinks = page.getByRole("link", { name: "팩 열어보기" });
-  await expect(packLinks).toHaveCount(1);
-  await expect(packLinks).toHaveAttribute("href", "/play/new?pack=old-friend");
-  await expect(page.getByText("준비 중", { exact: true })).toHaveCount(3);
+  const packLinks = page.getByRole("link", { name: "질문 시작하기" });
+  await expect(packLinks).toHaveCount(4);
+  await expect(packLinks.first()).toHaveAttribute(
+    "href",
+    "/play/new?pack=old-friend",
+  );
+  await expect(page.getByText("준비 중", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("progressbar")).toHaveCount(0);
   await expect(page.locator("[data-choice]")).toHaveCount(0);
 
-  await packLinks.click();
+  await packLinks.first().click();
 
   await expect(page).toHaveURL(`/play/${playId}`);
   await expect(
@@ -59,7 +62,7 @@ test("supports keyboard pack preview navigation", async ({ page }) => {
   await page.waitForLoadState("networkidle");
 
   const rail = page.getByTestId("pack-rail");
-  const cta = page.getByRole("link", { name: "팩 열어보기" }).first();
+  const cta = page.getByRole("link", { name: "질문 시작하기" }).first();
   await page.keyboard.press("Tab");
   await expect(rail).toBeFocused();
   await expect(rail).toHaveCSS("outline-style", /^(?!none$).+/);
@@ -123,9 +126,9 @@ for (const viewport of [
     const rail = page.getByTestId("pack-rail");
     const secondPack = page.getByRole("heading", {
       level: 3,
-      name: "첫인상팩",
+      name: "나, 첫눈에 어땠어?",
     });
-    const cta = page.getByRole("link", { name: "팩 열어보기" }).first();
+    const cta = page.getByRole("link", { name: "질문 시작하기" }).first();
     const ctaBox = await cta.boundingBox();
     const secondPackBox = await secondPack.boundingBox();
     expect(ctaBox?.height).toBeGreaterThanOrEqual(44);

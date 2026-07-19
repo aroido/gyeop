@@ -5,8 +5,6 @@ import { parseInviteFragment } from "../../lib/share-links/invite-fragment-core.
 import {
   buildShareData,
   isShareCancellation,
-  SHARE_TEXT,
-  SHARE_TITLE,
 } from "../../lib/share-links/share-handoff-core.mjs";
 import {
   deriveInviteRateLimitKey,
@@ -90,7 +88,7 @@ test("strictly decodes only public invite metadata", () => {
     metadata: {
       packSlug: "old-friend",
       packVersion: "old-friend-v1",
-      packTitle: "오래된 친구팩",
+      packTitle: "우리 아직 통할까?",
       kind: "one_to_one",
     },
   };
@@ -105,17 +103,13 @@ test("strictly decodes only public invite metadata", () => {
 
 test("builds the exact native share payload without channel metadata", () => {
   const url = `http://127.0.0.1:3000/i/AAAAAAAAAAAAAAAAAAAAAA#k=${secret}`;
-  assert.deepEqual(buildShareData(url), {
-    title: SHARE_TITLE,
-    text: SHARE_TEXT,
+  assert.deepEqual(buildShareData(url, "우리 아직 통할까?"), {
+    title: "겹 · 우리 아직 통할까?",
+    text: '내가 먼저 답한 "우리 아직 통할까?" 질문이야. 너는 나를 어떻게 보는지 3장만 골라줘.',
     url,
   });
-  assert.equal(SHARE_TITLE, "겹 · 오래된 친구팩");
-  assert.equal(
-    SHARE_TEXT,
-    "내가 먼저 답한 오래된 친구팩이야. 너는 나를 어떻게 보는지 3장만 골라줘.",
-  );
-  assert.throws(() => buildShareData(""));
+  assert.throws(() => buildShareData("", "우리 아직 통할까?"));
+  assert.throws(() => buildShareData(url, ""));
 });
 
 test("classifies only AbortError as a native share cancellation", () => {

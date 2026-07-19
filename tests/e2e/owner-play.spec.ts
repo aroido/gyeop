@@ -72,7 +72,7 @@ test("rejects an unknown bootstrap pack without an API request", async ({
   expect(api.calls).toHaveLength(0);
 });
 
-test("starts a new pack only after the generic terminal session is cleared", async ({
+test("returns to pack selection only after the generic terminal session is cleared", async ({
   page,
 }) => {
   const api = await installOwnerFlowApi(page, { readMissingCount: 1 });
@@ -80,16 +80,16 @@ test("starts a new pack only after the generic terminal session is cleared", asy
   await expect(
     page.getByRole("heading", { name: "이 팩을 이어갈 수 없어요" }),
   ).toBeFocused();
-  await page.getByRole("button", { name: "새 팩 시작" }).click();
-  await page.waitForURL(`/play/${playId}`);
+  await page.getByRole("button", { name: "다른 팩 고르기" }).click();
+  await page.waitForURL("/");
   await expect(
-    page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
+    page.getByRole("heading", {
+      name: "친구가 보는 나는 내가 아는 나와 같을까?",
+    }),
   ).toBeVisible();
-  expect(api.calls.slice(0, 4).map((call) => call.method)).toEqual([
+  expect(api.calls.slice(0, 2).map((call) => call.method)).toEqual([
     "GET",
     "DELETE",
-    "POST",
-    "GET",
   ]);
 });
 
@@ -199,9 +199,10 @@ test("holds all later choices behind a failed save and completes after retry", a
   ).toHaveLength(1);
 
   await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
-  ).toBeVisible();
+  const completedHeading = page.getByRole("heading", {
+    name: "내 답변 10개가 저장됐어요",
+  });
+  await expect(completedHeading).toBeFocused();
   await expect(page.locator("[data-choice]")).toHaveCount(0);
   await expect(
     page.getByRole("list", { name: "내 선택 10장" }).getByRole("listitem"),

@@ -20,6 +20,7 @@ const ALLOWED_RPC_EXPORTS = new Map([
   ["recordOwnerShareAction", "record_owner_share_action_with_source"],
   ["startResponse", "start_required_response"],
   ["getVisitorResponse", "get_visitor_response"],
+  ["getVisitorResponsePackMetadata", "get_visitor_response_pack_metadata"],
   ["saveResponseAnswer", "save_response_answer"],
   ["submitResponse", "submit_response"],
   ["recordVisitorResponseEvent", "record_visitor_response_event"],

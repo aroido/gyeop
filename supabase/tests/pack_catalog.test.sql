@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set search_path to extensions, public, pg_catalog;
 
-select plan(38);
+select plan(41);
 
 select is(
   (
@@ -30,8 +30,40 @@ select is(
     from public.pack_templates
     where id = '11111111-1111-4111-8111-111111111111'
   ),
-  '{"slug":"old-friend","title":"오래된 친구팩","targetRelationship":"old_friend","sensitivity":"low","active":true}'::jsonb,
+  '{"slug":"old-friend","title":"우리 아직 통할까?","targetRelationship":"old_friend","sensitivity":"low","active":true}'::jsonb,
   'seed recreates the frozen private-MVP active template'
+);
+
+select is(
+  (
+    select count(*)
+    from public.pack_templates
+    where is_active
+      and published_version_id is not null
+  ),
+  4::bigint,
+  'migration and seed expose exactly four active published packs'
+);
+
+select is(
+  (select count(*) from public.pack_cards),
+  40::bigint,
+  'the four published packs contain exactly forty cards'
+);
+
+select is(
+  (
+    select jsonb_object_agg(slug, title order by slug)
+    from public.pack_templates
+    where slug in ('old-friend', 'first-impression', 'coworker', 'honest-self')
+  ),
+  '{
+    "coworker":"같이 일할 때 나는?",
+    "first-impression":"나, 첫눈에 어땠어?",
+    "honest-self":"가까운 사람만 아는 나",
+    "old-friend":"우리 아직 통할까?"
+  }'::jsonb,
+  'all four reviewed titles are materialized exactly'
 );
 
 select ok(

@@ -8,6 +8,11 @@ const testKey = Buffer.alloc(32, 7).toString("base64url");
 const proxyKey = Buffer.alloc(32, 8).toString("base64url");
 const rateLimitKey = Buffer.alloc(32, 9).toString("base64url");
 const liveOwnerFlow = process.env.GYEOP_E2E_LIVE === "1";
+const e2ePort = process.env.GYEOP_E2E_PORT ?? "3000";
+if (!/^[1-9][0-9]{0,4}$/.test(e2ePort) || Number(e2ePort) > 65_535) {
+  throw new Error("GYEOP_E2E_PORT must be a valid TCP port");
+}
+const e2eBaseUrl = `http://127.0.0.1:${e2ePort}`;
 
 function localSupabase(): Record<string, string> {
   if (!liveOwnerFlow) return {};
@@ -43,7 +48,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? "github" : "list",
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: e2eBaseUrl,
     trace: "on-first-retry",
     ...(liveOwnerFlow
       ? {
@@ -67,13 +72,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "pnpm dev --hostname 127.0.0.1",
-    url: "http://127.0.0.1:3000",
+    command: `pnpm dev --hostname 127.0.0.1 --port ${e2ePort}`,
+    url: e2eBaseUrl,
     reuseExistingServer: !process.env.CI,
     env: {
       ACCOUNT_DELETE_REAUTH_KEYRING: JSON.stringify({ v1: testKey }),
       ACCOUNT_DELETE_REAUTH_ACTIVE_VERSION: "v1",
-      APP_URL: "http://127.0.0.1:3000",
+      APP_URL: e2eBaseUrl,
       ORIGIN_PROXY_SECRET: proxyKey,
       RATE_LIMIT_SECRET: rateLimitKey,
       ...supabaseEnv,

@@ -12,6 +12,12 @@ import {
 import styles from "../[playId]/page.module.css";
 
 type State = "loading" | "retryable" | "terminal";
+const packTitles: Readonly<Record<string, string>> = Object.freeze({
+  "old-friend": "우리 아직 통할까?",
+  "first-impression": "나, 첫눈에 어땠어?",
+  coworker: "같이 일할 때 나는?",
+  "honest-self": "가까운 사람만 아는 나",
+});
 
 function isRetryable(error: unknown) {
   return (
@@ -25,7 +31,7 @@ export default function BootstrapOwnerPlay({
   pack,
   entrySource,
 }: {
-  pack: "old-friend" | null;
+  pack: string | null;
   entrySource: "home" | "same_pack_cta";
 }) {
   const router = useRouter();
@@ -33,6 +39,7 @@ export default function BootstrapOwnerPlay({
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<State>(pack ? "loading" : "terminal");
   const [clearing, setClearing] = useState(false);
+  const packTitle = pack ? packTitles[pack] : null;
 
   useEffect(() => {
     if (!pack) return;
@@ -69,18 +76,18 @@ export default function BootstrapOwnerPlay({
 
   if (state === "loading") {
     return (
-      <main className={styles.shell} data-pack="old-friend">
+      <main className={styles.shell} data-pack={pack ?? undefined}>
         <p className={styles.loading} role="status">
-          오래된 친구팩을 준비하는 중…
+          {packTitle} 질문을 준비하는 중…
         </p>
       </main>
     );
   }
 
   return (
-    <main className={styles.shell} data-pack="old-friend">
+    <main className={styles.shell} data-pack={pack ?? undefined}>
       <section className={styles.message} aria-labelledby="start-error-title">
-        <p className={styles.brand}>겹 · 오래된 친구팩</p>
+        <p className={styles.brand}>겹{packTitle ? ` · ${packTitle}` : ""}</p>
         <h1 id="start-error-title" ref={headingRef} tabIndex={-1}>
           팩을 시작하지 못했어요
         </h1>

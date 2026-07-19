@@ -1,6 +1,9 @@
 const relationshipLabels = Object.freeze(
   Object.assign(Object.create(null) as Record<string, string>, {
     old_friend: "오래된 친구",
+    new_connection: "새로 알게 된 사이",
+    coworker: "직장 동료",
+    close_relationship: "가까운 사이",
   }),
 );
 
