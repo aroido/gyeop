@@ -1,7 +1,7 @@
 {
   "slug": "coworker",
   "version": "coworker-v1",
-  "title": "같이 일할 때 나는?",
+  "title": "같이 일한 너의 시선",
   "targetRelationship": "coworker",
   "sensitivity": "low",
   "active": true,

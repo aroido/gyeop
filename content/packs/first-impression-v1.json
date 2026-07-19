@@ -1,7 +1,7 @@
 {
   "slug": "first-impression",
   "version": "first-impression-v1",
-  "title": "나, 첫눈에 어땠어?",
+  "title": "처음 만난 너의 시선",
   "targetRelationship": "new_connection",
   "sensitivity": "low",
   "active": true,

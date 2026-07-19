@@ -30,7 +30,7 @@ select is(
     from public.pack_templates
     where id = '11111111-1111-4111-8111-111111111111'
   ),
-  '{"slug":"old-friend","title":"우리 아직 통할까?","targetRelationship":"old_friend","sensitivity":"low","active":true}'::jsonb,
+  '{"slug":"old-friend","title":"오래 본 너의 시선","targetRelationship":"old_friend","sensitivity":"low","active":true}'::jsonb,
   'seed recreates the frozen private-MVP active template'
 );
 
@@ -58,10 +58,10 @@ select is(
     where slug in ('old-friend', 'first-impression', 'coworker', 'honest-self')
   ),
   '{
-    "coworker":"같이 일할 때 나는?",
-    "first-impression":"나, 첫눈에 어땠어?",
-    "honest-self":"가까운 사람만 아는 나",
-    "old-friend":"우리 아직 통할까?"
+    "coworker":"같이 일한 너의 시선",
+    "first-impression":"처음 만난 너의 시선",
+    "honest-self":"가까운 너의 시선",
+    "old-friend":"오래 본 너의 시선"
   }'::jsonb,
   'all four reviewed titles are materialized exactly'
 );

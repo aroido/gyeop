@@ -24,10 +24,10 @@ test("shows four active private-MVP packs before the owner flow", async ({
   ).toBeVisible();
 
   for (const title of [
-    "우리 아직 통할까?",
-    "나, 첫눈에 어땠어?",
-    "같이 일할 때 나는?",
-    "가까운 사람만 아는 나",
+    "오래 본 너의 시선",
+    "처음 만난 너의 시선",
+    "같이 일한 너의 시선",
+    "가까운 너의 시선",
   ]) {
     await expect(
       page.getByRole("heading", { level: 3, name: title }),
@@ -102,6 +102,7 @@ test("renders the approved old-friend CSS cover recipe", async ({ page }) => {
 
 for (const viewport of [
   { width: 320, height: 800 },
+  { width: 390, height: 844 },
   { width: 430, height: 932 },
 ]) {
   test(`fits the landing inside ${viewport.width}x${viewport.height}`, async ({
@@ -126,7 +127,7 @@ for (const viewport of [
     const rail = page.getByTestId("pack-rail");
     const secondPack = page.getByRole("heading", {
       level: 3,
-      name: "나, 첫눈에 어땠어?",
+      name: "처음 만난 너의 시선",
     });
     const cta = page.getByRole("link", { name: "질문 시작하기" }).first();
     const ctaBox = await cta.boundingBox();
@@ -134,6 +135,17 @@ for (const viewport of [
     expect(ctaBox?.height).toBeGreaterThanOrEqual(44);
     expect(ctaBox!.y + ctaBox!.height).toBeLessThanOrEqual(viewport.height);
     expect(secondPackBox!.x).toBeLessThan(viewport.width);
+
+    const titleLineCounts = await page
+      .locator('[data-pack-state="active"] h3')
+      .evaluateAll((headings) =>
+        headings.map((heading) => {
+          const style = getComputedStyle(heading);
+          return heading.clientHeight / parseFloat(style.lineHeight);
+        }),
+      );
+    expect(titleLineCounts).toHaveLength(4);
+    expect(titleLineCounts.every((lineCount) => lineCount <= 2.05)).toBe(true);
 
     await page.keyboard.press("Tab");
     await expect(rail).toBeFocused();

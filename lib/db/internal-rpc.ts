@@ -614,19 +614,19 @@ export type GetVisitorResponsePackMetadataResult =
 const packMetadata = Object.freeze({
   "old-friend": Object.freeze({
     packVersion: "old-friend-v1",
-    packTitle: "우리 아직 통할까?",
+    packTitle: "오래 본 너의 시선",
   }),
   "first-impression": Object.freeze({
     packVersion: "first-impression-v1",
-    packTitle: "나, 첫눈에 어땠어?",
+    packTitle: "처음 만난 너의 시선",
   }),
   coworker: Object.freeze({
     packVersion: "coworker-v1",
-    packTitle: "같이 일할 때 나는?",
+    packTitle: "같이 일한 너의 시선",
   }),
   "honest-self": Object.freeze({
     packVersion: "honest-self-v1",
-    packTitle: "가까운 사람만 아는 나",
+    packTitle: "가까운 너의 시선",
   }),
 });
 
