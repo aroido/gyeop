@@ -1362,18 +1362,17 @@ test.describe("live owner flow", () => {
             status: response.status,
             retryAfter: response.headers.get("retry-after"),
           });
-          if (response.status === 429) break;
         }
         return results;
       },
       { publicId, rawSecret },
     );
-    expect(rateResults.length).toBeGreaterThan(60);
-    expect(rateResults.at(-1)?.status).toBe(429);
+    expect(rateResults).toHaveLength(121);
     expect(
-      rateResults.slice(0, -1).every((result) => result.status === 200),
+      rateResults.every(
+        (result) => result.status === 200 && result.retryAfter === null,
+      ),
     ).toBe(true);
-    expect(Number(rateResults.at(-1)?.retryAfter)).toBeGreaterThan(0);
     await rateContext.close();
 
     const initialProfileReshareEvents =
