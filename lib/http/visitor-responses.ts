@@ -14,6 +14,7 @@ import {
   saveVisitorResponseAnswer,
   startVisitorResponseSession,
   submitVisitorResponse,
+  withdrawVisitorResponse,
 } from "../visitor-response/visitor-responses.ts";
 import { visitorResponseHttpState } from "../visitor-response/visitor-context-core.mjs";
 import { errorResponse } from "./errors.ts";
@@ -222,4 +223,27 @@ export async function recordVisitorResponseScreenEvent(input: {
   const result = await recordVisitorEvent(input);
   if (result.outcome !== "recorded") return deletedUnavailableResponse();
   return privateNoStore(new Response(null, { status: 204 }));
+}
+
+export async function withdrawVisitorResponseByManagementToken(input: {
+  token: string;
+  signal: AbortSignal;
+}) {
+  const result = await withdrawVisitorResponse({
+    managementSecret: input.token,
+    signal: input.signal,
+  });
+  if (result.outcome === "withdrawn") {
+    return privateNoStore(new Response(null, { status: 204 }));
+  }
+  if (result.outcome !== "unavailable") throw new Error("INTERNAL_ERROR");
+  return privateNoStore(
+    Response.json(
+      {
+        code: "RESPONSE_MANAGEMENT_UNAVAILABLE",
+        message: "이 관리 링크는 사용할 수 없어요.",
+      },
+      { status: 404 },
+    ),
+  );
 }

@@ -153,3 +153,44 @@ export function buildManagementUrl(origin: string, secret: string) {
   }
   return `${origin}/responses/manage#token=${secret}`;
 }
+
+export function parseManagementFragment(fragment: string) {
+  if (typeof fragment !== "string") invalid();
+  const match = fragment.match(
+    /^#token=([A-Za-z0-9_-]{42}[AEIMQUYcgkosw048])$/,
+  );
+  if (!match) invalid();
+  return match[1];
+}
+
+export function removeManagementRecordMatchingSecret(
+  secret: string,
+  storage: Pick<
+    Storage,
+    "length" | "key" | "getItem" | "removeItem"
+  > = globalThis.localStorage,
+) {
+  if (!SECRET.test(secret)) invalid();
+  const candidates: string[] = [];
+  for (let index = 0; index < storage.length; index += 1) {
+    const storageKey = storage.key(index);
+    if (storageKey?.startsWith(PREFIX)) candidates.push(storageKey);
+  }
+  let removed = false;
+  for (const storageKey of candidates) {
+    const responseId = storageKey.slice(PREFIX.length);
+    if (!RESPONSE_ID.test(responseId)) continue;
+    const raw = storage.getItem(storageKey);
+    if (raw === null) continue;
+    try {
+      const record = exactRecord(JSON.parse(raw), responseId);
+      if (record.secret === secret) {
+        storage.removeItem(storageKey);
+        removed = true;
+      }
+    } catch {
+      // Malformed records are not proof of ownership and are left untouched.
+    }
+  }
+  return removed;
+}

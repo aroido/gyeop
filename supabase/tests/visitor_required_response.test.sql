@@ -47,7 +47,7 @@ select ok(
   has_table_privilege('gyeop_internal_rpc', 'public.visitor_answers', 'SELECT')
   and has_table_privilege('gyeop_internal_rpc', 'public.visitor_answers', 'INSERT')
   and has_table_privilege('gyeop_internal_rpc', 'public.visitor_answers', 'UPDATE')
-  and not has_table_privilege('gyeop_internal_rpc', 'public.visitor_answers', 'DELETE'),
+    and has_table_privilege('gyeop_internal_rpc', 'public.visitor_answers', 'DELETE'),
   'internal RPC role has only required visitor answer privileges'
 );
 select ok(

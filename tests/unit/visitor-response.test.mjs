@@ -15,6 +15,7 @@ import {
   decodeSaveResponseAnswerOutcome,
   decodeStartResponseOutcome,
   decodeSubmitResponseOutcome,
+  decodeWithdrawResponseOutcome,
   deriveResponseActionRateLimitKey,
   deriveResponseStartRateLimitKey,
   hashVisitorManagementSecret,
@@ -28,7 +29,9 @@ import {
   buildManagementUrl,
   completeManagementRecord,
   ensurePendingManagementRecord,
+  parseManagementFragment,
   readManagementRecord,
+  removeManagementRecordMatchingSecret,
 } from "../../lib/visitor-management/management-secret.ts";
 import {
   continueVisitorResponse,
@@ -493,6 +496,70 @@ test("persists one exact browser-only management record", () => {
   );
   assert.throws(() => readManagementRecord(id, storage));
   assert.deepEqual(ensurePendingManagementRecord(id, storage, source), pending);
+});
+
+test("parses an exact management fragment and removes only its strict record", () => {
+  assert.equal(parseManagementFragment(`#token=${secret}`), secret);
+  for (const fragment of [
+    "",
+    `?token=${secret}`,
+    `#token=${encodeURIComponent(secret)}&extra=1`,
+    `#extra=1&token=${secret}`,
+    `#token=${secret}#again`,
+    "#token=bad",
+  ]) {
+    assert.throws(() => parseManagementFragment(fragment));
+  }
+
+  const otherId = "22000000-0000-4000-8000-000000000002";
+  const otherSecret = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE";
+  const values = new Map([
+    [
+      `gyeop:visitor-management:v1:${id}`,
+      JSON.stringify({
+        version: 1,
+        responseId: id,
+        status: "completed",
+        secret,
+      }),
+    ],
+    [
+      `gyeop:visitor-management:v1:${otherId}`,
+      JSON.stringify({
+        version: 1,
+        responseId: otherId,
+        status: "completed",
+        secret: otherSecret,
+      }),
+    ],
+    ["gyeop:visitor-management:v1:not-a-response", "malformed"],
+    ["unrelated", secret],
+  ]);
+  const storage = {
+    get length() {
+      return values.size;
+    },
+    key: (index) => [...values.keys()][index] ?? null,
+    getItem: (key) => values.get(key) ?? null,
+    removeItem: (key) => values.delete(key),
+  };
+  assert.equal(removeManagementRecordMatchingSecret(secret, storage), true);
+  assert.equal(values.has(`gyeop:visitor-management:v1:${id}`), false);
+  assert.equal(values.has(`gyeop:visitor-management:v1:${otherId}`), true);
+  assert.equal(values.has("gyeop:visitor-management:v1:not-a-response"), true);
+  assert.equal(values.has("unrelated"), true);
+});
+
+test("strictly decodes visitor withdrawal outcomes", () => {
+  assert.deepEqual(decodeWithdrawResponseOutcome({ outcome: "withdrawn" }), {
+    outcome: "withdrawn",
+  });
+  assert.deepEqual(decodeWithdrawResponseOutcome({ outcome: "unavailable" }), {
+    outcome: "unavailable",
+  });
+  assert.throws(() =>
+    decodeWithdrawResponseOutcome({ outcome: "withdrawn", responseId: id }),
+  );
 });
 
 const httpState = Object.freeze({

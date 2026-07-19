@@ -338,10 +338,29 @@ export function verifyVisitorResponse() {
     "/responses/manage#token=",
     "globalThis.localStorage",
     "storage.removeItem(key(responseId))",
+    "parseManagementFragment",
+    "removeManagementRecordMatchingSecret",
   ]) {
     assert.ok(
       management.includes(contract),
       `missing management storage contract: ${contract}`,
+    );
+  }
+
+  const withdrawalMigration = source(
+    "supabase/migrations/20260719000300_visitor_response_withdrawal.sql",
+  );
+  for (const contract of [
+    "create function public.withdraw_response",
+    "delete from public.visitor_answers",
+    "delete from public.visitor_assignments",
+    "analytics_withdrawal_scrub_guard",
+    "response_withdrawn",
+    "status = 'withdrawn'",
+  ]) {
+    assert.ok(
+      withdrawalMigration.includes(contract),
+      `missing visitor withdrawal contract: ${contract}`,
     );
   }
 

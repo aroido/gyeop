@@ -114,9 +114,11 @@ select is(
     'share_links:INSERT',
     'share_links:SELECT',
     'share_links:UPDATE',
+    'visitor_answers:DELETE',
     'visitor_answers:INSERT',
     'visitor_answers:SELECT',
     'visitor_answers:UPDATE',
+    'visitor_assignments:DELETE',
     'visitor_assignments:INSERT',
     'visitor_assignments:SELECT',
     'visitor_responses:INSERT',
@@ -276,7 +278,8 @@ select is(
     'save_response_answer(uuid,bytea,text,text)',
     'start_required_response(text,bytea,text,uuid,bytea,uuid,bytea,text,text,bytea)',
     'start_response(text,bytea,text,uuid,bytea,uuid,bytea,text,text,bytea)',
-    'submit_response(uuid,bytea,bytea)'
+    'submit_response(uuid,bytea,bytea)',
+    'withdraw_response(bytea)'
   ]::text[],
   'service_role function grants match the exact RPC allowlist'
 );

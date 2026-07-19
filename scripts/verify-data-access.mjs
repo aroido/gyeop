@@ -25,6 +25,7 @@ const ALLOWED_RPC_EXPORTS = new Map([
   ["assignOptionalCards", "assign_optional_cards"],
   ["submitResponse", "submit_response"],
   ["recordVisitorResponseEvent", "record_visitor_response_event"],
+  ["withdrawResponse", "withdraw_response"],
   ["deleteAuthUser", "prepare_auth_deletion_call"],
   ["resolveNotificationRecipient", "resolve_notification_recipient_identity"],
 ]);

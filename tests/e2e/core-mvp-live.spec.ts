@@ -581,4 +581,84 @@ test.describe("core MVP live gate", () => {
     await expect(page.locator("article")).toHaveCount(10);
     await visitor.context.close();
   });
+
+  test("withdraws a visitor response through its copied management link", async ({
+    browser,
+    context,
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await installFailedClipboard(context);
+    await completeOwner(page);
+    await page.getByRole("button", { name: "공유 링크 만들기" }).click();
+    const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
+
+    const visitor = await completeVisitor(browser, inviteUrl, {
+      ip: "198.51.100.241",
+      viewport: { width: 390, height: 844 },
+      relationship: "가족",
+      knownSince: "1년 이상 · 3년 미만",
+    });
+    await visitor.page.evaluate(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: async () => {
+            throw new Error("clipboard failed");
+          },
+        },
+      });
+    });
+    const responseId = await visitor.page.evaluate(() => {
+      const key = Object.keys(localStorage).find((candidate) =>
+        candidate.startsWith("gyeop:visitor-management:v1:"),
+      );
+      return key?.slice("gyeop:visitor-management:v1:".length) ?? null;
+    });
+    expect(responseId).toMatch(/^[0-9a-f-]{36}$/);
+    await visitor.page
+      .getByRole("button", { name: "내 관리 링크 복사" })
+      .click();
+    const managementUrl = await visitor.page
+      .getByRole("textbox", { name: "직접 복사하기" })
+      .inputValue();
+    expect(managementUrl).toMatch(/\/responses\/manage#token=/);
+
+    await page.goto("/me");
+    await expect(page.getByText("시선을 모으는 중 · 1/3")).toHaveCount(3);
+
+    await visitor.page.goto(managementUrl);
+    await expect(
+      visitor.page.getByRole("heading", { name: "이 답변을 지울까요?" }),
+    ).toBeVisible();
+    expect(visitor.page.url()).not.toContain("#token=");
+    await visitor.page
+      .getByRole("button", { name: "이 답변 철회하기" })
+      .click();
+    await expect(
+      visitor.page.getByRole("heading", { name: "답변을 철회했어요" }),
+    ).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByText("시선을 모으는 중 · 0/3")).toHaveCount(10);
+
+    const oldSession = await visitor.context.request.get(
+      `/api/responses/${responseId}`,
+    );
+    expect(oldSession.status()).toBe(404);
+    expect((await oldSession.json()).code).toBe("INVITE_UNAVAILABLE");
+
+    await visitor.page.goto(managementUrl);
+    await visitor.page
+      .getByRole("button", { name: "이 답변 철회하기" })
+      .click();
+    await expect(
+      visitor.page.getByRole("heading", {
+        name: "이 관리 링크는 사용할 수 없어요",
+      }),
+    ).toBeVisible();
+    await visitor.context.close();
+  });
 });
