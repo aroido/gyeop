@@ -553,6 +553,7 @@ test.describe("core MVP live gate", () => {
       has: page.getByRole("heading", { name: "처음 만난 너의 시선" }),
     });
     await packCard.getByRole("link", { name: "질문 시작하기" }).click();
+    await confirmEligibility(page);
     await waitForOwnerPlayStart(page);
     await expect(
       page.getByRole("heading", { name: "처음 만난 자리에서 나는?" }),
@@ -597,6 +598,7 @@ test.describe("core MVP live gate", () => {
       name: "나도 이 팩으로 시작하기",
     });
     await samePack.click();
+    await confirmEligibility(visitor.page);
     await waitForOwnerPlayStart(visitor.page);
     await expect(
       visitor.page.getByRole("heading", {
