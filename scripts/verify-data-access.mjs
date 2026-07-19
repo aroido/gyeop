@@ -22,6 +22,7 @@ const ALLOWED_RPC_EXPORTS = new Map([
   ["getVisitorResponse", "get_visitor_response"],
   ["getVisitorResponsePackMetadata", "get_visitor_response_pack_metadata"],
   ["saveResponseAnswer", "save_response_answer"],
+  ["assignOptionalCards", "assign_optional_cards"],
   ["submitResponse", "submit_response"],
   ["recordVisitorResponseEvent", "record_visitor_response_event"],
   ["deleteAuthUser", "prepare_auth_deletion_call"],
