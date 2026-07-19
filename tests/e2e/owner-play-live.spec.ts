@@ -520,12 +520,20 @@ function expectExactAssignmentResponse(body: string) {
     "id",
     "knownSinceCode",
     "knownSinceLabel",
+    "packSlug",
+    "packTitle",
+    "packVersion",
     "relationshipCode",
     "relationshipLabel",
     "sessionExpiresAt",
     "sessionTtlSeconds",
     "status",
   ]);
+  expect(parsed).toMatchObject({
+    packSlug: "old-friend",
+    packVersion: "old-friend-v1",
+    packTitle: "우리 아직 통할까?",
+  });
   const assignments = parsed.assignments as Record<string, unknown>[];
   expect(assignments).toHaveLength(3);
   expect(assignments.map((assignment) => assignment.position)).toEqual([
@@ -562,12 +570,20 @@ function expectExactSubmittedResponse(body: string) {
     "id",
     "knownSinceCode",
     "knownSinceLabel",
+    "packSlug",
+    "packTitle",
+    "packVersion",
     "relationshipCode",
     "relationshipLabel",
     "sessionExpiresAt",
     "sessionTtlSeconds",
     "status",
   ]);
+  expect(parsed).toMatchObject({
+    packSlug: "old-friend",
+    packVersion: "old-friend-v1",
+    packTitle: "우리 아직 통할까?",
+  });
   expect(parsed.status).toBe("submitted");
   expect(typeof parsed.allMatched).toBe("boolean");
   const submittedAssignments = parsed.assignments as Record<string, unknown>[];
