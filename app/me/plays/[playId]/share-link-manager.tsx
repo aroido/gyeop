@@ -21,6 +21,7 @@ import {
 } from "@/lib/share-links/share-link-client";
 
 import styles from "./share-links.module.css";
+import PrivateOneToOnePanel from "./private-one-to-one-panel";
 
 type State =
   | { kind: "loading" }
@@ -549,6 +550,7 @@ export default function ShareLinkManager({
             </ul>
           )}
         </section>
+        {playId ? <PrivateOneToOnePanel playId={playId} /> : null}
       </section>
     </main>
   );

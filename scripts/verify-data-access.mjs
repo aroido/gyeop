@@ -50,6 +50,8 @@ const OWNER_MUTATION_SQL = new Set([
 
 const PLAY_CAPABILITY_EXPORTS = new Map([
   ["getOwnerProfile", "get_owner_profile"],
+  ["listOwnerOneToOneResponses", "list_owner_1to1_responses"],
+  ["getPrivateOneToOneComparison", "get_private_1to1_comparison"],
   ["recordOwnerProfileEvent", "record_owner_profile_event"],
   ["createShareLink", "create_share_link"],
   ["rotateShareLink", "rotate_share_link"],

@@ -113,6 +113,7 @@ node scripts/verify-http-boundary.mjs
 node scripts/verify-pack-catalog.mjs
 node scripts/verify-owner-flow.mjs
 node scripts/verify-owner-profile.mjs
+node scripts/verify-private-one-to-one.mjs
 node scripts/verify-share-links.mjs
 node scripts/verify-visitor-response.mjs
 node --test tests/integration/http-boundary.test.mjs

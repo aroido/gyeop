@@ -602,6 +602,14 @@ export type Database = {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: Json;
       };
+      get_private_1to1_comparison: {
+        Args: {
+          p_management_secret_hash: string;
+          p_play_id: string;
+          p_response_id: string;
+        };
+        Returns: Json;
+      };
       get_published_pack: { Args: { p_slug: string }; Returns: Json };
       get_visitor_response: {
         Args: { p_response_id: string; p_session_hash: string };
@@ -609,6 +617,10 @@ export type Database = {
       };
       get_visitor_response_pack_metadata: {
         Args: { p_response_id: string; p_session_hash: string };
+        Returns: Json;
+      };
+      list_owner_1to1_responses: {
+        Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: Json;
       };
       list_owner_share_links: {

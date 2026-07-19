@@ -686,6 +686,90 @@ test.describe("core MVP live gate", () => {
     await visitor.context.close();
   });
 
+  test("keeps one-to-one comparison private to its owner and visitor", async ({
+    browser,
+    context,
+    page,
+  }) => {
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await installFailedClipboard(context);
+    await completeOwner(page);
+    const sharePageUrl = page.url();
+
+    await page.getByRole("radio", { name: "한 친구에게 1:1" }).check();
+    await page.getByRole("button", { name: "공유 링크 만들기" }).click();
+    const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
+    const visitor = await completeVisitor(browser, inviteUrl, {
+      ip: "198.51.100.242",
+      viewport: { width: 390, height: 844 },
+      relationship: "오래된 친구",
+      knownSince: "10년 이상이에요",
+    });
+    const responseId = await visitor.page.evaluate(() => {
+      const prefix = "gyeop:visitor-management:v1:";
+      return Object.keys(localStorage)
+        .find((candidate) => candidate.startsWith(prefix))
+        ?.slice(prefix.length);
+    });
+    expect(responseId).toMatch(/^[0-9a-f-]{36}$/);
+
+    await page.goto(sharePageUrl);
+    await expect(
+      page.getByRole("heading", { name: "1:1로 본 우리" }),
+    ).toBeVisible();
+    await expect(page.getByText("오래된 친구 · 10년 이상이에요")).toBeVisible();
+    await page.getByRole("button", { name: "비교 보기" }).click();
+    await expect(
+      page.getByRole("heading", { name: "둘만 보는 1:1 비교" }),
+    ).toBeFocused();
+    await expect(page.getByText("내 실제 답")).toHaveCount(3);
+    await expect(page.getByText("친구가 본 나")).toHaveCount(3);
+    await expectNoHighImpactA11yViolations(page);
+
+    sql(`
+      with fixed_time as (select clock_timestamp() as value)
+      update public.visitor_responses
+      set created_at = fixed_time.value - interval '48 hours',
+          session_expires_at = fixed_time.value - interval '24 hours'
+      from fixed_time
+      where id = '${responseId}'
+    `);
+    await visitor.page.reload();
+    await expect(
+      visitor.page.getByRole("heading", {
+        name: "이 초대는 지금 참여할 수 없어요",
+      }),
+    ).toBeVisible();
+
+    await page.reload();
+    await page.getByRole("button", { name: "비교 보기" }).click();
+    await expect(page.getByText("내 실제 답")).toHaveCount(3);
+
+    expect(
+      sql(`
+        select public.withdraw_response(
+          (select management_token_hash from public.visitor_responses where id = '${responseId}')
+        )->>'outcome'
+      `),
+    ).toBe("withdrawn");
+    await page.reload();
+    await expect(page.getByText("철회된 1:1 답변")).toBeVisible();
+    await expect(page.getByText("비교 내용은 남아 있지 않아요.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "비교 보기" })).toHaveCount(
+      0,
+    );
+    expect(
+      sql(`
+        select status || ':' || (consumed_response_id = '${responseId}')::text
+        from public.share_links
+        where consumed_response_id = '${responseId}'
+      `),
+    ).toBe("disabled:true");
+    await visitor.context.close();
+  });
+
   test("rate limits before resolving a valid withdrawal capability", async ({
     page,
   }) => {

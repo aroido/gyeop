@@ -57,6 +57,7 @@ const REVIEWED_INTERNAL_ADAPTERS = new Set([
   "lib/http/rate-limit.ts",
   "lib/http/owner-play.ts",
   "lib/http/owner-profile.ts",
+  "lib/http/private-one-to-one.ts",
   "lib/http/published-pack.ts",
   "lib/http/share-links.ts",
   "lib/share-links/share-links.ts",
@@ -567,6 +568,42 @@ function isFixedOwnerAccessPolicy(expression) {
 }
 
 const OWNER_ROUTE_CONTRACTS = new Map([
+  [
+    "app/api/me/plays/[playId]/responses/route.ts",
+    {
+      method: "GET",
+      sequence: [
+        ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
+        [
+          "lib/owner-play/owner-play-session-core.mjs",
+          "parseOwnerCookieHeader",
+        ],
+        [
+          "lib/http/private-one-to-one.ts",
+          "listPrivateOneToOneResponsesResponse",
+        ],
+      ],
+      limited: true,
+    },
+  ],
+  [
+    "app/api/me/responses/[responseId]/route.ts",
+    {
+      method: "GET",
+      sequence: [
+        ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
+        [
+          "lib/owner-play/owner-play-session-core.mjs",
+          "parseOwnerCookieHeader",
+        ],
+        [
+          "lib/http/private-one-to-one.ts",
+          "readPrivateOneToOneComparisonResponse",
+        ],
+      ],
+      limited: true,
+    },
+  ],
   [
     "app/api/me/profile/route.ts",
     {
