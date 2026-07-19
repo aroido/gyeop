@@ -138,6 +138,7 @@ node --test tests/integration/owner-profile-session.test.mjs
 node --test tests/integration/owner-play-concurrency.test.mjs
 node --test tests/integration/share-link-concurrency.test.mjs
 node --test tests/integration/visitor-response-concurrency.test.mjs
+node --test tests/integration/visitor-withdrawal-concurrency.test.mjs
 env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SECRET_KEY pnpm build
 node --test tests/integration/pack-runtime.test.mjs
 GYEOP_E2E_PORT=3110 pnpm test:e2e:live
