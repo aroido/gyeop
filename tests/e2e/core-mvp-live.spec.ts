@@ -541,7 +541,7 @@ test.describe("core MVP live gate", () => {
 
     await page.getByRole("button", { name: "공유 링크 만들기" }).click();
     const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
-    expect(inviteUrl).toContain("/i/");
+    expect(inviteUrl.includes("/i/")).toBe(true);
 
     const visitor = await completeVisitor(browser, inviteUrl, {
       ip: "198.51.100.240",
