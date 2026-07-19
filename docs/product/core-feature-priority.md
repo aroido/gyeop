@@ -418,6 +418,8 @@ P1에서 공개 가능한 프로필을 추가한다. 프로필 첫 화면은 타
 | 비교 결과 → 선택 2장 추가 응답 | 25% 이상 |
 | 팩 주인 1명당 완료 방문자 응답 | 평균 3개 이상 |
 
+MVP 판단은 `owner_share`, `visitor_same_pack`, `profile_reshare` 세 ordered funnel을 기준으로 한다. 후행 event 총량이 아니라 같은 owner/response/link subject가 앞 단계를 먼저 통과한 전환만 센다. 관계·알게 된 시점·A/B 선택은 분석 properties에 저장하지 않으며 상세 계약은 `docs/engineering/core-funnel-events.md`가 소유한다.
+
 ### 재방문 지표
 
 - 첫 응답 도착 후 24시간 내 주인 재방문율 60% 이상
@@ -459,7 +461,7 @@ P1에서 공개 가능한 프로필을 추가한다. 프로필 첫 화면은 타
 - 썸·연애팩의 결과는 사용자의 명시적 선택 없이는 공개되지 않는다.
 - 템플릿 제작자는 다른 사용자의 응답 내용에 접근할 수 없다.
 - 비공개 재미 검증의 주인은 same-browser 로그아웃으로 capability를 폐기할 수 있다. Auth owner 계정 삭제와 backup 완전 삭제 시한은 production beta 재승인 기준으로 별도 추적한다.
-- 주요 퍼널 이벤트가 누락 없이 기록된다.
+- 완료→공개 공유, 제출→비교→same-pack 새 owner, 프로필→재공유→후속 제출의 세 퍼널이 subject와 발생 순서로 계산된다.
 
 ## 13. 가장 중요한 제품 결정
 

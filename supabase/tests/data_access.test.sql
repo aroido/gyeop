@@ -253,6 +253,7 @@ select is(
   array[
     'complete_owner_play(uuid,bytea)',
     'consume_rate_limit(bytea,text,integer,integer)',
+    'create_or_resume_play_with_source(text,uuid,bytea,uuid,bytea,bytea,text,uuid,bytea)',
     'create_or_resume_play(text,uuid,bytea,uuid,bytea,bytea)',
     'create_share_link(uuid,bytea,uuid,text,bytea,text,timestamp with time zone)',
     'disable_share_link(uuid,bytea,uuid)',

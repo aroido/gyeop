@@ -695,11 +695,17 @@ function Comparison({
         <Link
           className={styles.primaryCta}
           href="/play/new?pack=old-friend&source=same_pack_cta"
-          onClick={() => {
-            void recordVisitorEvent(
+          onClick={async (event) => {
+            event.preventDefault();
+            const href = event.currentTarget.href;
+            await recordVisitorEvent(response.id, "comparison_viewed").catch(
+              () => undefined,
+            );
+            await recordVisitorEvent(
               response.id,
               "same_pack_start_clicked",
             ).catch(() => undefined);
+            window.location.assign(href);
           }}
         >
           나도 이 팩으로 시작하기

@@ -217,9 +217,7 @@ select is(
       'responseId', '22200000-0000-4000-8000-000000000001'::uuid,
       'properties', jsonb_build_object(
         'packVersion', 'old-friend-v1',
-        'linkKind', 'public',
-        'relationshipCode', 'old_friend',
-        'knownSinceCode', 'ten_years_or_more'
+        'linkKind', 'public'
       )
     ),
     jsonb_build_object(

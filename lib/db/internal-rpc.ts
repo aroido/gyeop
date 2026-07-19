@@ -239,6 +239,11 @@ export type CreateOrResumeOwnerPlayInput = Readonly<{
     managementSecretHash: Uint8Array;
   }>;
   networkKey: Uint8Array;
+  entrySource: "home" | "same_pack_cta";
+  sourceResponse?: Readonly<{
+    responseId: string;
+    sessionTokenHash: Uint8Array;
+  }>;
   signal?: AbortSignal;
 }>;
 
@@ -255,7 +260,7 @@ export async function createOrResumeOwnerPlay(
   if ((input.existing === undefined) === (input.created === undefined)) {
     throw new Error("Exactly one owner play branch is required");
   }
-  let query = getInternalClient().rpc("create_or_resume_play", {
+  let query = getInternalClient().rpc("create_or_resume_play_with_source", {
     p_pack_slug: input.packSlug,
     p_existing_play_id: nullableRpcString(input.existing?.playId ?? null),
     p_existing_secret_hash: nullableRpcString(
@@ -266,6 +271,15 @@ export async function createOrResumeOwnerPlay(
       input.created ? bytea(input.created.managementSecretHash) : null,
     ),
     p_network_key: bytea(input.networkKey),
+    p_entry_source: input.entrySource,
+    p_source_response_id: nullableRpcString(
+      input.sourceResponse?.responseId ?? null,
+    ),
+    p_source_session_hash: nullableRpcString(
+      input.sourceResponse
+        ? bytea(input.sourceResponse.sessionTokenHash)
+        : null,
+    ),
   });
   if (input.signal) query = query.abortSignal(input.signal);
   const { data, error } = await query;

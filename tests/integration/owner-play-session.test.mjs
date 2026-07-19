@@ -143,20 +143,20 @@ function cookieFrom(response) {
 test("owner boundary failures are always private no-store", async () => {
   const invalidOrigin = await ownerRequest("/api/plays", {
     method: "POST",
-    body: { packSlug: "old-friend" },
+    body: { packSlug: "old-friend", entrySource: "home" },
     headerOverrides: { origin: "https://evil.example" },
   });
   assert.equal(invalidOrigin.status, 403);
 
   const invalidInput = await ownerRequest("/api/plays", {
     method: "POST",
-    body: { packSlug: "old-friend", extra: true },
+    body: { packSlug: "old-friend", entrySource: "home", extra: true },
   });
   assert.equal(invalidInput.status, 400);
 
   const invalidProxy = await ownerRequest("/api/plays", {
     method: "POST",
-    body: { packSlug: "old-friend" },
+    body: { packSlug: "old-friend", entrySource: "home" },
     headerOverrides: {
       "x-forwarded-for": "198.51.100.1, 203.0.113.1",
     },
@@ -168,7 +168,7 @@ test("inactive create returns PACK_NOT_FOUND without a cookie or quota row", asy
   const response = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.20",
-    body: { packSlug: "old-friend" },
+    body: { packSlug: "old-friend", entrySource: "home" },
   });
   assert.equal(response.status, 404);
   assert.deepEqual(await response.json(), {
@@ -192,7 +192,7 @@ test("owner can create, reload, save ten answers, complete, and cannot edit", as
   const created = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.21",
-    body: { packSlug: "old-friend" },
+    body: { packSlug: "old-friend", entrySource: "home" },
   });
   assert.equal(created.status, 201, serverLog);
   const createdBody = await created.json();
@@ -225,7 +225,7 @@ test("owner can create, reload, save ten answers, complete, and cannot edit", as
     method: "POST",
     ip: "198.51.100.21",
     cookie,
-    body: { packSlug: "old-friend" },
+    body: { packSlug: "old-friend", entrySource: "home" },
   });
   assert.equal(resumed.status, 200);
   assert.equal((await resumed.json()).id, createdBody.id);
@@ -291,7 +291,7 @@ test("nine saved answers remain a recoverable draft after incomplete completion"
   const created = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.22",
-    body: { packSlug: "old-friend" },
+    body: { packSlug: "old-friend", entrySource: "home" },
   });
   assert.equal(created.status, 201);
   const body = await created.json();
@@ -336,7 +336,7 @@ test("an expired capability converges to the generic terminal response", async (
   const created = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.23",
-    body: { packSlug: "old-friend" },
+    body: { packSlug: "old-friend", entrySource: "home" },
   });
   assert.equal(created.status, 201);
   const body = await created.json();
@@ -372,14 +372,14 @@ test("cross-play preserves a valid cookie while tamper and malformed cookies are
   const first = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.31",
-    body: { packSlug: "old-friend" },
+    body: { packSlug: "old-friend", entrySource: "home" },
   });
   const firstBody = await first.json();
   const firstCookie = cookieFrom(first);
   const second = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.32",
-    body: { packSlug: "old-friend" },
+    body: { packSlug: "old-friend", entrySource: "home" },
   });
   const secondCookie = cookieFrom(second);
 
@@ -419,7 +419,7 @@ test("create quota commits five orphan plays and the sixth response is 429", asy
       await ownerRequest("/api/plays", {
         method: "POST",
         ip: "203.0.113.99",
-        body: { packSlug: "old-friend" },
+        body: { packSlug: "old-friend", entrySource: "home" },
       }),
     );
   }
@@ -438,7 +438,7 @@ test("logout revokes the DB capability, clears the cookie, and is idempotent", a
   const created = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.41",
-    body: { packSlug: "old-friend" },
+    body: { packSlug: "old-friend", entrySource: "home" },
   });
   const body = await created.json();
   const cookie = cookieFrom(created);

@@ -7,6 +7,7 @@ import { createOwnerPlaySchema } from "../../../lib/http/owner-play-schemas.ts";
 import { runRateLimitedDomain } from "../../../lib/http/rate-limit.ts";
 import { withPublicRequest } from "../../../lib/http/request-boundary.ts";
 import { parseOwnerCookieHeader } from "../../../lib/owner-play/owner-play-session-core.mjs";
+import { parseVisitorResponseCookie } from "../../../lib/visitor-response/visitor-session-core.mjs";
 
 export function POST(request: Request) {
   return withPublicRequest(
@@ -17,15 +18,32 @@ export function POST(request: Request) {
       privateNoStore: true,
     },
     ({ input, networkKey, signal }) => {
-      if (!input || typeof input.packSlug !== "string") {
+      if (
+        !input ||
+        typeof input.packSlug !== "string" ||
+        (input.entrySource !== "home" && input.entrySource !== "same_pack_cta")
+      ) {
         throw new Error("INTERNAL_ERROR");
       }
       const packSlug = input.packSlug;
       const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
       if (cookie.outcome === "absent") {
+        const responseCookie = parseVisitorResponseCookie(
+          request.headers.get("cookie"),
+        );
+        const samePackSource =
+          input.entrySource === "same_pack_cta" &&
+          responseCookie.outcome === "valid";
         return createOwnerPlayResponse({
           packSlug,
           networkKey,
+          entrySource: samePackSource ? "same_pack_cta" : "home",
+          sourceResponse: samePackSource
+            ? {
+                responseId: responseCookie.responseId,
+                sessionTokenHash: responseCookie.sessionTokenHash,
+              }
+            : undefined,
           signal,
         });
       }

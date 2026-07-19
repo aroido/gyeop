@@ -104,6 +104,30 @@ function readProfileReshareClickEvents() {
   return JSON.parse(output.trim()) as unknown;
 }
 
+function readCoreFunnelStageCounts() {
+  const output = execFileSync(
+    "docker",
+    [
+      "exec",
+      databaseContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-At",
+      "-c",
+      `select coalesce(
+        jsonb_object_agg(funnel || ':' || stage, subjects),
+        '{}'::jsonb
+      )
+      from private.core_funnel_stage_counts`,
+    ],
+    { encoding: "utf8" },
+  );
+  return JSON.parse(output.trim()) as Record<string, number>;
+}
+
 function readRawShareCredentialLeakCount(rawSecret: string) {
   const sql = String.raw`\set raw_secret '${rawSecret}'
 select (
@@ -610,6 +634,7 @@ test.describe("live owner flow", () => {
   }) => {
     test.setTimeout(120_000);
     const initialShareActionEvents = readShareActionEvents();
+    const initialCoreFunnel = readCoreFunnelStageCounts();
     await context.addInitScript(() => {
       const state = { shareMode: "resolve" as "resolve" | "cancel" | "fail" };
       (
@@ -964,6 +989,18 @@ test.describe("live owner flow", () => {
       }),
     );
 
+    await visitors[0].visitor
+      .getByRole("link", { name: "나도 이 팩으로 시작하기" })
+      .click();
+    await visitors[0].visitor.waitForURL(/\/play\/[0-9a-f-]{36}$/);
+    await expect(
+      visitors[0].visitor.getByRole("heading", {
+        name: "서운한 일이 생기면 나는?",
+      }),
+    ).toBeVisible();
+    await visitors[0].visitor.goto(inviteUrl);
+    await expect(visitors[0].visitor.getByText("3장 비교 완료")).toBeVisible();
+
     await visitors[0].visitor.reload();
     await expect(visitors[0].visitor.getByText("3장 비교 완료")).toBeVisible();
     await expect(
@@ -1000,7 +1037,9 @@ test.describe("live owner flow", () => {
         ],
         events: {
           comparison_viewed: 1,
+          pack_opened: 1,
           relationship_selected: 2,
+          same_pack_start_clicked: 1,
           visitor_required_answer_saved: 3,
           visitor_required_submitted: 1,
           visitor_response_started: 2,
@@ -1390,6 +1429,57 @@ test.describe("live owner flow", () => {
       crossLinkCookie?.value.split(".")[1] !==
         visitors[0].cookieValue.split(".")[1],
     ).toBe(true);
+
+    const crossLinkQuestion = visitors[0].visitor.getByRole("heading", {
+      level: 1,
+    });
+    const crossLinkFirstPrompt = await crossLinkQuestion.textContent();
+    await visitors[0].visitor.getByRole("button", { name: /^B / }).click();
+    await expect(crossLinkQuestion).not.toHaveText(crossLinkFirstPrompt ?? "");
+    const crossLinkSecondPrompt = await crossLinkQuestion.textContent();
+    await visitors[0].visitor.getByRole("button", { name: /^A / }).click();
+    await expect(crossLinkQuestion).not.toHaveText(crossLinkSecondPrompt ?? "");
+    await visitors[0].visitor.getByRole("button", { name: /^A / }).click();
+    await expect(visitors[0].visitor.getByText("3장 비교 완료")).toBeVisible({
+      timeout: 15_000,
+    });
+
+    const coreFunnelKeys = [
+      "owner_share:self_pack_completed",
+      "owner_share:public_link_created",
+      "owner_share:public_share_succeeded",
+      "visitor_same_pack:visitor_required_submitted",
+      "visitor_same_pack:comparison_viewed",
+      "visitor_same_pack:same_pack_start_clicked",
+      "visitor_same_pack:new_owner_pack_opened",
+      "profile_reshare:profile_viewed",
+      "profile_reshare:profile_reshare_clicked",
+      "profile_reshare:profile_share_succeeded",
+      "profile_reshare:downstream_visitor_submitted",
+    ] as const;
+    await expect
+      .poll(() => {
+        const current = readCoreFunnelStageCounts();
+        return Object.fromEntries(
+          coreFunnelKeys.map((key) => [
+            key,
+            (current[key] ?? 0) - (initialCoreFunnel[key] ?? 0),
+          ]),
+        );
+      })
+      .toEqual({
+        "owner_share:self_pack_completed": 1,
+        "owner_share:public_link_created": 1,
+        "owner_share:public_share_succeeded": 1,
+        "visitor_same_pack:visitor_required_submitted": 2,
+        "visitor_same_pack:comparison_viewed": 2,
+        "visitor_same_pack:same_pack_start_clicked": 1,
+        "visitor_same_pack:new_owner_pack_opened": 1,
+        "profile_reshare:profile_viewed": 1,
+        "profile_reshare:profile_reshare_clicked": 1,
+        "profile_reshare:profile_share_succeeded": 1,
+        "profile_reshare:downstream_visitor_submitted": 1,
+      });
 
     const staleClientSuccess = await postShareAction(
       page,

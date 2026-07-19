@@ -226,6 +226,20 @@ test("anon key cannot execute owner play RPCs", async () => {
       },
     ],
     [
+      "create_or_resume_play_with_source",
+      {
+        p_pack_slug: "old-friend",
+        p_existing_play_id: null,
+        p_existing_secret_hash: null,
+        p_new_play_id: "17000000-0000-4000-8000-000000000009",
+        p_new_secret_hash: `\\x${randomBytes(32).toString("hex")}`,
+        p_network_key: `\\x${randomBytes(32).toString("hex")}`,
+        p_entry_source: "home",
+        p_source_response_id: null,
+        p_source_session_hash: null,
+      },
+    ],
+    [
       "get_owner_play",
       {
         p_play_id: "17000000-0000-4000-8000-000000000009",

@@ -110,23 +110,30 @@ function ownerPlayPath(playId: string) {
   return `/api/plays/${encodeURIComponent(playId)}`;
 }
 
-export function createOrResumeOwnerPlay(): Promise<OwnerPlayState> {
-  return fetch("/api/plays", jsonRequest("POST", { packSlug: PACK_SLUG })).then(
-    ownerStateResponse,
-  );
+export function createOrResumeOwnerPlay(
+  entrySource: "home" | "same_pack_cta" = "home",
+): Promise<OwnerPlayState> {
+  return fetch(
+    "/api/plays",
+    jsonRequest("POST", { packSlug: PACK_SLUG, entrySource }),
+  ).then(ownerStateResponse);
 }
 
 const bootstrapRequests = new Map<string, Promise<OwnerPlayState>>();
 
-export function bootstrapOwnerPlay(packSlug: string): Promise<OwnerPlayState> {
+export function bootstrapOwnerPlay(
+  packSlug: string,
+  entrySource: "home" | "same_pack_cta",
+): Promise<OwnerPlayState> {
   if (packSlug !== PACK_SLUG) invalidResponse(400);
-  const existing = bootstrapRequests.get(packSlug);
+  const key = `${packSlug}\0${entrySource}`;
+  const existing = bootstrapRequests.get(key);
   if (existing) return existing;
-  const request = createOrResumeOwnerPlay();
-  bootstrapRequests.set(packSlug, request);
+  const request = createOrResumeOwnerPlay(entrySource);
+  bootstrapRequests.set(key, request);
   const clear = () => {
-    if (bootstrapRequests.get(packSlug) === request) {
-      bootstrapRequests.delete(packSlug);
+    if (bootstrapRequests.get(key) === request) {
+      bootstrapRequests.delete(key);
     }
   };
   void request.then(clear, clear);

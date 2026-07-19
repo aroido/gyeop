@@ -98,6 +98,11 @@ export function ownerInternalErrorResponse() {
 export async function createOwnerPlayResponse(input: {
   packSlug: string;
   networkKey: Uint8Array;
+  entrySource: "home" | "same_pack_cta";
+  sourceResponse?: Readonly<{
+    responseId: string;
+    sessionTokenHash: Uint8Array;
+  }>;
   signal: AbortSignal;
 }) {
   const credential = createOwnerCredential();
@@ -108,6 +113,8 @@ export async function createOwnerPlayResponse(input: {
       managementSecretHash: credential.managementSecretHash,
     },
     networkKey: input.networkKey,
+    entrySource: input.entrySource,
+    sourceResponse: input.sourceResponse,
     signal: input.signal,
   });
   if (result.outcome === "created") {
@@ -139,6 +146,7 @@ export async function resumeOwnerPlayResponse(input: {
       managementSecretHash: input.cookie.managementSecretHash,
     },
     networkKey: input.networkKey,
+    entrySource: "home",
     signal: input.signal,
   });
   if (result.outcome === "resumed") {
