@@ -9,6 +9,7 @@ import {
   visitorResponseHttpState,
 } from "../../lib/visitor-response/visitor-context-core.mjs";
 import {
+  decodeAssignOptionalCardsOutcome,
   decodeGetVisitorResponseOutcome,
   decodeRecordVisitorResponseEventOutcome,
   decodeSaveResponseAnswerOutcome,
@@ -30,6 +31,7 @@ import {
   readManagementRecord,
 } from "../../lib/visitor-management/management-secret.ts";
 import {
+  continueVisitorResponse,
   readVisitorResponse,
   recordVisitorEvent,
   resumeVisitorResponse,
@@ -105,6 +107,55 @@ const submittedState = Object.freeze({
     ),
   ),
 });
+const assignedOptionalState = Object.freeze({
+  ...submittedState,
+  assignments: Object.freeze([
+    ...submittedState.assignments,
+    Object.freeze({
+      cardId: "comfort",
+      stage: "optional",
+      position: 1,
+      packPosition: 2,
+      visitorPrompt: "위로가 필요할 때 이 사람은?",
+      optionA: "곁에 있어 달라고 한다",
+      optionB: "혼자 정리할 시간을 갖는다",
+      isSignature: false,
+      visitorChoice: null,
+      ownerChoice: null,
+      matches: null,
+      isHighlight: false,
+    }),
+    Object.freeze({
+      cardId: "reconnect",
+      stage: "optional",
+      position: 2,
+      packPosition: 4,
+      visitorPrompt: "오랜만에 연락할 때 이 사람은?",
+      optionA: "먼저 안부를 묻는다",
+      optionB: "계기가 생길 때까지 기다린다",
+      isSignature: false,
+      visitorChoice: null,
+      ownerChoice: null,
+      matches: null,
+      isHighlight: false,
+    }),
+  ]),
+});
+const completedOptionalState = Object.freeze({
+  ...assignedOptionalState,
+  assignments: Object.freeze(
+    assignedOptionalState.assignments.map((assignment) =>
+      assignment.stage === "optional"
+        ? Object.freeze({
+            ...assignment,
+            visitorChoice: "a",
+            ownerChoice: assignment.position === 1 ? "a" : "b",
+            matches: assignment.position === 1,
+          })
+        : assignment,
+    ),
+  ),
+});
 
 test("freezes the exact relationship and known-since registries", () => {
   assert.deepEqual(
@@ -153,6 +204,24 @@ test("strictly decodes DB and browser response state", () => {
     decodeVisitorResponseState({
       ...state,
       sessionExpiresAt: "February 3, 2030",
+    }),
+  );
+  assert.deepEqual(
+    decodeVisitorResponseState(assignedOptionalState),
+    assignedOptionalState,
+  );
+  assert.deepEqual(
+    decodeVisitorResponseState(completedOptionalState),
+    completedOptionalState,
+  );
+  assert.throws(() =>
+    decodeVisitorResponseState({
+      ...assignedOptionalState,
+      assignments: assignedOptionalState.assignments.map((assignment) =>
+        assignment.stage === "optional" && assignment.position === 1
+          ? { ...assignment, ownerChoice: "a" }
+          : assignment,
+      ),
     }),
   );
   const twoDifferences = {
@@ -354,6 +423,13 @@ test("strictly decodes read, save, submit, and event outcomes", () => {
     { outcome: "saved", response: state },
   );
   assert.deepEqual(
+    decodeAssignOptionalCardsOutcome({
+      outcome: "assigned",
+      response: assignedOptionalState,
+    }),
+    { outcome: "assigned", response: assignedOptionalState },
+  );
+  assert.deepEqual(
     decodeSubmitResponseOutcome({
       outcome: "submitted",
       response: submittedState,
@@ -367,11 +443,12 @@ test("strictly decodes read, save, submit, and event outcomes", () => {
   assert.deepEqual(decodeSubmitResponseOutcome({ outcome: "incomplete" }), {
     outcome: "incomplete",
   });
-  assert.throws(() =>
+  assert.deepEqual(
     decodeSaveResponseAnswerOutcome({
       outcome: "saved",
-      response: submittedState,
+      response: completedOptionalState,
     }),
+    { outcome: "saved", response: completedOptionalState },
   );
   assert.throws(() =>
     decodeRecordVisitorResponseEventOutcome({
@@ -427,6 +504,13 @@ const httpState = Object.freeze({
 });
 const submittedHttpState = Object.freeze({
   ...submittedState,
+  ...packMetadata,
+  sessionExpiresAt: "2099-01-02T00:00:00Z",
+  relationshipLabel: "오래된 친구",
+  knownSinceLabel: "10년 이상이에요",
+});
+const assignedOptionalHttpState = Object.freeze({
+  ...assignedOptionalState,
   ...packMetadata,
   sessionExpiresAt: "2099-01-02T00:00:00Z",
   relationshipLabel: "오래된 친구",
@@ -495,7 +579,11 @@ test("browser client uses the exact read, save, submit, and event routes", async
         });
       }
       return Response.json(
-        String(url).endsWith("/submit") ? submittedHttpState : httpState,
+        String(url).endsWith("/submit")
+          ? submittedHttpState
+          : String(url).endsWith("/continue")
+            ? assignedOptionalHttpState
+            : httpState,
         { headers: { "cache-control": "private, no-store" } },
       );
     };
@@ -504,6 +592,10 @@ test("browser client uses the exact read, save, submit, and event routes", async
     assert.deepEqual(
       await submitVisitorAnswers(id, secret),
       submittedHttpState,
+    );
+    assert.deepEqual(
+      await continueVisitorResponse(id),
+      assignedOptionalHttpState,
     );
     await recordVisitorEvent(id, "comparison_viewed");
     assert.deepEqual(
@@ -520,6 +612,7 @@ test("browser client uses the exact read, save, submit, and event routes", async
           "POST",
           JSON.stringify({ managementSecret: secret }),
         ],
+        [`/api/responses/${id}/continue`, "POST", JSON.stringify({})],
         [
           `/api/responses/${id}/events`,
           "POST",
@@ -527,7 +620,7 @@ test("browser client uses the exact read, save, submit, and event routes", async
         ],
       ],
     );
-    assert.equal(calls[3].init.keepalive, true);
+    assert.equal(calls[4].init.keepalive, true);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  assignOptionalCards,
   getVisitorResponse,
   getVisitorResponsePackMetadata,
   recordVisitorResponseEvent,
@@ -220,6 +221,26 @@ export async function saveVisitorResponseAnswer(input: {
   if (result.outcome !== "saved") return result;
   return Object.freeze({
     outcome: "saved",
+    response: await attachPackMetadata(
+      result.response,
+      input.cookie.sessionTokenHash,
+      input.signal,
+    ),
+  });
+}
+
+export async function assignVisitorOptionalCards(input: {
+  cookie: Existing;
+  signal?: AbortSignal;
+}) {
+  const result = await assignOptionalCards({
+    responseId: input.cookie.responseId,
+    sessionTokenHash: input.cookie.sessionTokenHash,
+    signal: input.signal,
+  });
+  if (result.outcome !== "assigned") return result;
+  return Object.freeze({
+    outcome: "assigned" as const,
     response: await attachPackMetadata(
       result.response,
       input.cookie.sessionTokenHash,

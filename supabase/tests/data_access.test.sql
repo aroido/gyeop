@@ -251,6 +251,7 @@ select is(
       )
   ),
   array[
+    'assign_optional_cards(uuid,bytea)',
     'complete_owner_play(uuid,bytea)',
     'consume_rate_limit(bytea,text,integer,integer)',
     'create_or_resume_play_with_source(text,uuid,bytea,uuid,bytea,bytea,text,uuid,bytea)',

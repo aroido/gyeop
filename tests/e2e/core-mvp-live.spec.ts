@@ -552,6 +552,19 @@ test.describe("core MVP live gate", () => {
     await expect(
       visitor.page.getByText("겹 · 처음 만난 너의 시선"),
     ).toBeVisible();
+    await visitor.page.getByRole("button", { name: "2장 더 답하기" }).click();
+    await expect(
+      visitor.page.getByRole("progressbar", { name: "추가 답변 진행" }),
+    ).toHaveAttribute("aria-valuenow", "0");
+    await visitor.page.getByRole("button", { name: /^B / }).click();
+    await visitor.page.reload();
+    await expect(
+      visitor.page.getByRole("progressbar", { name: "추가 답변 진행" }),
+    ).toHaveAttribute("aria-valuenow", "1");
+    await visitor.page.getByRole("button", { name: /^A / }).click();
+    await expect(visitor.page.getByText("2장 추가 비교 완료")).toBeVisible();
+    await expect(visitor.page.getByText("추가 1번째 질문")).toBeVisible();
+    await expect(visitor.page.getByText("추가 2번째 질문")).toBeVisible();
     const samePack = visitor.page.getByRole("link", {
       name: "나도 이 팩으로 시작하기",
     });

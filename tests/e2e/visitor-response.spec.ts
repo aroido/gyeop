@@ -7,7 +7,7 @@ const responseId = "22000000-0000-4000-8000-000000000001";
 
 type Assignment = {
   cardId: string;
-  stage: "required";
+  stage: "required" | "optional";
   position: 1 | 2 | 3;
   visitorPrompt: string;
   optionA: string;
@@ -35,9 +35,9 @@ type SubmittedResponse = Omit<DraftResponse, "status" | "assignments"> & {
   assignments: Array<
     Omit<Assignment, "visitorChoice"> & {
       packPosition: number;
-      visitorChoice: "a" | "b";
-      ownerChoice: "a" | "b";
-      matches: boolean;
+      visitorChoice: "a" | "b" | null;
+      ownerChoice: "a" | "b" | null;
+      matches: boolean | null;
       isHighlight: boolean;
     }
   >;
@@ -76,10 +76,34 @@ const assignments: Assignment[] = [
     visitorChoice: null,
   },
 ];
+const optionalAssignments: Assignment[] = [
+  {
+    cardId: "comfort",
+    stage: "optional",
+    position: 1,
+    visitorPrompt: "위로가 필요할 때 이 사람은?",
+    optionA: "곁에 있어 달라고 한다",
+    optionB: "혼자 정리할 시간을 갖는다",
+    isSignature: false,
+    visitorChoice: null,
+  },
+  {
+    cardId: "reconnect",
+    stage: "optional",
+    position: 2,
+    visitorPrompt: "오랜만에 연락할 때 이 사람은?",
+    optionA: "먼저 안부를 묻는다",
+    optionB: "계기가 생길 때까지 기다린다",
+    isSignature: false,
+    visitorChoice: null,
+  },
+];
 const packPositions = new Map([
   ["conflict", 1],
   ["hard-day", 10],
   ["plans", 3],
+  ["comfort", 2],
+  ["reconnect", 4],
 ]);
 
 function json(route: Route, status: number, body: unknown, extra = {}) {
@@ -207,6 +231,30 @@ async function installVisitorApi(
         headers: { "cache-control": "private, no-store" },
       });
     }
+    if (url.pathname.endsWith("/continue") && request.method() === "POST") {
+      if (saved.status !== "submitted") {
+        return json(route, 409, {
+          code: "VISITOR_RESPONSE_CONFLICT",
+          message: "필수 답변을 먼저 제출해 주세요.",
+        });
+      }
+      if (!saved.assignments.some(({ stage }) => stage === "optional")) {
+        saved = {
+          ...saved,
+          assignments: [
+            ...saved.assignments,
+            ...optionalAssignments.map((assignment) => ({
+              ...assignment,
+              packPosition: packPositions.get(assignment.cardId)!,
+              ownerChoice: null,
+              matches: null,
+              isHighlight: false,
+            })),
+          ],
+        };
+      }
+      return json(route, 200, saved);
+    }
     if (url.pathname.endsWith("/submit")) {
       if (
         saved.status !== "draft" ||
@@ -217,7 +265,10 @@ async function installVisitorApi(
           message: "세 장에 모두 답한 뒤 제출해 주세요.",
         });
       }
-      const differences = saved.assignments.filter(
+      const required = saved.assignments.filter(
+        ({ stage }) => stage === "required",
+      );
+      const differences = required.filter(
         ({ visitorChoice }) => visitorChoice !== "a",
       );
       const highlight =
@@ -232,7 +283,7 @@ async function installVisitorApi(
         ...saved,
         status: "submitted",
         allMatched: differences.length === 0,
-        assignments: saved.assignments.map((assignment) => ({
+        assignments: required.map((assignment) => ({
           ...assignment,
           packPosition: packPositions.get(assignment.cardId)!,
           visitorChoice: assignment.visitorChoice!,
@@ -265,6 +316,24 @@ async function installVisitorApi(
         assignments: saved.assignments.map((assignment) =>
           assignment.cardId === match[1]
             ? { ...assignment, visitorChoice: choice }
+            : assignment,
+        ),
+      };
+      return json(route, 200, saved);
+    }
+    if (request.method() === "PUT" && match && saved.status === "submitted") {
+      const choice = (body as { choice: "a" | "b" }).choice;
+      saved = {
+        ...saved,
+        assignments: saved.assignments.map((assignment) =>
+          assignment.cardId === match[1] && assignment.stage === "optional"
+            ? {
+                ...assignment,
+                visitorChoice: choice,
+                ownerChoice: "a" as const,
+                matches: choice === "a",
+                isHighlight: false,
+              }
             : assignment,
         ),
       };
@@ -358,6 +427,83 @@ test("public invite completes three cards, compares, copies, and reloads", async
     page.locator('section[data-kind="comparison"] h1'),
   ).toBeFocused();
   expect(api.starts()).toBe(1);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
+
+test("optional two cards resume after reload and compare without outranking the primary CTA", async ({
+  page,
+}) => {
+  await installClipboard(page);
+  const api = await installVisitorApi(page);
+  await page.goto(`/i/${publicId}#k=${secret}`);
+  await chooseContext(page);
+  await answerThree(page);
+
+  const primary = page.getByRole("link", {
+    name: "나도 이 팩으로 시작하기",
+  });
+  const secondary = page.getByRole("button", { name: "2장 더 답하기" });
+  await expect(primary).toBeVisible();
+  await expect(secondary).toBeVisible();
+  expect((await primary.boundingBox())!.y).toBeLessThan(
+    (await secondary.boundingBox())!.y,
+  );
+  expect(
+    await primary.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    ),
+  ).not.toBe("rgba(0, 0, 0, 0)");
+  expect(
+    await secondary.evaluate(
+      (element) => getComputedStyle(element).backgroundColor,
+    ),
+  ).toBe("rgba(0, 0, 0, 0)");
+
+  await secondary.click();
+  await expect(
+    page.getByRole("heading", {
+      name: optionalAssignments[0].visitorPrompt,
+    }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("progressbar", { name: "추가 답변 진행" }),
+  ).toHaveAttribute("aria-valuenow", "0");
+  await page.getByRole("button", { name: /^B / }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: optionalAssignments[1].visitorPrompt,
+    }),
+  ).toBeFocused();
+
+  await page.reload();
+  await expect(
+    page.getByRole("heading", {
+      name: optionalAssignments[1].visitorPrompt,
+    }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("progressbar", { name: "추가 답변 진행" }),
+  ).toHaveAttribute("aria-valuenow", "1");
+  await page.getByRole("button", { name: /^A / }).click();
+
+  await expect(page.getByText("2장 추가 비교 완료")).toBeVisible();
+  await expect(page.getByText("조금 더 선명해진 비교")).toBeVisible();
+  await expect(page.getByText("추가 1번째 질문")).toBeVisible();
+  await expect(page.getByText("추가 2번째 질문")).toBeVisible();
+  await expect(primary).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /2장 (더|이어서) 답하기/ }),
+  ).toHaveCount(0);
+  expect(
+    api.calls.filter(
+      ({ pathname, method }) =>
+        pathname.endsWith("/continue") && method === "POST",
+    ),
+  ).toHaveLength(1);
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
@@ -552,6 +698,7 @@ test("unsupported response methods are private 405 responses", async ({
   for (const [path, method, allow] of [
     [`/api/responses/${responseId}`, "POST", "GET"],
     [`/api/responses/${responseId}/submit`, "GET", "POST"],
+    [`/api/responses/${responseId}/continue`, "GET", "POST"],
     [`/api/responses/${responseId}/answers/conflict`, "POST", "PUT"],
     [`/api/responses/${responseId}/events`, "PUT", "POST"],
   ] as const) {

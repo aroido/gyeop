@@ -28,6 +28,7 @@ import {
 } from "../share-links/share-link-state-core.mjs";
 import {
   decodeGetVisitorResponseOutcome,
+  decodeAssignOptionalCardsOutcome,
   decodeRecordVisitorResponseEventOutcome,
   decodeSaveResponseAnswerOutcome,
   decodeStartResponseOutcome,
@@ -89,7 +90,7 @@ type RecordShareActionResult =
   | Readonly<{ outcome: "link_not_found" | "link_not_active" }>;
 type VisitorAssignmentBase = Readonly<{
   cardId: string;
-  stage: "required";
+  stage: "required" | "optional";
   position: 1 | 2 | 3;
   visitorPrompt: string;
   optionA: string;
@@ -117,9 +118,9 @@ export type VisitorResponseState =
         assignments: readonly Readonly<
           VisitorAssignmentBase & {
             packPosition: number;
-            visitorChoice: "a" | "b";
-            ownerChoice: "a" | "b";
-            matches: boolean;
+            visitorChoice: "a" | "b" | null;
+            ownerChoice: "a" | "b" | null;
+            matches: boolean | null;
             isHighlight: boolean;
           }
         >[];
@@ -697,6 +698,25 @@ export async function getVisitorResponse(input: {
   const { data, error } = await query;
   if (error) throw new Error("Internal visitor response RPC failed");
   return decodeGetVisitorResponseOutcome(data) as GetVisitorResponseResult;
+}
+
+export type AssignOptionalCardsResult =
+  | Readonly<{ outcome: "assigned"; response: VisitorResponseState }>
+  | Readonly<{ outcome: "not_submitted" | "session_invalid" }>;
+
+export async function assignOptionalCards(input: {
+  responseId: string;
+  sessionTokenHash: Uint8Array;
+  signal?: AbortSignal;
+}): Promise<AssignOptionalCardsResult> {
+  let query = getInternalClient().rpc("assign_optional_cards", {
+    p_response_id: input.responseId,
+    p_session_hash: bytea(input.sessionTokenHash),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal optional assignment RPC failed");
+  return decodeAssignOptionalCardsOutcome(data) as AssignOptionalCardsResult;
 }
 
 export async function getVisitorResponsePackMetadata(input: {

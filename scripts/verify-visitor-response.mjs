@@ -69,6 +69,7 @@ export function verifyVisitorResponse() {
   assert.match(context, /decodeVisitorResponseHttpState/);
   assert.match(context, /decodeVisitorAssignment/);
   assert.match(context, /value\.assignments\.length !== 3/);
+  assert.match(context, /value\.assignments\.length !== 5/);
   assert.match(context, /assignment\.position !== index \+ 1/);
   assert.match(context, /new Set\(assignments\.map/);
   assert.match(context, /Object\.getOwnPropertySymbols/);
@@ -119,6 +120,8 @@ export function verifyVisitorResponse() {
     "response.status === 429",
     "saveVisitorAnswer",
     "submitVisitorAnswers",
+    "continueVisitorResponse",
+    "/continue",
     "recordVisitorEvent",
   ]) {
     assert.ok(
@@ -137,6 +140,9 @@ export function verifyVisitorResponse() {
     "queue.current.push",
     "친구 답과 맞춰보는 중…",
     "3장 비교 완료",
+    "2장 더 답하기",
+    "2장 이어서 답하기",
+    "2장 추가 비교 완료",
     "내 관리 링크 복사",
     "encodeURIComponent(response.packSlug)",
     "&source=same_pack_cta",
@@ -250,6 +256,7 @@ export function verifyVisitorResponse() {
     "app/api/responses/[id]/route.ts",
     "app/api/responses/[id]/answers/[cardId]/route.ts",
     "app/api/responses/[id]/submit/route.ts",
+    "app/api/responses/[id]/continue/route.ts",
     "app/api/responses/[id]/events/route.ts",
   ];
   const routeSources = responseRoutePaths.map(source);
@@ -284,6 +291,43 @@ export function verifyVisitorResponse() {
   const submitDomain = submitRoute.lastIndexOf("submitVisitorAnswers({");
   assert.ok(submitLimiter >= 0 && submitDomain > submitLimiter);
   assert.match(submitRoute, /limit:\s*10/);
+
+  const continueRoute = source("app/api/responses/[id]/continue/route.ts");
+  assert.match(continueRoute, /emptyOwnerMutationSchema/);
+  assert.match(continueRoute, /maximumBodyBytes:\s*2/);
+  assert.match(continueRoute, /continueVisitorAnswers\(\{ cookie, signal \}\)/);
+
+  const optionalMigration = source(
+    "supabase/migrations/20260719000200_visitor_optional_answers.sql",
+  );
+  for (const contract of [
+    "create or replace function public.assign_optional_cards",
+    "gyeop-optional-assignment-v1",
+    "prior_link.pack_play_id = v_pack_play_id",
+    "assignment.stage = 'optional'",
+    "visitor_optional_started as (",
+    "visitor_optional_completed as (",
+    "'optional_answers_started'",
+    "'optional_answers_completed'",
+  ]) {
+    assert.ok(
+      optionalMigration.includes(contract),
+      `missing optional response migration contract: ${contract}`,
+    );
+  }
+  const optionalState = optionalMigration.slice(
+    optionalMigration.indexOf(
+      "create or replace function private.visitor_required_response_state",
+    ),
+    optionalMigration.indexOf(
+      "create or replace function public.assign_optional_cards",
+    ),
+  );
+  assert.doesNotMatch(
+    optionalState,
+    /'(?:ownerPrompt|sessionTokenHash|secretHash|tieHash)'\s*,/,
+    "optional response JSON cannot expose owner prompts, credentials, or hashes",
+  );
 
   const management = source("lib/visitor-management/management-secret.ts");
   for (const contract of [
