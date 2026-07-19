@@ -199,9 +199,10 @@ test("holds all later choices behind a failed save and completes after retry", a
   ).toHaveLength(1);
 
   await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
-  ).toBeVisible();
+  const completedHeading = page.getByRole("heading", {
+    name: "내 답변 10개가 저장됐어요",
+  });
+  await expect(completedHeading).toBeFocused();
   await expect(page.locator("[data-choice]")).toHaveCount(0);
   await expect(
     page.getByRole("list", { name: "내 선택 10장" }).getByRole("listitem"),
