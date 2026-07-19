@@ -4,7 +4,7 @@
 
 - 결정: public link 30일, 1:1 link 7일 또는 첫 제출, 비로그인 owner inactivity 7일, visitor draft activity 24시간, submitted response와 로그인 owner inactivity 1년을 기본 보유 상한으로 정한다. 보유 종료부터 운영 DB hard-delete는 24시간, backup 잔존은 hard-delete부터 30일을 넘지 않는다. Auth adoption grace는 7일이고 owner-request·unclaimed Auth provider 삭제는 eligible 시점부터 24시간 안에 완료한다.
 - 이유: 같은-browser 비공개 핵심 루프의 복구 약속은 지키되 목적이 끝난 답변·token·식별자를 무기한 남기지 않고, 후속 schema·cleanup·계정 삭제·알림 구현이 공유할 하나의 수치 계약이 필요하다.
-- 결과: 철회 tombstone은 최소 4개 필드만 30일 유지하고, raw analytics는 30일, 비식별 집계는 1년, rate-limit bucket은 window 종료+24시간까지만 유지한다. notification은 terminal 직접 ID 제거→24시간 최소 tombstone→payload row→key reader 순서로 정리한다. 승인 일일 peak와 2배 staging fixture, reason별 overdue 0, 50% 경보·70% 재검토·4시간 catch-up을 release 기준으로 삼는다. 상세 SSOT는 `docs/product/data-retention-and-deletion-policy.md`다.
+- 결과: 철회 tombstone은 최소 4개 필드만 30일 유지하고, raw analytics는 30일, 비식별 집계는 1년 유지한다. rate-limit bucket은 window 종료+24시간에 cleanup eligible이 되고 다음 24시간 안에 삭제한다. notification은 terminal 직접 ID 제거→24시간 최소 tombstone→payload row→key reader 순서로 정리한다. 승인 일일 peak와 2배 staging fixture, reason별 overdue 0, 50% 경보·70% 재검토·4시간 catch-up을 release 기준으로 삼는다. 상세 SSOT는 `docs/product/data-retention-and-deletion-policy.md`다.
 - 출시 조건: 이 결정은 비공개 MVP의 잠정 제품 승인이다. 현행 한국 개인정보 법률 서면 검토, provider backup 30일 증빙, 2배 peak cleanup·격리 restore drill, 공개 privacy 연락 채널이 없으면 production beta를 열지 않는다.
 
 ## 2026-07-19 — 대한민국 우선 베타는 만 19세 이상만 참여

@@ -1,9 +1,9 @@
 # GYEOP 데이터 보관·파기 정책 v1
 
-> 결정일: 2026-07-20  
-> 적용 범위: 대한민국 우선 비공개 MVP와 production beta 후보  
-> 제품 승인안: https://github.com/aroido/gyeop/issues/7#issuecomment-5016965438  
-> Product Owner 승인 기록: https://github.com/aroido/gyeop/issues/7#issuecomment-5017543427  
+> 결정일: 2026-07-20
+> 적용 범위: 대한민국 우선 비공개 MVP와 production beta 후보
+> 제품 승인안: https://github.com/aroido/gyeop/issues/7#issuecomment-5016965438
+> Product Owner 승인 기록: https://github.com/aroido/gyeop/issues/7#issuecomment-5017543427
 > 구현 추적: #32, #33
 
 ## 1. 한 문장 정책
@@ -40,7 +40,7 @@ GYEOP은 제품 목적에 필요한 최소 기간만 데이터를 보관하고, 
 | raw analytics event | `occurred_at + 30일`; source 삭제·철회 시 subject와 연관 property는 즉시 제거 | 24시간 | hard-delete + 30일 |
 | 비식별 집계 지표 | `aggregated_at + 1년` | 24시간 | hard-delete + 30일 |
 | rate-limit bucket | `expires_at + 24시간` | 24시간 | hard-delete + 30일 |
-| 미귀속 Auth registration | `auth user created_at + 7일` adoption grace 종료 | Auth provider 24시간 | provider hard-delete + 30일 |
+| 미귀속 Auth registration | `auth user created_at + 7일` adoption grace 종료 | 앱 DB state·job UID와 Auth provider 계정 모두 `eligible_at + 24시간` | 각 hard-delete + 30일 |
 | Auth deletion call permit | `max(acquired_at + 5분, lease_until)` | 24시간 | hard-delete + 30일 |
 | completed owner-request receipt·recovery tombstone | 아래 6절의 completed expiry | 24시간 | hard-delete + 30일 |
 | terminal notification 직접 ID·request fingerprint | terminal 전이 또는 철회·owner 삭제 예외 transaction | 같은 transaction에서 `NULL` | backup에서 마지막 식별 상태 + 30일 |
@@ -81,6 +81,8 @@ submit은 `last_active_at = submitted_at`, `session_expires_at = submitted_at + 
 - public OTP로 생성된 미귀속 Auth 상태는 UID와 `created_at`만 앱 DB에 저장한다. raw email 사본을 두지 않는다.
 - adoption grace는 `auth user created_at + 7일`이다. grace 안 adoption과 cleanup enqueue는 같은 registration row lock으로 직렬화한다.
 - grace 안 adoption이 먼저 commit되면 registration state를 제거한다. grace 경과·enqueue·deleting이 먼저 commit되면 claim과 복원을 영구 거부한다.
+- grace 종료 cleanup은 registration state를 잠가 `auth_deletion_jobs(reason = unclaimed_auth)`를 idempotent하게 만들고 같은 transaction에서 registration state row를 삭제한다. 따라서 그 시점부터 앱 DB의 지정 UID는 active deletion job 한 곳에만 남는다.
+- provider hard-delete 성공 finish는 deletion job의 `auth_user_id`와 proof를 `NULL` 처리한다. registration state enqueue와 provider finish를 합쳐 grace 종료 `eligible_at`부터 24시간 안에 앱 DB UID와 provider 계정을 모두 제거한다.
 - `owner_request`와 `unclaimed_auth` 모두 deletion `eligible_at`부터 Auth provider hard-delete까지 최대 24시간이다. 실패는 capped retry로 계속 수렴시키며 권한·구성 오류 또는 3회 연속 실패는 즉시 escalation한다.
 - owner 삭제 요청은 live application 접근을 즉시 차단하고 play·self answer·link·response와 application 식별자를 24시간 안에 제거한다.
 - owner-request status receipt의 provisional expiry는 job `created_at + 48시간`보다 짧지 않다. 이는 Auth hard-delete 24시간 상한+24시간이다.
@@ -108,19 +110,16 @@ DB cleanup은 key material을 변경하지 않는다. key rotation은 add-reader
 
 아래 수치는 초기 beta의 admission ceiling이다. production 사용량 예측으로 자동 상향하지 않는다.
 
-| retention category | production 승인 일일 peak | 2배 staging fixture | 산정 근거 |
+| retention family와 포함 category | production 승인 일일 peak | 2배 staging fixture | 산정 근거 |
 |---|---:|---:|---|
-| anonymous/authenticated owner play | 1,000 | 2,000 | 초기 beta owner 일일 상한 |
-| public/1:1 share link | 2,000 | 4,000 | owner당 최대 2개 발급 |
-| visitor draft/submitted response | 5,000 | 10,000 | owner당 visitor 5명 |
-| withdrawn response tombstone | 500 | 1,000 | submitted의 10% 철회 |
-| raw analytics event | 100,000 | 200,000 | visitor당 최대 20개 allowlisted event |
+| owner/link: anonymous/authenticated play, public/1:1 link tombstone | 1,000 | 2,000 | 승인안의 owner play 상한을 family 전체에 적용 |
+| visitor: draft, submitted, withdrawn tombstone | 5,000 | 10,000 | 승인안의 visitor response 상한을 family 전체에 적용 |
+| analytics: raw event, 비식별 aggregate | 100,000 | 200,000 | 승인안의 analytics event 상한을 family 전체에 적용 |
 | rate-limit bucket | 100,000 | 200,000 | visitor당 최대 20개 action/window bucket |
-| terminal notification job | 5,000 | 10,000 | submitted response당 최대 1개 terminal job |
-| `owner_request` + `unclaimed_auth` deletion 합계 | 100 | 200 | 승인안의 두 Auth reason 합산 상한 |
-| Auth deletion permit prune | 100 | 200 | Auth deletion과 1:1 |
-| completed receipt prune | 100 | 200 | owner-request 최악값 |
+| Auth lifecycle: registration, `owner_request`, `unclaimed_auth`, permit, receipt | 100 | 200 | 승인안의 미귀속 Auth·owner 삭제 합산 상한 |
+| notification lifecycle: job, payload version, key drain | 5,000 | 10,000 | 승인안의 terminal notification 상한을 family 전체에 적용 |
 
+- family의 각 포함 category와 합계가 모두 같은 상한을 넘지 않아야 한다. 한 category의 빈 처리 몫만 같은 family 안에서 빌릴 수 있다.
 - cleanup의 첫 round는 모든 활성 category를 한 chunk씩 시도하고, 남은 처리량은 oldest-due-first fair round-robin으로 빌려 쓴다.
 - category 하나의 timeout·오류가 다른 category의 첫 chunk를 막지 않는다. 실패 category는 다음 일일 실행과 signed catch-up에서 같은 idempotent cleanup을 재시도해 overdue 0건까지 수렴한다.
 - Auth deletion은 둘 다 due이면 `owner_request` 한 건을 먼저 보호하고 같은 round에서 `unclaimed_auth`도 최소 한 건 진행한다. 한 reason의 due row가 없으면 빈 몫을 다른 reason이 빌린다.
