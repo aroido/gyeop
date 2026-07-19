@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-19 — 대한민국 우선 베타는 만 19세 이상만 참여
+
+- 결정: private MVP 모집과 production beta의 주인·무가입 방문자를 모두 `대한민국에서 이용하는 만 19세 이상`으로 제한한다. 보호자 동의 흐름을 제공하지 않고 생년월일·신분증·보호자 정보·IP geolocation을 수집하지 않으며, 새 play/response 생성 직전 exact 자기확인만 받는다.
+- 이유: 개인정보 보호법 제22조의2와 현행 시행령 제17조의2는 만 14세 미만 아동 동의에 법정대리인 확인을 요구하고, 민법 제4조는 19세를 성년으로 정한다. 관계 맥락과 타인에 대한 판단을 외부 공유하는 초기 서비스에서는 법적 미성년자 전체를 의도적으로 제외하는 편이 더 보수적이며, 별도 보호자 개인정보 처리 시스템을 만들지 않고 핵심 재미를 검증할 수 있다.
+- 결과: #16은 owner·visitor 생성 API에서 `eligibilityConfirmed: true`를 domain write보다 먼저 강제하고 정책 이전 row를 자동 승계하지 않는다. 신고된 미성년자 데이터는 안전하게 특정한 때부터 live 72시간, hard delete부터 backup 30일 상한을 적용하며 #7은 backup 밖 최소 45일 삭제 ledger와 격리 restore 재삭제를 집행한다. 현행 한국 법률 서면 검토, #16, #7, privacy 연락 채널 중 하나라도 없으면 production beta를 열지 않는다. 상세 SSOT는 `docs/product/age-and-minor-policy.md`다.
+
 ## 2026-07-19 — 1:1 응답은 두 참여자에게만 개별 비교 허용
 
 - 결정: 완료된 1:1 응답 한 건의 카드 비교를 해당 링크를 만든 현재 play 주인과 만료 전 동일 response session을 가진 방문자에게만 제공한다. 주인은 owner capability로, 방문자는 response capability로 각각 검증하며 어느 한쪽 capability도 다른 API의 대체물로 인정하지 않는다.
