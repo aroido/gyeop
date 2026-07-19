@@ -1,9 +1,9 @@
 # 겹 P0 모바일 UI 상태·토큰 명세
 
-Status: Reviewed candidate  
-Version: 1.0  
-Issue: https://github.com/aroido/gyeop/issues/11  
-적용 단계: 비공개 재미 검증. 별도 표시된 production beta 후보는 inactive다.
+- Status: Reviewed
+- Version: 1.0
+- Issue: https://github.com/aroido/gyeop/issues/11
+- 적용 단계: 비공개 재미 검증. 별도 표시된 production beta 후보는 inactive다.
 
 ## 1. 이 문서가 고정하는 것
 
@@ -21,13 +21,13 @@ Issue: https://github.com/aroido/gyeop/issues/11
 
 ## 2. 현재 단계와 inactive 후보
 
-| 항목 | 비공개 재미 검증 | production beta 재승인 후보 |
-|---|---|---|
-| 주인 저장 | 이메일 없이 same-browser capability | 이메일 매직 링크 계정 연결과 cross-device 복구 |
-| 완료 직후 | 저장 범위 안내 → 공유 링크 만들기 | 공유를 막지 않는 보조 이메일 연결 제안 가능 |
-| 프로필 | 주인 전용 `/me`, 공개 링크 제출만 누적 | 계정 기반 복구, 관계 layer 정책 재승인 |
-| 계정 삭제 | Auth 계정이 없어 화면을 노출하지 않음 | `/me/settings`, 재인증, `/account-deletion/status` |
-| 공개 대상 | 특정 팩 플레이 링크 | 공개 프로필은 P1 이후 별도 결정 |
+| 항목      | 비공개 재미 검증                       | production beta 재승인 후보                        |
+| --------- | -------------------------------------- | -------------------------------------------------- |
+| 주인 저장 | 이메일 없이 same-browser capability    | 이메일 매직 링크 계정 연결과 cross-device 복구     |
+| 완료 직후 | 저장 범위 안내 → 공유 링크 만들기      | 공유를 막지 않는 보조 이메일 연결 제안 가능        |
+| 프로필    | 주인 전용 `/me`, 공개 링크 제출만 누적 | 계정 기반 복구, 관계 layer 정책 재승인             |
+| 계정 삭제 | Auth 계정이 없어 화면을 노출하지 않음  | `/me/settings`, 재인증, `/account-deletion/status` |
+| 공개 대상 | 특정 팩 플레이 링크                    | 공개 프로필은 P1 이후 별도 결정                    |
 
 현재 완료 화면에서 로그인을 요구하거나 로그인 modal로 공유를 가리지 않는다. 대신 다음 문구를 사용한다.
 
@@ -38,16 +38,16 @@ Issue: https://github.com/aroido/gyeop/issues/11
 
 production beta가 재승인되면 링크 생성 성공 뒤 Secondary 영역에 `다른 기기에서도 이어보려면 이메일 연결`을 둘 수 있다. 이 제안은 답변 완료나 첫 공유를 막지 않는다.
 
-## 3. 목업 01~06 판정
+## 3. 목업 01–06 판정
 
-| 목업 | 유지 | 수정 | 현재 단계에서 보류·폐기 |
-|---|---|---|---|
-| 01 Product overview | 큰 한글 typography, 검정 canvas, lime/blue/coral 카드, 한 화면 한 질문, 겹 metaphor | 표시 이름을 `나`·`이 사람`으로 바꾸고 실제 팩 metadata를 우선 노출 | avatar, 확인되지 않은 관계별 결과, `민수` 같은 이름 |
-| 02 End-to-end flow | 진행, 관계 선택, 새 겹 도착, 프로필로 이어지는 순서 | 주인 10장과 방문자 3장을 분리하고 A/B 버튼으로 통일 | 1~5 점수 척도, 중간 개봉 대기, 답변 전 결과 암시 |
-| 03 Perspective stack | 실제 응답이 쌓일수록 card depth가 늘어나는 설명 | 현재 `/me`는 셀프 카드 + 공개 링크 카드 표본으로만 표현 | 실제 데이터 없는 avatar·사람 수, 1:1 응답 포함, 임의 성격 단어 |
-| 04 Profile evolution | `0 → 1 → threshold → 여러 겹`의 단계감 | private MVP 단계는 `셀프 답 → 첫 시선 → 카드 n/3 → 공개 가능한 선택 수`로 번역 | 관계별 레이어는 production beta 정책 전까지 locked candidate |
-| 05 Share card system | 검정/blue/lime/coral palette, 한 문장 질문, 겹 symbol | P0 공유 card는 특정 팩 참여 CTA와 generic copy만 사용 | 공개 프로필 card, 표시 이름, avatar, 자동 생성 성격 요약 |
-| 06 Friend contribution | 관계·시점 → 3장 → 비교 → 새 주인 전환 | 1~5를 A/B로 바꾸고 Primary를 `나도 이 팩으로 시작하기`로 고정 | 비교 전에 셀프 답 노출, `나도 내 겹 만들기`처럼 다른 팩으로 갈 수 있는 모호한 CTA |
+| 목업                   | 유지                                                                                | 수정                                                                           | 현재 단계에서 보류·폐기                                                           |
+| ---------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| 01 Product overview    | 큰 한글 typography, 검정 canvas, lime/blue/coral 카드, 한 화면 한 질문, 겹 metaphor | 표시 이름을 `나`·`이 사람`으로 바꾸고 실제 팩 metadata를 우선 노출             | avatar, 확인되지 않은 관계별 결과, `민수` 같은 이름                               |
+| 02 End-to-end flow     | 진행, 관계 선택, 새 겹 도착, 프로필로 이어지는 순서                                 | 주인 10장과 방문자 3장을 분리하고 A/B 버튼으로 통일                            | 1~5 점수 척도, 중간 개봉 대기, 답변 전 결과 암시                                  |
+| 03 Perspective stack   | 실제 응답이 쌓일수록 card depth가 늘어나는 설명                                     | 현재 `/me`는 셀프 카드 + 공개 링크 카드 표본으로만 표현                        | 실제 데이터 없는 avatar·사람 수, 1:1 응답 포함, 임의 성격 단어                    |
+| 04 Profile evolution   | `0 → 1 → threshold → 여러 겹`의 단계감                                              | private MVP 단계는 `셀프 답 → 첫 시선 → 카드 n/3 → 공개 가능한 선택 수`로 번역 | 관계별 레이어는 production beta 정책 전까지 locked candidate                      |
+| 05 Share card system   | 검정/blue/lime/coral palette, 한 문장 질문, 겹 symbol                               | P0 공유 card는 특정 팩 참여 CTA와 generic copy만 사용                          | 공개 프로필 card, 표시 이름, avatar, 자동 생성 성격 요약                          |
+| 06 Friend contribution | 관계·시점 → 3장 → 비교 → 새 주인 전환                                               | 1~5를 A/B로 바꾸고 Primary를 `나도 이 팩으로 시작하기`로 고정                  | 비교 전에 셀프 답 노출, `나도 내 겹 만들기`처럼 다른 팩으로 갈 수 있는 모호한 CTA |
 
 ### 겹 표현의 사용 조건
 
@@ -71,8 +71,8 @@ production beta가 재승인되면 링크 생성 성공 뒤 Secondary 영역에 
   --g-color-black-800: #171717;
   --g-color-black-700: #202020;
   --g-color-black-600: #2b2b2b;
-  --g-color-line: #555555;
-  --g-color-line-strong: #666666;
+  --g-color-line: #767676;
+  --g-color-line-strong: #8a8a8a;
   --g-color-white: #ffffff;
   --g-color-text-secondary: #bdbdbd;
   --g-color-text-muted: #929292;
@@ -86,7 +86,7 @@ production beta가 재승인되면 링크 생성 성공 뒤 Secondary 영역에 
   --g-color-success-border: #7ea274;
   --g-color-success-text: #d7ffd0;
   --g-color-danger-bg: #2b1716;
-  --g-color-danger-border: #7f403d;
+  --g-color-danger-border: #ff7a70;
   --g-color-danger-text: #ffb4ab;
 
   --g-bg-canvas: var(--g-color-black-950);
@@ -99,6 +99,10 @@ production beta가 재승인되면 링크 생성 성공 뒤 Secondary 영역에 
   --g-action-primary-bg: var(--g-color-lime-500);
   --g-action-primary-text: var(--g-color-black-950);
   --g-action-focus: var(--g-color-blue-500);
+  --g-action-focus-on-blue: var(--g-color-lime-500);
+  --g-action-focus-on-coral: var(--g-color-black-950);
+  --g-focus-width: 0.1875rem;
+  --g-focus-offset: 0.1875rem;
   --g-action-danger-bg: var(--g-color-danger-bg);
   --g-action-danger-border: var(--g-color-danger-border);
   --g-action-danger-text: var(--g-color-danger-text);
@@ -110,6 +114,8 @@ production beta가 재승인되면 링크 생성 성공 뒤 Secondary 영역에 
 
 - lime은 Primary CTA, 현재 선택, progress와 공개된 핵심 상태에만 쓴다.
 - blue는 focus, 겹 offset, 정보성 보조 강조에 쓴다. normal body text 색으로 쓰지 않는다.
+- focus 기본색은 blue다. blue surface 위에서는 lime, coral surface 위에서는 black으로 component token을 override해 3:1 boundary 대비를 유지한다.
+- line은 가장 밝은 dark surface인 `#202020` 위에서도 3:1을 넘고, danger border는 danger bg와 canvas 모두에서 3:1을 넘는다.
 - coral은 팩 구분 또는 경고에 쓸 수 있지만 파괴적 상태는 danger semantic을 사용한다.
 - `#929292`보다 어두운 회색을 본문에 쓰지 않는다.
 - success/error는 색과 함께 `저장됨`, `다시 시도`, icon 또는 border 형태를 제공한다.
@@ -118,7 +124,8 @@ production beta가 재승인되면 링크 생성 성공 뒤 Secondary 영역에 
 
 ```css
 :root {
-  --g-font-sans: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --g-font-sans:
+    Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --g-font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
 
   --g-font-size-2xs: 0.6875rem;
@@ -167,6 +174,7 @@ production beta가 재승인되면 링크 생성 성공 뒤 Secondary 영역에 
   --g-control-min: 2.75rem;
   --g-control-large: 3.5rem;
   --g-content-max: 30rem;
+  --g-home-max: 64rem;
   --g-page-gutter: clamp(0.75rem, 4vw, 1rem);
 
   --g-radius-xs: 0.45rem;
@@ -190,7 +198,6 @@ production beta가 재승인되면 링크 생성 성공 뒤 Secondary 영역에 
   --g-shadow-card: 0.35rem 0.35rem 0 var(--g-color-blue-500);
   --g-shadow-card-small: 0.2rem 0.2rem 0 var(--g-color-blue-500);
   --g-shadow-modal: 0 1.5rem 3.75rem rgb(0 0 0 / 45%);
-  --g-shadow-focus: 0 0 0 3px var(--g-action-focus);
   --g-layer-step: 0.35rem;
   --g-tilt-negative: -0.7deg;
   --g-tilt-positive: 0.7deg;
@@ -221,7 +228,9 @@ production beta가 재승인되면 링크 생성 성공 뒤 Secondary 영역에 
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -237,155 +246,174 @@ production beta가 재승인되면 링크 생성 성공 뒤 Secondary 영역에 
 
 ## 5. 공통 layout과 responsive 규칙
 
-| viewport | gutter | content | 규칙 |
-|---:|---:|---:|---|
-| 320px | 12px | 296px | title·선택지를 줄바꿈하고 2열 action을 1열로 내린다. required flow는 가로 scroll이 없다. |
-| 390px | 16px | 358px | 기본 mobile 기준. 한 화면 한 질문과 56px 이상 A/B 선택을 유지한다. |
-| 430px | 16px | 398px | 여백을 늘리기보다 card 폭을 사용하되 line length는 body 약 34자 안쪽으로 제한한다. |
-| 768px 이상 | 16px | 최대 480px | 가운데 정렬된 mobile flow를 유지한다. 배경 여백만 늘리고 핵심 순서나 CTA 위치를 바꾸지 않는다. |
+|   viewport |    gutter |                                  content | 규칙                                                                                                                  |
+| ---------: | --------: | ---------------------------------------: | --------------------------------------------------------------------------------------------------------------------- |
+|      320px |      12px |                                    296px | title·선택지를 줄바꿈하고 2열 action을 1열로 내린다. required flow는 가로 scroll이 없다.                              |
+|      390px |      16px |                                    358px | 기본 mobile 기준. 한 화면 한 질문과 56px 이상 A/B 선택을 유지한다.                                                    |
+|      430px |      16px |                                    398px | 여백을 늘리기보다 card 폭을 사용하되 line length는 body 약 34자 안쪽으로 제한한다.                                    |
+| 768px 이상 | 32px 이하 | 홈 최대 1024px, required flow 최대 480px | 홈만 hero/pack rail 2열 확장을 허용한다. 주인·방문자·비교·설정은 가운데 정렬된 1열 mobile flow와 CTA 순서를 유지한다. |
 
 - page shell은 `min-height: 100svh`, `overflow-x: clip`을 사용한다.
 - 홈의 팩 rail만 의도적 horizontal list를 허용한다. 다음 card가 12~20% 보이게 해 scroll 가능성을 알리고, keyboard/focus/scroll-snap을 제공한다.
 - 팩 선택 뒤 owner/visitor required flow, 비교, profile, settings에는 horizontal scroll을 사용하지 않는다.
 - sticky 하단 CTA를 사용할 때 키보드, safe area, 200% zoom에서 내용과 겹치지 않게 같은 높이의 flow padding을 둔다.
-- desktop에서 별도 navigation, sidebar, hover-only 설명을 추가하지 않는다.
+- desktop 홈 2열은 hero를 왼쪽, pack rail을 오른쪽에 두며 DOM 읽기 순서는 brand → hero → pack list다. 별도 navigation, sidebar, hover-only 설명은 추가하지 않는다.
 
 ## 6. CTA 위계
 
-| level | 표현 | 예시 | 금지 |
-|---|---|---|---|
-| Primary | full-width lime, 검정 text, 56px 이상 | `이 팩 시작하기`, `공유 링크 만들기`, `나도 이 팩으로 시작하기` | 한 화면에 두 개, disabled 상태에서 이유 없음 |
-| Secondary | transparent/dark surface, 흰 text, 1px border | `2장 더 답하기`, `내 프로필 보기`, `링크 복사` | Primary 앞 배치, lime fill |
-| Tertiary | text link, underline 또는 chevron | `이전`, `나중에`, `응답 관리` | 44px 미만 hit area |
-| Danger | danger outline/bg/text, 별도 위험 구역 | `응답 철회하기`, `계정 삭제 계속하기` | lime, success icon, Primary와 인접 배치 |
+| level     | 표현                                          | 예시                                                            | 금지                                         |
+| --------- | --------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------- |
+| Primary   | full-width lime, 검정 text, 56px 이상         | `이 팩 시작하기`, `공유 링크 만들기`, `나도 이 팩으로 시작하기` | 한 화면에 두 개, disabled 상태에서 이유 없음 |
+| Secondary | transparent/dark surface, 흰 text, 1px border | `2장 더 답하기`, `내 프로필 보기`, `링크 복사`                  | Primary 앞 배치, lime fill                   |
+| Tertiary  | text link, underline 또는 chevron             | `이전`, `나중에`, `응답 관리`                                   | 44px 미만 hit area                           |
+| Danger    | danger outline/bg/text, 별도 위험 구역        | `응답 철회하기`, `계정 삭제 계속하기`                           | lime, success icon, Primary와 인접 배치      |
 
 동일한 화면에서 Primary는 하나뿐이다. 비동기 진행 중에는 label을 동사형 상태로 바꾸고(`링크 만드는 중…`) control을 중복 제출 불가로 만들되, 기존 결과와 현재 단계는 지우지 않는다.
 
 ## 7. 화면 상태 명세
 
+### 7.0 공통 상태 적용표
+
+`empty`가 도메인상 정상일 수 없는 화면은 빈 canvas를 만들지 않고 아래의 지정된 terminal/error 상태로 수렴한다.
+
+| 화면                    | default                              | loading          | error            | empty                                                               | disabled                    | success                           |
+| ----------------------- | ------------------------------------ | ---------------- | ---------------- | ------------------------------------------------------------------- | --------------------------- | --------------------------------- |
+| 시작·팩 선택            | 팩 목록                              | skeleton         | retry            | active pack 없음                                                    | play 생성 중                | 첫 질문 이동                      |
+| 주인 10장               | 질문·A/B                             | 질문 조회        | 저장 retry       | N/A — published pack은 정확히 10장이며 0장은 generic terminal error | 저장·완료 중                | 10장 완료·공유 이동               |
+| 공유                    | 방식 선택·목록                       | 목록 조회        | action retry     | 생성 링크 없음                                                      | 생성·복사 중                | 링크 ready·copy feedback          |
+| 관계·시점               | 두 fieldset                          | metadata 조회    | retry/validation | N/A — invalid·expired link는 generic terminal error                 | response 생성 중            | 필수 3장 이동                     |
+| 방문자 3장              | 질문·A/B                             | assignment 조회  | 저장 retry       | N/A — assignment 0장은 generic terminal error                       | 저장·제출 중                | 비교 이동                         |
+| 즉시 비교               | mismatch/all-same 결과               | 결과 조회        | 결과 retry       | N/A — 비교 card 0장은 generic terminal error                        | continuation·복사 action 중 | 실제 3장 비교 + same-pack CTA     |
+| 프로필                  | 현재 단일 play stack                 | profile 조회     | retry            | 완료 play 없음 또는 시선 없음                                       | reshare 이동 중             | 새 시선·threshold 공개            |
+| 응답 철회               | 철회 범위 안내                       | token 확인       | 철회 retry       | N/A — invalid·expired·reused는 generic terminal                     | 철회 중                     | withdrawn 완료                    |
+| 계정 삭제 settings 후보 | 위험 구역                            | 정책·재인증 조회 | 재인증 retry     | N/A — adopted owner 없음은 generic terminal 안내                    | 발송·삭제 준비 중           | receipt 발급 뒤 status route 이동 |
+| 계정 삭제 status 후보   | N/A — receipt 조회 뒤 즉시 실제 상태 | receipt 조회     | status retry     | receipt missing/expired generic 안내                                | polling 중                  | completed                         |
+
+모든 `generic terminal error`는 내부 원인과 resource 존재를 구분하지 않는다. 빈 데이터가 정상인 시작·공유·프로필만 전용 empty illustration 없이 짧은 안내와 다음 행동을 제공한다.
+
 ### 7.1 시작과 팩 선택 `/`
 
 팩 card 정보 순서는 추천 관계/공유 방식 → 제목 → `10장 · 예상 시간` → 분위기·민감도 → CTA다. 장식 cover보다 선택에 필요한 metadata가 먼저 읽혀야 한다.
 
-| 상태 | 화면 | 행동·복구 | 접근성·privacy |
-|---|---|---|---|
-| default | hero 아래 공식 팩 4개, 첫 card 전체와 다음 card 일부 | card 안 단일 `이 팩 시작하기` | rail은 `ul`, 각 CTA에 팩 제목 포함 accessible name |
-| loading | hero 유지, 실제 card와 같은 높이의 2개 skeleton | CTA 없음 | `aria-busy=true`, skeleton은 읽지 않음 |
-| error | `팩을 불러오지 못했어요`와 `다시 시도` | retry가 같은 요청 재실행 | `role=alert`, 내부 오류 code 미노출 |
-| empty | `지금 시작할 수 있는 팩이 없어요` | 홈 새로고침만 제공 | inactive pack 제목을 노출하지 않음 |
-| disabled | create 요청 중 선택한 card만 `시작하는 중…` | 다른 pack CTA도 중복 create 방지 | disabled 이유를 live status로 알림 |
-| success | 별도 개봉 대기 없이 `/play/[playId]` 첫 질문 | 첫 질문 heading으로 focus 이동 | redirect 뒤 title 변경 |
-| resume | 같은 브라우저의 유효 play가 있으면 `이어서 답하기` | 기존 play로만 이동 | 다른 play 존재를 추정하게 하지 않음 |
+| 상태     | 화면                                                 | 행동·복구                        | 접근성·privacy                                     |
+| -------- | ---------------------------------------------------- | -------------------------------- | -------------------------------------------------- |
+| default  | hero 아래 공식 팩 4개, 첫 card 전체와 다음 card 일부 | card 안 단일 `이 팩 시작하기`    | rail은 `ul`, 각 CTA에 팩 제목 포함 accessible name |
+| loading  | hero 유지, 실제 card와 같은 높이의 2개 skeleton      | CTA 없음                         | `aria-busy=true`, skeleton은 읽지 않음             |
+| error    | `팩을 불러오지 못했어요`와 `다시 시도`               | retry가 같은 요청 재실행         | `role=alert`, 내부 오류 code 미노출                |
+| empty    | `지금 시작할 수 있는 팩이 없어요`                    | 홈 새로고침만 제공               | inactive pack 제목을 노출하지 않음                 |
+| disabled | create 요청 중 선택한 card만 `시작하는 중…`          | 다른 pack CTA도 중복 create 방지 | disabled 이유를 live status로 알림                 |
+| success  | 별도 개봉 대기 없이 `/play/[playId]` 첫 질문         | 첫 질문 heading으로 focus 이동   | redirect 뒤 title 변경                             |
+| resume   | 같은 브라우저의 유효 play가 있으면 `이어서 답하기`   | 기존 play로만 이동               | 다른 play 존재를 추정하게 하지 않음                |
 
 ### 7.2 주인 셀프 10장 `/play/[playId]`
 
-| 상태 | 화면 | 행동·복구 | 접근성·privacy |
-|---|---|---|---|
-| loading | pack 제목, `질문 불러오는 중`, progress shell | 조작 대기 | 이전 질문 text를 skeleton 아래 남기지 않음 |
-| default | `3/10`, 질문 1개, A/B 2개, 이전/나가기 | 선택 즉시 optimistic 반응 | A/B는 button, `aria-pressed` 사용 |
-| selected/saving | 선택 강조 + `저장하는 중…` chip | 다음 질문 표시 가능, 중복 선택 잠금 | `aria-live=polite`, focus는 선택 button 유지 |
-| saved | `저장됨` chip, 다음 질문 | 1초 뒤 visually muted 가능 | 색 외 text로 상태 전달 |
-| save error | 선택은 남기고 `저장하지 못했어요 · 다시 시도` | retry 또는 선택 변경 | 다음 완료는 저장 성공 전 차단 |
-| disabled | 완료 요청 중 A/B·이전 비활성 | `답변 마무리하는 중…` | `aria-disabled`, focus 유실 금지 |
-| success | 10장 요약, same-browser 저장 범위, 공유 Primary | `공유 링크 만들기` → share | 로그인 modal을 띄우지 않음 |
-| completed/locked | 이미 완료된 답은 read-only | 공유 또는 `/me` | 수정 가능한 control처럼 보이지 않음 |
-| expired/tampered | `이 브라우저에서 더는 이 팩을 관리할 수 없어요` | 홈에서 새 팩 시작 | play 존재·답변 내용 미노출 |
-| exit confirm | 현재까지 저장됨 또는 미저장 오류 명시 | `계속 답하기` Primary, `나가기` Secondary | native/dialog focus trap, Escape는 취소 |
+| 상태             | 화면                                            | 행동·복구                                 | 접근성·privacy                               |
+| ---------------- | ----------------------------------------------- | ----------------------------------------- | -------------------------------------------- |
+| loading          | pack 제목, `질문 불러오는 중`, progress shell   | 조작 대기                                 | 이전 질문 text를 skeleton 아래 남기지 않음   |
+| default          | `3/10`, 질문 1개, A/B 2개, 이전/나가기          | 선택 즉시 optimistic 반응                 | A/B는 button, `aria-pressed` 사용            |
+| selected/saving  | 선택 강조 + `저장하는 중…` chip                 | 다음 질문 표시 가능, 중복 선택 잠금       | `aria-live=polite`, focus는 선택 button 유지 |
+| saved            | `저장됨` chip, 다음 질문                        | 1초 뒤 visually muted 가능                | 색 외 text로 상태 전달                       |
+| save error       | 선택은 남기고 `저장하지 못했어요 · 다시 시도`   | retry 또는 선택 변경                      | 다음 완료는 저장 성공 전 차단                |
+| disabled         | 완료 요청 중 A/B·이전 비활성                    | `답변 마무리하는 중…`                     | `aria-disabled`, focus 유실 금지             |
+| success          | 10장 요약, same-browser 저장 범위, 공유 Primary | `공유 링크 만들기` → share                | 로그인 modal을 띄우지 않음                   |
+| completed/locked | 이미 완료된 답은 read-only                      | 공유 또는 `/me`                           | 수정 가능한 control처럼 보이지 않음          |
+| expired/tampered | `이 브라우저에서 더는 이 팩을 관리할 수 없어요` | 홈에서 새 팩 시작                         | play 존재·답변 내용 미노출                   |
+| exit confirm     | 현재까지 저장됨 또는 미저장 오류 명시           | `계속 답하기` Primary, `나가기` Secondary | native/dialog focus trap, Escape는 취소      |
 
 ### 7.3 공유 `/me/plays/[playId]`
 
-| 상태 | 화면 | 행동·복구 | 접근성·privacy |
-|---|---|---|---|
-| default | 공개/1:1 두 방식, 차이와 추천 badge | 하나 선택 후 `링크 만들기` | radio/fieldset, 민감 팩의 1:1 추천은 강제가 아님 |
-| loading | 기존 링크 목록 유지 + `불러오는 중…` | 새 create 잠금 | 기존 raw URL placeholder 금지 |
-| creating | 선택한 방식에 `링크 만드는 중…` | 중복 create 방지 | live status |
-| ready/success | 공유 sheet Primary, 링크 복사 Secondary, manual fallback | OS 공유 → 실패 시 복사 | raw fragment는 명시적 user action 때만 clipboard에 씀 |
-| copy success | `링크를 복사했어요` | 2초 뒤 status만 정리 | `aria-live=polite` |
-| copy failure | `자동 복사가 안 됐어요`와 선택 가능한 field | `직접 선택하기` | field에 secret이 보여도 analytics/log 금지 |
-| active list | 방식·상태·만든 시각, 비활성/재발급 | 한 항목씩 관리 | secret 전체를 다시 복원하지 않음 |
-| consumed 1:1 | `응답이 완료되어 닫힌 링크` | `새 1:1 링크 만들기` | 완료 방문자 정보 미노출 |
-| disabled/revoked | muted card, 공유 control 없음 | 재활성 대신 안전한 새 발급 | 링크 상태를 text로 표시 |
-| error | 기존 결과 유지 + 해당 action 옆 오류 | action-scoped retry | 전체 화면 error로 성공 링크를 지우지 않음 |
-| empty | `아직 만든 링크가 없어요` | mode 선택이 Primary | empty와 loading skeleton 구분 |
+| 상태             | 화면                                                     | 행동·복구                  | 접근성·privacy                                        |
+| ---------------- | -------------------------------------------------------- | -------------------------- | ----------------------------------------------------- |
+| default          | 공개/1:1 두 방식, 차이와 추천 badge                      | 하나 선택 후 `링크 만들기` | radio/fieldset, 민감 팩의 1:1 추천은 강제가 아님      |
+| loading          | 기존 링크 목록 유지 + `불러오는 중…`                     | 새 create 잠금             | 기존 raw URL placeholder 금지                         |
+| creating         | 선택한 방식에 `링크 만드는 중…`                          | 중복 create 방지           | live status                                           |
+| ready/success    | 공유 sheet Primary, 링크 복사 Secondary, manual fallback | OS 공유 → 실패 시 복사     | raw fragment는 명시적 user action 때만 clipboard에 씀 |
+| copy success     | `링크를 복사했어요`                                      | 2초 뒤 status만 정리       | `aria-live=polite`                                    |
+| copy failure     | `자동 복사가 안 됐어요`와 선택 가능한 field              | `직접 선택하기`            | field에 secret이 보여도 analytics/log 금지            |
+| active list      | 방식·상태·만든 시각, 비활성/재발급                       | 한 항목씩 관리             | secret 전체를 다시 복원하지 않음                      |
+| consumed 1:1     | `응답이 완료되어 닫힌 링크`                              | `새 1:1 링크 만들기`       | 완료 방문자 정보 미노출                               |
+| disabled/revoked | muted card, 공유 control 없음                            | 재활성 대신 안전한 새 발급 | 링크 상태를 text로 표시                               |
+| error            | 기존 결과 유지 + 해당 action 옆 오류                     | action-scoped retry        | 전체 화면 error로 성공 링크를 지우지 않음             |
+| empty            | `아직 만든 링크가 없어요`                                | mode 선택이 Primary        | empty와 loading skeleton 구분                         |
 
 ### 7.4 방문자 관계·알게 된 시점 `/i/[publicId]#k=…`
 
-| 상태 | 화면 | 행동·복구 | 접근성·privacy |
-|---|---|---|---|
-| metadata loading | `친구가 먼저 답한 질문팩이에요`, skeleton | 대기 | owner 이름·답변 미노출 |
-| default | pack 맥락, 관계 8개, 시점 6개 | 둘 다 선택하면 `3장 답하기` 활성 | 두 fieldset과 legend, 최소 44px option |
-| partial/disabled | 선택한 field는 유지, CTA disabled | 미선택 field 바로 아래 안내 | color만으로 validation 표시 금지 |
-| validation error | `관계를 골라 주세요` 또는 `알게 된 시점을 골라 주세요` | 첫 오류로 focus | live assertive는 submit 때 한 번만 |
-| submitting | 선택 유지, `질문 준비하는 중…` | 중복 제출 방지 | option을 skeleton으로 바꾸지 않음 |
-| restored | 같은 response session이면 저장된 context와 3장 진행으로 복구 | 이어서 답하기 | 다른 response 맥락 미노출 |
-| expired/invalid/consumed | `이 링크로는 지금 답할 수 없어요` | 홈 이동 또는 공유자에게 새 링크 요청 | 404/expired/revoked 원인을 구분 노출하지 않음 |
-| error | generic network 오류 | retry | relationship/time을 analytics나 오류 문구에 넣지 않음 |
+| 상태                     | 화면                                                         | 행동·복구                            | 접근성·privacy                                        |
+| ------------------------ | ------------------------------------------------------------ | ------------------------------------ | ----------------------------------------------------- |
+| metadata loading         | `친구가 먼저 답한 질문팩이에요`, skeleton                    | 대기                                 | owner 이름·답변 미노출                                |
+| default                  | pack 맥락, 관계 8개, 시점 6개                                | 둘 다 선택하면 `3장 답하기` 활성     | 두 fieldset과 legend, 최소 44px option                |
+| partial/disabled         | 선택한 field는 유지, CTA disabled                            | 미선택 field 바로 아래 안내          | color만으로 validation 표시 금지                      |
+| validation error         | `관계를 골라 주세요` 또는 `알게 된 시점을 골라 주세요`       | 첫 오류로 focus                      | live assertive는 submit 때 한 번만                    |
+| submitting               | 선택 유지, `질문 준비하는 중…`                               | 중복 제출 방지                       | option을 skeleton으로 바꾸지 않음                     |
+| restored                 | 같은 response session이면 저장된 context와 3장 진행으로 복구 | 이어서 답하기                        | 다른 response 맥락 미노출                             |
+| expired/invalid/consumed | `이 링크로는 지금 답할 수 없어요`                            | 홈 이동 또는 공유자에게 새 링크 요청 | 404/expired/revoked 원인을 구분 노출하지 않음         |
+| error                    | generic network 오류                                         | retry                                | relationship/time을 analytics나 오류 문구에 넣지 않음 |
 
 ### 7.5 방문자 필수 3장
 
-| 상태 | 화면 | 행동·복구 | 접근성·privacy |
-|---|---|---|---|
-| locked invariant | 질문과 A/B만 표시, owner answer/aggregate DOM 없음 | 3장 제출 전 해제 불가 | blur·opacity·offscreen으로 답을 미리 render하지 않음 |
-| loading | `1/3`, question skeleton | 대기 | owner answer skeleton도 만들지 않음 |
-| default | `이 사람은?` 질문, A/B 2개, progress | 답 선택 | button + `aria-pressed` |
-| selected/saving | 선택 유지 + inline saving | 다음 질문 가능 | live polite |
-| save error | 선택 유지 + retry | 제출은 실패 card 저장 전 차단 | 오류 뒤 owner answer 노출 금지 |
-| submitting/disabled | 세 선택 유지, `비교 결과 만드는 중…` | duplicate submit 방지 | management token 원문 미노출 |
-| success | comparison으로 전환 | heading focus 이동 | 제출 commit 후에만 owner answer 요청·render |
-| session expired | generic 접근 종료 | 홈 이동 | 답·관계·시점 미노출 |
+| 상태                | 화면                                               | 행동·복구                     | 접근성·privacy                                       |
+| ------------------- | -------------------------------------------------- | ----------------------------- | ---------------------------------------------------- |
+| locked invariant    | 질문과 A/B만 표시, owner answer/aggregate DOM 없음 | 3장 제출 전 해제 불가         | blur·opacity·offscreen으로 답을 미리 render하지 않음 |
+| loading             | `1/3`, question skeleton                           | 대기                          | owner answer skeleton도 만들지 않음                  |
+| default             | `이 사람은?` 질문, A/B 2개, progress               | 답 선택                       | button + `aria-pressed`                              |
+| selected/saving     | 선택 유지 + inline saving                          | 다음 질문 가능                | live polite                                          |
+| save error          | 선택 유지 + retry                                  | 제출은 실패 card 저장 전 차단 | 오류 뒤 owner answer 노출 금지                       |
+| submitting/disabled | 세 선택 유지, `비교 결과 만드는 중…`               | duplicate submit 방지         | management token 원문 미노출                         |
+| success             | comparison으로 전환                                | heading focus 이동            | 제출 commit 후에만 owner answer 요청·render          |
+| session expired     | generic 접근 종료                                  | 홈 이동                       | 답·관계·시점 미노출                                  |
 
 ### 7.6 즉시 비교
 
 결과 순서는 `결과 요약 → 3개 card 비교 → Primary → optional continuation → 응답 관리`다.
 
-| 상태 | 화면 | 행동·복구 | 접근성·privacy |
-|---|---|---|---|
-| loading | 제출 완료 문구 + 비교 skeleton | 결과 재조회 | 제출 전 화면으로 돌아가지 않음 |
-| mismatch | 결정 규칙으로 고른 차이 1개 highlight, 나머지 card | `나도 이 팩으로 시작하기` Primary | `실제 답`과 `내가 본 답`을 dl 또는 명확한 label로 구분 |
-| all same | `세 항목을 모두 같게 봤어요` | 같은 Primary | 차이를 꾸며내거나 점수화하지 않음 |
-| primary | 결과 직후 full-width lime | 동일 pack owner flow로 직행 | accessible name에 pack 제목 포함 가능 |
-| continuation | Primary 아래 Secondary `2장 더 답하기` | 선택 2장으로 이동 후 다시 결과 | Primary를 선행 조건으로 막지 않음 |
-| management ready | tertiary 영역 `응답 관리 링크 복사` | 명시적 복사 | fragment를 analytics/log에 넣지 않음 |
-| management copy failure | manual select field | 직접 복사 | field label과 실패 live status |
-| error | 제출 성공은 유지, `비교를 불러오지 못했어요` | retry | owner answer 일부만 먼저 노출하지 않음 |
-| session expired | generic 결과 접근 종료 | 홈 또는 same-pack 새 시작 | 주인의 셀프 답 미노출 |
+| 상태                    | 화면                                               | 행동·복구                         | 접근성·privacy                                         |
+| ----------------------- | -------------------------------------------------- | --------------------------------- | ------------------------------------------------------ |
+| loading                 | 제출 완료 문구 + 비교 skeleton                     | 결과 재조회                       | 제출 전 화면으로 돌아가지 않음                         |
+| mismatch                | 결정 규칙으로 고른 차이 1개 highlight, 나머지 card | `나도 이 팩으로 시작하기` Primary | `실제 답`과 `내가 본 답`을 dl 또는 명확한 label로 구분 |
+| all same                | `세 항목을 모두 같게 봤어요`                       | 같은 Primary                      | 차이를 꾸며내거나 점수화하지 않음                      |
+| primary                 | 결과 직후 full-width lime                          | 동일 pack owner flow로 직행       | accessible name에 pack 제목 포함 가능                  |
+| continuation            | Primary 아래 Secondary `2장 더 답하기`             | 선택 2장으로 이동 후 다시 결과    | Primary를 선행 조건으로 막지 않음                      |
+| management ready        | tertiary 영역 `응답 관리 링크 복사`                | 명시적 복사                       | fragment를 analytics/log에 넣지 않음                   |
+| management copy failure | manual select field                                | 직접 복사                         | field label과 실패 live status                         |
+| error                   | 제출 성공은 유지, `비교를 불러오지 못했어요`       | retry                             | owner answer 일부만 먼저 노출하지 않음                 |
+| session expired         | generic 결과 접근 종료                             | 홈 또는 same-pack 새 시작         | 주인의 셀프 답 미노출                                  |
 
 Primary는 error가 comparison 내용만 가리는 동안에도 새 owner 전환에 필요한 pack identity가 안전하게 확정된 경우 유지할 수 있다. pack identity조차 확정되지 않으면 retry만 표시하고 다른 팩 탐색으로 보내지 않는다.
 
 ### 7.7 비공개 최소 프로필 `/me`
 
-| 상태 | 화면 | 행동·복구 | 접근성·privacy |
-|---|---|---|---|
-| loading | pack heading·summary skeleton | 대기 | 이전 사용자 profile 잔상 금지 |
-| empty | 셀프 10장 + `아직 도착한 시선이 없어요` | `시선 모으기`는 완료 play의 share 관리로 연결 | 새 play를 만들지 않음 |
-| first sight success | 전체 시선 `1`, `새 시선이 도착했어요` | 같은 play `시선 더 모으기` 한 번 | animation 없이도 live status 제공 |
-| under threshold | 각 card에 `시선을 모으는 중 · n/3` | 선택 수 숨김 | `n`은 공개 링크 submitted 필수 응답만 |
-| threshold met | 셀프 선택 + 공개 가능한 A/B count | card별 실제 count | AI 요약, 점수, 고정 성격 label 없음 |
-| mixed | threshold 충족·미달 card가 한 목록에 공존 | card 상태별 표시 | 미달 card의 count 추정 불가 |
-| empty pack list | `완료한 팩이 없어요` | 홈 `팩 고르기` | profile이 삭제됐다고 표현하지 않음 |
-| error | heading 유지 + `프로필을 불러오지 못했어요` | retry | stale count를 현재 값처럼 보이지 않음 |
-| session expired/revoked | same-browser 관리 종료 generic 안내 | 홈에서 새 시작 | 기존 play·시선 존재 미노출 |
+| 상태                    | 화면                                        | 행동·복구                                     | 접근성·privacy                        |
+| ----------------------- | ------------------------------------------- | --------------------------------------------- | ------------------------------------- |
+| loading                 | pack heading·summary skeleton               | 대기                                          | 이전 사용자 profile 잔상 금지         |
+| empty                   | 셀프 10장 + `아직 도착한 시선이 없어요`     | `시선 모으기`는 완료 play의 share 관리로 연결 | 새 play를 만들지 않음                 |
+| first sight success     | 전체 시선 `1`, `새 시선이 도착했어요`       | 같은 play `시선 더 모으기` 한 번              | animation 없이도 live status 제공     |
+| under threshold         | 각 card에 `시선을 모으는 중 · n/3`          | 선택 수 숨김                                  | `n`은 공개 링크 submitted 필수 응답만 |
+| threshold met           | 셀프 선택 + 공개 가능한 A/B count           | card별 실제 count                             | AI 요약, 점수, 고정 성격 label 없음   |
+| mixed                   | threshold 충족·미달 card가 한 목록에 공존   | card 상태별 표시                              | 미달 card의 count 추정 불가           |
+| empty pack list         | `완료한 팩이 없어요`                        | 홈 `팩 고르기`                                | profile이 삭제됐다고 표현하지 않음    |
+| error                   | heading 유지 + `프로필을 불러오지 못했어요` | retry                                         | stale count를 현재 값처럼 보이지 않음 |
+| session expired/revoked | same-browser 관리 종료 generic 안내         | 홈에서 새 시작                                | 기존 play·시선 존재 미노출            |
 
 현재 private MVP의 layer 정의:
 
 1. base card: 주인의 셀프 선택
 2. pending edge: 공개 링크 card 표본 `0/3`, `1/3`, `2/3`
 3. revealed layer: 같은 card가 공개 기준을 충족했을 때 실제 A/B count
-4. pack stack: 여러 완료 pack은 서로 다른 stack이며 관계별로 쪼개지 않는다.
+4. play stack: 현재 브라우저는 owner play 하나만 관리하므로 단일 pack의 base/pending/revealed layer만 쌓는다. 여러 완료 pack을 한 프로필에 합치는 표현은 계정 기반 multi-play ownership이 승인되기 전까지 inactive다.
 
 목업의 `오래된 친구 7명`, avatar row, 여러 관계별 성격 단어는 현재 화면에 사용하지 않는다. submitted 1:1 응답과 민감 관계도 `/me` 누적에서 제외한다.
 
 ### 7.8 방문자 응답 철회 `/responses/manage#token=…`
 
-| 상태 | 화면 | 행동·복구 | 접근성·privacy |
-|---|---|---|---|
-| loading | generic `응답 관리 정보를 확인하는 중…` | 대기 | URL token을 본문·title에 반복하지 않음 |
-| default | 철회되는 범위와 되돌릴 수 없음 | danger `응답 철회하기` | 다른 결과·owner 정보 미노출 |
-| confirm | 명시적 확인 dialog | `취소`가 초기 focus, danger는 마지막 | focus trap, Escape 취소 |
-| submitting/disabled | `응답을 철회하는 중…` | duplicate 방지 | success icon 금지 |
-| success | `응답이 철회됐어요` | 홈 이동 | 기존 비교·선택 값 제거 |
-| invalid/expired/reused | `이 링크로 관리할 수 있는 응답이 없어요` | 홈 이동 | 존재·과거 철회 여부를 구분하지 않음 |
-| error | `철회하지 못했어요` | retry 또는 나가기 | 실패면 기존 응답이 철회됐다고 표현하지 않음 |
+| 상태                   | 화면                                     | 행동·복구                            | 접근성·privacy                              |
+| ---------------------- | ---------------------------------------- | ------------------------------------ | ------------------------------------------- |
+| loading                | generic `응답 관리 정보를 확인하는 중…`  | 대기                                 | URL token을 본문·title에 반복하지 않음      |
+| default                | 철회되는 범위와 되돌릴 수 없음           | danger `응답 철회하기`               | 다른 결과·owner 정보 미노출                 |
+| confirm                | 명시적 확인 dialog                       | `취소`가 초기 focus, danger는 마지막 | focus trap, Escape 취소                     |
+| submitting/disabled    | `응답을 철회하는 중…`                    | duplicate 방지                       | success icon 금지                           |
+| success                | `응답이 철회됐어요`                      | 홈 이동                              | 기존 비교·선택 값 제거                      |
+| invalid/expired/reused | `이 링크로 관리할 수 있는 응답이 없어요` | 홈 이동                              | 존재·과거 철회 여부를 구분하지 않음         |
+| error                  | `철회하지 못했어요`                      | retry 또는 나가기                    | 실패면 기존 응답이 철회됐다고 표현하지 않음 |
 
 ## 8. Production beta 후보: 계정 삭제 UI
 
@@ -393,16 +421,18 @@ Primary는 error가 comparison 내용만 가리는 동안에도 새 owner 전환
 
 ### 8.1 `/me/settings` 위험 구역
 
-| 상태 | 화면 | 행동·복구 |
-|---|---|---|
-| default | 일반 설정과 32px 이상 분리된 `계정 삭제` 위험 구역, 삭제 범위·복구 불가·정책 링크 | danger outline `삭제 절차 시작` |
-| policy unavailable | 확정되지 않은 기간을 숨기고 `현재 삭제 요청을 받을 수 없어요` | CTA disabled, 지원/나중에 확인 |
-| reauth sending | 현재 인증 email로 재인증 링크 발송 중 | 중복 발송 잠금 |
-| reauth sent | `같은 브라우저에서 이메일 링크를 열어 주세요` | 재발송 cooldown과 취소 |
-| reauth error/expired | generic 재인증 실패 | `다시 인증하기` |
-| fresh confirm | 삭제 대상 목록, checkbox `삭제 후 복구할 수 없음을 이해했어요` | checkbox 후 danger `계정 삭제 계속하기` 활성 |
-| submitting | `삭제 요청을 준비하는 중…` | 모든 owner mutation 잠금, 중복 DELETE는 같은 job 복구 |
-| response lost | 성공/실패를 추정하지 않고 `/account-deletion/status`로 이동 | reload로 receipt 상태 확인 |
+| 상태                                    | 화면                                                                                                   | 행동·복구                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| default                                 | 일반 설정과 32px 이상 분리된 `계정 삭제` 위험 구역, 삭제 범위·복구 불가·정책 링크                      | danger outline `삭제 절차 시작`                                |
+| policy unavailable                      | 확정되지 않은 기간을 숨기고 `현재 삭제 요청을 받을 수 없어요`                                          | CTA disabled, 지원/나중에 확인                                 |
+| reauth sending                          | 현재 인증 email로 재인증 링크 발송 중                                                                  | 중복 발송 잠금                                                 |
+| reauth sent                             | `같은 브라우저에서 이메일 링크를 열어 주세요`                                                          | 재발송 cooldown과 취소                                         |
+| reauth error/expired                    | generic 재인증 실패                                                                                    | `다시 인증하기`                                                |
+| fresh confirm                           | 삭제 대상 목록, checkbox `삭제 후 복구할 수 없음을 이해했어요`                                         | checkbox 후 danger `계정 삭제 계속하기` 활성                   |
+| submitting                              | `삭제 요청을 준비하는 중…`                                                                             | 모든 owner mutation 잠금, 중복 DELETE는 같은 job 복구          |
+| response lost · receipt 있음            | 브라우저가 receipt cookie를 받은 경우 `/account-deletion/status`가 실제 pending/retry/completed를 복구 | 새 job 없이 status로 이동                                      |
+| response lost · receipt 없음·인증 유효  | 성공/실패를 추정하지 않고 동일 actor의 유효한 fresh evidence로 같은 DELETE를 idempotent하게 재실행     | retained job을 찾아 같은 receipt를 재발급받은 뒤 status로 이동 |
+| response lost · receipt 없음·signed-out | `요청 처리는 끝났어요` generic completed/no-new-job 안내                                               | 계정 존재를 구분하지 않고 새 job·재인증 없이 홈 이동           |
 
 삭제 CTA는 일반 저장 button과 같은 줄에 두지 않는다. confirm 화면에서 email, UID, pack 답변을 재출력하지 않는다.
 
@@ -410,15 +440,17 @@ Primary는 error가 comparison 내용만 가리는 동안에도 새 owner 전환
 
 이 route는 owner session이 없어도 status receipt cookie만으로 동작한다. 모든 문구는 public-generic이어야 한다.
 
-| 상태 | heading·표현 | reload/poll 행동 | 금지 |
-|---|---|---|---|
-| pending | `삭제 요청을 처리하고 있어요`, neutral spinner/progress | backoff polling과 `상태 새로고침` | success 색·check icon, 완료 시각 약속 |
-| retry | `삭제를 계속 처리하고 있어요`, `잠시 후 다시 확인해 주세요` | receipt 유효 동안 polling 연장 | 내부 provider 오류·attempt 수 노출, 실패 확정 표현 |
-| completed | `삭제가 완료됐어요`, success text/icon | polling 종료, 홈 이동 | 삭제된 account 상세·과거 답변 노출 |
-| receipt missing | `현재 브라우저에서 확인할 삭제 상태가 없어요` | 홈 이동 | 계정 없음/삭제 완료/다른 job 구분 |
-| receipt expired | missing과 같은 generic 안내 | cookie 제거 후 홈 이동 | `완료됐을 가능성` 같은 추정 |
-| network error | `상태를 불러오지 못했어요` | 수동 retry, 기존 pending을 completed로 바꾸지 않음 | receipt·job identifier 출력 |
-| response loss recovery | status route 첫 load에서 pending/retry/completed 중 실제 상태 | owner session 재로그인 요구 없음 | 새 deletion job 생성 |
+| 상태                                    | heading·표현                                                                    | reload/poll 행동                                   | 금지                                               |
+| --------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------- | -------------------------------------------------- |
+| pending                                 | `삭제 요청을 처리하고 있어요`, neutral spinner/progress                         | backoff polling과 `상태 새로고침`                  | success 색·check icon, 완료 시각 약속              |
+| retry                                   | `삭제를 계속 처리하고 있어요`, `잠시 후 다시 확인해 주세요`                     | receipt 유효 동안 polling 연장                     | 내부 provider 오류·attempt 수 노출, 실패 확정 표현 |
+| completed                               | `삭제가 완료됐어요`, success text/icon                                          | polling 종료, 홈 이동                              | 삭제된 account 상세·과거 답변 노출                 |
+| receipt missing                         | `현재 브라우저에서 확인할 삭제 상태가 없어요`                                   | 홈 이동                                            | 계정 없음/삭제 완료/다른 job 구분                  |
+| receipt expired                         | missing과 같은 generic 안내                                                     | cookie 제거 후 홈 이동                             | `완료됐을 가능성` 같은 추정                        |
+| network error                           | `상태를 불러오지 못했어요`                                                      | 수동 retry, 기존 pending을 completed로 바꾸지 않음 | receipt·job identifier 출력                        |
+| response loss · receipt 있음            | status route 첫 load에서 pending/retry/completed 중 실제 상태                   | owner session 재로그인 요구 없음                   | 새 deletion job 생성                               |
+| response loss · receipt 없음·인증 유효  | settings recovery가 동일 DELETE를 재실행해 같은 receipt를 받은 뒤 이 route 진입 | 발급 뒤 실제 상태 조회                             | 새 job·attempt·active lease takeover               |
+| response loss · receipt 없음·signed-out | `요청 처리는 끝났어요` generic completed/no-new-job 안내                        | 홈 이동                                            | 계정·job 존재 추정, 새 job, 재인증 강요            |
 
 상태 전이는 `pending → retry → pending|completed` 또는 `pending → completed`로 보일 수 있다. retry는 terminal failure가 아니며 receipt가 유효한 동안 reload로 같은 job 상태를 복구한다.
 
@@ -440,7 +472,7 @@ Primary는 error가 comparison 내용만 가리는 동안에도 새 owner 전환
 - [ ] text와 icon은 WCAG AA를 충족한다. normal text 4.5:1, large text 3:1, focus/control boundary 3:1 이상이다.
 - [ ] 모든 interactive target은 최소 44×44 CSS px다.
 - [ ] A/B, 관계, 시점은 native button/radio semantics와 visible label을 사용한다.
-- [ ] focus-visible은 3px blue outline과 3px offset을 사용하고 overflow에 잘리지 않는다.
+- [ ] focus-visible은 `var(--g-focus-width)` blue outline과 `var(--g-focus-offset)`을 사용하고 overflow에 잘리지 않는다. blue/coral surface에서는 context focus token으로 바꾼다.
 - [ ] heading은 화면당 하나의 `h1`부터 순서대로 사용하며 route 전환 뒤 main heading으로 focus를 옮긴다.
 - [ ] 저장·복사·제출 feedback은 `aria-live=polite`, 즉시 수정해야 할 submit 오류는 한 번만 `role=alert`로 알린다.
 - [ ] skeleton, decorative stack, asterisk는 screen reader에서 숨긴다.
@@ -456,8 +488,19 @@ Primary는 error가 comparison 내용만 가리는 동안에도 새 owner 전환
 - 빠른 사례 검색: `personality quiz profile results`, mobile. 결과 화면에서 profile/result를 먼저 보여 주고 share와 match/next action을 분리한 Tolan, 저장·연결을 결과 뒤에 제안하는 Breeze, 결과 card를 중심으로 둔 Storia 패턴을 검토했다.
 - 채택: 결과를 먼저 보상하고 공유/다음 행동을 분명히 하는 구조, 로그인이나 연결을 콘텐츠 경험 뒤에 두는 순서, 하나의 dominant CTA.
 - 미채택: personality score, avatar social proof, 가입으로 결과를 잠그는 방식, generic quiz discovery로 되돌리는 CTA.
-- 현재 화면 기반 Lazyweb improve report: 생성 완료 후 이슈 QA와 이 절에 hosted URL을 기록한다.
+- 현재 화면 기반 Lazyweb improve report: [GYEOP mobile UI improve report](https://www.lazyweb.com/report/lazyweb/fc21cfcf-ca51-449b-b6fd-ae9769fc43f0/?source=create). 생성 결과는 `degraded=false`, mockup failure 0건이다.
 - 현재 홈 baseline: 검정 canvas와 네온 palette는 식별력이 높지만 pack 선택 rail은 다음 card가 일부 보인다는 것만으로 scroll affordance에 의존한다. metadata 순서, focus 가능한 rail, 한 card 한 Primary를 이 명세로 고정한다.
+
+### 320/390/430px 현재 baseline 검수
+
+| viewport | 결과 | 관찰과 이 문서의 기준                                                                                                                    |
+| -------: | ---- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+|  320×800 | PASS | 12px gutter 안에서 hero와 첫 pack card가 잘리지 않고 Primary가 44px 이상이다. 다음 card 일부 노출은 의도한 rail affordance로만 허용한다. |
+|  390×844 | PASS | 첫 pack의 추천 관계, 제목, 시간·분위기·민감도, CTA가 한 card 안에서 순서대로 읽힌다.                                                     |
+|  430×932 | PASS | content를 불필요하게 늘리지 않고 첫 card와 다음 card가 분리된다. rail 밖의 required flow에는 이 가로 pattern을 재사용하지 않는다.        |
+| 1024×900 | PASS | public home이 hero/pack rail 2열로 확장되고 pack CTA 위계는 mobile과 같다. required flow는 이 2열 pattern을 상속하지 않는다.             |
+
+세 viewport 모두 body 자체의 가로 overflow는 없었다. rail의 잘린 다음 card text는 현재 화면에서 의도한 preview지만, focus가 rail 안으로 들어오면 해당 card 전체로 scroll-snap 되어야 한다.
 
 ## 12. 구현 handoff
 

@@ -5,12 +5,12 @@ Issue: https://github.com/aroido/gyeop/issues/11
 
 ## 목표
 
-서로 다른 방향을 보여 주는 목업 01~06과 현재 비공개 MVP 제품 계약을 대조해, 320~430px 모바일에서 구현자가 그대로 CSS custom properties와 화면 상태로 옮길 수 있는 단일 P0 UI 기준을 `docs/design/p0-mobile-ui-spec.md`에 확정한다.
+서로 다른 방향을 보여 주는 목업 01–06과 현재 비공개 MVP 제품 계약을 대조해, 320–430px 모바일에서 구현자가 그대로 CSS custom properties와 화면 상태로 옮길 수 있는 단일 P0 UI 기준을 `docs/design/p0-mobile-ui-spec.md`에 확정한다.
 
 ## 범위
 
 - `docs/design/p0-mobile-ui-spec.md`를 새로 만든다.
-- 목업 01~06에서 유지할 시각 언어와 제품 SSOT 때문에 폐기하거나 보류할 표현을 명시한다.
+- 목업 01–06에서 유지할 시각 언어와 제품 SSOT 때문에 폐기하거나 보류할 표현을 명시한다.
 - 색상, typography, spacing, radius, elevation/layer, motion, layout 토큰의 이름과 exact 값을 정의한다.
 - 다음 화면의 default, loading, error, empty, disabled, success 및 도메인별 복구 상태를 표로 정의한다.
   - 시작과 팩 선택
@@ -75,7 +75,7 @@ Issue: https://github.com/aroido/gyeop/issues/11
 
 ## 구현 계획
 
-1. 현재 실행 홈을 320/390/430px에서 캡처하고 목업 01~06 및 Lazyweb 모바일 quiz/profile 사례와 비교한다.
+1. 현재 실행 홈을 320/390/430px에서 캡처하고 목업 01–06 및 Lazyweb 모바일 quiz/profile 사례와 비교한다.
 2. 제품 SSOT를 기준으로 목업 요소를 `유지`, `수정`, `inactive 후보`, `폐기`로 분류한다.
 3. 기존 CSS 값과 WCAG 대비·44px target을 고려해 primitive/semantic/layout/motion token registry를 exact CSS custom property 값으로 작성한다.
 4. 핵심 화면 8개와 production beta 계정 삭제 2개 화면의 상태표, CTA 순서, loading/error/recovery 행동을 작성한다.
@@ -87,13 +87,13 @@ Issue: https://github.com/aroido/gyeop/issues/11
 ## 완료 기준
 
 - `docs/design/p0-mobile-ui-spec.md`에 CSS custom properties로 복사할 수 있는 color, type, space, radius, shadow/layer, motion, layout token 이름과 exact 값이 있다.
-- 목업 01~06 각각의 유지·수정·보류/폐기 결론과 이유가 제품 SSOT에 연결된다.
+- 목업 01–06 각각의 유지·수정·보류/폐기 결론과 이유가 제품 SSOT에 연결된다.
 - 시작, 주인 10장, 공유, 관계·시점, 방문자 3장, 비교, 프로필, 철회의 default/loading/error/empty/disabled/success 상태와 복구 행동이 있다.
 - 필수 3장 제출 전 셀프 답은 어떤 loading/error 상태에서도 노출되지 않는다.
 - 현재 비공개 프로필에서 공개 링크 시선만 누적하고, 카드 표본 미달은 선택 수 대신 `시선을 모으는 중 · n/3`으로 표시한다.
 - 목업의 관계 layer는 현재 private MVP 데이터 경계와 production beta 후보가 구분되며, avatar·점수·성격 label을 꾸며내지 않는다.
 - 비교 성공의 Primary CTA는 항상 `나도 이 팩으로 시작하기`이고 Secondary가 선행하거나 같은 강조를 갖지 않는다.
-- `/me/settings`와 `/account-deletion/status`의 정책 안내, 파괴적 확인, 재인증, pending, retry, completed, receipt 부재/만료, 오류, 응답 유실 reload 복구가 정의된다.
+- `/me/settings`와 `/account-deletion/status`의 정책 안내, 파괴적 확인, 재인증, pending, retry, completed, receipt 부재/만료, 오류가 정의된다. 응답 유실은 receipt가 있으면 status reload, 없고 인증 증거가 유효하면 동일 DELETE의 idempotent receipt 재발급, signed-out이면 계정 존재를 노출하지 않는 generic completed/no-new-job 안내로 수렴한다.
 - 계정 삭제 pending/retry는 완료로 오인할 색·icon·문구를 쓰지 않고, receipt 부재/만료는 계정·job 존재를 노출하지 않는다.
 - 320/390/430px에서 required flow의 가로 넘침이 없고 44×44 target, visible focus, WCAG AA, screen reader status, reduced motion 기준이 있다.
 - Lazyweb search와 current-screen report URL, 3개 viewport 검수 결과, 독립 시각 review, 접근성 checklist가 문서 또는 QA artifact에 남는다.
@@ -105,9 +105,9 @@ Issue: https://github.com/aroido/gyeop/issues/11
 - 문서 focused 검사
   - token 표의 모든 항목이 `--g-*` 이름과 exact CSS 값 보유
   - 화면 상태표 10개와 required state keyword 존재
-  - 목업 01~06 대조표, viewport 320/390/430, accessibility checklist 존재
+  - 목업 01–06 대조표, viewport 320/390/430, accessibility checklist 존재
 - Playwright로 실행 중인 비공개 홈을 320×800, 390×844, 430×932에서 캡처해 현재 baseline의 overflow, pack 선택 위계, 44px target을 확인한다.
-- account deletion walkthrough: settings → reauth → destructive confirmation → status pending → retry → completed, response loss reload, receipt missing/expired generic 안내를 문서 상태 전이로 추적한다.
+- account deletion walkthrough: settings → reauth → destructive confirmation → status pending → retry → completed, response loss의 receipt 있음/없음+인증 유효/없음+signed-out 세 분기, receipt missing/expired generic 안내를 문서 상태 전이로 추적한다.
 - 독립 reviewer가 목업, 제품 경계, CTA 위계, WCAG/reduced motion을 확인한다.
 - 마지막 clean commit에서 `./scripts/run-ai-verify --mode full`
 
