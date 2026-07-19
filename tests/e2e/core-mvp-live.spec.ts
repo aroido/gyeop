@@ -476,6 +476,7 @@ test.describe("core MVP live gate", () => {
     });
     await samePack.focus();
     await visitors[0].page.keyboard.press("Enter");
+    await confirmEligibility(visitors[0].page);
     await visitors[0].page.waitForURL(/\/play\/[0-9a-f-]{36}$/);
     await expect(
       visitors[0].page.getByRole("heading", {
