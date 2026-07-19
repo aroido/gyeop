@@ -29,6 +29,7 @@ function sqlString(value) {
 function renderPack(pack) {
   const ids = PACK_IDS[pack.version];
   if (!ids) throw new Error(`Missing fixed IDs for ${pack.version}`);
+  const isLegacyCompatiblePack = pack.slug === "old-friend";
   const rows = pack.cards.map((card) =>
     [
       ids.version,
@@ -50,7 +51,8 @@ function renderPack(pack) {
       .join(", "),
   );
 
-  return `insert into public.pack_templates (
+  const templateInsert = isLegacyCompatiblePack
+    ? `insert into public.pack_templates (
   id,
   slug,
   title,
@@ -66,15 +68,65 @@ values (
   ${sqlString(pack.sensitivity)},
   ${pack.active}
 )
-on conflict (id) do nothing;
+on conflict (id) do nothing;`
+    : `insert into public.pack_templates (
+  id,
+  slug,
+  title,
+  target_relationship,
+  sensitivity,
+  is_active
+)
+select seed.*
+from (
+  values (
+    ${sqlString(ids.template)}::uuid,
+    ${sqlString(pack.slug)},
+    ${sqlString(pack.title)},
+    ${sqlString(pack.targetRelationship)},
+    ${sqlString(pack.sensitivity)},
+    ${pack.active}
+  )
+) as seed (
+  id,
+  slug,
+  title,
+  target_relationship,
+  sensitivity,
+  is_active
+)
+where to_regprocedure(
+  'public.get_visitor_response_pack_metadata(uuid,bytea)'
+) is not null
+on conflict (id) do nothing;`;
 
-insert into public.pack_versions (id, template_id, version)
+  const versionInsert = isLegacyCompatiblePack
+    ? `insert into public.pack_versions (id, template_id, version)
 values (
   ${sqlString(ids.version)},
   ${sqlString(ids.template)},
   ${sqlString(pack.version)}
 )
-on conflict (id) do nothing;
+on conflict (id) do nothing;`
+    : `insert into public.pack_versions (id, template_id, version)
+select seed.*
+from (
+  values (
+    ${sqlString(ids.version)}::uuid,
+    ${sqlString(ids.template)}::uuid,
+    ${sqlString(pack.version)}
+  )
+) as seed (id, template_id, version)
+where exists (
+  select 1
+  from public.pack_templates as template
+  where template.id = ${sqlString(ids.template)}
+)
+on conflict (id) do nothing;`;
+
+  return `${templateInsert}
+
+${versionInsert}
 
 insert into public.pack_cards (
   pack_version_id,

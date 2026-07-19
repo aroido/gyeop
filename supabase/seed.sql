@@ -10,21 +10,42 @@ insert into public.pack_templates (
   sensitivity,
   is_active
 )
-values (
-  '13131313-1313-4313-8313-131313131313',
-  'coworker',
-  '같이 일할 때 나는?',
-  'coworker',
-  'low',
-  true
+select seed.*
+from (
+  values (
+    '13131313-1313-4313-8313-131313131313'::uuid,
+    'coworker',
+    '같이 일할 때 나는?',
+    'coworker',
+    'low',
+    true
+  )
+) as seed (
+  id,
+  slug,
+  title,
+  target_relationship,
+  sensitivity,
+  is_active
 )
+where to_regprocedure(
+  'public.get_visitor_response_pack_metadata(uuid,bytea)'
+) is not null
 on conflict (id) do nothing;
 
 insert into public.pack_versions (id, template_id, version)
-values (
-  '17171717-1717-4717-8717-171717171717',
-  '13131313-1313-4313-8313-131313131313',
-  'coworker-v1'
+select seed.*
+from (
+  values (
+    '17171717-1717-4717-8717-171717171717'::uuid,
+    '13131313-1313-4313-8313-131313131313'::uuid,
+    'coworker-v1'
+  )
+) as seed (id, template_id, version)
+where exists (
+  select 1
+  from public.pack_templates as template
+  where template.id = '13131313-1313-4313-8313-131313131313'
 )
 on conflict (id) do nothing;
 
@@ -85,21 +106,42 @@ insert into public.pack_templates (
   sensitivity,
   is_active
 )
-values (
-  '12121212-1212-4212-8212-121212121212',
-  'first-impression',
-  '나, 첫눈에 어땠어?',
-  'new_connection',
-  'low',
-  true
+select seed.*
+from (
+  values (
+    '12121212-1212-4212-8212-121212121212'::uuid,
+    'first-impression',
+    '나, 첫눈에 어땠어?',
+    'new_connection',
+    'low',
+    true
+  )
+) as seed (
+  id,
+  slug,
+  title,
+  target_relationship,
+  sensitivity,
+  is_active
 )
+where to_regprocedure(
+  'public.get_visitor_response_pack_metadata(uuid,bytea)'
+) is not null
 on conflict (id) do nothing;
 
 insert into public.pack_versions (id, template_id, version)
-values (
-  '16161616-1616-4616-8616-161616161616',
-  '12121212-1212-4212-8212-121212121212',
-  'first-impression-v1'
+select seed.*
+from (
+  values (
+    '16161616-1616-4616-8616-161616161616'::uuid,
+    '12121212-1212-4212-8212-121212121212'::uuid,
+    'first-impression-v1'
+  )
+) as seed (id, template_id, version)
+where exists (
+  select 1
+  from public.pack_templates as template
+  where template.id = '12121212-1212-4212-8212-121212121212'
 )
 on conflict (id) do nothing;
 
@@ -160,21 +202,42 @@ insert into public.pack_templates (
   sensitivity,
   is_active
 )
-values (
-  '14141414-1414-4414-8414-141414141414',
-  'honest-self',
-  '가까운 사람만 아는 나',
-  'close_relationship',
-  'medium',
-  true
+select seed.*
+from (
+  values (
+    '14141414-1414-4414-8414-141414141414'::uuid,
+    'honest-self',
+    '가까운 사람만 아는 나',
+    'close_relationship',
+    'medium',
+    true
+  )
+) as seed (
+  id,
+  slug,
+  title,
+  target_relationship,
+  sensitivity,
+  is_active
 )
+where to_regprocedure(
+  'public.get_visitor_response_pack_metadata(uuid,bytea)'
+) is not null
 on conflict (id) do nothing;
 
 insert into public.pack_versions (id, template_id, version)
-values (
-  '18181818-1818-4818-8818-181818181818',
-  '14141414-1414-4414-8414-141414141414',
-  'honest-self-v1'
+select seed.*
+from (
+  values (
+    '18181818-1818-4818-8818-181818181818'::uuid,
+    '14141414-1414-4414-8414-141414141414'::uuid,
+    'honest-self-v1'
+  )
+) as seed (id, template_id, version)
+where exists (
+  select 1
+  from public.pack_templates as template
+  where template.id = '14141414-1414-4414-8414-141414141414'
 )
 on conflict (id) do nothing;
 
