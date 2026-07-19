@@ -117,7 +117,7 @@ test("one production build reflects runtime activation and fails closed", async 
   try {
     const inactive = await html(3106);
     assert.equal(inactive.response.status, 200);
-    assert.match(inactive.body, /우리 아직 통할까\?/);
+    assert.match(inactive.body, /오래 본 너의 시선/);
     assert.doesNotMatch(inactive.body, /href="\/play\/new\?pack=old-friend"/);
     assert.match(inactive.body, /href="\/play\/new\?pack=first-impression"/);
     assert.match(inactive.body, /href="\/play\/new\?pack=coworker"/);
@@ -133,16 +133,16 @@ test("one production build reflects runtime activation and fails closed", async 
     const active = await html(3106);
     assert.equal(active.response.status, 200);
     assert.match(active.body, /href="\/play\/new\?pack=old-friend"/);
-    assert.match(active.body, /우리 아직 통할까\?/);
+    assert.match(active.body, /오래 본 너의 시선/);
     assert.match(active.body, /낮은 민감도/);
     const play = await html(3106, "/play/new?pack=old-friend");
     assert.equal(play.response.status, 200);
-    assert.match(play.body, /우리 아직 통할까\?/);
+    assert.match(play.body, /오래 본 너의 시선/);
     assert.match(play.body, /질문을 준비하는 중/);
 
     setOldFriendActive(false);
     const inactiveAgain = await html(3106);
-    assert.match(inactiveAgain.body, /우리 아직 통할까\?/);
+    assert.match(inactiveAgain.body, /오래 본 너의 시선/);
     assert.doesNotMatch(
       inactiveAgain.body,
       /href="\/play\/new\?pack=old-friend"/,
@@ -161,10 +161,10 @@ test("one production build reflects runtime activation and fails closed", async 
     const fallback = await html(3107);
     assert.equal(fallback.response.status, 200);
     assert.match(fallback.body, /준비 중/);
-    assert.match(fallback.body, /우리 아직 통할까\?/);
-    assert.match(fallback.body, /나, 첫눈에 어땠어\?/);
-    assert.match(fallback.body, /같이 일할 때 나는\?/);
-    assert.match(fallback.body, /가까운 사람만 아는 나/);
+    assert.match(fallback.body, /오래 본 너의 시선/);
+    assert.match(fallback.body, /처음 만난 너의 시선/);
+    assert.match(fallback.body, /같이 일한 너의 시선/);
+    assert.match(fallback.body, /가까운 너의 시선/);
     assert.doesNotMatch(fallback.body, /href="\/play\/new\?pack=old-friend"/);
     assert.doesNotMatch(
       fallback.body,

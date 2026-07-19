@@ -1,7 +1,7 @@
 {
   "slug": "old-friend",
   "version": "old-friend-v1",
-  "title": "우리 아직 통할까?",
+  "title": "오래 본 너의 시선",
   "targetRelationship": "old_friend",
   "sensitivity": "low",
   "active": true,

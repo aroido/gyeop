@@ -19,7 +19,7 @@ type DraftResponse = {
   id: string;
   packSlug: "old-friend";
   packVersion: "old-friend-v1";
-  packTitle: "우리 아직 통할까?";
+  packTitle: "오래 본 너의 시선";
   status: "draft";
   relationshipCode: string;
   relationshipLabel: string;
@@ -143,7 +143,7 @@ async function installVisitorApi(
       return json(route, 200, {
         packSlug: "old-friend",
         packVersion: "old-friend-v1",
-        packTitle: "우리 아직 통할까?",
+        packTitle: "오래 본 너의 시선",
         kind:
           options.kind ??
           (url.pathname.includes(oneToOneId) ? "one_to_one" : "public"),
@@ -172,7 +172,7 @@ async function installVisitorApi(
       id: responseId,
       packSlug: "old-friend",
       packVersion: "old-friend-v1",
-      packTitle: "우리 아직 통할까?",
+      packTitle: "오래 본 너의 시선",
       status: "draft",
       relationshipCode: body.relationshipCode!,
       relationshipLabel:

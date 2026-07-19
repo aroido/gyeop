@@ -522,7 +522,7 @@ test.describe("core MVP live gate", () => {
     await page.goto("/");
 
     const packCard = page.locator("article").filter({
-      has: page.getByRole("heading", { name: "나, 첫눈에 어땠어?" }),
+      has: page.getByRole("heading", { name: "처음 만난 너의 시선" }),
     });
     await packCard.getByRole("link", { name: "질문 시작하기" }).click();
     await waitForOwnerPlayStart(page);
@@ -537,7 +537,7 @@ test.describe("core MVP live gate", () => {
       page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
     ).toBeVisible({ timeout: 15_000 });
     await page.getByRole("button", { name: "친구에게 공유하기" }).click();
-    await expect(page.getByText("겹 · 나, 첫눈에 어땠어?")).toBeVisible();
+    await expect(page.getByText("겹 · 처음 만난 너의 시선")).toBeVisible();
 
     await page.getByRole("button", { name: "공유 링크 만들기" }).click();
     const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
@@ -550,7 +550,7 @@ test.describe("core MVP live gate", () => {
       knownSince: "10년 이상이에요",
     });
     await expect(
-      visitor.page.getByText("겹 · 나, 첫눈에 어땠어?"),
+      visitor.page.getByText("겹 · 처음 만난 너의 시선"),
     ).toBeVisible();
     const samePack = visitor.page.getByRole("link", {
       name: "나도 이 팩으로 시작하기",
@@ -564,7 +564,7 @@ test.describe("core MVP live gate", () => {
     ).toBeFocused();
 
     await page.goto("/me");
-    await expect(page.getByText("겹 · 나, 첫눈에 어땠어?")).toBeVisible();
+    await expect(page.getByText("겹 · 처음 만난 너의 시선")).toBeVisible();
     await expect(page.locator("article")).toHaveCount(10);
     await visitor.context.close();
   });

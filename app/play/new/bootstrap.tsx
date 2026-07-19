@@ -13,10 +13,10 @@ import styles from "../[playId]/page.module.css";
 
 type State = "loading" | "retryable" | "terminal";
 const packTitles: Readonly<Record<string, string>> = Object.freeze({
-  "old-friend": "우리 아직 통할까?",
-  "first-impression": "나, 첫눈에 어땠어?",
-  coworker: "같이 일할 때 나는?",
-  "honest-self": "가까운 사람만 아는 나",
+  "old-friend": "오래 본 너의 시선",
+  "first-impression": "처음 만난 너의 시선",
+  coworker: "같이 일한 너의 시선",
+  "honest-self": "가까운 너의 시선",
 });
 
 function isRetryable(error: unknown) {

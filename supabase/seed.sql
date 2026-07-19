@@ -15,7 +15,7 @@ from (
   values (
     '13131313-1313-4313-8313-131313131313'::uuid,
     'coworker',
-    '같이 일할 때 나는?',
+    '같이 일한 너의 시선',
     'coworker',
     'low',
     true
@@ -111,7 +111,7 @@ from (
   values (
     '12121212-1212-4212-8212-121212121212'::uuid,
     'first-impression',
-    '나, 첫눈에 어땠어?',
+    '처음 만난 너의 시선',
     'new_connection',
     'low',
     true
@@ -207,7 +207,7 @@ from (
   values (
     '14141414-1414-4414-8414-141414141414'::uuid,
     'honest-self',
-    '가까운 사람만 아는 나',
+    '가까운 너의 시선',
     'close_relationship',
     'medium',
     true
@@ -301,7 +301,7 @@ insert into public.pack_templates (
 values (
   '11111111-1111-4111-8111-111111111111',
   'old-friend',
-  '우리 아직 통할까?',
+  '오래 본 너의 시선',
   'old_friend',
   'low',
   true
