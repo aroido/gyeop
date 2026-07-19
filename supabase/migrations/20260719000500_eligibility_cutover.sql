@@ -11,7 +11,7 @@ truncate table
   public.rate_limit_buckets;
 
 grant create on schema public, private to gyeop_internal_rpc;
-grant gyeop_internal_rpc to postgres with set true;
+grant gyeop_internal_rpc to postgres with inherit false, set true;
 set local role gyeop_internal_rpc;
 
 create or replace function public.get_invite_metadata(
@@ -117,16 +117,25 @@ alter function private.record_response_invite_open()
   owner to gyeop_internal_rpc;
 revoke execute on function private.record_response_invite_open()
   from public, anon, authenticated, service_role;
+grant execute on function private.record_response_invite_open()
+  to postgres;
 
 reset role;
 revoke create on schema public, private from gyeop_internal_rpc;
-grant gyeop_internal_rpc to postgres with set false;
 
 drop trigger if exists visitor_response_invite_open
   on public.visitor_responses;
 create trigger visitor_response_invite_open
 after insert on public.visitor_responses
-for each row execute function private.record_response_invite_open();
+for each row
+when (new.status = 'draft')
+execute function private.record_response_invite_open();
+
+set local role gyeop_internal_rpc;
+revoke execute on function private.record_response_invite_open()
+  from postgres;
+reset role;
+revoke gyeop_internal_rpc from postgres granted by postgres;
 
 update private.analytics_measurement_markers
 set started_at = clock_timestamp()
