@@ -68,7 +68,6 @@ export function verifyShareLinks() {
     "utf8",
   );
   assert.match(session, /gyeop-share-link-v1\\0/);
-  assert.match(session, /gyeop-invite-metadata-v1\\0/);
   assert.match(session, /randomBytes\(16\)/);
   assert.match(session, /randomBytes\(32\)/);
 
@@ -140,11 +139,13 @@ export function verifyShareLinks() {
       /privateNoStore:\s*true/,
       `${route} must be private no-store`,
     );
-    assert.match(
-      source,
-      /runRateLimitedDomain\s*\(/,
-      `${route} must apply a limiter`,
-    );
+    if (route !== "app/api/invites/[publicId]/metadata/route.ts") {
+      assert.match(
+        source,
+        /runRateLimitedDomain\s*\(/,
+        `${route} must apply a limiter`,
+      );
+    }
   }
   const shareEventRoute = readFileSync(
     path.join(ROOT, "app/api/me/plays/[playId]/share-events/route.ts"),
@@ -175,9 +176,16 @@ export function verifyShareLinks() {
     path.join(ROOT, "app/api/invites/[publicId]/metadata/route.ts"),
     "utf8",
   );
-  assert.match(inviteRoute, /action:\s*"invite_metadata"/);
-  assert.match(inviteRoute, /windowSeconds:\s*60/);
-  assert.match(inviteRoute, /limit:\s*60/);
+  assert.doesNotMatch(inviteRoute, /runRateLimitedDomain|invite_metadata/);
+  const eligibilityMigration = readFileSync(
+    path.join(
+      ROOT,
+      "supabase/migrations/20260719000500_eligibility_cutover.sql",
+    ),
+    "utf8",
+  );
+  assert.match(eligibilityMigration, /record_response_invite_open/);
+  assert.match(eligibilityMigration, /visitor_response_invite_open/);
 
   const presentation = readFileSync(
     path.join(ROOT, "lib/packs/presentation.ts"),

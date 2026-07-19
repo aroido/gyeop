@@ -5,7 +5,7 @@ export async function confirmEligibility(page: Page) {
     page.getByRole("heading", {
       name: "겹은 만 19세 이상만 이용할 수 있어요",
     }),
-  ).toBeVisible();
+  ).toBeFocused();
   const confirm = page.getByRole("button", { name: "확인하고 계속" });
   await expect(confirm).toBeDisabled();
   await page

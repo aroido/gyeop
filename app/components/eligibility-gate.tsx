@@ -15,6 +15,10 @@ export default function EligibilityGate({
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
     if (blocked) headingRef.current?.focus();
   }, [blocked]);
 
@@ -40,7 +44,9 @@ export default function EligibilityGate({
     <main className={styles.shell}>
       <section className={styles.card} aria-labelledby="eligibility-title">
         <p className={styles.brand}>겹</p>
-        <h1 id="eligibility-title">겹은 만 19세 이상만 이용할 수 있어요</h1>
+        <h1 id="eligibility-title" ref={headingRef} tabIndex={-1}>
+          겹은 만 19세 이상만 이용할 수 있어요
+        </h1>
         <p>
           지금은 대한민국에서 이용하는 성인만 참여할 수 있어요. 생년월일이나
           신분증은 받지 않아요.

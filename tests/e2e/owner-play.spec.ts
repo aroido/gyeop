@@ -45,6 +45,11 @@ test("blocks an ineligible owner before the create request", async ({
   const api = await installOwnerFlowApi(page);
   await page.goto("/play/new?pack=old-friend");
   await expect(
+    page.getByRole("heading", {
+      name: "겹은 만 19세 이상만 이용할 수 있어요",
+    }),
+  ).toBeFocused();
+  await expect(
     page.getByRole("checkbox", {
       name: "만 19세 이상이며 대한민국에서 이용 중이에요.",
     }),

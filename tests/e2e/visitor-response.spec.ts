@@ -370,6 +370,11 @@ test("blocks an ineligible visitor before relationship and response creation", a
 }) => {
   const api = await installVisitorApi(page);
   await page.goto(`/i/${publicId}#k=${secret}`);
+  await expect(
+    page.getByRole("heading", {
+      name: "겹은 만 19세 이상만 이용할 수 있어요",
+    }),
+  ).toBeFocused();
   await page.getByRole("button", { name: "아직 만 19세가 아니에요" }).click();
   await expect(
     page.getByRole("heading", { name: "지금은 겹을 이용할 수 없어요" }),

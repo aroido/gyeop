@@ -337,6 +337,13 @@ test("each additional pack completes the real owner, share, visitor, and profile
     const secret = inviteUrl.hash.slice("#k=".length);
     assert.ok(publicId && secret);
 
+    const beforeMetadata =
+      index === 0
+        ? sql(
+            "select json_build_array((select count(*) from public.visitor_responses), (select count(*) from public.analytics_events), (select count(*) from public.rate_limit_buckets))",
+            true,
+          )
+        : null;
     const metadata = await ownerRequest(`/api/invites/${publicId}/metadata`, {
       method: "POST",
       ip: `203.0.113.${41 + index}`,
@@ -349,6 +356,15 @@ test("each additional pack completes the real owner, share, visitor, and profile
       packTitle: pack.title,
       kind,
     });
+    if (beforeMetadata !== null) {
+      assert.equal(
+        sql(
+          "select json_build_array((select count(*) from public.visitor_responses), (select count(*) from public.analytics_events), (select count(*) from public.rate_limit_buckets))",
+          true,
+        ),
+        beforeMetadata,
+      );
+    }
 
     if (index === 0) {
       const before = sql(
@@ -426,6 +442,15 @@ test("each additional pack completes the real owner, share, visitor, and profile
     });
     assert.equal(response.status, 201, `${pack.slug}: ${serverLog}`);
     const responseBody = await response.json();
+    if (index === 0) {
+      assert.equal(
+        sql(
+          "select count(*) from public.analytics_events where event_name = 'invite_opened'",
+          true,
+        ),
+        "1",
+      );
+    }
     assert.equal(responseBody.packSlug, pack.slug);
     assert.equal(responseBody.packVersion, pack.version);
     assert.equal(responseBody.packTitle, pack.title);
