@@ -141,10 +141,7 @@ for (const viewport of [
       .evaluateAll((headings) =>
         headings.map((heading) => {
           const style = getComputedStyle(heading);
-          return (
-            heading.getBoundingClientRect().height /
-            parseFloat(style.lineHeight)
-          );
+          return heading.clientHeight / parseFloat(style.lineHeight);
         }),
       );
     expect(titleLineCounts).toHaveLength(4);
