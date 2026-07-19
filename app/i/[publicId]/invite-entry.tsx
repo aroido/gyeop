@@ -334,7 +334,7 @@ function ResponseFlow({
   const choicesRef = useRef(choices);
 
   useEffect(() => {
-    if (response.status === "draft") headingRef.current?.focus();
+    headingRef.current?.focus();
   }, [headingRef, position, response.status]);
 
   const finish = useCallback(async () => {

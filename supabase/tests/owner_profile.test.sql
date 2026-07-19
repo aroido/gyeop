@@ -530,25 +530,37 @@ select is(
     from public.analytics_events
     where event_name = 'profile_viewed'
   ),
-  1::bigint,
-  'only the explicit successful render event is stored'
-);
-select is(
-  (
-    select properties
-    from public.analytics_events
-    where event_name = 'profile_viewed'
-  ),
-  jsonb_build_object('packVersion', 'old-friend-v1'),
-  'profile event properties contain only the pack version'
+  2::bigint,
+  'render and eligible click store the explicit and atomic view events'
 );
 select ok(
   (
-    select visitor_response_id is null
+    select bool_and(
+      properties = jsonb_build_object('packVersion', 'old-friend-v1')
+    )
     from public.analytics_events
     where event_name = 'profile_viewed'
   ),
-  'profile event has no visitor response identifier'
+  'every profile view event contains only the pack version'
+);
+select ok(
+  (
+    select bool_and(visitor_response_id is null)
+    from public.analytics_events
+    where event_name = 'profile_viewed'
+  ),
+  'profile view events have no visitor response identifier'
+);
+select ok(
+  (
+    select max(viewed.occurred_at) <= min(clicked.occurred_at)
+    from public.analytics_events as viewed
+    cross join public.analytics_events as clicked
+    where viewed.event_name = 'profile_viewed'
+      and clicked.event_name = 'profile_reshare_clicked'
+      and viewed.owner_play_id = clicked.owner_play_id
+  ),
+  'eligible profile click atomically follows its guaranteed view event'
 );
 select is(
   (
