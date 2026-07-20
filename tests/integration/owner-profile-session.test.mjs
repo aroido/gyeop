@@ -3,6 +3,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { randomBytes, randomUUID } from "node:crypto";
 import test, { after, before } from "node:test";
+import { createClient } from "@supabase/supabase-js";
 
 import {
   OWNER_COOKIE_NAME,
@@ -16,6 +17,7 @@ const rateSecret = randomBytes(32).toString("base64url");
 const appUrl = "http://127.0.0.1:3107";
 let server;
 let serverLog = "";
+let testAccount;
 
 function localSupabase() {
   const output = execFileSync(
@@ -32,11 +34,15 @@ function localSupabase() {
 }
 
 const local = localSupabase();
+for (const name of ["ANON_KEY", "API_URL", "SECRET_KEY"]) {
+  if (!local[name]) throw new Error(`Local Supabase did not report ${name}`);
+}
 const serverEnv = {
   ...process.env,
   APP_URL: appUrl,
   ORIGIN_PROXY_SECRET: proxySecret,
   RATE_LIMIT_SECRET: rateSecret,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: local.ANON_KEY,
   NEXT_PUBLIC_SUPABASE_URL: local.API_URL,
   SUPABASE_SECRET_KEY: local.SECRET_KEY,
 };
@@ -69,6 +75,42 @@ function hashHex(credential) {
 
 function ownerCookie(credential) {
   return `${OWNER_COOKIE_NAME}=${credential.value}`;
+}
+
+async function createAuthenticatedAccount() {
+  const email = `owner-profile-${randomBytes(8).toString("hex")}@example.com`;
+  const password = `T3st-${randomBytes(12).toString("base64url")}`;
+  const admin = createClient(local.API_URL, local.SECRET_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const created = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  assert.ifError(created.error);
+  assert.ok(created.data.user);
+
+  const client = createClient(local.API_URL, local.ANON_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const signedIn = await client.auth.signInWithPassword({ email, password });
+  assert.ifError(signedIn.error);
+  assert.ok(signedIn.data.session);
+  const value = Buffer.from(JSON.stringify(signedIn.data.session)).toString(
+    "base64url",
+  );
+  return {
+    admin,
+    cookie: `sb-127-auth-token=base64-${value}`,
+    userId: created.data.user.id,
+  };
+}
+
+function claimOwner(credential) {
+  sql(
+    `update public.pack_plays set owner_id = '${testAccount.userId}' where id = '${credential.playId}'`,
+  );
 }
 
 function insertOwner(credential, completed) {
@@ -171,6 +213,7 @@ async function ownerRequest(
 }
 
 before(async () => {
+  testAccount = await createAuthenticatedAccount();
   server = spawn(
     "pnpm",
     ["exec", "next", "dev", "--hostname", "127.0.0.1", "--port", "3107"],
@@ -194,16 +237,26 @@ before(async () => {
 });
 
 after(async () => {
-  if (!server || server.exitCode !== null) return;
-  server.kill("SIGTERM");
-  await Promise.race([
-    new Promise((resolve) => server.once("exit", resolve)),
-    new Promise((resolve) => setTimeout(resolve, 5000)),
-  ]);
-  if (server.exitCode === null) server.kill("SIGKILL");
+  if (server && server.exitCode === null) {
+    server.kill("SIGTERM");
+    await Promise.race([
+      new Promise((resolve) => server.once("exit", resolve)),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]);
+    if (server.exitCode === null) server.kill("SIGKILL");
+  }
+  if (testAccount) {
+    sql(
+      `update public.pack_plays set owner_id = null where owner_id = '${testAccount.userId}'`,
+    );
+    const deleted = await testAccount.admin.auth.admin.deleteUser(
+      testAccount.userId,
+    );
+    assert.ifError(deleted.error);
+  }
 });
 
-test("current-cookie-only profile auth is private and generic", async () => {
+test("profile access requires Auth and stays scoped to the requested owned play", async () => {
   const initialProfileViewCount = Number(
     sql(
       "select count(*) from public.analytics_events where event_name = 'profile_viewed'",
@@ -213,69 +266,57 @@ test("current-cookie-only profile auth is private and generic", async () => {
   const ownerA = createOwnerCredential();
   const ownerB = createOwnerCredential();
   const draft = createOwnerCredential();
-  const expired = createOwnerCredential();
   insertOwner(ownerA, true);
   insertOwner(ownerB, true);
   insertOwner(draft, false);
-  insertOwner(expired, true);
-  sql(`with expired_time as (
-      select clock_timestamp() - interval '1 second' as value
-    )
-    update public.pack_plays
-    set management_expires_at = expired_time.value,
-        last_active_at = expired_time.value - interval '7 days'
-    from expired_time
-    where id = '${expired.playId}'`);
+  claimOwner(ownerA);
+  claimOwner(ownerB);
+  claimOwner(draft);
 
-  const absent = await ownerRequest("/api/me/profile");
-  const absentBody = await absent.text();
-  assert.equal(absent.status, 404);
-
-  const malformed = await ownerRequest("/api/me/profile", {
-    cookie: `${OWNER_COOKIE_NAME}=bad`,
+  const absent = await ownerRequest(`/api/me/profile?playId=${ownerA.playId}`);
+  const absentBody = await absent.json();
+  assert.equal(absent.status, 401);
+  assert.deepEqual(absentBody, {
+    code: "OWNER_AUTH_REQUIRED",
+    message: "로그인한 뒤 내 질문팩을 불러올 수 있어요.",
   });
-  assert.equal(malformed.status, 404);
-  assert.equal(await malformed.text(), absentBody);
-  assert.match(malformed.headers.get("set-cookie") ?? "", /Max-Age=0/);
 
-  const tamperedSecret = randomBytes(32).toString("base64url");
-  const tampered = await ownerRequest("/api/me/profile", {
-    cookie: `${OWNER_COOKIE_NAME}=v1.${ownerA.playId}.${tamperedSecret}`,
-  });
-  assert.equal(tampered.status, 404);
-  assert.equal(await tampered.text(), absentBody);
-  assert.match(tampered.headers.get("set-cookie") ?? "", /Max-Age=0/);
+  const malformed = await ownerRequest(
+    `/api/me/profile?playId=${ownerA.playId}`,
+    {
+      cookie: `${OWNER_COOKIE_NAME}=bad`,
+    },
+  );
+  assert.equal(malformed.status, 401);
+  assert.deepEqual(await malformed.json(), absentBody);
+  assert.equal(malformed.headers.get("set-cookie"), null);
 
-  const ownerBSecret = ownerB.value.split(".")[2];
-  const composed = await ownerRequest("/api/me/profile", {
-    cookie: `${OWNER_COOKIE_NAME}=v1.${ownerA.playId}.${ownerBSecret}`,
-  });
-  assert.equal(composed.status, 404);
-  assert.equal(await composed.text(), absentBody);
+  const anonymousOnly = await ownerRequest(
+    `/api/me/profile?playId=${ownerA.playId}`,
+    { cookie: ownerCookie(ownerA) },
+  );
+  assert.equal(anonymousOnly.status, 401);
+  assert.deepEqual(await anonymousOnly.json(), absentBody);
 
-  const draftResponse = await ownerRequest("/api/me/profile", {
-    cookie: ownerCookie(draft),
+  const unknown = await ownerRequest(`/api/me/profile?playId=${randomUUID()}`, {
+    cookie: testAccount.cookie,
   });
+  assert.equal(unknown.status, 404);
+
+  const draftResponse = await ownerRequest(
+    `/api/me/profile?playId=${draft.playId}`,
+    { cookie: testAccount.cookie },
+  );
   assert.equal(draftResponse.status, 404);
-  assert.equal(await draftResponse.text(), absentBody);
-  assert.match(draftResponse.headers.get("set-cookie") ?? "", /Max-Age=604800/);
 
-  const expiredResponse = await ownerRequest("/api/me/profile", {
-    cookie: ownerCookie(expired),
-  });
-  assert.equal(expiredResponse.status, 404);
-  assert.equal(await expiredResponse.text(), absentBody);
-  assert.match(expiredResponse.headers.get("set-cookie") ?? "", /Max-Age=0/);
-
-  const expiredEvent = await ownerRequest("/api/me/profile/events", {
+  const signedOutEvent = await ownerRequest("/api/me/profile/events", {
     method: "POST",
     ip: "198.51.100.30",
-    cookie: ownerCookie(expired),
-    body: { event: "profile_viewed" },
+    cookie: ownerCookie(ownerA),
+    body: { event: "profile_viewed", playId: ownerA.playId },
   });
-  assert.equal(expiredEvent.status, 404);
-  assert.equal(await expiredEvent.text(), absentBody);
-  assert.match(expiredEvent.headers.get("set-cookie") ?? "", /Max-Age=0/);
+  assert.equal(signedOutEvent.status, 401);
+  assert.deepEqual(await signedOutEvent.json(), absentBody);
   assert.equal(
     Number(
       sql(
@@ -286,19 +327,20 @@ test("current-cookie-only profile auth is private and generic", async () => {
     initialProfileViewCount,
   );
 
-  const responseA = await ownerRequest("/api/me/profile", {
-    cookie: ownerCookie(ownerA),
-  });
+  const responseA = await ownerRequest(
+    `/api/me/profile?playId=${ownerA.playId}`,
+    { cookie: testAccount.cookie },
+  );
   const profileA = await responseA.json();
   assert.equal(responseA.status, 200, serverLog);
   assert.equal(profileA.playId, ownerA.playId);
   assert.equal(profileA.cards.length, 10);
   assert.equal(profileA.sightCount, 0);
-  assert.match(responseA.headers.get("set-cookie") ?? "", /Max-Age=604800/);
 
-  const responseB = await ownerRequest("/api/me/profile", {
-    cookie: ownerCookie(ownerB),
-  });
+  const responseB = await ownerRequest(
+    `/api/me/profile?playId=${ownerB.playId}`,
+    { cookie: testAccount.cookie },
+  );
   assert.equal(responseB.status, 200);
   assert.equal((await responseB.json()).playId, ownerB.playId);
   assert.equal(
@@ -313,8 +355,8 @@ test("current-cookie-only profile auth is private and generic", async () => {
 
   const event = await ownerRequest("/api/me/profile/events", {
     method: "POST",
-    cookie: ownerCookie(ownerA),
-    body: { event: "profile_viewed" },
+    cookie: testAccount.cookie,
+    body: { event: "profile_viewed", playId: ownerA.playId },
   });
   assert.equal(event.status, 204, serverLog);
   assert.equal(
@@ -341,14 +383,15 @@ test("submitted public sights refresh live and reveal only at three samples", as
   );
   const owner = createOwnerCredential();
   insertOwner(owner, true);
+  claimOwner(owner);
   const publicLink = insertLink(owner.playId, "public");
   const oneToOneLink = insertLink(owner.playId, "one_to_one");
 
   const ineligibleReshare = await ownerRequest("/api/me/profile/events", {
     method: "POST",
     ip: "198.51.100.130",
-    cookie: ownerCookie(owner),
-    body: { event: "profile_reshare_clicked" },
+    cookie: testAccount.cookie,
+    body: { event: "profile_reshare_clicked", playId: owner.playId },
   });
   assert.equal(ineligibleReshare.status, 404);
   assert.equal(
@@ -363,9 +406,9 @@ test("submitted public sights refresh live and reveal only at three samples", as
   insertSubmittedResponse(publicLink, "b");
   insertSubmittedResponse(oneToOneLink, "b");
 
-  const before = await ownerRequest("/api/me/profile", {
+  const before = await ownerRequest(`/api/me/profile?playId=${owner.playId}`, {
     ip: "198.51.100.28",
-    cookie: ownerCookie(owner),
+    cookie: testAccount.cookie,
   });
   const beforeProfile = await before.json();
   assert.equal(beforeProfile.sightCount, 2);
@@ -375,8 +418,8 @@ test("submitted public sights refresh live and reveal only at three samples", as
   const eligibleReshare = await ownerRequest("/api/me/profile/events", {
     method: "POST",
     ip: "198.51.100.130",
-    cookie: ownerCookie(owner),
-    body: { event: "profile_reshare_clicked" },
+    cookie: testAccount.cookie,
+    body: { event: "profile_reshare_clicked", playId: owner.playId },
   });
   assert.equal(eligibleReshare.status, 204, serverLog);
   assert.equal(
@@ -408,9 +451,9 @@ test("submitted public sights refresh live and reveal only at three samples", as
   );
 
   insertSubmittedResponse(publicLink, "a");
-  const after = await ownerRequest("/api/me/profile", {
+  const after = await ownerRequest(`/api/me/profile?playId=${owner.playId}`, {
     ip: "198.51.100.28",
-    cookie: ownerCookie(owner),
+    cookie: testAccount.cookie,
   });
   const afterProfile = await after.json();
   assert.equal(afterProfile.sightCount, 3);
@@ -424,6 +467,7 @@ test("submitted public sights refresh live and reveal only at three samples", as
 test("owner profile access limit blocks the 121st request before the domain", async () => {
   const owner = createOwnerCredential();
   insertOwner(owner, true);
+  claimOwner(owner);
   const initialProfileViewCount = Number(
     sql(
       "select count(*) from public.analytics_events where event_name = 'profile_viewed'",
@@ -432,15 +476,18 @@ test("owner profile access limit blocks the 121st request before the domain", as
   );
   const ip = "198.51.100.129";
   for (let attempt = 0; attempt < 120; attempt += 1) {
-    const response = await ownerRequest("/api/me/profile", {
-      ip,
-      cookie: ownerCookie(owner),
-    });
+    const response = await ownerRequest(
+      `/api/me/profile?playId=${owner.playId}`,
+      {
+        ip,
+        cookie: testAccount.cookie,
+      },
+    );
     assert.equal(response.status, 200, `attempt ${attempt + 1}: ${serverLog}`);
   }
-  const blocked = await ownerRequest("/api/me/profile", {
+  const blocked = await ownerRequest(`/api/me/profile?playId=${owner.playId}`, {
     ip,
-    cookie: ownerCookie(owner),
+    cookie: testAccount.cookie,
   });
   assert.equal(blocked.status, 429);
   assert.match(blocked.headers.get("retry-after") ?? "", /^[1-9][0-9]*$/);

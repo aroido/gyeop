@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test, { after, before } from "node:test";
+import { createClient } from "@supabase/supabase-js";
 
 const root = path.resolve(new URL("../../", import.meta.url).pathname);
 const manifestFiles = [
@@ -29,7 +30,7 @@ function localSupabase() {
     const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
     if (match) values[match[1]] = JSON.parse(match[2]);
   }
-  for (const name of ["API_URL", "SECRET_KEY"]) {
+  for (const name of ["ANON_KEY", "API_URL", "SECRET_KEY"]) {
     if (!values[name]) throw new Error(`Local Supabase did not report ${name}`);
   }
   return values;
@@ -44,6 +45,7 @@ const serverEnv = {
   APP_URL: appUrl,
   ORIGIN_PROXY_SECRET: proxySecret,
   RATE_LIMIT_SECRET: rateSecret,
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: local.ANON_KEY,
   NEXT_PUBLIC_SUPABASE_URL: local.API_URL,
   SUPABASE_SECRET_KEY: local.SECRET_KEY,
 };
@@ -147,12 +149,34 @@ function cookieFrom(response) {
   return `__Host-gyeop-owner=${value}`;
 }
 
-function visitorCookieFrom(response) {
-  const header = response.headers.get("set-cookie");
-  assert.ok(header, "response must set the visitor cookie");
-  const value = header.match(/__Host-gyeop-response=([^;]*)/)?.[1];
-  assert.ok(value, "response must contain a non-empty visitor cookie");
-  return `__Host-gyeop-response=${value}`;
+async function createAuthenticatedAccount() {
+  const email = `owner-session-${randomBytes(8).toString("hex")}@example.com`;
+  const password = `T3st-${randomBytes(12).toString("base64url")}`;
+  const admin = createClient(local.API_URL, local.SECRET_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const created = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  assert.ifError(created.error);
+  assert.ok(created.data.user);
+
+  const client = createClient(local.API_URL, local.ANON_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const signedIn = await client.auth.signInWithPassword({ email, password });
+  assert.ifError(signedIn.error);
+  assert.ok(signedIn.data.session);
+  const value = Buffer.from(JSON.stringify(signedIn.data.session)).toString(
+    "base64url",
+  );
+  return {
+    admin,
+    cookie: `sb-127-auth-token=base64-${value}`,
+    userId: created.data.user.id,
+  };
 }
 
 test("owner boundary failures are always private no-store", async () => {
@@ -259,269 +283,136 @@ test("inactive create returns PACK_NOT_FOUND without a cookie or quota row", asy
   );
 });
 
-test("each additional pack completes the real owner, share, visitor, and profile path", async () => {
-  for (const [index, pack] of manifests.slice(1).entries()) {
-    const ip = `198.51.100.${41 + index}`;
-    const catalog = await fetch(`${appUrl}/api/packs/${pack.slug}`, {
-      headers: proxyHeaders(ip),
-    });
-    assert.equal(catalog.status, 200, `${pack.slug}: ${serverLog}`);
-    const catalogBody = await catalog.json();
-    assert.equal(catalogBody.title, pack.title);
-    assert.equal(catalogBody.cards.length, 10);
+test("each additional pack completes and exposes profile and sharing after account claim", async () => {
+  const account = await createAuthenticatedAccount();
+  try {
+    for (const [index, pack] of manifests.slice(1).entries()) {
+      const ip = `198.51.100.${41 + index}`;
+      const catalog = await fetch(`${appUrl}/api/packs/${pack.slug}`, {
+        headers: proxyHeaders(ip),
+      });
+      assert.equal(catalog.status, 200, `${pack.slug}: ${serverLog}`);
+      const catalogBody = await catalog.json();
+      assert.equal(catalogBody.title, pack.title);
+      assert.equal(catalogBody.cards.length, 10);
 
-    const created = await ownerRequest("/api/plays", {
-      method: "POST",
-      ip,
-      body: {
-        packSlug: pack.slug,
-        entrySource: "home",
-      },
-    });
-    assert.equal(created.status, 201, `${pack.slug}: ${serverLog}`);
-    const play = await created.json();
-    assert.equal(play.packSlug, pack.slug);
-    assert.equal(play.packVersion, pack.version);
-    const cookie = cookieFrom(created);
-
-    for (const card of pack.cards) {
-      const saved = await ownerRequest(
-        `/api/plays/${play.id}/answers/${card.id}`,
-        {
-          method: "PUT",
-          ip,
-          cookie,
-          body: { choice: "a", currentPosition: card.position },
+      const created = await ownerRequest("/api/plays", {
+        method: "POST",
+        ip,
+        body: {
+          packSlug: pack.slug,
+          entrySource: "home",
         },
-      );
-      assert.equal(saved.status, 200, `${pack.slug}/${card.id}: ${serverLog}`);
-    }
+      });
+      assert.equal(created.status, 201, `${pack.slug}: ${serverLog}`);
+      const play = await created.json();
+      assert.equal(play.packSlug, pack.slug);
+      assert.equal(play.packVersion, pack.version);
+      const cookie = cookieFrom(created);
 
-    const completed = await ownerRequest(`/api/plays/${play.id}/complete`, {
-      method: "POST",
-      ip,
-      cookie,
-      body: {},
-    });
-    assert.equal(completed.status, 200, `${pack.slug}: ${serverLog}`);
-    assert.equal((await completed.json()).status, "completed");
-
-    const profile = await ownerRequest("/api/me/profile", {
-      ip,
-      cookie,
-    });
-    assert.equal(profile.status, 200, `${pack.slug}: ${serverLog}`);
-    const profileBody = await profile.json();
-    assert.equal(profileBody.packSlug, pack.slug);
-    assert.equal(profileBody.packTitle, pack.title);
-    assert.equal(profileBody.cards.length, 10);
-
-    const kind = pack.presentation.defaultShareKind;
-    const shared = await ownerRequest(`/api/plays/${play.id}/links`, {
-      method: "POST",
-      ip,
-      cookie,
-      body: { kind },
-    });
-    assert.equal(shared.status, 201, `${pack.slug}: ${serverLog}`);
-    const shareBody = await shared.json();
-    assert.equal(shareBody.link.kind, kind);
-    const inviteUrl = new URL(shareBody.inviteUrl);
-    const publicId = inviteUrl.pathname.split("/").at(-1);
-    const secret = inviteUrl.hash.slice("#k=".length);
-    assert.ok(publicId && secret);
-
-    const beforeMetadata =
-      index === 0
-        ? sql(
-            "select json_build_array((select count(*) from public.visitor_responses), (select count(*) from public.analytics_events), (select count(*) from public.rate_limit_buckets))",
-            true,
-          )
-        : null;
-    const metadata = await ownerRequest(`/api/invites/${publicId}/metadata`, {
-      method: "POST",
-      ip: `203.0.113.${41 + index}`,
-      body: { secret },
-    });
-    assert.equal(metadata.status, 200, `${pack.slug}: ${serverLog}`);
-    assert.deepEqual(await metadata.json(), {
-      packSlug: pack.slug,
-      packVersion: pack.version,
-      packTitle: pack.title,
-      kind,
-    });
-    if (beforeMetadata !== null) {
-      assert.equal(
-        sql(
-          "select json_build_array((select count(*) from public.visitor_responses), (select count(*) from public.analytics_events), (select count(*) from public.rate_limit_buckets))",
-          true,
-        ),
-        beforeMetadata,
-      );
-    }
-
-    if (index === 0) {
-      const before = sql(
-        "select json_build_array((select count(*) from public.visitor_responses), (select count(*) from public.analytics_events), (select count(*) from public.rate_limit_buckets))",
-        true,
-      );
-      const bodies = [
-        {
-          intent: "start",
-          secret,
-          eligibilityConfirmed: false,
-          relationshipCode: "old_friend",
-          knownSinceCode: "ten_years_or_more",
-        },
-        {
-          intent: "start",
-          secret,
-          eligibilityConfirmed: "true",
-          relationshipCode: "old_friend",
-          knownSinceCode: "ten_years_or_more",
-        },
-        {
-          intent: "start",
-          secret,
-          eligibilityConfirmed: 1,
-          relationshipCode: "old_friend",
-          knownSinceCode: "ten_years_or_more",
-        },
-        {
-          intent: "start",
-          secret,
-          eligibilityConfirmed: true,
-          relationshipCode: "old_friend",
-          knownSinceCode: "ten_years_or_more",
-          extra: true,
-        },
-      ];
-      for (const body of bodies) {
-        const rejected = await ownerRequest(
-          `/api/invites/${publicId}/responses`,
+      for (const card of pack.cards) {
+        const saved = await ownerRequest(
+          `/api/plays/${play.id}/answers/${card.id}`,
           {
-            method: "POST",
-            ip: "203.0.113.220",
-            body,
+            method: "PUT",
+            ip,
+            cookie,
+            body: { choice: "a", currentPosition: card.position },
           },
         );
-        assert.equal(rejected.status, 400);
-        assert.equal(rejected.headers.get("set-cookie"), null);
+        assert.equal(
+          saved.status,
+          200,
+          `${pack.slug}/${card.id}: ${serverLog}`,
+        );
       }
-      assert.equal(
-        sql(
-          "select json_build_array((select count(*) from public.visitor_responses), (select count(*) from public.analytics_events), (select count(*) from public.rate_limit_buckets))",
-          true,
-        ),
-        before,
-      );
-    }
 
-    const response = await ownerRequest(`/api/invites/${publicId}/responses`, {
-      method: "POST",
-      ip: `203.0.113.${41 + index}`,
-      body: {
-        intent: "start",
-        secret,
-        relationshipCode: "old_friend",
-        knownSinceCode: "ten_years_or_more",
-      },
-    });
-    assert.equal(response.status, 201, `${pack.slug}: ${serverLog}`);
-    const responseBody = await response.json();
-    if (index === 0) {
-      assert.equal(
-        sql(
-          "select count(*) from public.analytics_events where event_name = 'invite_opened'",
-          true,
-        ),
-        "1",
-      );
-    }
-    assert.equal(responseBody.packSlug, pack.slug);
-    assert.equal(responseBody.packVersion, pack.version);
-    assert.equal(responseBody.packTitle, pack.title);
-    assert.equal(responseBody.assignments.length, 3);
-
-    const visitorCookie = visitorCookieFrom(response);
-    for (const assignment of responseBody.assignments) {
-      const saved = await ownerRequest(
-        `/api/responses/${responseBody.id}/answers/${assignment.cardId}`,
-        {
-          method: "PUT",
-          ip: `203.0.113.${41 + index}`,
-          cookie: visitorCookie,
-          body: { choice: "b" },
-        },
-      );
-      assert.equal(
-        saved.status,
-        200,
-        `${pack.slug}/${assignment.cardId}: ${serverLog}`,
-      );
-    }
-
-    const submitted = await ownerRequest(
-      `/api/responses/${responseBody.id}/submit`,
-      {
+      const completed = await ownerRequest(`/api/plays/${play.id}/complete`, {
         method: "POST",
-        ip: `203.0.113.${41 + index}`,
-        cookie: visitorCookie,
-        body: { managementSecret: `${"A".repeat(42)}${"AEI"[index]}` },
-      },
-    );
-    assert.equal(submitted.status, 200, `${pack.slug}: ${serverLog}`);
-    const submittedBody = await submitted.json();
-    assert.equal(submittedBody.status, "submitted");
-    assert.equal(submittedBody.packSlug, pack.slug);
-    assert.equal(submittedBody.packTitle, pack.title);
-    assert.equal(submittedBody.assignments.length, 3);
-    assert.ok(
-      submittedBody.assignments.every(
-        (assignment) =>
-          assignment.visitorChoice === "b" &&
-          typeof assignment.matches === "boolean",
-      ),
-    );
+        ip,
+        cookie,
+        body: {},
+      });
+      assert.equal(completed.status, 200, `${pack.slug}: ${serverLog}`);
+      assert.equal((await completed.json()).status, "completed");
 
-    for (const event of ["comparison_viewed", "same_pack_start_clicked"]) {
-      const recorded = await ownerRequest(
-        `/api/responses/${responseBody.id}/events`,
+      const claimed = sql(
+        `select public.claim_anonymous_owner(
+          play.anonymous_owner_id,
+          owner.management_secret_hash,
+          '${account.userId}',
+          '[{"keyVersion":"v1","hash":"integration"}]'::jsonb
+        )->>'outcome'
+        from public.pack_plays as play
+        join public.anonymous_owners as owner
+          on owner.id = play.anonymous_owner_id
+        where play.id = '${play.id}'`,
+        true,
+      );
+      assert.equal(claimed, "claimed", `${pack.slug}: ${serverLog}`);
+
+      const profile = await ownerRequest(`/api/me/profile?playId=${play.id}`, {
+        ip,
+        cookie: account.cookie,
+      });
+      assert.equal(profile.status, 200, `${pack.slug}: ${serverLog}`);
+      const profileBody = await profile.json();
+      assert.equal(profileBody.packSlug, pack.slug);
+      assert.equal(profileBody.packTitle, pack.title);
+      assert.equal(profileBody.cards.length, 10);
+
+      const linksBefore = Number(
+        sql(
+          `select count(*) from public.share_links where pack_play_id = '${play.id}'`,
+          true,
+        ),
+      );
+      const shared = await ownerRequest(`/api/plays/${play.id}/links`, {
+        method: "POST",
+        ip,
+        cookie: account.cookie,
+        body: { kind: pack.presentation.defaultShareKind },
+      });
+      assert.equal(shared.status, 201, `${pack.slug}: ${serverLog}`);
+      const sharedBody = await shared.json();
+      assert.equal(sharedBody.link.kind, pack.presentation.defaultShareKind);
+      assert.equal(
+        Number(
+          sql(
+            `select count(*) from public.share_links where pack_play_id = '${play.id}'`,
+            true,
+          ),
+        ),
+        linksBefore + 1,
+      );
+
+      const invite = new URL(sharedBody.inviteUrl);
+      const publicId = invite.pathname.split("/").at(-1);
+      const secret = new URLSearchParams(invite.hash.slice(1)).get("k");
+      assert.ok(publicId);
+      assert.ok(secret);
+      const metadata = await ownerRequest(
+        `/api/invites/${encodeURIComponent(publicId)}/metadata`,
         {
           method: "POST",
-          ip: `203.0.113.${41 + index}`,
-          cookie: visitorCookie,
-          body: { event },
+          ip,
+          body: { secret },
         },
       );
-      assert.equal(recorded.status, 204, `${pack.slug}/${event}: ${serverLog}`);
-    }
-
-    const converted = await ownerRequest("/api/plays", {
-      method: "POST",
-      ip: `203.0.113.${41 + index}`,
-      cookie: visitorCookie,
-      body: {
+      assert.equal(metadata.status, 200, `${pack.slug}: ${serverLog}`);
+      assert.deepEqual(await metadata.json(), {
         packSlug: pack.slug,
-        entrySource: "same_pack_cta",
-      },
-    });
-    assert.equal(converted.status, 201, `${pack.slug}: ${serverLog}`);
-    const convertedBody = await converted.json();
-    assert.equal(convertedBody.packSlug, pack.slug);
-    assert.equal(convertedBody.packVersion, pack.version);
-    assert.equal(
-      sql(
-        `select count(*) from public.analytics_events
-         where event_name = 'pack_opened'
-           and visitor_response_id = '${responseBody.id}'
-           and owner_play_id = '${convertedBody.id}'
-           and properties->>'entrySource' = 'same_pack_cta'
-           and properties->>'packVersion' = '${pack.version}'`,
-        true,
-      ),
-      "1",
+        packVersion: pack.version,
+        packTitle: pack.title,
+        kind: pack.presentation.defaultShareKind,
+      });
+    }
+  } finally {
+    sql(
+      `update public.pack_plays set owner_id = null where owner_id = '${account.userId}'`,
     );
+    const deleted = await account.admin.auth.admin.deleteUser(account.userId);
+    assert.ifError(deleted.error);
   }
 });
 
@@ -678,7 +569,7 @@ test("nine saved answers remain a recoverable draft after incomplete completion"
   assert.equal(restoredBody.answers.length, 9);
 });
 
-test("an expired capability converges to the generic terminal response", async () => {
+test("an expired capability requires account recovery and stays revoked", async () => {
   const created = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.23",
@@ -702,12 +593,12 @@ test("an expired capability converges to the generic terminal response", async (
     ip: "198.51.100.23",
     cookie,
   });
-  assert.equal(expired.status, 404);
+  assert.equal(expired.status, 401);
   assert.deepEqual(await expired.json(), {
-    code: "OWNER_PLAY_NOT_FOUND",
-    message: "진행 중인 팩을 찾을 수 없습니다.",
+    code: "OWNER_AUTH_REQUIRED",
+    message: "로그인한 뒤 내 질문팩을 불러올 수 있어요.",
   });
-  assert.ok(expired.headers.get("set-cookie")?.includes("Max-Age=0"));
+  assert.equal(expired.headers.get("set-cookie"), null);
   assert.equal(
     sql(
       `select count(*) from public.pack_plays where id = '${body.id}' and management_secret_hash is not null`,
@@ -753,7 +644,7 @@ test("a stale owner cookie starts the requested pack automatically", async () =>
   assert.ok(restarted.headers.get("set-cookie")?.includes(play.id));
 });
 
-test("a blank current pack yields to a new pack, but an answered pack stays", async () => {
+test("blank and answered packs coexist and each pack resumes", async () => {
   const blank = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.25",
@@ -805,7 +696,7 @@ test("a blank current pack yields to a new pack, but an answered pack stays", as
   );
   assert.equal(saved.status, 200);
 
-  const blocked = await ownerRequest("/api/plays", {
+  const secondPack = await ownerRequest("/api/plays", {
     method: "POST",
     ip: "198.51.100.26",
     cookie: answeredCookie,
@@ -814,8 +705,22 @@ test("a blank current pack yields to a new pack, but an answered pack stays", as
       entrySource: "home",
     },
   });
-  assert.equal(blocked.status, 404);
-  assert.equal(blocked.headers.get("set-cookie"), null);
+  assert.equal(secondPack.status, 201);
+  assert.equal((await secondPack.json()).packSlug, "coworker");
+
+  const resumedAnswered = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.26",
+    cookie: answeredCookie,
+    body: {
+      packSlug: "honest-self",
+      entrySource: "home",
+    },
+  });
+  assert.equal(resumedAnswered.status, 200);
+  const resumedAnsweredPlay = await resumedAnswered.json();
+  assert.equal(resumedAnsweredPlay.id, answeredPlay.id);
+  assert.equal(resumedAnsweredPlay.answers.length, 1);
 });
 
 test("cross-play preserves a valid cookie while tamper and malformed cookies are deleted", async () => {
@@ -843,10 +748,10 @@ test("cross-play preserves a valid cookie while tamper and malformed cookies are
     ip: "198.51.100.32",
     cookie: secondCookie,
   });
-  assert.equal(crossPlay.status, 404);
+  assert.equal(crossPlay.status, 401);
   assert.deepEqual(await crossPlay.json(), {
-    code: "OWNER_PLAY_NOT_FOUND",
-    message: "진행 중인 팩을 찾을 수 없습니다.",
+    code: "OWNER_AUTH_REQUIRED",
+    message: "로그인한 뒤 내 질문팩을 불러올 수 있어요.",
   });
   assert.equal(crossPlay.headers.get("set-cookie"), null);
 
@@ -917,8 +822,12 @@ test("logout revokes the DB capability, clears the cookie, and is idempotent", a
     ip: "198.51.100.41",
     cookie,
   });
-  assert.equal(revoked.status, 404);
-  assert.ok(revoked.headers.get("set-cookie")?.includes("Max-Age=0"));
+  assert.equal(revoked.status, 401);
+  assert.deepEqual(await revoked.json(), {
+    code: "OWNER_AUTH_REQUIRED",
+    message: "로그인한 뒤 내 질문팩을 불러올 수 있어요.",
+  });
+  assert.equal(revoked.headers.get("set-cookie"), null);
 
   const repeated = await ownerRequest("/api/me/session", {
     method: "DELETE",
