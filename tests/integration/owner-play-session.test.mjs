@@ -40,9 +40,12 @@ function localSupabase() {
 const local = localSupabase();
 const proxySecret = Buffer.alloc(32, 28).toString("base64url");
 const rateSecret = randomBytes(32).toString("base64url");
+const accountDeleteKey = Buffer.alloc(32, 29).toString("base64url");
 const appUrl = "http://127.0.0.1:3106";
 const serverEnv = {
   ...process.env,
+  ACCOUNT_DELETE_REAUTH_ACTIVE_VERSION: "v1",
+  ACCOUNT_DELETE_REAUTH_KEYRING: JSON.stringify({ v1: accountDeleteKey }),
   APP_URL: appUrl,
   ORIGIN_PROXY_SECRET: proxySecret,
   RATE_LIMIT_SECRET: rateSecret,
