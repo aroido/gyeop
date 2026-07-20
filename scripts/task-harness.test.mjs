@@ -496,6 +496,12 @@ test("CI gate requires at least one completed successful result", () => {
     ],
     ["failed check", [{ ...success, conclusion: "failure" }], [], true],
     [
+      "unrelated success does not replace verify",
+      [{ ...success, name: "lint" }],
+      [],
+      true,
+    ],
+    [
       "allowed check conclusions",
       [
         success,
@@ -665,7 +671,7 @@ detached
   ]);
 });
 
-test("QA gate requires reviewer, zero P0/P1 findings, and full verify PASS", () => {
+test("QA gate requires reviewer and zero P0/P1 findings", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gyeop-qa-fields-"));
   const valid = completeQaText();
   const cases = [
@@ -699,14 +705,14 @@ test("QA gate requires reviewer, zero P0/P1 findings, and full verify PASS", () 
     [
       "failed verify",
       valid.replace("Result: PASS", "Result: FAIL"),
-      true,
-      /Result: PASS/,
+      false,
+      null,
     ],
     [
       "verify not run",
       valid.replace("Result: PASS", "Result: Not run"),
-      true,
-      /Result: PASS/,
+      false,
+      null,
     ],
     [
       "descriptive fields do not interfere",
@@ -731,8 +737,8 @@ test("QA gate requires reviewer, zero P0/P1 findings, and full verify PASS", () 
     [
       "duplicate full verify block",
       `${valid}\n- Command: ./scripts/run-ai-verify --mode full\n- Result: FAIL\n`,
-      true,
-      /full verification/,
+      false,
+      null,
     ],
   ];
 
@@ -982,10 +988,11 @@ function fakeGhLines() {
     "  save();",
     "}",
     'else if (method === "PATCH" && /\\/pulls\\/940$/.test(endpoint)) {',
-    "  state.createdPr = { ...state.createdPr, ...payload }; response = state.createdPr; save();",
+    "  state.pr = { ...state.pr, ...payload }; state.createdPr = { ...state.createdPr, ...payload }; state.openPrs = [state.pr]; response = state.pr; save();",
     "}",
     'else if (method === "GET" && endpoint.includes("/check-runs")) {',
     "  response = state.checks;",
+    '  if (state.driftQaAfterChecks) fs.appendFileSync(`${process.env.FAKE_TASK_PATH}/docs/temp/qa/issue-40.md`, "\\nQA drift\\n");',
     "  if (state.driftIssueAfterChecks) { state.issue = { ...state.issue, labels: state.driftIssueAfterChecks.map((name) => ({ name })) }; save(); }",
     "}",
     'else if (method === "GET" && /\\/status$/.test(endpoint)) response = state.commitStatus;',
@@ -1049,7 +1056,7 @@ function openPr(taskSha, baseSha) {
     state: "open",
     draft: false,
     mergeable: true,
-    body: "Closes #40",
+    body: `Closes #40\n\n- 검증 HEAD: \`${taskSha}\``,
     base: { ref: "main", sha: baseSha, repo: { full_name: "aroido/gyeop" } },
     head: {
       ref: "codex/issue-40",
@@ -2862,6 +2869,11 @@ test("PR creation checks existing PRs, creates a draft, and marks it ready", (t)
   assert.equal(calls[createIndex].payload.draft, true);
   assert.equal(calls[createIndex].payload.body.split("\n")[0], "Closes #40");
   assert.ok(
+    calls[createIndex].payload.body.includes(
+      "- 검증 HEAD: `" + fixture.taskSha + "`",
+    ),
+  );
+  assert.ok(
     listIndex >= 0 &&
       listIndex < createIndex &&
       createIndex < readyIndex &&
@@ -2908,6 +2920,34 @@ test("PR creation safely reuses valid draft and ready PRs", (t) => {
     );
     assert.equal(readGhState(fixture).pr.draft, false);
   }
+});
+
+test("PR reuse records the current verified SHA when the marker is missing", (t) => {
+  const fixture = makeRepoFixture(t);
+  const candidate = openPr(fixture.taskSha, fixture.baseSha);
+  candidate.body = "Closes #40";
+  writeGhState(fixture, {
+    openPrs: [candidate],
+    pr: candidate,
+    createdPr: candidate,
+  });
+
+  const result = runHarness(fixture, fixture.task, ["pr", "40"]);
+  assert.equal(result.status, 0, `${result.stderr}\n${result.stdout}`);
+  const patch = readCalls(fixture).find(
+    (call) =>
+      call.tool === "gh" &&
+      call.method === "PATCH" &&
+      /\/pulls\/940$/.test(call.endpoint),
+  );
+  assert.ok(
+    patch.payload.body.includes("- 검증 HEAD: `" + fixture.taskSha + "`"),
+  );
+  assert.ok(
+    readGhState(fixture).pr.body.includes(
+      "- 검증 HEAD: `" + fixture.taskSha + "`",
+    ),
+  );
 });
 
 test("multiple, invalid, or remote-mismatched existing PRs cause zero mutation", (t) => {
@@ -3012,7 +3052,7 @@ test("ready confirmation loss preserves the PR and a rerun reuses it", (t) => {
   );
 });
 
-test("PR and merge stop when verify changes the ignored QA artifact", (t) => {
+test("PR and merge stop when the ignored QA artifact changes", (t) => {
   const prFixture = makeRepoFixture(t);
   const prResult = runHarness(prFixture, prFixture.task, ["pr", "40"], {
     FAKE_VERIFY_MUTATION: "qa",
@@ -3036,13 +3076,11 @@ test("PR and merge stop when verify changes the ignored QA artifact", (t) => {
   );
 
   const mergeFixture = makeRepoFixture(t);
+  writeGhState(mergeFixture, { driftQaAfterChecks: true });
   const mergeResult = runHarness(
     mergeFixture,
     mergeFixture.task,
     ["merge", "940"],
-    {
-      FAKE_VERIFY_MUTATION: "qa",
-    },
   );
   assert.equal(
     mergeResult.status,
@@ -3072,7 +3110,7 @@ test("merge rejects base SHA drift before the merge mutation", (t) => {
   assert.equal(result.status, 1, `${result.stderr}\n${result.stdout}`);
   assert.match(result.stderr, /base SHA/);
   const calls = readCalls(fixture);
-  assert.ok(calls.some((call) => call.tool === "verify"));
+  assert.equal(calls.filter((call) => call.tool === "verify").length, 0);
   assert.equal(
     calls.filter(
       (call) =>
@@ -3202,6 +3240,26 @@ test("merge sends the verified PR head SHA after rechecking the PR", (t) => {
   assert.ok(prGetIndexes[1] < checksIndex && checksIndex < prGetIndexes[2]);
   assert.ok(prGetIndexes[2] < mergeIndex && mergeIndex < prGetIndexes[3]);
   assert.match(result.stdout, /"alreadyMerged": false/);
+});
+
+test("merge requires the PR body to bind the verified SHA", (t) => {
+  const fixture = makeRepoFixture(t);
+  const pr = openPr(fixture.taskSha, fixture.baseSha);
+  pr.body = "Closes #40";
+  writeGhState(fixture, { pr });
+
+  const result = runHarness(fixture, fixture.task, ["merge", "940"]);
+  assert.equal(result.status, 1, `${result.stderr}\n${result.stdout}`);
+  assert.match(result.stderr, /verified SHA/);
+  assert.equal(
+    readCalls(fixture).filter(
+      (call) =>
+        call.tool === "gh" &&
+        call.method === "PUT" &&
+        /\/pulls\/940\/merge$/.test(call.endpoint),
+    ).length,
+    0,
+  );
 });
 
 test("merge is idempotent when the PR is already merged", (t) => {

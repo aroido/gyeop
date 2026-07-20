@@ -6,7 +6,7 @@ Reviewer Agent: TODO
 Status: FAIL
 P0/P1 Findings: TODO
 
-`TODO`, `FAIL`, `Not run`을 실제 검토 결과로 교체한다. 통과하려면 독립 검토자 이름, 판정 `PASS`, P0/P1 발견 0건, 전체 검증 `PASS`가 모두 필요하다.
+`TODO`, `FAIL`, `Not run`을 실제 검토 결과로 교체한다. 통과하려면 독립 검토자 이름, 판정 `PASS`, P0/P1 발견 0건이 필요하다. 전체 검증은 QA 뒤 `scripts/task-harness pr`이 exact clean HEAD에서 한 번 실행한다.
 
 ## 발견 사항
 
@@ -14,7 +14,7 @@ P0/P1 Findings: TODO
 
 ## 검증
 
-- Command: ./scripts/run-ai-verify --mode full
+- Command: <focused check or manual verification>
 - Result: Not run
 
 ## 필수 수정

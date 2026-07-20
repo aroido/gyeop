@@ -53,10 +53,9 @@ scripts/task-harness cleanup <issue-number> <pr-number>
 12. Have an independent `verifier` or `test-engineer` review the spec, diff, and relevant SSOT.
 13. Write QA to `docs/temp/qa/issue-<number>.md` using the QA template.
 14. Fix all P0/P1 QA findings and run `scripts/task-harness qa-check <qa-path>`.
-15. Run targeted checks while implementing, then run `./scripts/run-ai-verify --mode full` once on the final clean commit immediately before publishing.
-16. Create or recover the PR with `scripts/task-harness pr <issue-number>`; the harness reuses the exact-SHA local verification marker, falls back to one full verification when the marker is missing, rejects ambiguous or mismatched open PRs, verifies a draft before making it ready, preserves uncertain ready transitions for rerun recovery, and requires `Closes #<issue>` as the first line with no other GitHub closing keyword reference.
-17. Merge only after required CI checks, exact-SHA local full verification, unchanged QA artifact, and the final PR base/head snapshot checks pass. The merge gate reuses that verification instead of rerunning the full suite.
-18. Return to the base checkout, then run `scripts/task-harness close <issue-number> <pr-number>` and `scripts/task-harness cleanup <issue-number> <pr-number>`.
+15. Create or recover the PR with `scripts/task-harness pr <issue-number>`; it reuses an exact-HEAD full-verification marker or runs the suite once when absent, records the verified SHA in the PR, and preserves uncertain PR writes for a safe rerun.
+16. After the PR's named `verify` CI check passes, run `scripts/task-harness merge <pr-number>`; it requires the recorded SHA, unchanged QA artifact, and final PR snapshots without rerunning the suite.
+17. Return to the base checkout, then run `scripts/task-harness close <issue-number> <pr-number>` and `scripts/task-harness cleanup <issue-number> <pr-number>`.
 
 Read `references/review-gates.md` before resuming work, changing status, reviewing a spec, starting QA, publishing a PR, or merging.
 
