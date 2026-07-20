@@ -305,21 +305,9 @@ production beta가 재승인되면 링크 생성 성공 뒤 Secondary 영역에 
 | success  | 별도 개봉 대기 없이 `/play/[playId]` 첫 질문         | 첫 질문 heading으로 focus 이동   | redirect 뒤 title 변경                             |
 | resume   | 같은 브라우저의 유효 play가 있으면 `이어서 답하기`   | 기존 play로만 이동               | 다른 play 존재를 추정하게 하지 않음                |
 
-팩 목록 아래에는 `겹은 대한민국에서 이용하는 만 19세 이상만 참여할 수 있어요. 생년월일이나 신분증은 받지 않아요.`와 `/privacy` 링크를 둔다. 공개 문의 채널이 실제로 준비되기 전에는 준비 중임을 표시하고 production 모집을 열지 않는다.
+팩 목록 아래에는 `생년월일이나 신분증 없이 질문에 답하고 서로의 시선을 비교해요.`와 `/privacy` 링크를 둔다. 공개 문의 채널이 실제로 준비되기 전에는 준비 중임을 표시하고 production 모집을 열지 않는다.
 
-### 7.1.1 공통 이용 자격 확인
-
-owner는 owner cookie가 없을 때 첫 질문 생성 전에, visitor는 복구할 response가 없을 때 관계 선택 전에 아래 단일 required step을 거친다. 유효한 기존 capability resume에는 반복하지 않고 malformed·만료 capability는 기존 generic terminal로 수렴한다.
-
-| 상태       | heading·표현                                                                | 행동·복구                                   | 접근성·privacy                                                 |
-| ---------- | --------------------------------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------- |
-| default    | `겹은 만 19세 이상만 이용할 수 있어요`, 설명, 선택되지 않은 native checkbox | 확인 전 `확인하고 계속` disabled            | 44px hit area, 생년월일·신분증·위치 수집 없음                  |
-| confirmed  | checkbox selected                                                           | Primary 한 번으로 새 create 요청            | 요청에 일회성 exact boolean true만 포함                        |
-| ineligible | `지금은 겹을 이용할 수 없어요`                                              | `홈으로`만 제공                             | heading focus, 답변·프로필·cookie·analytics 생성 없음          |
-| retry      | 기존 create 오류 문구                                                       | `다시 시도`                                 | 확인 선택은 유지하되 중복 요청 잠금                            |
-| terminal   | capability 존재·원인을 구분하지 않는 기존 generic terminal                  | 세션 삭제 뒤 새 시작은 eligibility로 돌아감 | 연령 상태·resource 존재·내부 token 원인을 사용자에게 노출 금지 |
-
-exact copy는 `docs/product/age-and-minor-policy.md`를 따른다. owner와 visitor는 같은 component를 사용하고 화면당 lime Primary를 하나만 둔다. 320/390/430px, 200% zoom, keyboard, safe area, reduced motion에서 가로 overflow와 CTA 가림이 없어야 한다.
+owner는 팩 선택 뒤, visitor는 초대 맥락 뒤 관계 선택으로 바로 이어진다. 공식 질문팩은 전체 연령용 콘텐츠 기준을 지키며, 320/390/430px, 200% zoom, keyboard, safe area, reduced motion에서 가로 overflow와 CTA 가림이 없어야 한다.
 
 ### 7.2 주인 셀프 10장 `/play/[playId]`
 

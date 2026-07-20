@@ -23,7 +23,6 @@ GYEOP은 제품 목적에 필요한 최소 기간만 데이터를 보관하고, 
 - 모든 시각은 DB UTC `timestamptz`와 서버 시각으로 판정한다. 브라우저 시각은 사용하지 않는다.
 - `eligible_at`은 데이터가 hard-delete 대상이 되는 시각이다. cleanup은 `eligible_at`부터 24시간 안에 운영 DB 삭제를 완료해야 한다.
 - 여러 종료 조건이 있으면 가장 먼저 도래한 시점을 적용한다. 상위 row 삭제는 종속 데이터의 더 긴 기간을 보장하지 않는다.
-- 신고된 미성년자 데이터에는 `docs/product/age-and-minor-policy.md`의 live 72시간·backup 30일·backup 밖 HMAC ledger 최소 45일 규칙을 우선 적용한다. 일반 정책이 더 짧으면 더 짧은 시한을 적용한다.
 - logical expiry 뒤 API·UI 접근은 즉시 거부한다. 24시간은 추가 접근 기간이 아니라 물리 cleanup 상한이다.
 
 ## 3. 데이터별 보관·삭제 기준
@@ -138,9 +137,6 @@ cleanup 로그·metric은 category, 처리 건수, `remaining_count`, `oldest_du
 - restore 직후 삭제 ledger를 재적용하고 erased subject 재스캔 0건, migration·보안 검증 PASS 전에는 traffic을 연결하지 않는다.
 - provider가 30일 이내 파기와 격리 restore를 증명하지 못하면 production beta를 열지 않는다.
 - 삭제·보관 문의는 영업일 2일 안에 접수 사실을 회신하고 영업일 7일 안에 완료 또는 지연 사유·예정일을 회신한다.
-- 신고된 미성년자 데이터는 `target_located_at`부터 live 72시간 상한을 우선 적용하며 문의 회신 기한이 삭제를 늦추지 않는다.
-
-미성년자 삭제 ledger는 application backup 밖에 `subject_type`, domain-separated HMAC 대상 ID, key version, `hard_deleted_at`, `expires_at`만 둔다. 마지막 관련 backup 만료 뒤 7일 이상이며 최소 45일 보관하고, 그 뒤 24시간 안에 삭제한다.
 
 ## 10. 책임과 release gate
 

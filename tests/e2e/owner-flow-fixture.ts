@@ -2,8 +2,6 @@ import type { Page, Route } from "@playwright/test";
 
 import manifest from "../../content/packs/old-friend-v1.json" with { type: "json" };
 
-import { confirmEligibility } from "./eligibility-fixture";
-
 export const playId = "18181818-1818-4181-8181-181818181818";
 
 type Choice = "a" | "b";
@@ -211,7 +209,6 @@ export async function installOwnerFlowApi(
 export async function openOwnerFlow(page: Page, api?: OwnerFlowApi) {
   const fixture = api ?? (await installOwnerFlowApi(page));
   await page.goto("/play/new?pack=old-friend");
-  await confirmEligibility(page);
   await page.waitForURL(`/play/${playId}`);
   await page
     .getByRole("heading", { name: "서운한 일이 생기면 나는?" })

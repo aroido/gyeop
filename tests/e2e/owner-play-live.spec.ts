@@ -8,8 +8,6 @@ import {
   type Page,
 } from "@playwright/test";
 
-import { confirmEligibility } from "./eligibility-fixture";
-
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
 const proxyKey = Buffer.alloc(32, 8).toString("base64url");
@@ -474,7 +472,6 @@ async function postRawVisitorResponse(input: {
     | {
         intent: "start";
         secret: string;
-        eligibilityConfirmed: true;
         relationshipCode: string;
         knownSinceCode: string;
       };
@@ -701,7 +698,6 @@ test.describe("live owner flow", () => {
       });
     });
     await page.goto("/play/new?pack=old-friend");
-    await confirmEligibility(page);
     await waitForOwnerPlayStart(page);
     await expect(
       page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
@@ -797,7 +793,6 @@ test.describe("live owner flow", () => {
       body: {
         intent: "start",
         secret: rawSecretFrom(oneToOneInviteUrl),
-        eligibilityConfirmed: true,
         relationshipCode: "coworker",
         knownSinceCode: "three_to_five_years",
       },
@@ -977,7 +972,6 @@ test.describe("live owner flow", () => {
         });
         const visitor = await visitorContext.newPage();
         await visitor.goto(inviteUrl);
-        await confirmEligibility(visitor);
         await expect(
           visitor.getByRole("heading", {
             name: "이 사람과 어떤 사이인가요?",
@@ -1039,7 +1033,6 @@ test.describe("live owner flow", () => {
     await visitors[0].visitor
       .getByRole("link", { name: "나도 이 팩으로 시작하기" })
       .click();
-    await confirmEligibility(visitors[0].visitor);
     await visitors[0].visitor.waitForURL(/\/play\/[0-9a-f-]{36}$/);
     await expect(
       visitors[0].visitor.getByRole("heading", {
@@ -1273,7 +1266,6 @@ test.describe("live owner flow", () => {
           body: {
             intent: "start",
             secret: rawSecret,
-            eligibilityConfirmed: true,
             relationshipCode: "online_friend",
             knownSinceCode: "not_sure",
           },
@@ -1451,7 +1443,6 @@ test.describe("live owner flow", () => {
     ).toBeVisible();
 
     await visitors[0].visitor.goto(rotatedUrl);
-    await confirmEligibility(visitors[0].visitor);
     await expect(
       visitors[0].visitor.getByRole("heading", {
         name: "이 사람과 어떤 사이인가요?",

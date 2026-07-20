@@ -118,16 +118,11 @@ function ownerPlayPath(playId: string) {
 export function createOrResumeOwnerPlay(
   packSlug: string,
   entrySource: "home" | "same_pack_cta" = "home",
-  eligibilityConfirmed?: true,
 ): Promise<OwnerPlayState> {
   if (!PACK_SLUGS.has(packSlug)) invalidResponse(400);
   return fetch(
     "/api/plays",
-    jsonRequest("POST", {
-      packSlug,
-      entrySource,
-      ...(eligibilityConfirmed ? { eligibilityConfirmed } : {}),
-    }),
+    jsonRequest("POST", { packSlug, entrySource }),
   ).then(ownerStateResponse);
 }
 
@@ -136,17 +131,12 @@ const bootstrapRequests = new Map<string, Promise<OwnerPlayState>>();
 export function bootstrapOwnerPlay(
   packSlug: string,
   entrySource: "home" | "same_pack_cta",
-  eligibilityConfirmed?: true,
 ): Promise<OwnerPlayState> {
   if (!PACK_SLUGS.has(packSlug)) invalidResponse(400);
-  const key = `${packSlug}\0${entrySource}\0${eligibilityConfirmed === true}`;
+  const key = `${packSlug}\0${entrySource}`;
   const existing = bootstrapRequests.get(key);
   if (existing) return existing;
-  const request = createOrResumeOwnerPlay(
-    packSlug,
-    entrySource,
-    eligibilityConfirmed,
-  );
+  const request = createOrResumeOwnerPlay(packSlug, entrySource);
   bootstrapRequests.set(key, request);
   const clear = () => {
     if (bootstrapRequests.get(key) === request) {

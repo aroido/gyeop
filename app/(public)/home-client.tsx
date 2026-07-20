@@ -120,8 +120,7 @@ export default function HomeClient({
         </section>
 
         <p className={styles.ageNotice}>
-          겹은 대한민국에서 이용하는 만 19세 이상만 참여할 수 있어요.
-          생년월일이나 신분증은 받지 않아요.{" "}
+          생년월일이나 신분증 없이 질문에 답하고 서로의 시선을 비교해요.{" "}
           <Link href="/privacy">정책과 문의</Link>
         </p>
       </div>

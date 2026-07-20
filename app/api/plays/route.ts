@@ -27,26 +27,25 @@ export function POST(request: Request) {
       }
       const packSlug = input.packSlug;
       const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
+      const responseCookie = parseVisitorResponseCookie(
+        request.headers.get("cookie"),
+      );
+      const samePackSource =
+        input.entrySource === "same_pack_cta" &&
+        responseCookie.outcome === "valid";
+      const entrySource = samePackSource ? "same_pack_cta" : "home";
+      const sourceResponse = samePackSource
+        ? {
+            responseId: responseCookie.responseId,
+            sessionTokenHash: responseCookie.sessionTokenHash,
+          }
+        : undefined;
       if (cookie.outcome === "absent") {
-        if (input.eligibilityConfirmed !== true) {
-          throw new Error("INVALID_INPUT");
-        }
-        const responseCookie = parseVisitorResponseCookie(
-          request.headers.get("cookie"),
-        );
-        const samePackSource =
-          input.entrySource === "same_pack_cta" &&
-          responseCookie.outcome === "valid";
         return createOwnerPlayResponse({
           packSlug,
           networkKey,
-          entrySource: samePackSource ? "same_pack_cta" : "home",
-          sourceResponse: samePackSource
-            ? {
-                responseId: responseCookie.responseId,
-                sessionTokenHash: responseCookie.sessionTokenHash,
-              }
-            : undefined,
+          entrySource,
+          sourceResponse,
           signal,
         });
       }
@@ -65,6 +64,8 @@ export function POST(request: Request) {
             packSlug,
             cookie,
             networkKey,
+            entrySource,
+            sourceResponse,
             signal,
           }),
       );

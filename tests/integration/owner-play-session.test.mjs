@@ -161,7 +161,6 @@ test("owner boundary failures are always private no-store", async () => {
     body: {
       packSlug: "old-friend",
       entrySource: "home",
-      eligibilityConfirmed: true,
     },
     headerOverrides: { origin: "https://evil.example" },
   });
@@ -172,7 +171,6 @@ test("owner boundary failures are always private no-store", async () => {
     body: {
       packSlug: "old-friend",
       entrySource: "home",
-      eligibilityConfirmed: true,
       extra: true,
     },
   });
@@ -183,7 +181,6 @@ test("owner boundary failures are always private no-store", async () => {
     body: {
       packSlug: "old-friend",
       entrySource: "home",
-      eligibilityConfirmed: true,
     },
     headerOverrides: {
       "x-forwarded-for": "198.51.100.1, 203.0.113.1",
@@ -192,13 +189,12 @@ test("owner boundary failures are always private no-store", async () => {
   assert.equal(invalidProxy.status, 400);
 });
 
-test("new owner rejects eligibility bypasses without side effects", async () => {
+test("new owner rejects unexpected input without side effects", async () => {
   const before = sql(
     "select json_build_array((select count(*) from public.pack_plays), (select count(*) from public.analytics_events), (select count(*) from public.rate_limit_buckets))",
     true,
   );
   const bodies = [
-    { packSlug: "first-impression", entrySource: "home" },
     {
       packSlug: "first-impression",
       entrySource: "home",
@@ -246,7 +242,6 @@ test("inactive create returns PACK_NOT_FOUND without a cookie or quota row", asy
     body: {
       packSlug: "old-friend",
       entrySource: "home",
-      eligibilityConfirmed: true,
     },
   });
   assert.equal(response.status, 404);
@@ -281,7 +276,6 @@ test("each additional pack completes the real owner, share, visitor, and profile
       body: {
         packSlug: pack.slug,
         entrySource: "home",
-        eligibilityConfirmed: true,
       },
     });
     assert.equal(created.status, 201, `${pack.slug}: ${serverLog}`);
@@ -375,12 +369,6 @@ test("each additional pack completes the real owner, share, visitor, and profile
         {
           intent: "start",
           secret,
-          relationshipCode: "old_friend",
-          knownSinceCode: "ten_years_or_more",
-        },
-        {
-          intent: "start",
-          secret,
           eligibilityConfirmed: false,
           relationshipCode: "old_friend",
           knownSinceCode: "ten_years_or_more",
@@ -435,7 +423,6 @@ test("each additional pack completes the real owner, share, visitor, and profile
       body: {
         intent: "start",
         secret,
-        eligibilityConfirmed: true,
         relationshipCode: "old_friend",
         knownSinceCode: "ten_years_or_more",
       },
@@ -517,7 +504,6 @@ test("each additional pack completes the real owner, share, visitor, and profile
       body: {
         packSlug: pack.slug,
         entrySource: "same_pack_cta",
-        eligibilityConfirmed: true,
       },
     });
     assert.equal(converted.status, 201, `${pack.slug}: ${serverLog}`);
@@ -549,7 +535,6 @@ test("owner can create, reload, save ten answers, complete, and cannot edit", as
     body: {
       packSlug: "old-friend",
       entrySource: "home",
-      eligibilityConfirmed: true,
     },
   });
   assert.equal(created.status, 201, serverLog);
@@ -652,7 +637,6 @@ test("nine saved answers remain a recoverable draft after incomplete completion"
     body: {
       packSlug: "old-friend",
       entrySource: "home",
-      eligibilityConfirmed: true,
     },
   });
   assert.equal(created.status, 201);
@@ -701,7 +685,6 @@ test("an expired capability converges to the generic terminal response", async (
     body: {
       packSlug: "old-friend",
       entrySource: "home",
-      eligibilityConfirmed: true,
     },
   });
   assert.equal(created.status, 201);
@@ -734,6 +717,107 @@ test("an expired capability converges to the generic terminal response", async (
   );
 });
 
+test("a stale owner cookie starts the requested pack automatically", async () => {
+  const created = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.24",
+    body: {
+      packSlug: "honest-self",
+      entrySource: "home",
+    },
+  });
+  assert.equal(created.status, 201);
+  const stale = await created.json();
+  const cookie = cookieFrom(created);
+  sql(`
+    update public.pack_plays
+    set last_active_at = expired.at,
+        management_expires_at = expired.at + interval '7 days'
+    from (select clock_timestamp() - interval '8 days' as at) expired
+    where id = '${stale.id}'
+  `);
+
+  const restarted = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.24",
+    cookie,
+    body: {
+      packSlug: "honest-self",
+      entrySource: "home",
+    },
+  });
+  assert.equal(restarted.status, 201);
+  const play = await restarted.json();
+  assert.equal(play.packSlug, "honest-self");
+  assert.notEqual(play.id, stale.id);
+  assert.ok(restarted.headers.get("set-cookie")?.includes(play.id));
+});
+
+test("a blank current pack yields to a new pack, but an answered pack stays", async () => {
+  const blank = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.25",
+    body: {
+      packSlug: "honest-self",
+      entrySource: "home",
+    },
+  });
+  assert.equal(blank.status, 201);
+  const blankPlay = await blank.json();
+  const blankCookie = cookieFrom(blank);
+
+  const replaced = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.25",
+    cookie: blankCookie,
+    body: {
+      packSlug: "coworker",
+      entrySource: "home",
+    },
+  });
+  assert.equal(replaced.status, 201);
+  const replacement = await replaced.json();
+  assert.equal(replacement.packSlug, "coworker");
+  assert.notEqual(replacement.id, blankPlay.id);
+
+  const answered = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.26",
+    body: {
+      packSlug: "honest-self",
+      entrySource: "home",
+    },
+  });
+  assert.equal(answered.status, 201);
+  const answeredPlay = await answered.json();
+  const answeredCookie = cookieFrom(answered);
+  const honestSelf = manifests.find((pack) => pack.slug === "honest-self");
+  assert.ok(honestSelf);
+  const firstCard = honestSelf.cards[0];
+  const saved = await ownerRequest(
+    `/api/plays/${answeredPlay.id}/answers/${firstCard.id}`,
+    {
+      method: "PUT",
+      ip: "198.51.100.26",
+      cookie: answeredCookie,
+      body: { choice: "a", currentPosition: firstCard.position },
+    },
+  );
+  assert.equal(saved.status, 200);
+
+  const blocked = await ownerRequest("/api/plays", {
+    method: "POST",
+    ip: "198.51.100.26",
+    cookie: answeredCookie,
+    body: {
+      packSlug: "coworker",
+      entrySource: "home",
+    },
+  });
+  assert.equal(blocked.status, 404);
+  assert.equal(blocked.headers.get("set-cookie"), null);
+});
+
 test("cross-play preserves a valid cookie while tamper and malformed cookies are deleted", async () => {
   const first = await ownerRequest("/api/plays", {
     method: "POST",
@@ -741,7 +825,6 @@ test("cross-play preserves a valid cookie while tamper and malformed cookies are
     body: {
       packSlug: "old-friend",
       entrySource: "home",
-      eligibilityConfirmed: true,
     },
   });
   const firstBody = await first.json();
@@ -752,7 +835,6 @@ test("cross-play preserves a valid cookie while tamper and malformed cookies are
     body: {
       packSlug: "old-friend",
       entrySource: "home",
-      eligibilityConfirmed: true,
     },
   });
   const secondCookie = cookieFrom(second);
@@ -796,7 +878,6 @@ test("create quota commits five orphan plays and the sixth response is 429", asy
         body: {
           packSlug: "old-friend",
           entrySource: "home",
-          eligibilityConfirmed: true,
         },
       }),
     );
@@ -819,7 +900,6 @@ test("logout revokes the DB capability, clears the cookie, and is idempotent", a
     body: {
       packSlug: "old-friend",
       entrySource: "home",
-      eligibilityConfirmed: true,
     },
   });
   const body = await created.json();

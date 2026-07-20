@@ -5,7 +5,6 @@ import {
   openOwnerFlow,
   playId,
 } from "./owner-flow-fixture";
-import { confirmEligibility } from "./eligibility-fixture";
 
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -24,7 +23,6 @@ test("bootstraps once and shows the first server-backed question", async ({
   expect(createCalls[0]?.body).toEqual({
     packSlug: "old-friend",
     entrySource: "home",
-    eligibilityConfirmed: true,
   });
   expect(api.calls.slice(0, 3).map((call) => call.pathname)).toEqual([
     "/api/plays",
@@ -39,36 +37,26 @@ test("bootstraps once and shows the first server-backed question", async ({
   await expect(page.locator('[data-state="auto"]')).toBeVisible();
 });
 
-test("blocks an ineligible owner before the create request", async ({
+test("starts a new owner play without an intermediate gate", async ({
   page,
 }) => {
   const api = await installOwnerFlowApi(page);
   await page.goto("/play/new?pack=old-friend");
   await expect(
     page.getByRole("heading", {
-      name: "겹은 만 19세 이상만 이용할 수 있어요",
+      name: "서운한 일이 생기면 나는?",
     }),
-  ).toBeFocused();
-  await expect(
-    page.getByRole("checkbox", {
-      name: "만 19세 이상이며 대한민국에서 이용 중이에요.",
-    }),
-  ).not.toBeChecked();
-  expect(api.calls).toHaveLength(0);
-  await page.getByRole("button", { name: "아직 만 19세가 아니에요" }).click();
-  await expect(
-    page.getByRole("heading", { name: "지금은 겹을 이용할 수 없어요" }),
-  ).toBeFocused();
-  await expect(
-    page.getByText("답변이나 프로필은 저장되지 않았어요."),
   ).toBeVisible();
-  expect(api.calls).toHaveLength(0);
+  expect(
+    api.calls.filter(
+      (call) => call.method === "POST" && call.pathname === "/api/plays",
+    ),
+  ).toHaveLength(1);
 });
 
 test("reports the reviewed same-pack entry source", async ({ page }) => {
   const api = await installOwnerFlowApi(page);
   await page.goto("/play/new?pack=old-friend&source=same_pack_cta");
-  await confirmEligibility(page);
   await page.waitForURL(`/play/${playId}`);
 
   expect(
@@ -78,7 +66,6 @@ test("reports the reviewed same-pack entry source", async ({ page }) => {
   ).toEqual({
     packSlug: "old-friend",
     entrySource: "same_pack_cta",
-    eligibilityConfirmed: true,
   });
 });
 

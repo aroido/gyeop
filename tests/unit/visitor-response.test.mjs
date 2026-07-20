@@ -728,7 +728,6 @@ test("browser start single-flight sends one same-tick HTTP request", async () =>
     assert.deepEqual(requestBody, {
       intent: "start",
       secret,
-      eligibilityConfirmed: true,
       relationshipCode: "old_friend",
       knownSinceCode: "ten_years_or_more",
     });

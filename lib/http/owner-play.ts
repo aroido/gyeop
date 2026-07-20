@@ -137,6 +137,11 @@ export async function resumeOwnerPlayResponse(input: {
   packSlug: string;
   cookie: ValidOwnerCookie;
   networkKey: Uint8Array;
+  entrySource: "home" | "same_pack_cta";
+  sourceResponse?: Readonly<{
+    responseId: string;
+    sessionTokenHash: Uint8Array;
+  }>;
   signal: AbortSignal;
 }) {
   const result = await createOrResumeOwnerPlay({
@@ -157,9 +162,35 @@ export async function resumeOwnerPlayResponse(input: {
     );
   }
   if (result.outcome === "expired" || result.outcome === "not_found") {
-    return ownerNotFoundResponse(true);
+    return createOwnerPlayResponse({
+      packSlug: input.packSlug,
+      networkKey: input.networkKey,
+      entrySource: input.entrySource,
+      sourceResponse: input.sourceResponse,
+      signal: input.signal,
+    });
   }
-  if (result.outcome === "wrong_pack") return ownerNotFoundResponse();
+  if (result.outcome === "wrong_pack") {
+    const existing = await getOwnerPlay({
+      playId: input.cookie.playId,
+      managementSecretHash: input.cookie.managementSecretHash,
+      signal: input.signal,
+    });
+    if (
+      existing.outcome === "authorized" &&
+      existing.play.status === "draft" &&
+      existing.play.answers.length === 0
+    ) {
+      return createOwnerPlayResponse({
+        packSlug: input.packSlug,
+        networkKey: input.networkKey,
+        entrySource: input.entrySource,
+        sourceResponse: input.sourceResponse,
+        signal: input.signal,
+      });
+    }
+    return ownerNotFoundResponse();
+  }
   return ownerInternalErrorResponse();
 }
 

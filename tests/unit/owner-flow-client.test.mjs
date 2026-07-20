@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { createOrResumeOwnerPlay } from "../../lib/owner-flow/owner-flow-client.ts";
 
-test("owner client sends eligibility only for confirmed create", async () => {
+test("owner client sends the create contract", async () => {
   const originalFetch = globalThis.fetch;
   const bodies = [];
   try {
@@ -17,16 +17,8 @@ test("owner client sends eligibility only for confirmed create", async () => {
         },
       );
     };
-    await assert.rejects(createOrResumeOwnerPlay("old-friend", "home", true));
     await assert.rejects(createOrResumeOwnerPlay("old-friend", "home"));
-    assert.deepEqual(bodies, [
-      {
-        packSlug: "old-friend",
-        entrySource: "home",
-        eligibilityConfirmed: true,
-      },
-      { packSlug: "old-friend", entrySource: "home" },
-    ]);
+    assert.deepEqual(bodies, [{ packSlug: "old-friend", entrySource: "home" }]);
   } finally {
     globalThis.fetch = originalFetch;
   }
