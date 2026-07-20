@@ -1,0 +1,107 @@
+{
+  "slug": "room-temperature",
+  "version": "room-temperature-v1",
+  "title": "방 온도와 내 기분",
+  "targetRelationship": "close_relationship",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "공간 취향 추리",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "room-temperature-card-v1",
+    "coverTone": "violet"
+  },
+  "cards": [
+    {
+      "id": "reset-space",
+      "position": 1,
+      "ownerPrompt": "집에 돌아와 가장 먼저 하는 건?",
+      "visitorPrompt": "이 사람이 집에 돌아와 가장 먼저 하는 건?",
+      "optionA": "공간을 편하게 바꾼다",
+      "optionB": "내 몸부터 쉬게 한다",
+      "isSignature": true
+    },
+    {
+      "id": "lighting",
+      "position": 2,
+      "ownerPrompt": "밤에 더 편한 빛은?",
+      "visitorPrompt": "이 사람이 밤에 더 편해하는 빛은?",
+      "optionA": "환하고 또렷한 빛",
+      "optionB": "은은하고 따뜻한 빛",
+      "isSignature": false
+    },
+    {
+      "id": "sound",
+      "position": 3,
+      "ownerPrompt": "집에서 나는?",
+      "visitorPrompt": "집에서 이 사람은?",
+      "optionA": "무언가 틀어 두는 편이다",
+      "optionB": "조용한 편이 좋다",
+      "isSignature": false
+    },
+    {
+      "id": "tidy",
+      "position": 4,
+      "ownerPrompt": "정리가 필요해 보이면 나는?",
+      "visitorPrompt": "정리가 필요해 보이면 이 사람은?",
+      "optionA": "바로 눈에 보이는 곳부터 한다",
+      "optionB": "각 잡고 한 번에 한다",
+      "isSignature": false
+    },
+    {
+      "id": "blanket",
+      "position": 5,
+      "ownerPrompt": "집에서 쉬는 자세는?",
+      "visitorPrompt": "이 사람이 집에서 쉬는 자세는?",
+      "optionA": "편한 옷으로 완전히 갈아입는다",
+      "optionB": "지금 차림 그대로 편하게 앉는다",
+      "isSignature": false
+    },
+    {
+      "id": "window",
+      "position": 6,
+      "ownerPrompt": "바깥 날씨가 좋으면 나는?",
+      "visitorPrompt": "바깥 날씨가 좋으면 이 사람은?",
+      "optionA": "창문을 열고 공기를 바꾼다",
+      "optionB": "밖에 나갈 계획을 세운다",
+      "isSignature": false
+    },
+    {
+      "id": "plant",
+      "position": 7,
+      "ownerPrompt": "방에 하나를 더 들인다면 나는?",
+      "visitorPrompt": "이 사람이 방에 하나를 더 들인다면?",
+      "optionA": "보기 좋은 장식",
+      "optionB": "매일 쓰는 편한 물건",
+      "isSignature": false
+    },
+    {
+      "id": "desk",
+      "position": 8,
+      "ownerPrompt": "책상 위가 복잡해지면 나는?",
+      "visitorPrompt": "책상 위가 복잡해지면 이 사람은?",
+      "optionA": "정리해야 집중된다",
+      "optionB": "익숙한 어수선함도 괜찮다",
+      "isSignature": false
+    },
+    {
+      "id": "scent",
+      "position": 9,
+      "ownerPrompt": "공간 분위기를 바꾸고 싶을 때 나는?",
+      "visitorPrompt": "공간 분위기를 바꾸고 싶을 때 이 사람은?",
+      "optionA": "향이나 음악을 바꾼다",
+      "optionB": "가구나 배치를 바꾼다",
+      "isSignature": false
+    },
+    {
+      "id": "guest",
+      "position": 10,
+      "ownerPrompt": "집에 손님이 온다면 나는?",
+      "visitorPrompt": "집에 손님이 온다면 이 사람은?",
+      "optionA": "먹을 것부터 챙긴다",
+      "optionB": "편히 있을 자리를 만든다",
+      "isSignature": false
+    }
+  ]
+}

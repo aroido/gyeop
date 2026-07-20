@@ -1,0 +1,107 @@
+{
+  "slug": "snack-personality",
+  "version": "snack-personality-v1",
+  "title": "간식 취향 보고서",
+  "targetRelationship": "old_friend",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "입이 심심한 철학",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "snack-personality-card-v1",
+    "coverTone": "cream"
+  },
+  "cards": [
+    {
+      "id": "snack-moment",
+      "position": 1,
+      "ownerPrompt": "간식이 당길 때 나는?",
+      "visitorPrompt": "간식이 당길 때 이 사람은?",
+      "optionA": "정해 둔 최애를 찾는다",
+      "optionB": "그날 당기는 맛을 고른다",
+      "isSignature": true
+    },
+    {
+      "id": "sweet-salty",
+      "position": 2,
+      "ownerPrompt": "더 먼저 손이 가는 쪽은?",
+      "visitorPrompt": "이 사람에게 더 먼저 손이 가는 쪽은?",
+      "optionA": "달콤한 한 입",
+      "optionB": "짭짤한 한 입",
+      "isSignature": false
+    },
+    {
+      "id": "share",
+      "position": 3,
+      "ownerPrompt": "간식을 나눌 때 나는?",
+      "visitorPrompt": "간식을 나눌 때 이 사람은?",
+      "optionA": "내가 좋아하는 걸 권한다",
+      "optionB": "상대 취향을 먼저 묻는다",
+      "isSignature": false
+    },
+    {
+      "id": "movie-snack",
+      "position": 4,
+      "ownerPrompt": "뭘 보며 먹을 때 나는?",
+      "visitorPrompt": "뭘 보며 먹을 때 이 사람은?",
+      "optionA": "손이 바쁘지 않은 걸 고른다",
+      "optionB": "먹는 재미가 있는 걸 고른다",
+      "isSignature": false
+    },
+    {
+      "id": "new-flavor",
+      "position": 5,
+      "ownerPrompt": "처음 보는 맛을 만나면 나는?",
+      "visitorPrompt": "처음 보는 맛을 만나면 이 사람은?",
+      "optionA": "궁금해서 시도한다",
+      "optionB": "후기를 보고 결정한다",
+      "isSignature": false
+    },
+    {
+      "id": "last-bite",
+      "position": 6,
+      "ownerPrompt": "마지막 한 입이 남으면 나는?",
+      "visitorPrompt": "마지막 한 입이 남으면 이 사람은?",
+      "optionA": "마지막까지 내가 먹는다",
+      "optionB": "주변에 한 번 권한다",
+      "isSignature": false
+    },
+    {
+      "id": "stock",
+      "position": 7,
+      "ownerPrompt": "집에 간식을 둘 때 나는?",
+      "visitorPrompt": "집에 간식을 둘 때 이 사람은?",
+      "optionA": "없으면 불안한 걸 쟁인다",
+      "optionB": "그때그때 필요한 만큼 산다",
+      "isSignature": false
+    },
+    {
+      "id": "pairing",
+      "position": 8,
+      "ownerPrompt": "음료와 간식을 고를 때 나는?",
+      "visitorPrompt": "음료와 간식을 고를 때 이 사람은?",
+      "optionA": "잘 어울리는 조합을 맞춘다",
+      "optionB": "각자 먹고 싶은 걸 고른다",
+      "isSignature": false
+    },
+    {
+      "id": "craving",
+      "position": 9,
+      "ownerPrompt": "먹고 싶은 게 있는데 없으면 나는?",
+      "visitorPrompt": "먹고 싶은 게 있는데 없으면 이 사람은?",
+      "optionA": "비슷한 걸 찾아 해결한다",
+      "optionB": "다음 기회까지 기다린다",
+      "isSignature": false
+    },
+    {
+      "id": "gift-snack",
+      "position": 10,
+      "ownerPrompt": "누군가에게 간식을 고른다면 나는?",
+      "visitorPrompt": "누군가에게 간식을 고른다면 이 사람은?",
+      "optionA": "안전하게 좋아할 만한 걸 고른다",
+      "optionB": "새롭게 좋아할 걸 골라 본다",
+      "isSignature": false
+    }
+  ]
+}

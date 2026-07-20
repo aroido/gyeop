@@ -32,6 +32,7 @@ const serverEnv = {
   APP_URL: "http://127.0.0.1:3105",
   ORIGIN_PROXY_SECRET: proxySecret,
   RATE_LIMIT_SECRET: rateSecret,
+  GYEOP_NEXT_DIST_DIR: ".next/integration-pack-catalog-3105",
   NEXT_PUBLIC_SUPABASE_URL: local.API_URL,
   SUPABASE_SECRET_KEY: local.SECRET_KEY,
 };

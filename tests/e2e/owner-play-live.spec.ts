@@ -563,7 +563,7 @@ function expectExactAssignmentResponse(body: string) {
   expect(parsed).toMatchObject({
     packSlug: "old-friend",
     packVersion: "old-friend-v1",
-    packTitle: "오래 본 너의 시선",
+    packTitle: "우리는 아직도 통하는 편",
   });
   const assignments = parsed.assignments as Record<string, unknown>[];
   expect(assignments).toHaveLength(3);
@@ -613,7 +613,7 @@ function expectExactSubmittedResponse(body: string) {
   expect(parsed).toMatchObject({
     packSlug: "old-friend",
     packVersion: "old-friend-v1",
-    packTitle: "오래 본 너의 시선",
+    packTitle: "우리는 아직도 통하는 편",
   });
   expect(parsed.status).toBe("submitted");
   expect(typeof parsed.allMatched).toBe("boolean");

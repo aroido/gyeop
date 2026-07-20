@@ -187,7 +187,7 @@
   scroll-snap-align: start;
 }
 
-.activeCard {
+.limeCard {
   background: #dfff00;
   color: #050505;
   box-shadow: 0.35rem 0.35rem 0 #315cff;
@@ -200,13 +200,13 @@
   transform: rotate(0.7deg);
 }
 
-.redCard {
+.coralCard {
   background: #ff4d42;
   color: #050505;
   transform: rotate(-0.7deg);
 }
 
-.blackCard {
+.inkCard {
   background: #0a0a0a;
   color: #fff;
   transform: rotate(0.7deg);
@@ -229,7 +229,7 @@
   font-weight: 850;
 }
 
-.blackCard .cardTopline span {
+.inkCard .cardTopline span {
   border: 1px solid #fff;
 }
 
@@ -270,7 +270,7 @@
 }
 
 .blueCard .packMeta span,
-.blackCard .packMeta span {
+.inkCard .packMeta span {
   border-color: rgb(255 255 255 / 65%);
 }
 
@@ -300,17 +300,35 @@
   outline-color: #dfff00;
 }
 
-.redCard .cta:focus-visible {
+.coralCard .cta:focus-visible {
   outline-color: #050505;
 }
 
-.blackCard .cta {
+.inkCard .cta {
   background: #dfff00;
   color: #050505;
 }
 
-.blackCard .cta:focus-visible {
+.inkCard .cta:focus-visible {
   outline-color: #315cff;
+}
+
+.violetCard {
+  background: #7654ff;
+  color: #fff;
+  box-shadow: 0.35rem 0.35rem 0 #dfff00;
+  transform: rotate(0.55deg);
+}
+
+.creamCard {
+  background: #ffe8b5;
+  color: #050505;
+  box-shadow: 0.35rem 0.35rem 0 #ff513f;
+  transform: rotate(-0.45deg);
+}
+
+.violetCard .packMeta span {
+  border-color: rgb(255 255 255 / 65%);
 }
 
 .cta:disabled {

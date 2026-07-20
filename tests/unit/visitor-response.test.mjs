@@ -91,7 +91,7 @@ const state = Object.freeze({
 const packMetadata = Object.freeze({
   packSlug: "old-friend",
   packVersion: "old-friend-v1",
-  packTitle: "오래 본 너의 시선",
+  packTitle: "우리는 아직도 통하는 편",
 });
 const submittedState = Object.freeze({
   ...state,

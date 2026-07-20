@@ -1,0 +1,107 @@
+{
+  "slug": "small-luxury",
+  "version": "small-luxury-v1",
+  "title": "작은 사치 연구소",
+  "targetRelationship": "close_relationship",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "소소한 플렉스",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "small-luxury-card-v1",
+    "coverTone": "cream"
+  },
+  "cards": [
+    {
+      "id": "treat",
+      "position": 1,
+      "ownerPrompt": "나를 기분 좋게 하는 작은 소비는?",
+      "visitorPrompt": "이 사람을 기분 좋게 하는 작은 소비는?",
+      "optionA": "평소보다 좋은 한 가지를 고른다",
+      "optionB": "여러 개의 작은 즐거움을 고른다",
+      "isSignature": true
+    },
+    {
+      "id": "coffee",
+      "position": 2,
+      "ownerPrompt": "카페에서 나는?",
+      "visitorPrompt": "카페에서 이 사람은?",
+      "optionA": "늘 좋아하는 메뉴를 고른다",
+      "optionB": "계절 메뉴를 한 번 시도한다",
+      "isSignature": false
+    },
+    {
+      "id": "gift",
+      "position": 3,
+      "ownerPrompt": "나에게 선물한다면 나는?",
+      "visitorPrompt": "이 사람에게 선물한다면 이 사람은?",
+      "optionA": "오래 쓸 물건을 고른다",
+      "optionB": "그날 바로 즐길 것을 고른다",
+      "isSignature": false
+    },
+    {
+      "id": "upgrade",
+      "position": 4,
+      "ownerPrompt": "더 좋은 선택지가 보이면 나는?",
+      "visitorPrompt": "더 좋은 선택지가 보이면 이 사람은?",
+      "optionA": "값어치를 따져 업그레이드한다",
+      "optionB": "기본으로도 충분한지 본다",
+      "isSignature": false
+    },
+    {
+      "id": "comfort",
+      "position": 5,
+      "ownerPrompt": "집에서 편해지려면 나는?",
+      "visitorPrompt": "집에서 편해지려면 이 사람은?",
+      "optionA": "촉감 좋은 것을 바꾼다",
+      "optionB": "공간 분위기를 바꾼다",
+      "isSignature": false
+    },
+    {
+      "id": "meal",
+      "position": 6,
+      "ownerPrompt": "혼자 맛있는 걸 먹을 때 나는?",
+      "visitorPrompt": "혼자 맛있는 걸 먹을 때 이 사람은?",
+      "optionA": "제대로 차려서 먹는다",
+      "optionB": "편한 방식으로 즐긴다",
+      "isSignature": false
+    },
+    {
+      "id": "collect",
+      "position": 7,
+      "ownerPrompt": "마음에 드는 물건을 발견하면 나는?",
+      "visitorPrompt": "마음에 드는 물건을 발견하면 이 사람은?",
+      "optionA": "비슷한 걸 모으고 싶어진다",
+      "optionB": "하나만 골라 오래 쓴다",
+      "isSignature": false
+    },
+    {
+      "id": "occasion",
+      "position": 8,
+      "ownerPrompt": "특별한 날이 아니어도 나는?",
+      "visitorPrompt": "특별한 날이 아니어도 이 사람은?",
+      "optionA": "작은 이유를 만들어 챙긴다",
+      "optionB": "정말 필요할 때 아껴 둔다",
+      "isSignature": false
+    },
+    {
+      "id": "recommend",
+      "position": 9,
+      "ownerPrompt": "좋은 걸 발견하면 나는?",
+      "visitorPrompt": "좋은 걸 발견하면 이 사람은?",
+      "optionA": "누구에게든 추천하고 싶다",
+      "optionB": "나만의 목록에 넣어 둔다",
+      "isSignature": false
+    },
+    {
+      "id": "memory",
+      "position": 10,
+      "ownerPrompt": "돈을 쓸 때 더 오래 남는 건?",
+      "visitorPrompt": "이 사람에게 더 오래 남는 건?",
+      "optionA": "물건을 쓰는 시간",
+      "optionB": "그때 만든 경험",
+      "isSignature": false
+    }
+  ]
+}

@@ -468,7 +468,7 @@ test.describe("core MVP live gate", () => {
     ).toBe(false);
     await expect(
       accountPage.getByRole("heading", {
-        name: "오래 본 너의 시선",
+        name: "우리는 아직도 통하는 편",
         level: 2,
       }),
     ).toBeVisible();
@@ -594,7 +594,7 @@ test.describe("core MVP live gate", () => {
     await page.goto("/");
 
     const packCard = page.locator("article").filter({
-      has: page.getByRole("heading", { name: "처음 만난 너의 시선" }),
+      has: page.getByRole("heading", { name: "첫 장면, 네 버전" }),
     });
     await packCard.getByRole("link", { name: "질문 시작하기" }).click();
     await waitForOwnerPlayStart(page);
@@ -609,7 +609,7 @@ test.describe("core MVP live gate", () => {
       page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
     ).toBeVisible({ timeout: 15_000 });
     const ownerPlayId = await claimCompletedOwner(page);
-    await expect(page.getByText("겹 · 처음 만난 너의 시선")).toBeVisible();
+    await expect(page.getByText("겹 · 첫 장면, 네 버전")).toBeVisible();
 
     await page.getByRole("button", { name: "공유 링크 만들기" }).click();
     const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
@@ -621,9 +621,7 @@ test.describe("core MVP live gate", () => {
       relationship: "오래된 친구",
       knownSince: "10년 이상이에요",
     });
-    await expect(
-      visitor.page.getByText("겹 · 처음 만난 너의 시선"),
-    ).toBeVisible();
+    await expect(visitor.page.getByText("겹 · 첫 장면, 네 버전")).toBeVisible();
     await visitor.page.getByRole("button", { name: "2장 더 답하기" }).click();
     await expect(
       visitor.page.getByRole("progressbar", { name: "추가 답변 진행" }),
@@ -653,7 +651,7 @@ test.describe("core MVP live gate", () => {
       page.getByRole("heading", { name: "저장한 질문팩" }),
     ).toBeFocused();
     await expect(
-      page.getByRole("heading", { name: "처음 만난 너의 시선", level: 2 }),
+      page.getByRole("heading", { name: "첫 장면, 네 버전", level: 2 }),
     ).toBeVisible();
     await page.goto(`/me/profile/${ownerPlayId}`);
     await expect(page.locator("article")).toHaveCount(10);

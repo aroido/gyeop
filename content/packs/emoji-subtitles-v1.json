@@ -1,0 +1,107 @@
+{
+  "slug": "emoji-subtitles",
+  "version": "emoji-subtitles-v1",
+  "title": "이모지 자막 켜기",
+  "targetRelationship": "new_connection",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "밈 번역기",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "emoji-subtitles-card-v1",
+    "coverTone": "lime"
+  },
+  "cards": [
+    {
+      "id": "reaction-style",
+      "position": 1,
+      "ownerPrompt": "말보다 반응이 먼저 나올 때 나는?",
+      "visitorPrompt": "말보다 반응이 먼저 나올 때 이 사람은?",
+      "optionA": "이모지나 짤로 답한다",
+      "optionB": "짧은 문장으로 바로 말한다",
+      "isSignature": true
+    },
+    {
+      "id": "funny-post",
+      "position": 2,
+      "ownerPrompt": "웃긴 걸 발견하면 나는?",
+      "visitorPrompt": "웃긴 걸 발견하면 이 사람은?",
+      "optionA": "딱 생각나는 사람에게 보낸다",
+      "optionB": "내 저장 목록에 넣어 둔다",
+      "isSignature": false
+    },
+    {
+      "id": "tone",
+      "position": 3,
+      "ownerPrompt": "장난을 칠 때 나는?",
+      "visitorPrompt": "장난을 칠 때 이 사람은?",
+      "optionA": "표정이나 이모지를 덧붙인다",
+      "optionB": "말투만으로 전달한다",
+      "isSignature": false
+    },
+    {
+      "id": "inside-reference",
+      "position": 4,
+      "ownerPrompt": "우리만 아는 표현이 생기면 나는?",
+      "visitorPrompt": "우리만 아는 표현이 생기면 이 사람은?",
+      "optionA": "더 자주 써서 키운다",
+      "optionB": "결정적일 때만 꺼낸다",
+      "isSignature": false
+    },
+    {
+      "id": "misread",
+      "position": 5,
+      "ownerPrompt": "내 말이 오해될 것 같으면 나는?",
+      "visitorPrompt": "이 사람 말이 오해될 것 같으면 이 사람은?",
+      "optionA": "설명을 한 줄 더 붙인다",
+      "optionB": "다음 대화에서 자연스럽게 푼다",
+      "isSignature": false
+    },
+    {
+      "id": "gif-choice",
+      "position": 6,
+      "ownerPrompt": "반응 하나를 고를 때 나는?",
+      "visitorPrompt": "반응 하나를 고를 때 이 사람은?",
+      "optionA": "정확하게 맞는 걸 찾는다",
+      "optionB": "가장 빠르게 떠오른 걸 보낸다",
+      "isSignature": false
+    },
+    {
+      "id": "new-slang",
+      "position": 7,
+      "ownerPrompt": "새로운 말투를 들으면 나는?",
+      "visitorPrompt": "새로운 말투를 들으면 이 사람은?",
+      "optionA": "재밌으면 바로 써 본다",
+      "optionB": "어울릴 때까지 지켜본다",
+      "isSignature": false
+    },
+    {
+      "id": "laughter",
+      "position": 8,
+      "ownerPrompt": "텍스트로 웃음을 표현할 때 나는?",
+      "visitorPrompt": "텍스트로 웃음을 표현할 때 이 사람은?",
+      "optionA": "크고 분명하게 반응한다",
+      "optionB": "조용히 한 마디를 남긴다",
+      "isSignature": false
+    },
+    {
+      "id": "reply-context",
+      "position": 9,
+      "ownerPrompt": "대화 맥락이 길어지면 나는?",
+      "visitorPrompt": "대화 맥락이 길어지면 이 사람은?",
+      "optionA": "앞의 말을 인용해 답한다",
+      "optionB": "핵심만 새로 정리한다",
+      "isSignature": false
+    },
+    {
+      "id": "translate",
+      "position": 10,
+      "ownerPrompt": "누가 내 반응을 못 알아들으면 나는?",
+      "visitorPrompt": "누가 이 사람 반응을 못 알아들으면 이 사람은?",
+      "optionA": "왜 웃긴지 설명해 준다",
+      "optionB": "다른 예시를 가져온다",
+      "isSignature": false
+    }
+  ]
+}

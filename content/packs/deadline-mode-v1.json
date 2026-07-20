@@ -1,0 +1,107 @@
+{
+  "slug": "deadline-mode",
+  "version": "deadline-mode-v1",
+  "title": "마감 전의 나",
+  "targetRelationship": "coworker",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "벼락치기 DNA",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "deadline-mode-card-v1",
+    "coverTone": "coral"
+  },
+  "cards": [
+    {
+      "id": "start-point",
+      "position": 1,
+      "ownerPrompt": "마감이 잡히면 나는?",
+      "visitorPrompt": "마감이 잡히면 이 사람은?",
+      "optionA": "바로 첫 조각부터 시작한다",
+      "optionB": "전체 그림을 잡은 뒤 움직인다",
+      "isSignature": true
+    },
+    {
+      "id": "calendar",
+      "position": 2,
+      "ownerPrompt": "할 일이 많아지면 나는?",
+      "visitorPrompt": "할 일이 많아지면 이 사람은?",
+      "optionA": "일정을 눈에 보이게 나눈다",
+      "optionB": "급한 순서대로 바로 처리한다",
+      "isSignature": false
+    },
+    {
+      "id": "focus-place",
+      "position": 3,
+      "ownerPrompt": "집중이 안 될 때 나는?",
+      "visitorPrompt": "집중이 안 될 때 이 사람은?",
+      "optionA": "환경을 바꿔 다시 시작한다",
+      "optionB": "작은 목표를 정해 버틴다",
+      "isSignature": false
+    },
+    {
+      "id": "first-draft",
+      "position": 4,
+      "ownerPrompt": "처음 결과물을 만들 때 나는?",
+      "visitorPrompt": "처음 결과물을 만들 때 이 사람은?",
+      "optionA": "일단 빠르게 초안을 낸다",
+      "optionB": "기준에 맞게 다듬어 시작한다",
+      "isSignature": false
+    },
+    {
+      "id": "help-signal",
+      "position": 5,
+      "ownerPrompt": "막히는 일이 생기면 나는?",
+      "visitorPrompt": "막히는 일이 생기면 이 사람은?",
+      "optionA": "일찍 도움을 요청한다",
+      "optionB": "가능한 데까지 혼자 풀어본다",
+      "isSignature": false
+    },
+    {
+      "id": "break-time",
+      "position": 6,
+      "ownerPrompt": "바쁜 중간 쉬는 시간 나는?",
+      "visitorPrompt": "바쁜 중간 쉬는 시간 이 사람은?",
+      "optionA": "짧게라도 몸을 움직인다",
+      "optionB": "흐름이 끊기지 않게 계속 간다",
+      "isSignature": false
+    },
+    {
+      "id": "feedback-time",
+      "position": 7,
+      "ownerPrompt": "중간 피드백을 받을 때 나는?",
+      "visitorPrompt": "중간 피드백을 받을 때 이 사람은?",
+      "optionA": "바로 공유해 방향을 맞춘다",
+      "optionB": "한 번 더 완성도를 올려 공유한다",
+      "isSignature": false
+    },
+    {
+      "id": "deadline-night",
+      "position": 8,
+      "ownerPrompt": "마감 직전 나는?",
+      "visitorPrompt": "마감 직전 이 사람은?",
+      "optionA": "우선 제출 가능한 상태를 만든다",
+      "optionB": "끝까지 디테일을 다듬는다",
+      "isSignature": false
+    },
+    {
+      "id": "done",
+      "position": 9,
+      "ownerPrompt": "일을 끝낸 뒤 나는?",
+      "visitorPrompt": "일을 끝낸 뒤 이 사람은?",
+      "optionA": "바로 다음 일을 정리한다",
+      "optionB": "잠깐 성취감을 즐긴다",
+      "isSignature": false
+    },
+    {
+      "id": "rematch",
+      "position": 10,
+      "ownerPrompt": "다음번 같은 일이 오면 나는?",
+      "visitorPrompt": "다음번 같은 일이 오면 이 사람은?",
+      "optionA": "이번의 방식을 반복한다",
+      "optionB": "새 방법을 하나 바꿔 본다",
+      "isSignature": false
+    }
+  ]
+}

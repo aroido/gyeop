@@ -28,7 +28,7 @@ type VisitorResponseWithPack = VisitorResponseState &
 const LEGACY_OLD_FRIEND = Object.freeze({
   packSlug: "old-friend",
   packVersion: "old-friend-v1",
-  packTitle: "오래 본 너의 시선",
+  packTitle: "우리는 아직도 통하는 편",
 });
 
 async function attachPackMetadata(

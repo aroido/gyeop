@@ -108,10 +108,10 @@ begin
     raise exception 'eligibility cutover retained pre-policy product data';
   end if;
 
-  if (select count(*) from public.pack_templates where is_active) <> 4
-    or (select count(*) from public.pack_versions where published_at is not null) <> 4
-    or (select count(*) from public.pack_cards) <> 40 then
-    raise exception 'eligibility cutover changed the published pack catalog';
+  if (select count(*) from public.pack_templates where is_active) <> 24
+    or (select count(*) from public.pack_versions where published_at is not null) <> 24
+    or (select count(*) from public.pack_cards) <> 240 then
+    raise exception 'published pack catalog was not expanded to 24 packs';
   end if;
 
   if (select started_at from private.analytics_measurement_markers

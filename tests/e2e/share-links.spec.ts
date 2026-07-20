@@ -149,7 +149,7 @@ async function installShareApi(
       return json(route, 200, {
         packSlug: "old-friend",
         packVersion: "old-friend-v1",
-        packTitle: "오래 본 너의 시선",
+        packTitle: "우리는 아직도 통하는 편",
         kind: "public",
       });
     }
@@ -402,8 +402,8 @@ test("attributes profile-entry share once despite same-tick activation", async (
         ).__gyeopHandoff.shareCalls[0],
     ),
   ).toEqual({
-    title: "겹 · 오래 본 너의 시선",
-    text: '내가 먼저 답한 "오래 본 너의 시선" 질문이야. 너는 나를 어떻게 보는지 3장만 골라줘.',
+    title: "겹 · 우리는 아직도 통하는 편",
+    text: '내가 먼저 답한 "우리는 아직도 통하는 편" 질문이야. 너는 나를 어떻게 보는지 3장만 골라줘.',
     url: `http://127.0.0.1:3000/i/${publicIds[0]}#k=${secret}`,
   });
   await expect

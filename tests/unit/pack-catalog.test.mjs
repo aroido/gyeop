@@ -77,16 +77,16 @@ test("published pack decoder rejects extra, coerced, reordered, and leaky rows",
 test("cover trace rejects missing application and important overrides", () => {
   assert.equal(
     validateCoverSources(
-      "<article data-cover-variant={pack.coverRecipe} style={pack.coverStyle}>",
-      ".activeCard { background: #dfff00; }",
+      "<article data-cover-variant={pack.coverRecipe} className={styles[`${pack.coverTone}Card`]}",
+      ".limeCard { background: #dfff00; }",
     ),
     true,
   );
   assert.throws(() => validateCoverSources("<article />", ""));
   assert.throws(() =>
     validateCoverSources(
-      "<article data-cover-variant={pack.coverRecipe} style={pack.coverStyle}>",
-      ".activeCard { background: red !important; }",
+      "<article data-cover-variant={pack.coverRecipe} className={styles[`${pack.coverTone}Card`]}",
+      ".limeCard { background: red !important; }",
     ),
   );
 });

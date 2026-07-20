@@ -12,12 +12,6 @@ import {
 import styles from "../[playId]/page.module.css";
 
 type State = "loading" | "retryable" | "terminal";
-const packTitles: Readonly<Record<string, string>> = Object.freeze({
-  "old-friend": "오래 본 너의 시선",
-  "first-impression": "처음 만난 너의 시선",
-  coworker: "같이 일한 너의 시선",
-  "honest-self": "가까운 너의 시선",
-});
 
 function isRetryable(error: unknown) {
   return (
@@ -29,9 +23,11 @@ function isRetryable(error: unknown) {
 
 export default function BootstrapOwnerPlay({
   pack,
+  packTitle,
   entrySource,
 }: {
   pack: string | null;
+  packTitle: string | null;
   entrySource: "home" | "same_pack_cta";
 }) {
   const router = useRouter();
@@ -39,14 +35,15 @@ export default function BootstrapOwnerPlay({
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<State>(pack ? "loading" : "terminal");
   const [clearing, setClearing] = useState(false);
-  const packTitle = pack ? packTitles[pack] : null;
-
   useEffect(() => {
     if (!pack || state !== "loading") return;
     let active = true;
-    void bootstrapOwnerPlay(pack, entrySource)
+    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => window.setTimeout(resolve, 620));
+    void Promise.all([bootstrapOwnerPlay(pack, entrySource), delay])
       .then((play) => {
-        if (active) router.replace(`/play/${encodeURIComponent(play.id)}`);
+        if (active) router.replace(`/play/${encodeURIComponent(play[0].id)}`);
       })
       .catch((error: unknown) => {
         if (active) setState(isRetryable(error) ? "retryable" : "terminal");
@@ -78,9 +75,18 @@ export default function BootstrapOwnerPlay({
   if (state === "loading") {
     return (
       <main className={styles.shell} data-pack={pack ?? undefined}>
-        <p className={styles.loading} role="status">
-          {packTitle} 질문을 준비하는 중…
-        </p>
+        <section className={styles.packOpening} aria-labelledby="opening-title">
+          <div className={styles.openingCards} aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </div>
+          <p className={styles.brand}>겹 · PACK OPEN</p>
+          <h1 id="opening-title">{packTitle}</h1>
+          <p className={styles.loading} role="status">
+            첫 장을 꺼내는 중…
+          </p>
+        </section>
       </main>
     );
   }

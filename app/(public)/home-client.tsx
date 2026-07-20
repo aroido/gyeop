@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import Link from "next/link";
 
 import styles from "./page.module.css";
@@ -16,15 +15,8 @@ export type PackSummary = Readonly<{
   estimatedMinutes: number;
   sharing: string;
   coverRecipe: string;
-  coverStyle: Readonly<CSSProperties>;
+  coverTone: string;
 }>;
-
-const cardClasses: Readonly<Record<string, string>> = Object.freeze({
-  "old-friend": "activeCard",
-  "first-impression": "blueCard",
-  coworker: "redCard",
-  "honest-self": "blackCard",
-});
 
 export default function HomeClient({
   packs,
@@ -60,7 +52,7 @@ export default function HomeClient({
         <section className={styles.packs} aria-labelledby="pack-title">
           <div className={styles.packHeading}>
             <h2 id="pack-title">질문팩</h2>
-            <p>옆으로 넘겨보기 →</p>
+            <p>{packs.length}개 골라보기 →</p>
           </div>
 
           <ul
@@ -82,10 +74,9 @@ export default function HomeClient({
             {packs.map((pack, index) => (
               <li key={pack.slug}>
                 <article
-                  className={`${styles.packCard} ${styles[cardClasses[pack.slug] ?? "activeCard"]}`}
+                  className={`${styles.packCard} ${styles[`${pack.coverTone}Card`] ?? styles.limeCard}`}
                   data-pack-state={pack.active ? "active" : "upcoming"}
                   data-cover-variant={pack.coverRecipe}
-                  style={pack.coverStyle}
                 >
                   <div className={styles.cardTopline}>
                     <span>{pack.active ? "지금 시작" : "준비 중"}</span>

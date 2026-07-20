@@ -1,0 +1,107 @@
+{
+  "slug": "reply-temperature",
+  "version": "reply-temperature-v1",
+  "title": "읽고도 생각 중",
+  "targetRelationship": "new_connection",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "답장 온도",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "reply-temperature-card-v1",
+    "coverTone": "blue"
+  },
+  "cards": [
+    {
+      "id": "reply-gap",
+      "position": 1,
+      "ownerPrompt": "메시지를 보낸 뒤 답이 늦으면 나는?",
+      "visitorPrompt": "메시지를 보낸 뒤 답이 늦으면 이 사람은?",
+      "optionA": "다른 일을 하며 기다린다",
+      "optionB": "무슨 일 있나 한 번 확인한다",
+      "isSignature": true
+    },
+    {
+      "id": "first-text",
+      "position": 2,
+      "ownerPrompt": "먼저 연락하고 싶을 때 나는?",
+      "visitorPrompt": "먼저 연락하고 싶을 때 이 사람은?",
+      "optionA": "짧은 안부부터 보낸다",
+      "optionB": "보낼 이유가 생길 때까지 기다린다",
+      "isSignature": false
+    },
+    {
+      "id": "emoji-reply",
+      "position": 3,
+      "ownerPrompt": "할 말은 많은데 바쁠 때 나는?",
+      "visitorPrompt": "할 말은 많은데 바쁠 때 이 사람은?",
+      "optionA": "이모지로 먼저 신호를 남긴다",
+      "optionB": "여유 생긴 뒤 제대로 답한다",
+      "isSignature": false
+    },
+    {
+      "id": "long-message",
+      "position": 4,
+      "ownerPrompt": "긴 메시지를 받으면 나는?",
+      "visitorPrompt": "긴 메시지를 받으면 이 사람은?",
+      "optionA": "읽으며 바로바로 답한다",
+      "optionB": "한 번 다 읽고 정리해 답한다",
+      "isSignature": false
+    },
+    {
+      "id": "typo",
+      "position": 5,
+      "ownerPrompt": "오타를 발견하면 나는?",
+      "visitorPrompt": "오타를 발견하면 이 사람은?",
+      "optionA": "바로 수정해서 다시 보낸다",
+      "optionB": "뜻이 통하면 그냥 둔다",
+      "isSignature": false
+    },
+    {
+      "id": "late-night",
+      "position": 6,
+      "ownerPrompt": "늦은 밤 연락이 오면 나는?",
+      "visitorPrompt": "늦은 밤 연락이 오면 이 사람은?",
+      "optionA": "지금 할 수 있는 만큼 답한다",
+      "optionB": "다음 날 정신 있을 때 답한다",
+      "isSignature": false
+    },
+    {
+      "id": "reaction",
+      "position": 7,
+      "ownerPrompt": "재밌는 걸 발견하면 나는?",
+      "visitorPrompt": "재밌는 걸 발견하면 이 사람은?",
+      "optionA": "바로 공유한다",
+      "optionB": "나중에 모아서 보낸다",
+      "isSignature": false
+    },
+    {
+      "id": "voice-note",
+      "position": 8,
+      "ownerPrompt": "텍스트로 설명이 길어질 것 같으면 나는?",
+      "visitorPrompt": "텍스트로 설명이 길어질 것 같으면 이 사람은?",
+      "optionA": "음성이나 통화로 바꾼다",
+      "optionB": "글로 차근차근 적는다",
+      "isSignature": false
+    },
+    {
+      "id": "read-receipt",
+      "position": 9,
+      "ownerPrompt": "읽음 표시를 신경 쓸 때 나는?",
+      "visitorPrompt": "읽음 표시를 신경 쓸 때 이 사람은?",
+      "optionA": "상대 상황을 먼저 생각한다",
+      "optionB": "내가 느낀 걸 솔직히 말한다",
+      "isSignature": false
+    },
+    {
+      "id": "goodbye",
+      "position": 10,
+      "ownerPrompt": "대화를 마칠 때 나는?",
+      "visitorPrompt": "대화를 마칠 때 이 사람은?",
+      "optionA": "다음 이야기를 남겨 둔다",
+      "optionB": "깔끔하게 인사하고 끝낸다",
+      "isSignature": false
+    }
+  ]
+}

@@ -80,6 +80,8 @@ export default defineConfig({
       ACCOUNT_DELETE_REAUTH_KEYRING: JSON.stringify({ v1: testKey }),
       ACCOUNT_DELETE_REAUTH_ACTIVE_VERSION: "v1",
       APP_URL: e2eBaseUrl,
+      GYEOP_NEXT_DIST_DIR:
+        process.env.GYEOP_NEXT_DIST_DIR ?? `.next/e2e-${e2ePort}`,
       ORIGIN_PROXY_SECRET: proxyKey,
       RATE_LIMIT_SECRET: rateLimitKey,
       ...supabaseEnv,

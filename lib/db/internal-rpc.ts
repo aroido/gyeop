@@ -27,6 +27,7 @@ import type {
 } from "../private-one-to-one/private-one-to-one.ts";
 import { decodePublishedPack } from "../packs/published-pack-core.mjs";
 import type { PublishedPack } from "../packs/published-pack.ts";
+import { packManifests } from "../packs/catalog";
 import {
   decodeCreateShareLinkOutcome,
   decodeDisableShareLinkOutcome,
@@ -1072,24 +1073,14 @@ export type GetVisitorResponsePackMetadataResult =
     }>
   | Readonly<{ outcome: "session_invalid" | "legacy_missing" }>;
 
-const packMetadata = Object.freeze({
-  "old-friend": Object.freeze({
-    packVersion: "old-friend-v1",
-    packTitle: "오래 본 너의 시선",
-  }),
-  "first-impression": Object.freeze({
-    packVersion: "first-impression-v1",
-    packTitle: "처음 만난 너의 시선",
-  }),
-  coworker: Object.freeze({
-    packVersion: "coworker-v1",
-    packTitle: "같이 일한 너의 시선",
-  }),
-  "honest-self": Object.freeze({
-    packVersion: "honest-self-v1",
-    packTitle: "가까운 너의 시선",
-  }),
-});
+const packMetadata = Object.freeze(
+  Object.fromEntries(
+    packManifests.map((pack) => [
+      pack.slug,
+      Object.freeze({ packVersion: pack.version, packTitle: pack.title }),
+    ]),
+  ),
+);
 
 function decodeVisitorResponsePackMetadata(
   value: unknown,

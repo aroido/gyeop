@@ -1,0 +1,107 @@
+{
+  "slug": "social-battery",
+  "version": "social-battery-v1",
+  "title": "사람들 사이 배터리",
+  "targetRelationship": "close_relationship",
+  "sensitivity": "medium",
+  "active": true,
+  "presentation": {
+    "moodLabel": "MBTI풍 상황 선택",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "one_to_one",
+    "coverRecipe": "social-battery-card-v1",
+    "coverTone": "ink"
+  },
+  "cards": [
+    {
+      "id": "recharge",
+      "position": 1,
+      "ownerPrompt": "사람들과 오래 보낸 뒤 나는?",
+      "visitorPrompt": "사람들과 오래 보낸 뒤 이 사람은?",
+      "optionA": "누군가와 더 이야기하며 마무리한다",
+      "optionB": "혼자 조용히 있어야 회복된다",
+      "isSignature": true
+    },
+    {
+      "id": "party-entry",
+      "position": 2,
+      "ownerPrompt": "모임에 도착하면 나는?",
+      "visitorPrompt": "모임에 도착하면 이 사람은?",
+      "optionA": "여러 사람에게 먼저 인사한다",
+      "optionB": "익숙한 사람부터 찾는다",
+      "isSignature": false
+    },
+    {
+      "id": "new-person",
+      "position": 3,
+      "ownerPrompt": "처음 보는 사람이 있으면 나는?",
+      "visitorPrompt": "처음 보는 사람이 있으면 이 사람은?",
+      "optionA": "궁금한 걸 먼저 묻는다",
+      "optionB": "대화 흐름을 보며 합류한다",
+      "isSignature": false
+    },
+    {
+      "id": "small-talk",
+      "position": 4,
+      "ownerPrompt": "가벼운 대화가 길어지면 나는?",
+      "visitorPrompt": "가벼운 대화가 길어지면 이 사람은?",
+      "optionA": "다른 화제를 더 꺼낸다",
+      "optionB": "잠깐 쉬는 시간을 찾는다",
+      "isSignature": false
+    },
+    {
+      "id": "week-plan",
+      "position": 5,
+      "ownerPrompt": "약속이 연달아 잡히면 나는?",
+      "visitorPrompt": "약속이 연달아 잡히면 이 사람은?",
+      "optionA": "재밌을 것 같아 기대한다",
+      "optionB": "중간에 비는 시간을 만든다",
+      "isSignature": false
+    },
+    {
+      "id": "one-on-one",
+      "position": 6,
+      "ownerPrompt": "더 편한 대화는?",
+      "visitorPrompt": "이 사람이 더 편해하는 대화는?",
+      "optionA": "여러 사람과 빠르게 오가는 대화",
+      "optionB": "한 사람과 깊게 이어지는 대화",
+      "isSignature": false
+    },
+    {
+      "id": "after-cancel",
+      "position": 7,
+      "ownerPrompt": "약속이 취소되면 나는?",
+      "visitorPrompt": "약속이 취소되면 이 사람은?",
+      "optionA": "다른 계획을 바로 찾는다",
+      "optionB": "뜻밖의 휴식을 반긴다",
+      "isSignature": false
+    },
+    {
+      "id": "hosting",
+      "position": 8,
+      "ownerPrompt": "사람들을 초대하는 날 나는?",
+      "visitorPrompt": "사람들을 초대하는 날 이 사람은?",
+      "optionA": "각자 편하게 놀게 만든다",
+      "optionB": "함께할 흐름을 준비한다",
+      "isSignature": false
+    },
+    {
+      "id": "leave-time",
+      "position": 9,
+      "ownerPrompt": "모임을 마칠 때 나는?",
+      "visitorPrompt": "모임을 마칠 때 이 사람은?",
+      "optionA": "마지막까지 남아 이야기한다",
+      "optionB": "좋았을 때 먼저 인사한다",
+      "isSignature": false
+    },
+    {
+      "id": "reset",
+      "position": 10,
+      "ownerPrompt": "내 컨디션을 되찾는 가장 빠른 방법은?",
+      "visitorPrompt": "이 사람이 컨디션을 되찾는 가장 빠른 방법은?",
+      "optionA": "좋아하는 사람과 시간을 보내기",
+      "optionB": "나만의 시간 확보하기",
+      "isSignature": false
+    }
+  ]
+}

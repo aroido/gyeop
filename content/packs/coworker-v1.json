@@ -1,7 +1,7 @@
 {
   "slug": "coworker",
   "version": "coworker-v1",
-  "title": "같이 일한 너의 시선",
+  "title": "퇴근 전의 우리",
   "targetRelationship": "coworker",
   "sensitivity": "low",
   "active": true,
@@ -9,7 +9,8 @@
     "moodLabel": "담백한 관찰",
     "estimatedMinutes": 2,
     "defaultShareKind": "public",
-    "coverRecipe": "coworker-card-v1"
+    "coverRecipe": "coworker-card-v1",
+    "coverTone": "coral"
   },
   "cards": [
     {

@@ -1,0 +1,107 @@
+{
+  "slug": "comment-section",
+  "version": "comment-section-v1",
+  "title": "내적 댓글창",
+  "targetRelationship": "close_relationship",
+  "sensitivity": "medium",
+  "active": true,
+  "presentation": {
+    "moodLabel": "생각의 반응창",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "one_to_one",
+    "coverRecipe": "comment-section-card-v1",
+    "coverTone": "ink"
+  },
+  "cards": [
+    {
+      "id": "surprise-thought",
+      "position": 1,
+      "ownerPrompt": "뜻밖의 일이 생기면 내 머릿속은?",
+      "visitorPrompt": "뜻밖의 일이 생기면 이 사람 머릿속은?",
+      "optionA": "말로 바로 나오는 편이다",
+      "optionB": "속으로 먼저 여러 번 생각한다",
+      "isSignature": true
+    },
+    {
+      "id": "replay",
+      "position": 2,
+      "ownerPrompt": "대화가 끝난 뒤 나는?",
+      "visitorPrompt": "대화가 끝난 뒤 이 사람은?",
+      "optionA": "재밌던 말을 다시 떠올린다",
+      "optionB": "다음에 할 말을 생각한다",
+      "isSignature": false
+    },
+    {
+      "id": "awkward-moment",
+      "position": 3,
+      "ownerPrompt": "민망한 순간이 오면 나는?",
+      "visitorPrompt": "민망한 순간이 오면 이 사람은?",
+      "optionA": "웃으며 바로 넘긴다",
+      "optionB": "혼자 조금 더 곱씹는다",
+      "isSignature": false
+    },
+    {
+      "id": "idea",
+      "position": 4,
+      "ownerPrompt": "좋은 생각이 떠오르면 나는?",
+      "visitorPrompt": "좋은 생각이 떠오르면 이 사람은?",
+      "optionA": "누군가에게 말하며 키운다",
+      "optionB": "혼자 메모하며 다듬는다",
+      "isSignature": false
+    },
+    {
+      "id": "choice-voice",
+      "position": 5,
+      "ownerPrompt": "결정 앞에서 내 마음은?",
+      "visitorPrompt": "결정 앞에서 이 사람 마음은?",
+      "optionA": "응원하는 쪽이 더 크다",
+      "optionB": "걱정하는 쪽이 더 크다",
+      "isSignature": false
+    },
+    {
+      "id": "quiet",
+      "position": 6,
+      "ownerPrompt": "조용한 시간에 나는?",
+      "visitorPrompt": "조용한 시간에 이 사람은?",
+      "optionA": "생각이 더 선명해진다",
+      "optionB": "생각도 함께 쉬어 간다",
+      "isSignature": false
+    },
+    {
+      "id": "mistake",
+      "position": 7,
+      "ownerPrompt": "실수를 알아차리면 나는?",
+      "visitorPrompt": "실수를 알아차리면 이 사람은?",
+      "optionA": "바로 고칠 방법을 찾는다",
+      "optionB": "왜 그랬는지 먼저 이해한다",
+      "isSignature": false
+    },
+    {
+      "id": "compliment-thought",
+      "position": 8,
+      "ownerPrompt": "좋은 말을 들은 뒤 나는?",
+      "visitorPrompt": "좋은 말을 들은 뒤 이 사람은?",
+      "optionA": "그 말이 오래 떠오른다",
+      "optionB": "그 자리에서 힘을 얻는다",
+      "isSignature": false
+    },
+    {
+      "id": "plan-thought",
+      "position": 9,
+      "ownerPrompt": "새 계획을 세울 때 나는?",
+      "visitorPrompt": "새 계획을 세울 때 이 사람은?",
+      "optionA": "잘될 장면을 먼저 그린다",
+      "optionB": "막힐 부분을 먼저 살핀다",
+      "isSignature": false
+    },
+    {
+      "id": "share-thought",
+      "position": 10,
+      "ownerPrompt": "마음에 걸리는 생각이 있으면 나는?",
+      "visitorPrompt": "마음에 걸리는 생각이 있으면 이 사람은?",
+      "optionA": "믿는 사람에게 말해 본다",
+      "optionB": "시간을 두고 혼자 정리한다",
+      "isSignature": false
+    }
+  ]
+}

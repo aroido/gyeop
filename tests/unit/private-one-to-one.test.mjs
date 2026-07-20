@@ -85,7 +85,7 @@ const assignments = Object.freeze([
 ]);
 const comparison = Object.freeze({
   id: responseId,
-  packTitle: "오래 본 너의 시선",
+  packTitle: "우리는 아직도 통하는 편",
   relationshipCode: "old_friend",
   knownSinceCode: "ten_years_or_more",
   submittedAt: submitted.submittedAt,

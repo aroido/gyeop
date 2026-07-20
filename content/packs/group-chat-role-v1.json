@@ -1,0 +1,107 @@
+{
+  "slug": "group-chat-role",
+  "version": "group-chat-role-v1",
+  "title": "단톡방의 나",
+  "targetRelationship": "old_friend",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "단체방 생존기",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "group-chat-role-card-v1",
+    "coverTone": "coral"
+  },
+  "cards": [
+    {
+      "id": "new-message",
+      "position": 1,
+      "ownerPrompt": "단체 채팅방에 새 소식이 올라오면 나는?",
+      "visitorPrompt": "단체 채팅방에 새 소식이 올라오면 이 사람은?",
+      "optionA": "바로 리액션을 남긴다",
+      "optionB": "내용을 다 읽고 한마디 한다",
+      "isSignature": true
+    },
+    {
+      "id": "plan-maker",
+      "position": 2,
+      "ownerPrompt": "모임 얘기가 나오면 나는?",
+      "visitorPrompt": "모임 얘기가 나오면 이 사람은?",
+      "optionA": "날짜 후보를 먼저 던진다",
+      "optionB": "사람들 반응을 보고 고른다",
+      "isSignature": false
+    },
+    {
+      "id": "photo-drop",
+      "position": 3,
+      "ownerPrompt": "사진이 한꺼번에 올라오면 나는?",
+      "visitorPrompt": "사진이 한꺼번에 올라오면 이 사람은?",
+      "optionA": "마음에 드는 한 장을 고른다",
+      "optionB": "그때 있었던 일을 다시 꺼낸다",
+      "isSignature": false
+    },
+    {
+      "id": "silence-break",
+      "position": 4,
+      "ownerPrompt": "채팅방이 조용해지면 나는?",
+      "visitorPrompt": "채팅방이 조용해지면 이 사람은?",
+      "optionA": "새로운 소재를 올린다",
+      "optionB": "조용한 상태도 그냥 둔다",
+      "isSignature": false
+    },
+    {
+      "id": "notification",
+      "position": 5,
+      "ownerPrompt": "알림이 많이 쌓이면 나는?",
+      "visitorPrompt": "알림이 많이 쌓이면 이 사람은?",
+      "optionA": "틈날 때 처음부터 읽는다",
+      "optionB": "중요한 부분부터 훑는다",
+      "isSignature": false
+    },
+    {
+      "id": "birthday",
+      "position": 6,
+      "ownerPrompt": "누군가 생일인 걸 알면 나는?",
+      "visitorPrompt": "누군가 생일인 걸 알면 이 사람은?",
+      "optionA": "바로 축하 메시지를 보낸다",
+      "optionB": "센스 있는 사진이나 말을 찾는다",
+      "isSignature": false
+    },
+    {
+      "id": "decision",
+      "position": 7,
+      "ownerPrompt": "의견이 갈리는 대화에서 나는?",
+      "visitorPrompt": "의견이 갈리는 대화에서 이 사람은?",
+      "optionA": "내 선택을 분명히 말한다",
+      "optionB": "각자 편한 쪽을 찾게 둔다",
+      "isSignature": false
+    },
+    {
+      "id": "inside-joke",
+      "position": 8,
+      "ownerPrompt": "우리끼리만 아는 얘기가 나오면 나는?",
+      "visitorPrompt": "우리끼리만 아는 얘기가 나오면 이 사람은?",
+      "optionA": "더 살을 붙여 웃긴다",
+      "optionB": "그때 장면을 정확히 복기한다",
+      "isSignature": false
+    },
+    {
+      "id": "exit",
+      "position": 9,
+      "ownerPrompt": "대화가 너무 빨라지면 나는?",
+      "visitorPrompt": "대화가 너무 빨라지면 이 사람은?",
+      "optionA": "흐름에 맞춰 짧게 낀다",
+      "optionB": "나중에 읽고 필요한 말만 한다",
+      "isSignature": false
+    },
+    {
+      "id": "meeting-day",
+      "position": 10,
+      "ownerPrompt": "모임 당일 나는?",
+      "visitorPrompt": "모임 당일 이 사람은?",
+      "optionA": "일찍부터 분위기를 띄운다",
+      "optionB": "도착해서 자연스럽게 합류한다",
+      "isSignature": false
+    }
+  ]
+}

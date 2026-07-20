@@ -1,0 +1,107 @@
+{
+  "slug": "compliment-receipt",
+  "version": "compliment-receipt-v1",
+  "title": "칭찬 영수증",
+  "targetRelationship": "close_relationship",
+  "sensitivity": "medium",
+  "active": true,
+  "presentation": {
+    "moodLabel": "다정함 사용법",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "one_to_one",
+    "coverRecipe": "compliment-receipt-card-v1",
+    "coverTone": "ink"
+  },
+  "cards": [
+    {
+      "id": "receive",
+      "position": 1,
+      "ownerPrompt": "칭찬을 들으면 나는?",
+      "visitorPrompt": "칭찬을 들으면 이 사람은?",
+      "optionA": "기분 좋은 티가 바로 난다",
+      "optionB": "쑥스러워도 조용히 기억한다",
+      "isSignature": true
+    },
+    {
+      "id": "give",
+      "position": 2,
+      "ownerPrompt": "좋은 점을 발견하면 나는?",
+      "visitorPrompt": "좋은 점을 발견하면 이 사람은?",
+      "optionA": "그 자리에서 바로 말한다",
+      "optionB": "딱 맞는 순간까지 아껴 둔다",
+      "isSignature": false
+    },
+    {
+      "id": "specific",
+      "position": 3,
+      "ownerPrompt": "누군가를 칭찬할 때 나는?",
+      "visitorPrompt": "이 사람이 누군가를 칭찬할 때는?",
+      "optionA": "구체적인 장면을 말한다",
+      "optionB": "느낀 마음을 크게 전한다",
+      "isSignature": false
+    },
+    {
+      "id": "achievement",
+      "position": 4,
+      "ownerPrompt": "내가 잘한 일을 들으면 나는?",
+      "visitorPrompt": "이 사람이 잘한 일을 들으면 이 사람은?",
+      "optionA": "과정을 먼저 이야기한다",
+      "optionB": "도와준 사람을 먼저 말한다",
+      "isSignature": false
+    },
+    {
+      "id": "awkward",
+      "position": 5,
+      "ownerPrompt": "갑자기 다정한 말을 들으면 나는?",
+      "visitorPrompt": "갑자기 다정한 말을 들으면 이 사람은?",
+      "optionA": "장난으로 받아친다",
+      "optionB": "고맙다고 그대로 받는다",
+      "isSignature": false
+    },
+    {
+      "id": "encourage",
+      "position": 6,
+      "ownerPrompt": "힘들어 보이는 사람에게 나는?",
+      "visitorPrompt": "힘들어 보이는 사람에게 이 사람은?",
+      "optionA": "실질적인 도움을 제안한다",
+      "optionB": "먼저 마음을 알아준다",
+      "isSignature": false
+    },
+    {
+      "id": "small-win",
+      "position": 7,
+      "ownerPrompt": "작은 성공이 생기면 나는?",
+      "visitorPrompt": "작은 성공이 생기면 이 사람은?",
+      "optionA": "누군가에게 바로 알린다",
+      "optionB": "혼자 뿌듯해하며 쌓아 둔다",
+      "isSignature": false
+    },
+    {
+      "id": "feedback",
+      "position": 8,
+      "ownerPrompt": "좋은 피드백을 받으면 나는?",
+      "visitorPrompt": "좋은 피드백을 받으면 이 사람은?",
+      "optionA": "다음에도 살리고 싶어진다",
+      "optionB": "왜 좋았는지 분석해 본다",
+      "isSignature": false
+    },
+    {
+      "id": "support",
+      "position": 9,
+      "ownerPrompt": "친구가 자신 없어 하면 나는?",
+      "visitorPrompt": "친구가 자신 없어 하면 이 사람은?",
+      "optionA": "해낸 장면을 떠올려 준다",
+      "optionB": "지금 필요한 걸 같이 찾는다",
+      "isSignature": false
+    },
+    {
+      "id": "memory",
+      "position": 10,
+      "ownerPrompt": "오래 남는 말은 내게?",
+      "visitorPrompt": "이 사람에게 오래 남는 말은?",
+      "optionA": "나를 정확히 봐 준 말",
+      "optionB": "용기를 건네 준 말",
+      "isSignature": false
+    }
+  ]
+}

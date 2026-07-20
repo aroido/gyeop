@@ -1,7 +1,7 @@
 {
   "slug": "honest-self",
   "version": "honest-self-v1",
-  "title": "가까운 너의 시선",
+  "title": "말 안 해도 알까?",
   "targetRelationship": "close_relationship",
   "sensitivity": "medium",
   "active": true,
@@ -9,7 +9,8 @@
     "moodLabel": "차분한 솔직함",
     "estimatedMinutes": 2,
     "defaultShareKind": "one_to_one",
-    "coverRecipe": "honest-self-card-v1"
+    "coverRecipe": "honest-self-card-v1",
+    "coverTone": "ink"
   },
   "cards": [
     {
