@@ -3,6 +3,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { Buffer } from "node:buffer";
 import { randomBytes, randomUUID } from "node:crypto";
 import test, { after, before } from "node:test";
+import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 
 import {
@@ -91,18 +92,26 @@ async function createAuthenticatedAccount() {
   assert.ifError(created.error);
   assert.ok(created.data.user);
 
-  const client = createClient(local.API_URL, local.ANON_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
+  const authCookies = new Map();
+  const client = createServerClient(local.API_URL, local.ANON_KEY, {
+    cookies: {
+      getAll() {
+        return [...authCookies].map(([name, value]) => ({ name, value }));
+      },
+      setAll(values) {
+        for (const { name, value } of values) authCookies.set(name, value);
+      },
+    },
   });
   const signedIn = await client.auth.signInWithPassword({ email, password });
   assert.ifError(signedIn.error);
   assert.ok(signedIn.data.session);
-  const value = Buffer.from(JSON.stringify(signedIn.data.session)).toString(
-    "base64url",
-  );
+  assert.ok(authCookies.size > 0, "SSR sign-in must persist an auth cookie");
   return {
     admin,
-    cookie: `sb-127-auth-token=base64-${value}`,
+    cookie: [...authCookies]
+      .map(([name, value]) => `${name}=${value}`)
+      .join("; "),
     userId: created.data.user.id,
   };
 }
