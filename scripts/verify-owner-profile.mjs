@@ -77,12 +77,22 @@ export function verifyOwnerProfile() {
   assert.match(getRoute, /withPublicRequest\s*\(/);
   assert.match(getRoute, /privateNoStore:\s*true/);
   assert.match(getRoute, /action:\s*"owner_play_access"/);
-  assert.match(getRoute, /parseOwnerCookieHeader/);
-  assert.doesNotMatch(getRoute, /params|searchParams|playId/);
+  assert.match(getRoute, /new URL\(request\.url\)\.searchParams/);
+  assert.match(getRoute, /query\.getAll\("playId"\)\.length !== 1/);
+  assert.match(getRoute, /isOwnerPlayId\(playId\)/);
+  assert.match(getRoute, /readOwnerProfileResponse\(\{ playId, signal \}\)/);
+  assert.doesNotMatch(getRoute, /parseOwnerCookieHeader/);
+
+  const profileHttp = source("lib/http/owner-profile.ts");
+  assert.match(profileHttp, /getAuthenticatedOwnerProfile/);
+  assert.match(profileHttp, /recordAuthenticatedOwnerProfileEvent/);
+  assert.match(profileHttp, /authenticatedOwnerFailureResponse/);
+  assert.doesNotMatch(profileHttp, /\.catch\(\(\) => null\)/);
 
   const eventRoute = source("app/api/me/profile/events/route.ts");
   assert.match(eventRoute, /ownerProfileEventSchema/);
-  assert.match(eventRoute, /maximumBodyBytes:\s*64/);
+  assert.match(eventRoute, /maximumBodyBytes:\s*128/);
+  assert.match(eventRoute, /const playId = input\?\.playId/);
   assert.match(eventRoute, /recordOwnerProfileEventResponse/);
 
   const core = source("lib/owner-profile/owner-profile-core.mjs");
@@ -108,10 +118,12 @@ export function verifyOwnerProfile() {
   assert.doesNotMatch(view, /팔로워|팔로잉|친밀도|순위|AI 요약/);
   assert.doesNotMatch(view, /console\s*\./);
 
-  assert.match(source("app/play/[playId]/owner-play.tsx"), /내 시선 프로필/);
+  const ownerPlay = source("app/play/[playId]/owner-play.tsx");
+  assert.match(ownerPlay, /내 질문팩 저장하고 공유하기/);
+  assert.match(ownerPlay, /\/auth\/sign-in\?playId=/);
   assert.match(
     source("app/me/plays/[playId]/share-link-manager.tsx"),
-    /href="\/me"[\s\S]*내 시선 프로필/,
+    /href=\{`\/me\/profile\/\$\{playId\}`\}[\s\S]*내 시선 프로필/,
   );
   return true;
 }

@@ -42,14 +42,20 @@ export function verifyPrivateOneToOne() {
     assert.match(route, /withPublicRequest\s*\(/);
     assert.match(route, /privateNoStore:\s*true/);
     assert.match(route, /action:\s*"owner_play_access"/);
-    assert.match(route, /parseOwnerCookieHeader/);
+    assert.doesNotMatch(route, /parseOwnerCookieHeader/);
     assert.match(route, /privateOneToOneMethodNotAllowed as HEAD/);
   }
   assert.match(listRoute, /query\.get\("kind"\) !== "one_to_one"/);
+  assert.match(listRoute, /isOwnerPlayId\(playId\)/);
   assert.match(detailRoute, /isVisitorResponseId/);
+  assert.match(detailRoute, /query\.getAll\("playId"\)\.length !== 1/);
 
   const adapter = source("lib/http/private-one-to-one.ts");
   assert.match(adapter, /ownerNotFoundResponse\(true\)/);
+  assert.match(adapter, /listAuthenticatedOwnerOneToOneResponses/);
+  assert.match(adapter, /getAuthenticatedPrivateOneToOneComparison/);
+  assert.match(adapter, /authenticatedOwnerFailureResponse/);
+  assert.doesNotMatch(adapter, /\.catch\(\(\) => null\)/);
   assert.match(adapter, /Response\.json\(\{ responses: result\.responses \}\)/);
   assert.match(adapter, /Response\.json\(result\.comparison\)/);
 
