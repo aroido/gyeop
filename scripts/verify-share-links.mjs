@@ -191,7 +191,11 @@ export function verifyShareLinks() {
     path.join(ROOT, "lib/packs/presentation.ts"),
     "utf8",
   );
-  assert.match(presentation, /defaultShareKind:\s*"public"/);
+  assert.match(presentation, /export function defaultShareKind/);
+  assert.match(
+    presentation,
+    /sensitivity === "low" \? "public" : "one_to_one"/,
+  );
   return true;
 }
 

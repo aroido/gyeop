@@ -1,0 +1,107 @@
+{
+  "slug": "weekend-escape",
+  "version": "weekend-escape-v1",
+  "title": "주말 사용 설명서",
+  "targetRelationship": "old_friend",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "현생 잠깐 끄기",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "weekend-escape-card-v1",
+    "coverTone": "lime"
+  },
+  "cards": [
+    {
+      "id": "free-morning",
+      "position": 1,
+      "ownerPrompt": "아무 일정 없는 토요일 아침 나는?",
+      "visitorPrompt": "아무 일정 없는 토요일 아침 이 사람은?",
+      "optionA": "일단 밖으로 나갈 이유를 찾는다",
+      "optionB": "침대에서 천천히 하루를 연다",
+      "isSignature": true
+    },
+    {
+      "id": "last-minute",
+      "position": 2,
+      "ownerPrompt": "갑자기 놀자는 연락이 오면 나는?",
+      "visitorPrompt": "갑자기 놀자는 연락이 오면 이 사람은?",
+      "optionA": "가능하면 바로 합류한다",
+      "optionB": "내 컨디션과 계획을 먼저 본다",
+      "isSignature": false
+    },
+    {
+      "id": "rest-plan",
+      "position": 3,
+      "ownerPrompt": "쉬는 날을 앞두고 나는?",
+      "visitorPrompt": "쉬는 날을 앞두고 이 사람은?",
+      "optionA": "하고 싶은 걸 미리 적어 둔다",
+      "optionB": "그날 기분에 맡긴다",
+      "isSignature": false
+    },
+    {
+      "id": "home-or-out",
+      "position": 4,
+      "ownerPrompt": "주말 오후에 나는 더 자주?",
+      "visitorPrompt": "주말 오후에 이 사람은 더 자주?",
+      "optionA": "새로운 동네를 돌아다닌다",
+      "optionB": "익숙한 곳에서 시간을 보낸다",
+      "isSignature": false
+    },
+    {
+      "id": "weather",
+      "position": 5,
+      "ownerPrompt": "날씨가 좋다는 말을 들으면 나는?",
+      "visitorPrompt": "날씨가 좋다는 말을 들으면 이 사람은?",
+      "optionA": "밖에 나갈 약속을 만든다",
+      "optionB": "창문 열고 집에서도 즐긴다",
+      "isSignature": false
+    },
+    {
+      "id": "late-lunch",
+      "position": 6,
+      "ownerPrompt": "늦은 점심을 고를 때 나는?",
+      "visitorPrompt": "늦은 점심을 고를 때 이 사람은?",
+      "optionA": "처음 보는 메뉴를 시도한다",
+      "optionB": "확실히 좋아하는 메뉴를 고른다",
+      "isSignature": false
+    },
+    {
+      "id": "one-more-episode",
+      "position": 7,
+      "ownerPrompt": "재밌는 걸 보기 시작하면 나는?",
+      "visitorPrompt": "재밌는 걸 보기 시작하면 이 사람은?",
+      "optionA": "정한 만큼만 보고 멈춘다",
+      "optionB": "한 번만 더를 여러 번 한다",
+      "isSignature": false
+    },
+    {
+      "id": "sunday-night",
+      "position": 8,
+      "ownerPrompt": "일요일 저녁이 되면 나는?",
+      "visitorPrompt": "일요일 저녁이 되면 이 사람은?",
+      "optionA": "다음 주 준비를 조금 한다",
+      "optionB": "마지막까지 주말에 집중한다",
+      "isSignature": false
+    },
+    {
+      "id": "mini-adventure",
+      "position": 9,
+      "ownerPrompt": "멀리 못 가는 날 나는?",
+      "visitorPrompt": "멀리 못 가는 날 이 사람은?",
+      "optionA": "가까운 곳에서 새 코스를 만든다",
+      "optionB": "집에서 좋아하는 걸 꺼낸다",
+      "isSignature": false
+    },
+    {
+      "id": "weekend-proof",
+      "position": 10,
+      "ownerPrompt": "주말이 잘 보냈다고 느끼는 순간은?",
+      "visitorPrompt": "이 사람이 주말을 잘 보냈다고 느끼는 순간은?",
+      "optionA": "새로운 장면이 생겼을 때",
+      "optionB": "제대로 쉬었다고 느낄 때",
+      "isSignature": false
+    }
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "slug": "friend-fusion",
+  "version": "friend-fusion-v1",
+  "title": "우리 둘이 섞인다면",
+  "targetRelationship": "old_friend",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "친구 합체 상상",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "friend-fusion-card-v1",
+    "coverTone": "violet"
+  },
+  "cards": [
+    {
+      "id": "combined-plan",
+      "position": 1,
+      "ownerPrompt": "친구와 내가 한 팀이면 나는?",
+      "visitorPrompt": "친구와 이 사람이 한 팀이면 이 사람은?",
+      "optionA": "시작을 끌어가는 역할",
+      "optionB": "마무리를 챙기는 역할",
+      "isSignature": true
+    },
+    {
+      "id": "trip-team",
+      "position": 2,
+      "ownerPrompt": "여행을 같이 준비하면 나는?",
+      "visitorPrompt": "여행을 같이 준비하면 이 사람은?",
+      "optionA": "가고 싶은 곳을 모은다",
+      "optionB": "현실적인 동선을 만든다",
+      "isSignature": false
+    },
+    {
+      "id": "game-team",
+      "position": 3,
+      "ownerPrompt": "게임이나 놀이에서 나는?",
+      "visitorPrompt": "게임이나 놀이에서 이 사람은?",
+      "optionA": "규칙을 빨리 파악한다",
+      "optionB": "분위기를 더 재밌게 만든다",
+      "isSignature": false
+    },
+    {
+      "id": "food-team",
+      "position": 4,
+      "ownerPrompt": "메뉴를 같이 고르면 나는?",
+      "visitorPrompt": "메뉴를 같이 고르면 이 사람은?",
+      "optionA": "후보를 여러 개 던진다",
+      "optionB": "마지막 선택을 정리한다",
+      "isSignature": false
+    },
+    {
+      "id": "problem-team",
+      "position": 5,
+      "ownerPrompt": "갑작스러운 문제가 생기면 나는?",
+      "visitorPrompt": "갑작스러운 문제가 생기면 이 사람은?",
+      "optionA": "해결책부터 찾는다",
+      "optionB": "사람들 기분부터 살핀다",
+      "isSignature": false
+    },
+    {
+      "id": "photo-team",
+      "position": 6,
+      "ownerPrompt": "함께 사진을 찍으면 나는?",
+      "visitorPrompt": "함께 사진을 찍으면 이 사람은?",
+      "optionA": "구도를 잡는 쪽이다",
+      "optionB": "표정을 만드는 쪽이다",
+      "isSignature": false
+    },
+    {
+      "id": "gift-team",
+      "position": 7,
+      "ownerPrompt": "선물을 같이 고르면 나는?",
+      "visitorPrompt": "선물을 같이 고르면 이 사람은?",
+      "optionA": "상대 정보를 모은다",
+      "optionB": "결정적인 한 가지를 고른다",
+      "isSignature": false
+    },
+    {
+      "id": "story-team",
+      "position": 8,
+      "ownerPrompt": "둘만 아는 이야기가 생기면 나는?",
+      "visitorPrompt": "둘만 아는 이야기가 생기면 이 사람은?",
+      "optionA": "자세한 장면을 기억한다",
+      "optionB": "그때의 감정을 기억한다",
+      "isSignature": false
+    },
+    {
+      "id": "support-team",
+      "position": 9,
+      "ownerPrompt": "친구가 지치면 나는?",
+      "visitorPrompt": "친구가 지치면 이 사람은?",
+      "optionA": "필요한 일을 같이 한다",
+      "optionB": "옆에 있어 주며 듣는다",
+      "isSignature": false
+    },
+    {
+      "id": "best-combo",
+      "position": 10,
+      "ownerPrompt": "친구와 가장 잘 맞는 순간은?",
+      "visitorPrompt": "이 사람이 친구와 가장 잘 맞는 순간은?",
+      "optionA": "즉흥적으로 같이 움직일 때",
+      "optionB": "서로 다른 걸 채워 줄 때",
+      "isSignature": false
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,9 +27,29 @@ function sqlString(value) {
   return `'${String(value).replaceAll("'", "''")}'`;
 }
 
+function stableUuid(value) {
+  const hash = createHash("sha256").update(value).digest("hex");
+  return [
+    hash.slice(0, 8),
+    hash.slice(8, 12),
+    `4${hash.slice(13, 16)}`,
+    `${((Number.parseInt(hash[16], 16) & 0x3) | 0x8).toString(16)}${hash.slice(17, 20)}`,
+    hash.slice(20, 32),
+  ].join("-");
+}
+
+function packIds(version) {
+  return (
+    PACK_IDS[version] ??
+    Object.freeze({
+      template: stableUuid(`gyeop:pack-template:${version}`),
+      version: stableUuid(`gyeop:pack-version:${version}`),
+    })
+  );
+}
+
 function renderPack(pack) {
-  const ids = PACK_IDS[pack.version];
-  if (!ids) throw new Error(`Missing fixed IDs for ${pack.version}`);
+  const ids = packIds(pack.version);
   const isLegacyCompatiblePack = pack.slug === "old-friend";
   const rows = pack.cards.map((card) =>
     [

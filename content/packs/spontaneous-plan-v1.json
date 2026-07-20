@@ -1,0 +1,107 @@
+{
+  "slug": "spontaneous-plan",
+  "version": "spontaneous-plan-v1",
+  "title": "갑자기, 지금, 같이?",
+  "targetRelationship": "old_friend",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "즉흥 약속 모드",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "spontaneous-plan-card-v1",
+    "coverTone": "coral"
+  },
+  "cards": [
+    {
+      "id": "sudden-invite",
+      "position": 1,
+      "ownerPrompt": "지금 보자는 연락이 오면 나는?",
+      "visitorPrompt": "지금 보자는 연락이 오면 이 사람은?",
+      "optionA": "가능하면 바로 움직인다",
+      "optionB": "준비할 시간을 먼저 본다",
+      "isSignature": true
+    },
+    {
+      "id": "meeting-place",
+      "position": 2,
+      "ownerPrompt": "약속 장소를 정할 때 나는?",
+      "visitorPrompt": "약속 장소를 정할 때 이 사람은?",
+      "optionA": "딱 떠오르는 곳을 말한다",
+      "optionB": "서로 편한 중간을 찾는다",
+      "isSignature": false
+    },
+    {
+      "id": "one-more",
+      "position": 3,
+      "ownerPrompt": "재밌는 시간이 끝날 무렵 나는?",
+      "visitorPrompt": "재밌는 시간이 끝날 무렵 이 사람은?",
+      "optionA": "한 곳 더 가자고 한다",
+      "optionB": "좋을 때 다음을 기약한다",
+      "isSignature": false
+    },
+    {
+      "id": "weather-change",
+      "position": 4,
+      "ownerPrompt": "날씨 때문에 계획이 바뀌면 나는?",
+      "visitorPrompt": "날씨 때문에 계획이 바뀌면 이 사람은?",
+      "optionA": "다른 할 일을 바로 고른다",
+      "optionB": "그 상황에 맞춰 천천히 바꾼다",
+      "isSignature": false
+    },
+    {
+      "id": "unexpected-guest",
+      "position": 5,
+      "ownerPrompt": "예상 못 한 합류자가 생기면 나는?",
+      "visitorPrompt": "예상 못 한 합류자가 생기면 이 사람은?",
+      "optionA": "더 재밌어질 것 같아 반긴다",
+      "optionB": "원래 약속의 결을 먼저 본다",
+      "isSignature": false
+    },
+    {
+      "id": "late-start",
+      "position": 6,
+      "ownerPrompt": "약속 시간에 늦을 것 같으면 나는?",
+      "visitorPrompt": "약속 시간에 늦을 것 같으면 이 사람은?",
+      "optionA": "바로 알리고 대안을 말한다",
+      "optionB": "얼마나 늦을지 확인하고 알린다",
+      "isSignature": false
+    },
+    {
+      "id": "new-place",
+      "position": 7,
+      "ownerPrompt": "처음 보는 장소를 고를 때 나는?",
+      "visitorPrompt": "처음 보는 장소를 고를 때 이 사람은?",
+      "optionA": "호기심으로 일단 가 본다",
+      "optionB": "후기와 정보를 먼저 본다",
+      "isSignature": false
+    },
+    {
+      "id": "budget",
+      "position": 8,
+      "ownerPrompt": "즉흥 약속의 비용은 나는?",
+      "visitorPrompt": "즉흥 약속의 비용은 이 사람은?",
+      "optionA": "재밌으면 조금 더 쓸 수 있다",
+      "optionB": "편한 범위를 먼저 정한다",
+      "isSignature": false
+    },
+    {
+      "id": "surprise",
+      "position": 9,
+      "ownerPrompt": "작은 깜짝 계획을 세울 때 나는?",
+      "visitorPrompt": "작은 깜짝 계획을 세울 때 이 사람은?",
+      "optionA": "완전히 비밀로 준비한다",
+      "optionB": "힌트를 조금씩 준다",
+      "isSignature": false
+    },
+    {
+      "id": "memory-plan",
+      "position": 10,
+      "ownerPrompt": "좋은 즉흥 약속은 내게?",
+      "visitorPrompt": "이 사람에게 좋은 즉흥 약속은?",
+      "optionA": "예상 못 한 장면이 생긴 날",
+      "optionB": "서로 편하게 웃은 날",
+      "isSignature": false
+    }
+  ]
+}

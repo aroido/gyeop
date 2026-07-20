@@ -7,7 +7,7 @@ import {
   loadOwnerFlow,
   OwnerFlowHttpError,
 } from "@/lib/owner-flow/owner-flow-client";
-import { getPackPresentation, type ShareKind } from "@/lib/packs/presentation";
+import { defaultShareKind, type ShareKind } from "@/lib/packs/presentation";
 import {
   buildShareData,
   isShareCancellation,
@@ -69,7 +69,7 @@ async function readManagerState(
   return {
     kind: "ready",
     packTitle: pack.title,
-    defaultShareKind: getPackPresentation(pack.slug).defaultShareKind,
+    defaultShareKind: defaultShareKind(pack.sensitivity),
     links,
   };
 }

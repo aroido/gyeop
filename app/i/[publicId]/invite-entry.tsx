@@ -930,11 +930,25 @@ function Comparison({
         <Link
           className={styles.primaryCta}
           href={`/play/new?pack=${encodeURIComponent(response.packSlug)}&source=same_pack_cta`}
-          onClick={() => {
-            void recordVisitorEvent(
-              response.id,
-              "same_pack_start_clicked",
-            ).catch(() => undefined);
+          onClick={(event) => {
+            if (
+              event.button !== 0 ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey
+            ) {
+              void recordVisitorEvent(
+                response.id,
+                "same_pack_start_clicked",
+              ).catch(() => undefined);
+              return;
+            }
+            event.preventDefault();
+            const href = event.currentTarget.href;
+            void recordVisitorEvent(response.id, "same_pack_start_clicked")
+              .catch(() => undefined)
+              .finally(() => window.location.assign(href));
           }}
         >
           나도 이 팩으로 시작하기

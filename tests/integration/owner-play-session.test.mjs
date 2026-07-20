@@ -49,6 +49,7 @@ const serverEnv = {
   APP_URL: appUrl,
   ORIGIN_PROXY_SECRET: proxySecret,
   RATE_LIMIT_SECRET: rateSecret,
+  GYEOP_NEXT_DIST_DIR: ".next/integration-owner-play-3106",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: local.ANON_KEY,
   NEXT_PUBLIC_SUPABASE_URL: local.API_URL,
   SUPABASE_SECRET_KEY: local.SECRET_KEY,

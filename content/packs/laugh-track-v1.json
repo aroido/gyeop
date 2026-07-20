@@ -1,0 +1,107 @@
+{
+  "slug": "laugh-track",
+  "version": "laugh-track-v1",
+  "title": "웃음 버튼의 위치",
+  "targetRelationship": "old_friend",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "리액션 모드",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "laugh-track-card-v1",
+    "coverTone": "lime"
+  },
+  "cards": [
+    {
+      "id": "first-laugh",
+      "position": 1,
+      "ownerPrompt": "웃긴 일이 생기면 나는?",
+      "visitorPrompt": "웃긴 일이 생기면 이 사람은?",
+      "optionA": "바로 크게 반응한다",
+      "optionB": "한 번 곱씹고 터진다",
+      "isSignature": true
+    },
+    {
+      "id": "storytelling",
+      "position": 2,
+      "ownerPrompt": "재밌는 이야기를 할 때 나는?",
+      "visitorPrompt": "재밌는 이야기를 할 때 이 사람은?",
+      "optionA": "상황을 자세히 살린다",
+      "optionB": "핵심만 빠르게 던진다",
+      "isSignature": false
+    },
+    {
+      "id": "pun",
+      "position": 3,
+      "ownerPrompt": "말장난이 떠오르면 나는?",
+      "visitorPrompt": "말장난이 떠오르면 이 사람은?",
+      "optionA": "참지 못하고 바로 말한다",
+      "optionB": "타이밍이 맞을 때 꺼낸다",
+      "isSignature": false
+    },
+    {
+      "id": "friend-joke",
+      "position": 4,
+      "ownerPrompt": "친구가 웃긴 말을 하면 나는?",
+      "visitorPrompt": "친구가 웃긴 말을 하면 이 사람은?",
+      "optionA": "더 크게 받아친다",
+      "optionB": "한참 웃고 다시 꺼낸다",
+      "isSignature": false
+    },
+    {
+      "id": "unexpected",
+      "position": 5,
+      "ownerPrompt": "예상 못 한 상황에서 나는?",
+      "visitorPrompt": "예상 못 한 상황에서 이 사람은?",
+      "optionA": "당황한 게 더 웃기다",
+      "optionB": "상황을 정리한 뒤 웃는다",
+      "isSignature": false
+    },
+    {
+      "id": "reference",
+      "position": 6,
+      "ownerPrompt": "예전 웃긴 일을 나는?",
+      "visitorPrompt": "예전 웃긴 일을 이 사람은?",
+      "optionA": "새 맥락에서도 자주 꺼낸다",
+      "optionB": "딱 맞는 순간에만 꺼낸다",
+      "isSignature": false
+    },
+    {
+      "id": "quiet-laugh",
+      "position": 7,
+      "ownerPrompt": "진짜 웃길 때 나는?",
+      "visitorPrompt": "진짜 웃길 때 이 사람은?",
+      "optionA": "소리부터 크게 난다",
+      "optionB": "말없이 표정부터 바뀐다",
+      "isSignature": false
+    },
+    {
+      "id": "humor-style",
+      "position": 8,
+      "ownerPrompt": "더 끌리는 유머는?",
+      "visitorPrompt": "이 사람이 더 끌리는 유머는?",
+      "optionA": "관찰하다가 툭 나오는 말",
+      "optionB": "상상력이 터지는 말",
+      "isSignature": false
+    },
+    {
+      "id": "share-laugh",
+      "position": 9,
+      "ownerPrompt": "혼자 웃긴 걸 보면 나는?",
+      "visitorPrompt": "혼자 웃긴 걸 보면 이 사람은?",
+      "optionA": "누군가에게 보여 주고 싶다",
+      "optionB": "혼자 웃은 걸로도 충분하다",
+      "isSignature": false
+    },
+    {
+      "id": "recover",
+      "position": 10,
+      "ownerPrompt": "너무 웃어서 힘들면 나는?",
+      "visitorPrompt": "너무 웃어서 힘들면 이 사람은?",
+      "optionA": "또 생각나서 다시 웃는다",
+      "optionB": "물 한 잔 마시고 진정한다",
+      "isSignature": false
+    }
+  ]
+}

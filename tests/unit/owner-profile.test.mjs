@@ -26,7 +26,7 @@ function profile(overrides = {}) {
     playId: "27000000-0000-4000-8000-000000000001",
     packSlug: "old-friend",
     packVersion: "old-friend-v1",
-    packTitle: "오래 본 너의 시선",
+    packTitle: "우리는 아직도 통하는 편",
     sightCount: 0,
     sightStatus: "empty",
     cards: manifest.cards.map((card, index) => ({

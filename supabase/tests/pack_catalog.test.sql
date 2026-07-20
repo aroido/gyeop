@@ -30,7 +30,7 @@ select is(
     from public.pack_templates
     where id = '11111111-1111-4111-8111-111111111111'
   ),
-  '{"slug":"old-friend","title":"오래 본 너의 시선","targetRelationship":"old_friend","sensitivity":"low","active":true}'::jsonb,
+  '{"slug":"old-friend","title":"우리는 아직도 통하는 편","targetRelationship":"old_friend","sensitivity":"low","active":true}'::jsonb,
   'seed recreates the frozen private-MVP active template'
 );
 
@@ -41,14 +41,14 @@ select is(
     where is_active
       and published_version_id is not null
   ),
-  4::bigint,
-  'migration and seed expose exactly four active published packs'
+  24::bigint,
+  'migration and seed expose exactly twenty-four active published packs'
 );
 
 select is(
   (select count(*) from public.pack_cards),
-  40::bigint,
-  'the four published packs contain exactly forty cards'
+  240::bigint,
+  'the twenty-four published packs contain exactly two hundred forty cards'
 );
 
 select is(
@@ -58,10 +58,10 @@ select is(
     where slug in ('old-friend', 'first-impression', 'coworker', 'honest-self')
   ),
   '{
-    "coworker":"같이 일한 너의 시선",
-    "first-impression":"처음 만난 너의 시선",
-    "honest-self":"가까운 너의 시선",
-    "old-friend":"오래 본 너의 시선"
+    "coworker":"퇴근 전의 우리",
+    "first-impression":"첫 장면, 네 버전",
+    "honest-self":"말 안 해도 알까?",
+    "old-friend":"우리는 아직도 통하는 편"
   }'::jsonb,
   'all four reviewed titles are materialized exactly'
 );

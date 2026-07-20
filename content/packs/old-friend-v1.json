@@ -1,7 +1,7 @@
 {
   "slug": "old-friend",
   "version": "old-friend-v1",
-  "title": "오래 본 너의 시선",
+  "title": "우리는 아직도 통하는 편",
   "targetRelationship": "old_friend",
   "sensitivity": "low",
   "active": true,
@@ -9,7 +9,8 @@
     "moodLabel": "따뜻한 회상",
     "estimatedMinutes": 2,
     "defaultShareKind": "public",
-    "coverRecipe": "old-friend-card-v1"
+    "coverRecipe": "old-friend-card-v1",
+    "coverTone": "lime"
   },
   "cards": [
     {

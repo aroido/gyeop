@@ -124,8 +124,16 @@ export function verifyOwnerFlow(root = ROOT) {
     "coworker",
     "honest-self",
   ]) {
-    assert.ok(home.includes(`"${slug}"`) || home.includes(`${slug}:`));
+    assert.equal(
+      existsSync(path.join(root, "content/packs", `${slug}-v1.json`)),
+      true,
+    );
   }
+  const newPlay = readFileSync(
+    path.join(root, "app/play/new/page.tsx"),
+    "utf8",
+  );
+  assert.match(newPlay, /findPackManifest\(pack\)/);
   assert.doesNotMatch(home, /href=\{`\/play\/\$\{/);
 
   const legacy = readFileSync(

@@ -75,7 +75,7 @@ test("strictly decodes only public invite metadata", () => {
     metadata: {
       packSlug: "old-friend",
       packVersion: "old-friend-v1",
-      packTitle: "오래 본 너의 시선",
+      packTitle: "우리는 아직도 통하는 편",
       kind: "one_to_one",
     },
   };
@@ -90,12 +90,12 @@ test("strictly decodes only public invite metadata", () => {
 
 test("builds the exact native share payload without channel metadata", () => {
   const url = `http://127.0.0.1:3000/i/AAAAAAAAAAAAAAAAAAAAAA#k=${secret}`;
-  assert.deepEqual(buildShareData(url, "오래 본 너의 시선"), {
-    title: "겹 · 오래 본 너의 시선",
-    text: '내가 먼저 답한 "오래 본 너의 시선" 질문이야. 너는 나를 어떻게 보는지 3장만 골라줘.',
+  assert.deepEqual(buildShareData(url, "우리는 아직도 통하는 편"), {
+    title: "겹 · 우리는 아직도 통하는 편",
+    text: '내가 먼저 답한 "우리는 아직도 통하는 편" 질문이야. 너는 나를 어떻게 보는지 3장만 골라줘.',
     url,
   });
-  assert.throws(() => buildShareData("", "오래 본 너의 시선"));
+  assert.throws(() => buildShareData("", "우리는 아직도 통하는 편"));
   assert.throws(() => buildShareData(url, ""));
 });
 

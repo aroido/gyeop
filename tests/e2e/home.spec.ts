@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
-test("shows four active private-MVP packs before the owner flow", async ({
+test("shows twenty-four active private-MVP packs before the owner flow", async ({
   page,
 }) => {
   await installOwnerFlowApi(page);
@@ -24,10 +24,13 @@ test("shows four active private-MVP packs before the owner flow", async ({
   ).toBeVisible();
 
   for (const title of [
-    "오래 본 너의 시선",
-    "처음 만난 너의 시선",
-    "같이 일한 너의 시선",
-    "가까운 너의 시선",
+    "우리는 아직도 통하는 편",
+    "첫 장면, 네 버전",
+    "퇴근 전의 우리",
+    "말 안 해도 알까?",
+    "단톡방의 나",
+    "사람들 사이 배터리",
+    "우리 둘이 섞인다면",
   ]) {
     await expect(
       page.getByRole("heading", { level: 3, name: title }),
@@ -35,12 +38,12 @@ test("shows four active private-MVP packs before the owner flow", async ({
   }
 
   const activePacks = page.locator('[data-pack-state="active"]');
-  await expect(activePacks).toHaveCount(4);
+  await expect(activePacks).toHaveCount(24);
   await expect(activePacks.getByText("지금 시작", { exact: true })).toHaveCount(
-    4,
+    24,
   );
   const packLinks = page.getByRole("link", { name: "질문 시작하기" });
-  await expect(packLinks).toHaveCount(4);
+  await expect(packLinks).toHaveCount(24);
   await expect(packLinks.first()).toHaveAttribute(
     "href",
     "/play/new?pack=old-friend",
@@ -141,7 +144,7 @@ for (const viewport of [
     const rail = page.getByTestId("pack-rail");
     const secondPack = page.getByRole("heading", {
       level: 3,
-      name: "처음 만난 너의 시선",
+      name: "첫 장면, 네 버전",
     });
     const cta = page.getByRole("link", { name: "질문 시작하기" }).first();
     const ctaBox = await cta.boundingBox();
@@ -158,7 +161,7 @@ for (const viewport of [
           return heading.clientHeight / parseFloat(style.lineHeight);
         }),
       );
-    expect(titleLineCounts).toHaveLength(4);
+    expect(titleLineCounts).toHaveLength(24);
     expect(titleLineCounts.every((lineCount) => lineCount <= 2.05)).toBe(true);
 
     await page.keyboard.press("Tab");
