@@ -11,6 +11,7 @@ import {
 } from "@/lib/owner-profile/owner-profile-core.mjs";
 import {
   loadOwnerProfile,
+  OwnerProfileHttpError,
   recordOwnerProfileReshareClicked,
   recordOwnerProfileViewed,
 } from "@/lib/owner-profile/owner-profile-client";
@@ -24,6 +25,7 @@ import styles from "./owner-profile.module.css";
 type SightNotice = "empty" | "new" | "existing";
 type State =
   | { kind: "loading" }
+  | { kind: "auth" }
   | { kind: "terminal" }
   | { kind: "ready"; profile: OwnerProfile; notice: SightNotice };
 
@@ -117,8 +119,14 @@ function ProfileCard({ card }: { card: OwnerProfileCard }) {
   );
 }
 
-export default function OwnerProfileView() {
-  const [state, setState] = useState<State>({ kind: "loading" });
+export default function OwnerProfileView({
+  playId,
+}: {
+  playId: string | null;
+}) {
+  const [state, setState] = useState<State>(
+    playId ? { kind: "loading" } : { kind: "terminal" },
+  );
   const [refreshVersion, setRefreshVersion] = useState(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const eventPlayRef = useRef<string | null>(null);
@@ -126,19 +134,27 @@ export default function OwnerProfileView() {
 
   useEffect(() => {
     let active = true;
-    void loadOwnerProfile()
+    if (!playId) return;
+    void loadOwnerProfile(playId)
       .then((profile) => {
         if (active) {
           setState({ kind: "ready", profile, notice: readNotice(profile) });
         }
       })
-      .catch(() => {
-        if (active) setState({ kind: "terminal" });
+      .catch((error: unknown) => {
+        if (active) {
+          setState({
+            kind:
+              error instanceof OwnerProfileHttpError && error.status === 401
+                ? "auth"
+                : "terminal",
+          });
+        }
       });
     return () => {
       active = false;
     };
-  }, [refreshVersion]);
+  }, [playId, refreshVersion]);
 
   useEffect(() => {
     const refreshWhenVisible = () => {
@@ -160,20 +176,20 @@ export default function OwnerProfileView() {
       return;
     }
     eventPlayRef.current = state.profile.playId;
-    void recordOwnerProfileViewed().catch(() => undefined);
+    void recordOwnerProfileViewed(state.profile.playId).catch(() => undefined);
   }, [state]);
 
   if (state.kind === "loading") {
     return (
-      <main className={styles.shell}>
+      <section className={styles.shell}>
         <p role="status">내 시선을 불러오는 중…</p>
-      </main>
+      </section>
     );
   }
 
   if (state.kind === "terminal") {
     return (
-      <main className={styles.shell}>
+      <section className={styles.shell}>
         <section className={styles.terminal}>
           <p className={styles.brand}>겹</p>
           <h1 ref={headingRef} tabIndex={-1}>
@@ -184,13 +200,30 @@ export default function OwnerProfileView() {
             홈으로
           </Link>
         </section>
-      </main>
+      </section>
+    );
+  }
+
+  if (state.kind === "auth") {
+    return (
+      <section className={styles.shell}>
+        <section className={styles.terminal}>
+          <p className={styles.brand}>겹</p>
+          <h1 ref={headingRef} tabIndex={-1}>
+            다시 로그인해 주세요
+          </h1>
+          <p>계정을 확인하면 저장해 둔 내 시선 프로필을 다시 볼 수 있어요.</p>
+          <Link className={styles.primary} href="/auth/sign-in?returnTo=%2Fme">
+            이메일로 로그인
+          </Link>
+        </section>
+      </section>
     );
   }
 
   const { profile, notice } = state;
   return (
-    <main className={styles.shell}>
+    <section className={styles.shell}>
       <section className={styles.profile} aria-labelledby="profile-title">
         <Link className={styles.back} href={`/play/${profile.playId}`}>
           ← 내 답변
@@ -226,7 +259,7 @@ export default function OwnerProfileView() {
                 onClick={() => {
                   if (reshareClickRef.current) return;
                   reshareClickRef.current = true;
-                  void recordOwnerProfileReshareClicked().catch(
+                  void recordOwnerProfileReshareClicked(profile.playId).catch(
                     () => undefined,
                   );
                 }}
@@ -247,6 +280,6 @@ export default function OwnerProfileView() {
           ))}
         </div>
       </section>
-    </main>
+    </section>
   );
 }

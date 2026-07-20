@@ -1,18 +1,12 @@
 import "server-only";
 
 import {
-  getPrivateOneToOneComparison,
-  listOwnerOneToOneResponses,
+  getAuthenticatedPrivateOneToOneComparison,
+  listAuthenticatedOwnerOneToOneResponses,
 } from "../db/internal-rpc.ts";
-import type { ParsedOwnerCookie } from "../owner-play/owner-play-session.ts";
 import { errorResponse } from "./errors.ts";
-import {
-  ownerNotFoundResponse,
-  privateNoStore,
-  refreshOwnerCookie,
-} from "./owner-play.ts";
-
-type OwnerCookie = Extract<ParsedOwnerCookie, { outcome: "valid" }>;
+import { authenticatedOwnerFailureResponse } from "./auth-errors.ts";
+import { ownerNotFoundResponse, privateNoStore } from "./owner-play.ts";
 
 export function privateOneToOneInvalidRequest() {
   return privateNoStore(errorResponse("INVALID_REQUEST"));
@@ -32,37 +26,35 @@ function failure(outcome: string) {
 }
 
 export async function listPrivateOneToOneResponsesResponse(input: {
-  cookie: OwnerCookie;
+  playId: string;
   signal: AbortSignal;
 }) {
-  const result = await listOwnerOneToOneResponses({
-    playId: input.cookie.playId,
-    managementSecretHash: input.cookie.managementSecretHash,
-    signal: input.signal,
-  });
+  let result;
+  try {
+    result = await listAuthenticatedOwnerOneToOneResponses({
+      playId: input.playId,
+    });
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
   if (result.outcome !== "listed") return failure(result.outcome);
-  return refreshOwnerCookie(
-    privateNoStore(Response.json({ responses: result.responses })),
-    input.cookie.value,
-    result,
-  );
+  return privateNoStore(Response.json({ responses: result.responses }));
 }
 
 export async function readPrivateOneToOneComparisonResponse(input: {
-  cookie: OwnerCookie;
+  playId: string;
   responseId: string;
   signal: AbortSignal;
 }) {
-  const result = await getPrivateOneToOneComparison({
-    playId: input.cookie.playId,
-    managementSecretHash: input.cookie.managementSecretHash,
-    responseId: input.responseId,
-    signal: input.signal,
-  });
+  let result;
+  try {
+    result = await getAuthenticatedPrivateOneToOneComparison({
+      playId: input.playId,
+      responseId: input.responseId,
+    });
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
   if (result.outcome !== "authorized") return failure(result.outcome);
-  return refreshOwnerCookie(
-    privateNoStore(Response.json(result.comparison)),
-    input.cookie.value,
-    result,
-  );
+  return privateNoStore(Response.json(result.comparison));
 }

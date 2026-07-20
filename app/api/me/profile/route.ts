@@ -2,7 +2,7 @@ import { readOwnerProfileResponse } from "../../../../lib/http/owner-profile.ts"
 import { ownerNotFoundResponse } from "../../../../lib/http/owner-play.ts";
 import { runRateLimitedDomain } from "../../../../lib/http/rate-limit.ts";
 import { withPublicRequest } from "../../../../lib/http/request-boundary.ts";
-import { parseOwnerCookieHeader } from "../../../../lib/owner-play/owner-play-session-core.mjs";
+import { isOwnerPlayId } from "../../../../lib/owner-play/owner-play-state-core.mjs";
 
 export function GET(request: Request) {
   return withPublicRequest(
@@ -18,12 +18,17 @@ export function GET(request: Request) {
           signal,
         },
         () => {
-          const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
-          if (cookie.outcome === "absent") return ownerNotFoundResponse();
-          if (cookie.outcome === "malformed") {
-            return ownerNotFoundResponse(true);
+          const query = new URL(request.url).searchParams;
+          const playId = query.get("playId");
+          if (
+            [...query.entries()].length !== 1 ||
+            query.getAll("playId").length !== 1 ||
+            !playId ||
+            !isOwnerPlayId(playId)
+          ) {
+            return ownerNotFoundResponse();
           }
-          return readOwnerProfileResponse({ cookie, signal });
+          return readOwnerProfileResponse({ playId, signal });
         },
       ),
   );

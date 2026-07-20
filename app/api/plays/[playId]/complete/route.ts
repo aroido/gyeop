@@ -1,4 +1,5 @@
 import {
+  completeAuthenticatedOwnerPlayResponse,
   completeOwnerPlayResponse,
   ownerNotFoundResponse,
 } from "../../../../../lib/http/owner-play.ts";
@@ -6,6 +7,7 @@ import { emptyOwnerMutationSchema } from "../../../../../lib/http/owner-play-sch
 import { runRateLimitedDomain } from "../../../../../lib/http/rate-limit.ts";
 import { withPublicRequest } from "../../../../../lib/http/request-boundary.ts";
 import { parseOwnerCookieHeader } from "../../../../../lib/owner-play/owner-play-session-core.mjs";
+import { isOwnerPlayId } from "../../../../../lib/owner-play/owner-play-state-core.mjs";
 
 export function POST(
   request: Request,
@@ -29,12 +31,15 @@ export function POST(
         },
         async () => {
           const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
-          if (cookie.outcome === "absent") return ownerNotFoundResponse();
-          if (cookie.outcome === "malformed")
-            return ownerNotFoundResponse(true);
           const { playId } = await context.params;
-          if (cookie.playId !== playId) return ownerNotFoundResponse();
-          return completeOwnerPlayResponse({ cookie, signal });
+          if (!isOwnerPlayId(playId)) return ownerNotFoundResponse();
+          if (cookie.outcome === "absent") {
+            return completeAuthenticatedOwnerPlayResponse({ playId });
+          }
+          if (cookie.outcome === "malformed") {
+            return ownerNotFoundResponse(true);
+          }
+          return completeOwnerPlayResponse({ cookie, playId, signal });
         },
       ),
   );

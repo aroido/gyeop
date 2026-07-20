@@ -1,7 +1,9 @@
 import "server-only";
 
 import {
+  createAuthenticatedShareLink,
   createShareLink as createShareLinkRpc,
+  rotateAuthenticatedShareLink,
   rotateShareLink as rotateShareLinkRpc,
 } from "../db/internal-rpc.ts";
 import {
@@ -40,6 +42,30 @@ export async function createShareLinkWithCredential(input: {
   throw new Error("Share link credential allocation failed");
 }
 
+export async function createAuthenticatedShareLinkWithCredential(input: {
+  playId: string;
+  kind: "public" | "one_to_one";
+}) {
+  for (let attempt = 0; attempt < MAX_COLLISION_ATTEMPTS; attempt += 1) {
+    const credential = createShareCredential();
+    const result = await createAuthenticatedShareLink({
+      ...input,
+      ...credential,
+    });
+    if (result.outcome === "collision") continue;
+    if (result.outcome !== "created") return result;
+    return Object.freeze({
+      ...result,
+      inviteUrl: canonicalInviteUrl(
+        appUrl(),
+        credential.publicId,
+        credential.secret,
+      ),
+    });
+  }
+  throw new Error("Share link credential allocation failed");
+}
+
 export async function rotateShareLinkWithCredential(input: {
   playId: string;
   managementSecretHash: Uint8Array;
@@ -49,6 +75,32 @@ export async function rotateShareLinkWithCredential(input: {
   for (let attempt = 0; attempt < MAX_COLLISION_ATTEMPTS; attempt += 1) {
     const credential = createShareCredential();
     const result = await rotateShareLinkRpc({
+      ...input,
+      linkIdNew: credential.linkId,
+      publicId: credential.publicId,
+      secretHash: credential.secretHash,
+    });
+    if (result.outcome === "collision") continue;
+    if (result.outcome !== "rotated") return result;
+    return Object.freeze({
+      ...result,
+      inviteUrl: canonicalInviteUrl(
+        appUrl(),
+        credential.publicId,
+        credential.secret,
+      ),
+    });
+  }
+  throw new Error("Share link credential allocation failed");
+}
+
+export async function rotateAuthenticatedShareLinkWithCredential(input: {
+  playId: string;
+  linkId: string;
+}) {
+  for (let attempt = 0; attempt < MAX_COLLISION_ATTEMPTS; attempt += 1) {
+    const credential = createShareCredential();
+    const result = await rotateAuthenticatedShareLink({
       ...input,
       linkIdNew: credential.linkId,
       publicId: credential.publicId,

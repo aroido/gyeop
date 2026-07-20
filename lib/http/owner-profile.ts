@@ -1,66 +1,44 @@
 import "server-only";
 
 import {
-  getOwnerProfile,
-  recordOwnerProfileEvent,
+  getAuthenticatedOwnerProfile,
+  recordAuthenticatedOwnerProfileEvent,
 } from "../db/internal-rpc.ts";
-import type { ParsedOwnerCookie } from "../owner-play/owner-play-session.ts";
-import {
-  ownerInternalErrorResponse,
-  ownerNotFoundResponse,
-  privateNoStore,
-  refreshOwnerCookie,
-} from "./owner-play.ts";
-
-type ValidOwnerCookie = Extract<ParsedOwnerCookie, { outcome: "valid" }>;
+import { authenticatedOwnerFailureResponse } from "./auth-errors.ts";
+import { ownerNotFoundResponse, privateNoStore } from "./owner-play.ts";
 
 export async function readOwnerProfileResponse(input: {
-  cookie: ValidOwnerCookie;
+  playId: string;
   signal: AbortSignal;
 }) {
-  const result = await getOwnerProfile({
-    playId: input.cookie.playId,
-    managementSecretHash: input.cookie.managementSecretHash,
-    signal: input.signal,
-  });
+  let result;
+  try {
+    result = await getAuthenticatedOwnerProfile({ playId: input.playId });
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
   if (result.outcome === "authorized") {
-    return refreshOwnerCookie(
-      privateNoStore(Response.json(result.profile)),
-      input.cookie.value,
-      result,
-    );
+    return privateNoStore(Response.json(result.profile));
   }
-  if (result.outcome === "not_completed") {
-    return refreshOwnerCookie(
-      ownerNotFoundResponse(),
-      input.cookie.value,
-      result,
-    );
-  }
-  if (result.outcome === "expired" || result.outcome === "not_found") {
-    return ownerNotFoundResponse(true);
-  }
-  return ownerInternalErrorResponse();
+  return ownerNotFoundResponse();
 }
 
 export async function recordOwnerProfileEventResponse(input: {
-  cookie: ValidOwnerCookie;
+  playId: string;
   event: "profile_viewed" | "profile_reshare_clicked";
   signal: AbortSignal;
 }) {
-  const result = await recordOwnerProfileEvent({
-    playId: input.cookie.playId,
-    managementSecretHash: input.cookie.managementSecretHash,
-    event: input.event,
-    signal: input.signal,
-  });
+  let result;
+  try {
+    result = await recordAuthenticatedOwnerProfileEvent({
+      playId: input.playId,
+      event: input.event,
+    });
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
   if (result.outcome === "recorded") {
     return privateNoStore(new Response(null, { status: 204 }));
   }
-  if (result.outcome === "expired" || result.outcome === "not_found") {
-    return ownerNotFoundResponse(true);
-  }
-  if (result.outcome === "not_completed") return ownerNotFoundResponse();
-  if (result.outcome === "not_eligible") return ownerNotFoundResponse();
-  return ownerInternalErrorResponse();
+  return ownerNotFoundResponse();
 }

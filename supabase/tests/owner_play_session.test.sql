@@ -219,8 +219,8 @@ select is(
     null,
     decode(repeat('c1', 32), 'hex')
   )->>'outcome',
-  'wrong_pack',
-  'a valid capability with a different body slug is rejected'
+  'pack_not_found',
+  'a valid capability still reports an unknown pack without replacing data'
 );
 select is(
   public.get_owner_play(

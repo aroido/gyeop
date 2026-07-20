@@ -5,7 +5,7 @@ import {
 import { ownerNotFoundResponse } from "../../../../../lib/http/owner-play.ts";
 import { runRateLimitedDomain } from "../../../../../lib/http/rate-limit.ts";
 import { withPublicRequest } from "../../../../../lib/http/request-boundary.ts";
-import { parseOwnerCookieHeader } from "../../../../../lib/owner-play/owner-play-session-core.mjs";
+import { isOwnerPlayId } from "../../../../../lib/owner-play/owner-play-state-core.mjs";
 import { isVisitorResponseId } from "../../../../../lib/visitor-response/visitor-context-core.mjs";
 
 export function GET(
@@ -25,15 +25,20 @@ export function GET(
           signal,
         },
         async () => {
-          const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
-          if (cookie.outcome === "absent") return ownerNotFoundResponse();
-          if (cookie.outcome === "malformed") {
-            return ownerNotFoundResponse(true);
+          const query = new URL(request.url).searchParams;
+          const playId = query.get("playId");
+          if (
+            [...query.entries()].length !== 1 ||
+            query.getAll("playId").length !== 1 ||
+            !playId ||
+            !isOwnerPlayId(playId)
+          ) {
+            return ownerNotFoundResponse();
           }
           const { responseId } = await context.params;
           if (!isVisitorResponseId(responseId)) return ownerNotFoundResponse();
           return readPrivateOneToOneComparisonResponse({
-            cookie,
+            playId,
             responseId,
             signal,
           });

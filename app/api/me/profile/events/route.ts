@@ -1,26 +1,25 @@
 import { recordOwnerProfileEventResponse } from "../../../../../lib/http/owner-profile.ts";
-import { ownerNotFoundResponse } from "../../../../../lib/http/owner-play.ts";
 import { ownerProfileEventSchema } from "../../../../../lib/http/owner-play-schemas.ts";
 import { runRateLimitedDomain } from "../../../../../lib/http/rate-limit.ts";
 import { withPublicRequest } from "../../../../../lib/http/request-boundary.ts";
-import { parseOwnerCookieHeader } from "../../../../../lib/owner-play/owner-play-session-core.mjs";
 
 export function POST(request: Request) {
   return withPublicRequest(
     request,
     {
       schema: ownerProfileEventSchema,
-      maximumBodyBytes: 64,
+      maximumBodyBytes: 128,
       privateNoStore: true,
     },
     ({ input, networkKey, signal }) => {
       const event = input?.event;
-      if (event !== "profile_viewed" && event !== "profile_reshare_clicked") {
+      const playId = input?.playId;
+      if (
+        (event !== "profile_viewed" && event !== "profile_reshare_clicked") ||
+        typeof playId !== "string"
+      ) {
         throw new Error("INTERNAL_ERROR");
       }
-      const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
-      if (cookie.outcome === "absent") return ownerNotFoundResponse();
-      if (cookie.outcome === "malformed") return ownerNotFoundResponse(true);
       return runRateLimitedDomain(
         {
           keyHash: networkKey,
@@ -31,7 +30,7 @@ export function POST(request: Request) {
         },
         () =>
           recordOwnerProfileEventResponse({
-            cookie,
+            playId,
             event,
             signal,
           }),

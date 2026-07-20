@@ -1,0 +1,134 @@
+.shell {
+  --lime: #dfff00;
+  --blue: #315cff;
+
+  min-height: 100svh;
+  padding: 1rem 0.85rem 2rem;
+  background: #050505;
+  color: #fff;
+}
+
+.card,
+.list {
+  width: min(100%, 36rem);
+  margin: 0 auto;
+}
+
+.card {
+  margin-top: 22svh;
+  padding: 1rem;
+  border: 1px solid #454545;
+  border-top: 0.6rem solid var(--lime);
+  border-radius: 1rem;
+}
+
+.brand {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.card h1,
+.list h1 {
+  margin: 0.8rem 0 0;
+  font-size: clamp(2rem, 10vw, 3.2rem);
+  font-weight: 950;
+  line-height: 1.03;
+  letter-spacing: -0.065em;
+  word-break: keep-all;
+}
+
+.card > p:not(.brand),
+.lead {
+  color: #bdbdbd;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.primary,
+.secondary {
+  display: grid;
+  min-height: 3rem;
+  margin-top: 1rem;
+  place-items: center;
+  border-radius: 0.7rem;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.primary {
+  background: var(--lime);
+  color: #050505;
+}
+
+.secondary {
+  border: 1px solid #666;
+  color: #fff;
+}
+
+.list {
+  padding-top: 2rem;
+}
+
+.plays {
+  display: grid;
+  gap: 0.8rem;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plays li,
+.empty {
+  padding: 1rem;
+  border: 1px solid #4c4c4c;
+  border-radius: 0.9rem;
+  background: #111;
+}
+
+.plays li {
+  display: grid;
+  gap: 1rem;
+}
+
+.plays p,
+.plays h2 {
+  margin: 0;
+}
+
+.plays p {
+  color: var(--lime);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.plays h2 {
+  margin-top: 0.3rem;
+  font-size: 1.25rem;
+}
+
+.plays span {
+  display: inline-block;
+  margin-top: 0.35rem;
+  color: #aaa;
+  font-size: 0.8rem;
+}
+
+.plays a {
+  display: grid;
+  min-height: 2.75rem;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: var(--lime);
+  color: #050505;
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.primary:focus-visible,
+.secondary:focus-visible,
+.plays a:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}

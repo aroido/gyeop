@@ -2,9 +2,11 @@ import {
   ownerNotFoundResponse,
   readOwnerPlayResponse,
 } from "../../../../lib/http/owner-play.ts";
+import { readAuthenticatedOwnerPlayResponse } from "../../../../lib/http/auth-owner.ts";
 import { runRateLimitedDomain } from "../../../../lib/http/rate-limit.ts";
 import { withPublicRequest } from "../../../../lib/http/request-boundary.ts";
 import { parseOwnerCookieHeader } from "../../../../lib/owner-play/owner-play-session-core.mjs";
+import { isOwnerPlayId } from "../../../../lib/owner-play/owner-play-state-core.mjs";
 
 export function GET(
   request: Request,
@@ -24,12 +26,14 @@ export function GET(
         },
         async () => {
           const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
-          if (cookie.outcome === "absent") return ownerNotFoundResponse();
+          const { playId } = await context.params;
+          if (!isOwnerPlayId(playId)) return ownerNotFoundResponse();
+          if (cookie.outcome === "absent") {
+            return readAuthenticatedOwnerPlayResponse({ playId });
+          }
           if (cookie.outcome === "malformed")
             return ownerNotFoundResponse(true);
-          const { playId } = await context.params;
-          if (cookie.playId !== playId) return ownerNotFoundResponse();
-          return readOwnerPlayResponse({ cookie, signal });
+          return readOwnerPlayResponse({ cookie, playId, signal });
         },
       ),
   );

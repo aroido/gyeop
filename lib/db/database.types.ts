@@ -86,6 +86,36 @@ export type Database = {
           },
         ];
       };
+      anonymous_owners: {
+        Row: {
+          created_at: string;
+          id: string;
+          last_active_at: string;
+          management_expires_at: string;
+          management_revoked_at: string | null;
+          management_secret_hash: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          id: string;
+          last_active_at: string;
+          management_expires_at: string;
+          management_revoked_at?: string | null;
+          management_secret_hash?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          last_active_at?: string;
+          management_expires_at?: string;
+          management_revoked_at?: string | null;
+          management_secret_hash?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       pack_cards: {
         Row: {
           created_at: string;
@@ -132,6 +162,7 @@ export type Database = {
       };
       pack_plays: {
         Row: {
+          anonymous_owner_id: string;
           completed_at: string | null;
           created_at: string;
           current_position: number;
@@ -140,11 +171,13 @@ export type Database = {
           management_expires_at: string;
           management_revoked_at: string | null;
           management_secret_hash: string | null;
+          owner_id: string | null;
           pack_version_id: string;
           status: string;
           updated_at: string;
         };
         Insert: {
+          anonymous_owner_id: string;
           completed_at?: string | null;
           created_at?: string;
           current_position?: number;
@@ -153,11 +186,13 @@ export type Database = {
           management_expires_at: string;
           management_revoked_at?: string | null;
           management_secret_hash?: string | null;
+          owner_id?: string | null;
           pack_version_id: string;
           status?: string;
           updated_at?: string;
         };
         Update: {
+          anonymous_owner_id?: string;
           completed_at?: string | null;
           created_at?: string;
           current_position?: number;
@@ -166,11 +201,19 @@ export type Database = {
           management_expires_at?: string;
           management_revoked_at?: string | null;
           management_secret_hash?: string | null;
+          owner_id?: string | null;
           pack_version_id?: string;
           status?: string;
           updated_at?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: "pack_plays_anonymous_owner_fk";
+            columns: ["anonymous_owner_id"];
+            isOneToOne: false;
+            referencedRelation: "anonymous_owners";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "pack_plays_pack_version_id_fkey";
             columns: ["pack_version_id"];
@@ -525,6 +568,19 @@ export type Database = {
         Args: { p_response_id: string; p_session_hash: string };
         Returns: Json;
       };
+      claim_anonymous_owner: {
+        Args: {
+          p_actor_id: string;
+          p_anonymous_owner_id: string;
+          p_management_secret_hash: string;
+          p_recovery_actor_candidates: Json;
+        };
+        Returns: Json;
+      };
+      complete_authenticated_owner_play: {
+        Args: { p_actor_id: string; p_play_id: string };
+        Returns: Json;
+      };
       complete_owner_play: {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: Json;
@@ -544,6 +600,30 @@ export type Database = {
           retry_after_seconds: number;
           window_start: string;
         }[];
+      };
+      create_authenticated_share_link: {
+        Args: {
+          p_actor_id: string;
+          p_expires_at: string;
+          p_kind: string;
+          p_link_id: string;
+          p_play_id: string;
+          p_public_id: string;
+          p_secret_hash: string;
+        };
+        Returns: Json;
+      };
+      create_claimed_share_link: {
+        Args: {
+          p_expires_at: string;
+          p_kind: string;
+          p_link_id: string;
+          p_management_secret_hash: string;
+          p_play_id: string;
+          p_public_id: string;
+          p_secret_hash: string;
+        };
+        Returns: Json;
       };
       create_or_resume_play: {
         Args: {
@@ -582,6 +662,10 @@ export type Database = {
         };
         Returns: Json;
       };
+      disable_authenticated_share_link: {
+        Args: { p_actor_id: string; p_link_id: string; p_play_id: string };
+        Returns: Json;
+      };
       disable_share_link: {
         Args: {
           p_link_id: string;
@@ -590,8 +674,24 @@ export type Database = {
         };
         Returns: Json;
       };
+      get_authenticated_owner_play: {
+        Args: { p_actor_id: string; p_play_id: string };
+        Returns: Json;
+      };
+      get_authenticated_owner_profile: {
+        Args: { p_actor_id: string; p_play_id: string };
+        Returns: Json;
+      };
+      get_authenticated_private_1to1_comparison: {
+        Args: { p_actor_id: string; p_play_id: string; p_response_id: string };
+        Returns: Json;
+      };
       get_invite_metadata: {
         Args: { p_public_id: string; p_secret_hash: string };
+        Returns: Json;
+      };
+      get_owner_claim_state: {
+        Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: Json;
       };
       get_owner_play: {
@@ -619,6 +719,18 @@ export type Database = {
         Args: { p_response_id: string; p_session_hash: string };
         Returns: Json;
       };
+      list_authenticated_owner_1to1_responses: {
+        Args: { p_actor_id: string; p_play_id: string };
+        Returns: Json;
+      };
+      list_authenticated_owner_plays: {
+        Args: { p_actor_id: string };
+        Returns: Json;
+      };
+      list_authenticated_share_links: {
+        Args: { p_actor_id: string; p_play_id: string };
+        Returns: Json;
+      };
       list_owner_1to1_responses: {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: Json;
@@ -630,6 +742,20 @@ export type Database = {
       publish_pack_version: {
         Args: { p_pack_version_id: string };
         Returns: string;
+      };
+      record_authenticated_owner_profile_event: {
+        Args: { p_actor_id: string; p_event_name: string; p_play_id: string };
+        Returns: Json;
+      };
+      record_authenticated_owner_share_action: {
+        Args: {
+          p_actor_id: string;
+          p_entry_source: string;
+          p_event_name: string;
+          p_link_id: string;
+          p_play_id: string;
+        };
+        Returns: Json;
       };
       record_owner_profile_event: {
         Args: {
@@ -670,6 +796,17 @@ export type Database = {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: boolean;
       };
+      rotate_authenticated_share_link: {
+        Args: {
+          p_actor_id: string;
+          p_link_id: string;
+          p_new_link_id: string;
+          p_new_public_id: string;
+          p_new_secret_hash: string;
+          p_play_id: string;
+        };
+        Returns: Json;
+      };
       rotate_share_link: {
         Args: {
           p_link_id: string;
@@ -677,6 +814,16 @@ export type Database = {
           p_new_link_id: string;
           p_new_public_id: string;
           p_new_secret_hash: string;
+          p_play_id: string;
+        };
+        Returns: Json;
+      };
+      save_authenticated_owner_answer: {
+        Args: {
+          p_actor_id: string;
+          p_card_id: string;
+          p_choice: string;
+          p_current_position: number;
           p_play_id: string;
         };
         Returns: Json;

@@ -3,7 +3,6 @@ import { recordShareActionSchema } from "../../../../../../lib/http/owner-play-s
 import { ownerNotFoundResponse } from "../../../../../../lib/http/owner-play.ts";
 import { runRateLimitedDomain } from "../../../../../../lib/http/rate-limit.ts";
 import { withPublicRequest } from "../../../../../../lib/http/request-boundary.ts";
-import { parseOwnerCookieHeader } from "../../../../../../lib/owner-play/owner-play-session-core.mjs";
 import { isOwnerPlayId } from "../../../../../../lib/owner-play/owner-play-state-core.mjs";
 
 export function POST(
@@ -37,16 +36,12 @@ export function POST(
           }
           const entrySource =
             input.entrySource === "profile_reshare" ? "profile_reshare" : null;
-          const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
-          if (cookie.outcome === "absent") return ownerNotFoundResponse();
-          if (cookie.outcome === "malformed")
-            return ownerNotFoundResponse(true);
           const { playId } = await context.params;
-          if (!isOwnerPlayId(playId) || cookie.playId !== playId) {
+          if (!isOwnerPlayId(playId)) {
             return ownerNotFoundResponse();
           }
           return recordShareActionResponse({
-            cookie,
+            playId,
             linkId: input.linkId,
             event: input.event,
             entrySource,

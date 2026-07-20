@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -23,7 +24,12 @@ type State =
   | { kind: "loading" }
   | { kind: "list"; responses: readonly PrivateOneToOneResponseRow[] }
   | { kind: "detail"; comparison: PrivateOneToOneComparison }
+  | { kind: "auth" }
   | { kind: "error" };
+
+function isAuthenticationRequired(error: unknown) {
+  return error instanceof PrivateOneToOneHttpError && error.status === 401;
+}
 
 function date(value: string) {
   return new Intl.DateTimeFormat("ko-KR", {
@@ -95,8 +101,8 @@ export default function PrivateOneToOnePanel({ playId }: { playId: string }) {
         kind: "list",
         responses: await listPrivateOneToOneResponses(playId),
       });
-    } catch {
-      setState({ kind: "error" });
+    } catch (error) {
+      setState({ kind: isAuthenticationRequired(error) ? "auth" : "error" });
     }
   }
 
@@ -106,8 +112,12 @@ export default function PrivateOneToOnePanel({ playId }: { playId: string }) {
       .then((responses) => {
         if (active) setState({ kind: "list", responses });
       })
-      .catch(() => {
-        if (active) setState({ kind: "error" });
+      .catch((error: unknown) => {
+        if (active) {
+          setState({
+            kind: isAuthenticationRequired(error) ? "auth" : "error",
+          });
+        }
       });
     return () => {
       active = false;
@@ -130,10 +140,15 @@ export default function PrivateOneToOnePanel({ playId }: { playId: string }) {
     try {
       setState({
         kind: "detail",
-        comparison: await getPrivateOneToOneComparison(responseId),
+        comparison: await getPrivateOneToOneComparison(playId, responseId),
       });
     } catch (error) {
-      if (error instanceof PrivateOneToOneHttpError && error.status === 404) {
+      if (isAuthenticationRequired(error)) {
+        setState({ kind: "auth" });
+      } else if (
+        error instanceof PrivateOneToOneHttpError &&
+        error.status === 404
+      ) {
         await loadList("답변 상태가 바뀌어 목록을 다시 불러왔어요.");
       } else {
         setNotice("비교를 불러오지 못했어요. 다시 시도해 주세요.");
@@ -199,6 +214,11 @@ export default function PrivateOneToOnePanel({ playId }: { playId: string }) {
       ) : null}
       {state.kind === "loading" ? (
         <p role="status">1:1 답변을 불러오는 중…</p>
+      ) : state.kind === "auth" ? (
+        <div className={styles.privateEmpty}>
+          <p role="alert">다시 로그인하면 저장된 1:1 답변을 볼 수 있어요.</p>
+          <Link href="/auth/sign-in?returnTo=%2Fme">이메일로 로그인</Link>
+        </div>
       ) : state.kind === "error" ? (
         <div className={styles.privateEmpty}>
           <p role="alert">1:1 답변을 불러오지 못했어요.</p>

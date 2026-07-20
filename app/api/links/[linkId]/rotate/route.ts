@@ -1,9 +1,8 @@
-import { emptyOwnerMutationSchema } from "../../../../../lib/http/owner-play-schemas.ts";
+import { playOwnerMutationSchema } from "../../../../../lib/http/owner-play-schemas.ts";
 import { ownerNotFoundResponse } from "../../../../../lib/http/owner-play.ts";
 import { runRateLimitedDomain } from "../../../../../lib/http/rate-limit.ts";
 import { withPublicRequest } from "../../../../../lib/http/request-boundary.ts";
 import { rotateShareLinkResponse } from "../../../../../lib/http/share-links.ts";
-import { parseOwnerCookieHeader } from "../../../../../lib/owner-play/owner-play-session-core.mjs";
 import { isShareLinkId } from "../../../../../lib/share-links/share-link-state-core.mjs";
 
 export function POST(
@@ -13,11 +12,11 @@ export function POST(
   return withPublicRequest(
     request,
     {
-      schema: emptyOwnerMutationSchema,
-      maximumBodyBytes: 16,
+      schema: playOwnerMutationSchema,
+      maximumBodyBytes: 80,
       privateNoStore: true,
     },
-    ({ networkKey, signal }) =>
+    ({ input, networkKey, signal }) =>
       runRateLimitedDomain(
         {
           keyHash: networkKey,
@@ -27,13 +26,16 @@ export function POST(
           signal,
         },
         async () => {
-          const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
-          if (cookie.outcome === "absent") return ownerNotFoundResponse();
-          if (cookie.outcome === "malformed")
-            return ownerNotFoundResponse(true);
+          if (!input || typeof input.playId !== "string") {
+            throw new Error("INTERNAL_ERROR");
+          }
           const { linkId } = await context.params;
           if (!isShareLinkId(linkId)) return ownerNotFoundResponse();
-          return rotateShareLinkResponse({ cookie, linkId, signal });
+          return rotateShareLinkResponse({
+            playId: input.playId,
+            linkId,
+            signal,
+          });
         },
       ),
   );

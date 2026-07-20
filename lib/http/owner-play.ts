@@ -1,10 +1,13 @@
 import "server-only";
 
 import {
+  completeAuthenticatedOwnerPlay,
   completeOwnerPlay,
   createOrResumeOwnerPlay,
+  getAuthenticatedOwnerPlay,
   getOwnerPlay,
   revokeOwnerPlaySession,
+  saveAuthenticatedOwnerAnswer,
   saveOwnerAnswer,
 } from "../db/internal-rpc.ts";
 import {
@@ -16,6 +19,7 @@ import type {
   OwnerPlayState,
   ParsedOwnerCookie,
 } from "../owner-play/owner-play-session.ts";
+import { authenticatedOwnerFailureResponse } from "./auth-errors.ts";
 import { errorResponse } from "./errors.ts";
 
 const PACK_NOT_FOUND = Object.freeze({
@@ -161,6 +165,13 @@ export async function resumeOwnerPlayResponse(input: {
       result.play,
     );
   }
+  if (result.outcome === "created") {
+    return setOwnerCookie(
+      ownerJson(result.play, 201),
+      input.cookie.value,
+      result.play,
+    );
+  }
   if (result.outcome === "expired" || result.outcome === "not_found") {
     return createOwnerPlayResponse({
       packSlug: input.packSlug,
@@ -196,10 +207,11 @@ export async function resumeOwnerPlayResponse(input: {
 
 export async function readOwnerPlayResponse(input: {
   cookie: ValidOwnerCookie;
+  playId: string;
   signal: AbortSignal;
 }) {
   const result = await getOwnerPlay({
-    playId: input.cookie.playId,
+    playId: input.playId,
     managementSecretHash: input.cookie.managementSecretHash,
     signal: input.signal,
   });
@@ -210,18 +222,28 @@ export async function readOwnerPlayResponse(input: {
       result.play,
     );
   }
-  return ownerNotFoundResponse(true);
+  try {
+    const authenticated = await getAuthenticatedOwnerPlay({
+      playId: input.playId,
+    });
+    return authenticated.outcome === "authorized"
+      ? ownerJson(authenticated.play)
+      : ownerNotFoundResponse(true);
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
 }
 
 export async function saveOwnerAnswerResponse(input: {
   cookie: ValidOwnerCookie;
+  playId: string;
   cardId: string;
   choice: "a" | "b";
   currentPosition: number;
   signal: AbortSignal;
 }) {
   const result = await saveOwnerAnswer({
-    playId: input.cookie.playId,
+    playId: input.playId,
     managementSecretHash: input.cookie.managementSecretHash,
     cardId: input.cardId,
     choice: input.choice,
@@ -243,15 +265,41 @@ export async function saveOwnerAnswerResponse(input: {
     );
   }
   if (result.outcome === "invalid_card") return ownerNotFoundResponse();
-  return ownerNotFoundResponse(true);
+  const authenticated = await saveAuthenticatedOwnerAnswerResponse({
+    playId: input.playId,
+    cardId: input.cardId,
+    choice: input.choice,
+    currentPosition: input.currentPosition,
+  });
+  return authenticated;
+}
+
+export async function saveAuthenticatedOwnerAnswerResponse(input: {
+  playId: string;
+  cardId: string;
+  choice: "a" | "b";
+  currentPosition: number;
+}) {
+  let result;
+  try {
+    result = await saveAuthenticatedOwnerAnswer(input);
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
+  if (result.outcome === "saved") return ownerJson(result.play);
+  if (result.outcome === "completed") {
+    return ownerJson(OWNER_COMPLETED, 409);
+  }
+  return ownerNotFoundResponse();
 }
 
 export async function completeOwnerPlayResponse(input: {
   cookie: ValidOwnerCookie;
+  playId: string;
   signal: AbortSignal;
 }) {
   const result = await completeOwnerPlay({
-    playId: input.cookie.playId,
+    playId: input.playId,
     managementSecretHash: input.cookie.managementSecretHash,
     signal: input.signal,
   });
@@ -269,7 +317,26 @@ export async function completeOwnerPlayResponse(input: {
       result.play,
     );
   }
-  return ownerNotFoundResponse(true);
+  const authenticated = await completeAuthenticatedOwnerPlayResponse({
+    playId: input.playId,
+  });
+  return authenticated;
+}
+
+export async function completeAuthenticatedOwnerPlayResponse(input: {
+  playId: string;
+}) {
+  let result;
+  try {
+    result = await completeAuthenticatedOwnerPlay(input);
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
+  if (result.outcome === "completed") return ownerJson(result.play);
+  if (result.outcome === "incomplete") {
+    return ownerJson(OWNER_INCOMPLETE, 409);
+  }
+  return ownerNotFoundResponse();
 }
 
 export async function revokeOwnerPlayResponse(input: {

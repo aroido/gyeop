@@ -6,6 +6,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { decodeRateLimitRow } from "./rate-limit-result.mjs";
 import type { Database } from "./database.types.ts";
+import { withOwnerMutationActor } from "./owner-mutation-actor.ts";
 import { decodeOwnerPlayOutcome } from "../owner-play/owner-play-session-core.mjs";
 import type { OwnerPlayState } from "../owner-play/owner-play-session.ts";
 import {
@@ -328,6 +329,395 @@ export async function getOwnerPlay(input: {
   ]) as GetOwnerPlayResult;
 }
 
+export type OwnerClaimStateResult = Readonly<{
+  outcome: "claimed" | "unclaimed" | "expired" | "not_found";
+  managementExpiresAt?: string;
+  managementTtlSeconds?: 604800;
+}>;
+
+export async function getOwnerClaimState(input: {
+  playId: string;
+  managementSecretHash: Uint8Array;
+  signal?: AbortSignal;
+}): Promise<OwnerClaimStateResult> {
+  let query = getInternalClient().rpc("get_owner_claim_state", {
+    p_play_id: input.playId,
+    p_management_secret_hash: bytea(input.managementSecretHash),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (
+    error ||
+    data === null ||
+    typeof data !== "object" ||
+    Array.isArray(data)
+  ) {
+    throw new Error("Internal owner claim-state RPC failed");
+  }
+  const outcome = (data as { outcome?: unknown }).outcome;
+  if (
+    outcome !== "claimed" &&
+    outcome !== "unclaimed" &&
+    outcome !== "expired" &&
+    outcome !== "not_found"
+  ) {
+    throw new Error("Internal owner claim-state RPC failed");
+  }
+  if (outcome === "expired" || outcome === "not_found") {
+    return Object.freeze({ outcome });
+  }
+  const record = data as {
+    managementExpiresAt?: unknown;
+    managementTtlSeconds?: unknown;
+  };
+  if (
+    typeof record.managementExpiresAt !== "string" ||
+    record.managementTtlSeconds !== 604800
+  ) {
+    throw new Error("Internal owner claim-state RPC failed");
+  }
+  return Object.freeze({
+    outcome,
+    managementExpiresAt: record.managementExpiresAt,
+    managementTtlSeconds: 604800,
+  });
+}
+
+export async function claimAnonymousOwner(input: {
+  anonymousOwnerId: string;
+  managementSecretHash: Uint8Array;
+}): Promise<Readonly<{ outcome: "claimed" | "not_completed" | "not_found" }>> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("claim_anonymous_owner", {
+        p_anonymous_owner_id: input.anonymousOwnerId,
+        p_management_secret_hash: bytea(input.managementSecretHash),
+        p_actor_id: actor.uid,
+        p_recovery_actor_candidates: actor.recoveryActorCandidates.map(
+          (candidate) => ({ ...candidate }),
+        ),
+      })
+      .abortSignal(signal);
+    const outcome =
+      data && typeof data === "object" && !Array.isArray(data)
+        ? (data as { outcome?: unknown }).outcome
+        : undefined;
+    if (
+      error ||
+      (outcome !== "claimed" &&
+        outcome !== "not_completed" &&
+        outcome !== "not_found")
+    ) {
+      throw new Error("Internal owner claim RPC failed");
+    }
+    return Object.freeze({ outcome });
+  });
+}
+
+export type AuthenticatedOwnerPlaySummary = Readonly<{
+  id: string;
+  packSlug: string;
+  packVersion: string;
+  packTitle: string;
+  status: "draft" | "completed";
+  answeredCount: number;
+  updatedAt: string;
+}>;
+
+export async function listAuthenticatedOwnerPlays(): Promise<
+  readonly AuthenticatedOwnerPlaySummary[]
+> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("list_authenticated_owner_plays", { p_actor_id: actor.uid })
+      .abortSignal(signal);
+    const plays =
+      data && typeof data === "object" && !Array.isArray(data)
+        ? (data as { outcome?: unknown; plays?: unknown }).plays
+        : undefined;
+    if (
+      error ||
+      (data as { outcome?: unknown } | null)?.outcome !== "listed" ||
+      !Array.isArray(plays)
+    ) {
+      throw new Error("Internal authenticated owner list RPC failed");
+    }
+    return Object.freeze(
+      plays.map((value) => {
+        if (!value || typeof value !== "object" || Array.isArray(value)) {
+          throw new Error("Internal authenticated owner list RPC failed");
+        }
+        const play = value as Record<string, unknown>;
+        if (
+          typeof play.id !== "string" ||
+          typeof play.packSlug !== "string" ||
+          typeof play.packVersion !== "string" ||
+          typeof play.packTitle !== "string" ||
+          (play.status !== "draft" && play.status !== "completed") ||
+          !Number.isInteger(play.answeredCount) ||
+          typeof play.updatedAt !== "string"
+        ) {
+          throw new Error("Internal authenticated owner list RPC failed");
+        }
+        return Object.freeze({
+          id: play.id,
+          packSlug: play.packSlug,
+          packVersion: play.packVersion,
+          packTitle: play.packTitle,
+          status: play.status,
+          answeredCount: play.answeredCount as number,
+          updatedAt: play.updatedAt,
+        });
+      }),
+    );
+  });
+}
+
+export async function getAuthenticatedOwnerPlay(input: {
+  playId: string;
+}): Promise<GetOwnerPlayResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("get_authenticated_owner_play", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+      })
+      .abortSignal(signal);
+    if (error) throw new Error("Internal authenticated owner play RPC failed");
+    return decodeOwnerPlayOutcome(data, [
+      "authorized",
+      "not_found",
+    ]) as GetOwnerPlayResult;
+  });
+}
+
+export async function saveAuthenticatedOwnerAnswer(input: {
+  playId: string;
+  cardId: string;
+  choice: "a" | "b";
+  currentPosition: number;
+}): Promise<SaveOwnerAnswerResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("save_authenticated_owner_answer", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+        p_card_id: input.cardId,
+        p_choice: input.choice,
+        p_current_position: input.currentPosition,
+      })
+      .abortSignal(signal);
+    if (error) {
+      throw new Error("Internal authenticated owner answer RPC failed");
+    }
+    return decodeOwnerPlayOutcome(data, [
+      "saved",
+      "completed",
+      "not_found",
+      "invalid_card",
+    ]) as SaveOwnerAnswerResult;
+  });
+}
+
+export async function completeAuthenticatedOwnerPlay(input: {
+  playId: string;
+}): Promise<CompleteOwnerPlayResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("complete_authenticated_owner_play", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+      })
+      .abortSignal(signal);
+    if (error) {
+      throw new Error("Internal authenticated owner completion RPC failed");
+    }
+    return decodeOwnerPlayOutcome(data, [
+      "completed",
+      "incomplete",
+      "not_found",
+    ]) as CompleteOwnerPlayResult;
+  });
+}
+
+export async function getAuthenticatedOwnerProfile(input: {
+  playId: string;
+}): Promise<OwnerProfileResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("get_authenticated_owner_profile", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+      })
+      .abortSignal(signal);
+    if (error)
+      throw new Error("Internal authenticated owner profile RPC failed");
+    return decodeOwnerProfileOutcome(data) as OwnerProfileResult;
+  });
+}
+
+export async function recordAuthenticatedOwnerProfileEvent(input: {
+  playId: string;
+  event: "profile_viewed" | "profile_reshare_clicked";
+}): Promise<OwnerProfileEventResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("record_authenticated_owner_profile_event", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+        p_event_name: input.event,
+      })
+      .abortSignal(signal);
+    if (error) {
+      throw new Error("Internal authenticated owner profile event RPC failed");
+    }
+    return decodeOwnerProfileEventOutcome(data) as OwnerProfileEventResult;
+  });
+}
+
+export async function createAuthenticatedShareLink(input: {
+  playId: string;
+  linkId: string;
+  publicId: string;
+  secretHash: Uint8Array;
+  kind: "public" | "one_to_one";
+}): Promise<CreateShareLinkResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("create_authenticated_share_link", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+        p_link_id: input.linkId,
+        p_public_id: input.publicId,
+        p_secret_hash: bytea(input.secretHash),
+        p_kind: input.kind,
+        p_expires_at: nullableRpcString(null),
+      })
+      .abortSignal(signal);
+    if (error) throw new Error("Internal authenticated share link RPC failed");
+    return decodeCreateShareLinkOutcome(data) as CreateShareLinkResult;
+  });
+}
+
+export async function listAuthenticatedShareLinks(input: {
+  playId: string;
+}): Promise<ListShareLinksResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("list_authenticated_share_links", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+      })
+      .abortSignal(signal);
+    if (error) throw new Error("Internal authenticated share link RPC failed");
+    return decodeListShareLinksOutcome(data) as ListShareLinksResult;
+  });
+}
+
+export async function disableAuthenticatedShareLink(input: {
+  playId: string;
+  linkId: string;
+}): Promise<DisableShareLinkResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("disable_authenticated_share_link", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+        p_link_id: input.linkId,
+      })
+      .abortSignal(signal);
+    if (error) throw new Error("Internal authenticated share link RPC failed");
+    return decodeDisableShareLinkOutcome(data) as DisableShareLinkResult;
+  });
+}
+
+export async function rotateAuthenticatedShareLink(input: {
+  playId: string;
+  linkId: string;
+  linkIdNew: string;
+  publicId: string;
+  secretHash: Uint8Array;
+}): Promise<RotateShareLinkResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("rotate_authenticated_share_link", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+        p_link_id: input.linkId,
+        p_new_link_id: input.linkIdNew,
+        p_new_public_id: input.publicId,
+        p_new_secret_hash: bytea(input.secretHash),
+      })
+      .abortSignal(signal);
+    if (error) throw new Error("Internal authenticated share link RPC failed");
+    return decodeRotateShareLinkOutcome(data) as RotateShareLinkResult;
+  });
+}
+
+export async function recordAuthenticatedOwnerShareAction(input: {
+  playId: string;
+  linkId: string;
+  event: "share_handoff_succeeded" | "share_link_copied";
+  entrySource: "profile_reshare" | null;
+}): Promise<RecordShareActionResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("record_authenticated_owner_share_action", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+        p_link_id: input.linkId,
+        p_event_name: input.event,
+        p_entry_source: nullableRpcString(input.entrySource),
+      })
+      .abortSignal(signal);
+    if (error)
+      throw new Error("Internal authenticated share action RPC failed");
+    return decodeRecordShareActionOutcome(data) as RecordShareActionResult;
+  });
+}
+
+export async function listAuthenticatedOwnerOneToOneResponses(input: {
+  playId: string;
+}): Promise<ListOwnerOneToOneResponsesResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("list_authenticated_owner_1to1_responses", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+      })
+      .abortSignal(signal);
+    if (error) {
+      throw new Error("Internal authenticated one-to-one list RPC failed");
+    }
+    return decodeOwnerOneToOneListOutcome(
+      data,
+    ) as ListOwnerOneToOneResponsesResult;
+  });
+}
+
+export async function getAuthenticatedPrivateOneToOneComparison(input: {
+  playId: string;
+  responseId: string;
+}): Promise<GetPrivateOneToOneComparisonResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("get_authenticated_private_1to1_comparison", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+        p_response_id: input.responseId,
+      })
+      .abortSignal(signal);
+    if (error) {
+      throw new Error(
+        "Internal authenticated one-to-one comparison RPC failed",
+      );
+    }
+    return decodeOwnerOneToOneComparisonOutcome(
+      data,
+    ) as GetPrivateOneToOneComparisonResult;
+  });
+}
+
 export async function getOwnerProfile(input: {
   playId: string;
   managementSecretHash: Uint8Array;
@@ -508,7 +898,7 @@ export async function createShareLink(input: {
   kind: "public" | "one_to_one";
   signal?: AbortSignal;
 }): Promise<CreateShareLinkResult> {
-  let query = getInternalClient().rpc("create_share_link", {
+  let query = getInternalClient().rpc("create_claimed_share_link", {
     p_play_id: input.playId,
     p_management_secret_hash: bytea(input.managementSecretHash),
     p_link_id: input.linkId,

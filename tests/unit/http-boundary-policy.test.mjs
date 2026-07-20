@@ -288,21 +288,19 @@ function ownerRouteFiles(routePath, routeSource) {
   };
 }
 
-test("requires share events to run behind limiter then cookie and path checks", () => {
+test("requires authenticated share events to run behind limiter then path checks", () => {
   const route = "app/api/me/plays/[playId]/share-events/route.ts";
   const accepted = `
     import { withPublicRequest } from "../../../../../../lib/http/request-boundary";
     import { runRateLimitedDomain } from "../../../../../../lib/http/rate-limit";
     import { recordShareActionResponse } from "../../../../../../lib/http/share-links";
-    import { parseOwnerCookieHeader } from "../../../../../../lib/owner-play/owner-play-session-core.mjs";
     import { isOwnerPlayId } from "../../../../../../lib/owner-play/owner-play-state-core.mjs";
     export function POST(request) {
       return withPublicRequest(request, { privateNoStore: true }, ({ networkKey, signal }) =>
         runRateLimitedDomain({ keyHash: networkKey, action: "owner_play_access", windowSeconds: 600, limit: 120, signal }, async () => {
-          const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
           const validPath = isOwnerPlayId("19000000-0000-4000-8000-000000000001");
           if (!validPath) return new Response(null, { status: 404 });
-          return recordShareActionResponse({ cookie, signal });
+          return recordShareActionResponse({ signal });
         })
       );
     }
@@ -314,12 +312,12 @@ test("requires share events to run behind limiter then cookie and path checks", 
 
   const reordered = accepted
     .replace(
-      'const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));\n          const validPath = isOwnerPlayId',
-      "const validPath = isOwnerPlayId",
+      "return withPublicRequest(request, { privateNoStore: true }, ({ networkKey, signal }) =>",
+      'const validPath = isOwnerPlayId("19000000-0000-4000-8000-000000000001");\n      return withPublicRequest(request, { privateNoStore: true }, ({ networkKey, signal }) =>',
     )
     .replace(
-      "if (!validPath) return new Response(null, { status: 404 });",
-      'const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));\n          if (!validPath) return new Response(null, { status: 404 });',
+      '          const validPath = isOwnerPlayId("19000000-0000-4000-8000-000000000001");\n',
+      "",
     );
   assert.ok(
     verifyHttpBoundarySources(ownerRouteFiles(route, reordered)).some(

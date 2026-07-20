@@ -229,6 +229,26 @@ async function completedOwner(page: Page) {
   return owner;
 }
 
+test("offers sign-in when the saved account session has expired", async ({
+  page,
+}) => {
+  await completedOwner(page);
+  await page.route(`**/api/plays/${playId}`, (route) =>
+    json(route, 401, {
+      code: "OWNER_AUTH_REQUIRED",
+      message: "로그인한 뒤 내 질문팩을 불러올 수 있어요.",
+    }),
+  );
+  await page.goto(`/me/plays/${playId}`);
+
+  await expect(
+    page.getByRole("heading", { name: "다시 로그인해 주세요" }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("link", { name: "이메일로 로그인" }),
+  ).toHaveAttribute("href", "/auth/sign-in?returnTo=%2Fme");
+});
+
 test("creates the recommended public link and loses the raw URL on reload", async ({
   page,
 }) => {
@@ -239,7 +259,7 @@ test("creates the recommended public link and loses the raw URL on reload", asyn
   await expect(page.getByRole("heading", { name: "공유 링크" })).toBeFocused();
   await expect(
     page.getByRole("link", { name: "내 시선 프로필" }),
-  ).toHaveAttribute("href", "/me");
+  ).toHaveAttribute("href", `/me/profile/${playId}`);
   await expect(
     page.getByRole("radio", { name: /여러 친구에게 공개/ }),
   ).toBeChecked();

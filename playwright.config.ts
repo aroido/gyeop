@@ -26,14 +26,15 @@ function localSupabase(): Record<string, string> {
     const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
     if (match) values[match[1]] = JSON.parse(match[2]) as string;
   }
-  if (!values.API_URL || !values.SECRET_KEY) {
+  if (!values.API_URL || !values.ANON_KEY || !values.SECRET_KEY) {
     throw new Error(
-      "Live owner flow requires local Supabase API_URL and SECRET_KEY",
+      "Live owner flow requires local Supabase API_URL, ANON_KEY, and SECRET_KEY",
     );
   }
   const serverSecretName = ["SUPABASE", "SECRET", "KEY"].join("_");
   return {
     NEXT_PUBLIC_SUPABASE_URL: values.API_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: values.ANON_KEY,
     [serverSecretName]: values.SECRET_KEY,
   };
 }

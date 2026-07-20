@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
-import { loadOwnerFlow } from "@/lib/owner-flow/owner-flow-client";
+import {
+  loadOwnerFlow,
+  OwnerFlowHttpError,
+} from "@/lib/owner-flow/owner-flow-client";
 import { getPackPresentation, type ShareKind } from "@/lib/packs/presentation";
 import {
   buildShareData,
@@ -25,6 +28,7 @@ import PrivateOneToOnePanel from "./private-one-to-one-panel";
 
 type State =
   | { kind: "loading" }
+  | { kind: "auth" }
   | { kind: "terminal" }
   | {
       kind: "ready";
@@ -41,6 +45,14 @@ type Feedback = Readonly<{
   tone: "status" | "alert";
   message: string;
 }>;
+
+function isAuthenticationRequired(error: unknown) {
+  return (
+    (error instanceof OwnerFlowHttpError ||
+      error instanceof ShareLinkHttpError) &&
+    error.status === 401
+  );
+}
 
 async function readManagerState(
   playId: string,
@@ -123,8 +135,8 @@ export default function ShareLinkManager({
       const next = await readManagerState(playId);
       setSelectedKind(next.defaultShareKind);
       setState(next);
-    } catch {
-      setState({ kind: "terminal" });
+    } catch (error) {
+      setState({ kind: isAuthenticationRequired(error) ? "auth" : "terminal" });
     }
   }
 
@@ -138,8 +150,12 @@ export default function ShareLinkManager({
           setState(next);
         }
       })
-      .catch(() => {
-        if (active) setState({ kind: "terminal" });
+      .catch((error: unknown) => {
+        if (active) {
+          setState({
+            kind: isAuthenticationRequired(error) ? "auth" : "terminal",
+          });
+        }
       });
     return () => {
       active = false;
@@ -188,7 +204,7 @@ export default function ShareLinkManager({
   }
 
   async function disable(link: ShareLink) {
-    if (state.kind !== "ready" || actionLatchRef.current) return;
+    if (!playId || state.kind !== "ready" || actionLatchRef.current) return;
     if (
       !window.confirm(
         "이 링크를 비활성화할까요? 더 이상 초대에 사용할 수 없어요.",
@@ -198,7 +214,7 @@ export default function ShareLinkManager({
       return;
     setFeedback(null);
     try {
-      const next = await disableShareLink(link.id);
+      const next = await disableShareLink(playId, link.id);
       setReadyLink((current) => (current?.linkId === link.id ? null : current));
       setState((current) =>
         current.kind === "ready"
@@ -216,7 +232,7 @@ export default function ShareLinkManager({
   }
 
   async function rotate(link: ShareLink) {
-    if (state.kind !== "ready" || actionLatchRef.current) return;
+    if (!playId || state.kind !== "ready" || actionLatchRef.current) return;
     if (
       !window.confirm(
         "새로 발급하면 지금 링크는 바로 비활성화돼요. 계속할까요?",
@@ -226,7 +242,7 @@ export default function ShareLinkManager({
       return;
     setFeedback(null);
     try {
-      const result = await rotateShareLink(link.id);
+      const result = await rotateShareLink(playId, link.id);
       setReadyLink({
         linkId: result.link.id,
         kind: result.link.kind,
@@ -346,6 +362,25 @@ export default function ShareLinkManager({
       </main>
     );
   }
+  if (state.kind === "auth") {
+    return (
+      <main className={styles.shell}>
+        <section className={styles.panel}>
+          <p className={styles.brand}>겹 · 질문팩</p>
+          <h1 ref={headingRef} tabIndex={-1}>
+            다시 로그인해 주세요
+          </h1>
+          <p>계정을 확인하면 저장해 둔 팩과 공유 링크를 다시 볼 수 있어요.</p>
+          <Link
+            className={styles.primaryLink}
+            href="/auth/sign-in?returnTo=%2Fme"
+          >
+            이메일로 로그인
+          </Link>
+        </section>
+      </main>
+    );
+  }
   if (state.kind === "terminal") {
     return (
       <main className={styles.shell}>
@@ -376,7 +411,7 @@ export default function ShareLinkManager({
         <p className={styles.lead}>
           친구가 나를 어떻게 보는지 답할 수 있는 초대를 준비해요.
         </p>
-        <Link className={styles.profileEntry} href="/me">
+        <Link className={styles.profileEntry} href={`/me/profile/${playId}`}>
           내 시선 프로필 →
         </Link>
 

@@ -8,6 +8,13 @@ import {
   type Page,
 } from "@playwright/test";
 
+import {
+  claimCompletedOwner,
+  claimCompletedOwnerAccount,
+  signInOwnerAccount,
+} from "./owner-auth-live-fixture";
+import honestSelfManifest from "../../content/packs/honest-self-v1.json" with { type: "json" };
+
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
 const proxyKey = Buffer.alloc(32, 8).toString("base64url");
@@ -667,6 +674,132 @@ test.describe("live owner flow", () => {
   test.beforeAll(() => setOldFriendActive());
   test.afterAll(() => setOldFriendActive());
 
+  test("keeps multiple packs under one anonymous owner and resumes each pack", async ({
+    browser,
+    context,
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.goto("/play/new?pack=old-friend");
+    await waitForOwnerPlayStart(page);
+    const oldFriendUrl = page.url();
+    await page.locator('button[data-choice="a"]').click();
+    await expect(page.locator('[data-state="saved"]')).toBeVisible();
+    const ownerCookie = (await context.cookies()).find(
+      (cookie) => cookie.name === "__Host-gyeop-owner",
+    );
+
+    await page.goto("/play/new?pack=honest-self");
+    await waitForOwnerPlayStart(page);
+    const honestSelfUrl = page.url();
+    expect(page.url()).not.toBe(oldFriendUrl);
+    await page.locator('button[data-choice="b"]').click();
+    await expect(page.locator('[data-state="saved"]')).toBeVisible();
+    expect(
+      (await context.cookies()).find(
+        (cookie) => cookie.name === "__Host-gyeop-owner",
+      )?.value,
+    ).toBe(ownerCookie?.value);
+
+    await page.goto("/play/new?pack=old-friend");
+    await waitForOwnerPlayStart(page);
+    await expect(page).toHaveURL(oldFriendUrl);
+    await page.getByRole("button", { name: "이전" }).click();
+    await expect(page.locator('button[data-choice="a"]')).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    await page.locator('button[data-choice="a"]').click();
+    for (let position = 2; position <= 10; position += 1) {
+      await page.locator('button[data-choice="a"]').click();
+    }
+    await expect(
+      page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
+    ).toBeVisible({ timeout: 15_000 });
+    const account = await claimCompletedOwnerAccount(page);
+
+    const recoveredContext = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+      extraHTTPHeaders: {
+        ...visitorHeaders,
+        "x-forwarded-for": "198.51.100.220",
+      },
+    });
+    const recoveredPage = await recoveredContext.newPage();
+    await recoveredPage.goto("/play/new?pack=coworker");
+    await waitForOwnerPlayStart(recoveredPage);
+    expect(
+      (await recoveredContext.cookies()).some(
+        (cookie) => cookie.name === "__Host-gyeop-owner",
+      ),
+    ).toBe(true);
+    await recoveredPage.goto("/me");
+    const claimedDraftId = honestSelfUrl.split("/").at(-1)!;
+    const signedOutStatuses = await recoveredPage.evaluate(
+      async ({ cardId, claimedDraftId, completedPlayId }) =>
+        Promise.all([
+          fetch(`/api/plays/${claimedDraftId}`, {
+            credentials: "same-origin",
+          }).then((response) => response.status),
+          fetch(`/api/plays/${claimedDraftId}/answers/${cardId}`, {
+            method: "PUT",
+            credentials: "same-origin",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ choice: "a", currentPosition: 2 }),
+          }).then((response) => response.status),
+          fetch(`/api/plays/${claimedDraftId}/complete`, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "content-type": "application/json" },
+            body: "{}",
+          }).then((response) => response.status),
+          fetch(`/api/me/plays/${completedPlayId}/links`, {
+            credentials: "same-origin",
+          }).then((response) => response.status),
+          fetch(`/api/me/profile?playId=${completedPlayId}`, {
+            credentials: "same-origin",
+          }).then((response) => response.status),
+          fetch(`/api/me/plays/${completedPlayId}/responses?kind=one_to_one`, {
+            credentials: "same-origin",
+          }).then((response) => response.status),
+        ]),
+      {
+        cardId: honestSelfManifest.cards[0].id,
+        claimedDraftId,
+        completedPlayId: account.playId,
+      },
+    );
+    expect(signedOutStatuses).toEqual([401, 401, 401, 401, 401, 401]);
+
+    await recoveredPage.goto(honestSelfUrl);
+    await expect(
+      recoveredPage.getByRole("heading", { name: "다시 로그인해 주세요" }),
+    ).toBeFocused();
+    await expect(
+      recoveredPage.getByRole("link", { name: "이메일로 로그인" }),
+    ).toHaveAttribute("href", "/auth/sign-in?returnTo=%2Fme");
+
+    await signInOwnerAccount(recoveredPage, account.email);
+    await recoveredPage.getByRole("link", { name: "이어서 답하기" }).click();
+    await expect(recoveredPage).toHaveURL(/\/play\/[0-9a-f-]{36}$/);
+    expect(
+      (await recoveredContext.cookies()).some(
+        (cookie) => cookie.name === "__Host-gyeop-owner",
+      ),
+    ).toBe(true);
+    for (let position = 2; position <= 10; position += 1) {
+      await recoveredPage.locator('button[data-choice="a"]').click();
+    }
+    await expect(
+      recoveredPage.getByRole("heading", {
+        name: "내 답변 10개가 저장됐어요",
+      }),
+    ).toBeVisible({ timeout: 15_000 });
+    await recoveredContext.close();
+  });
+
   test("keeps a Secure HttpOnly capability through save, reload, and completion", async ({
     browser,
     context,
@@ -742,10 +875,7 @@ test.describe("live owner flow", () => {
     ).toBeVisible();
     await expect(page.locator("[data-choice]")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "친구에게 공유하기" }).click();
-    await expect(
-      page.getByRole("heading", { name: "공유 링크" }),
-    ).toBeFocused();
+    const claimedPlayId = await claimCompletedOwner(page);
     await page.getByRole("button", { name: "공유 링크 만들기" }).click();
     const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
     expect(
@@ -901,7 +1031,7 @@ test.describe("live owner flow", () => {
         ownerCookie!.value.split(".")[1],
         activeOneToOne!.id,
       ),
-    ).toMatchObject({ status: 404, cacheControl: "private, no-store" });
+    ).toMatchObject({ status: 401, cacheControl: "private, no-store" });
     await missingCookieContext.close();
 
     const crossPlay = await postShareAction(
@@ -929,7 +1059,7 @@ test.describe("live owner flow", () => {
         ownerCookie!.value.split(".")[1],
         activeOneToOne!.id,
       ),
-    ).toMatchObject({ status: 404, cacheControl: "private, no-store" });
+    ).toMatchObject({ status: 401, cacheControl: "private, no-store" });
     await tamperedContext.close();
     expect(readShareActionEventsSince(initialShareActionEvents)).toHaveLength(
       2,
@@ -1372,7 +1502,7 @@ test.describe("live owner flow", () => {
         packVersion: string;
         entrySource: string;
       }>;
-    await page.goto("/me");
+    await page.goto(`/me/profile/${claimedPlayId}`);
     await expect(
       page.getByRole("heading", { name: "내 시선 프로필" }),
     ).toBeFocused();

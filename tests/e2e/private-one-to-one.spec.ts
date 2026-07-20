@@ -90,7 +90,11 @@ async function completedOwner(page: Page) {
 
 async function installPrivateApi(
   page: Page,
-  options: { withdrawn?: boolean; raceWithdrawal?: boolean } = {},
+  options: {
+    withdrawn?: boolean;
+    raceWithdrawal?: boolean;
+    authRequired?: boolean;
+  } = {},
 ) {
   const state = {
     withdrawn: options.withdrawn ?? false,
@@ -110,6 +114,12 @@ async function installPrivateApi(
     ) {
       state.calls.push(`${url.pathname}${url.search}`);
       expect(url.search).toBe("?kind=one_to_one");
+      if (options.authRequired) {
+        return json(route, 401, {
+          code: "OWNER_AUTH_REQUIRED",
+          message: "로그인한 뒤 내 질문팩을 불러올 수 있어요.",
+        });
+      }
       return json(route, 200, {
         responses: state.withdrawn
           ? [
@@ -142,6 +152,21 @@ async function installPrivateApi(
   });
   return state;
 }
+
+test("offers sign-in when private responses require authentication", async ({
+  page,
+}) => {
+  await completedOwner(page);
+  await installPrivateApi(page, { authRequired: true });
+  await page.goto(`/me/plays/${playId}`);
+
+  await expect(
+    page.getByText("다시 로그인하면 저장된 1:1 답변을 볼 수 있어요."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "이메일로 로그인" }),
+  ).toHaveAttribute("href", "/auth/sign-in?returnTo=%2Fme");
+});
 
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });

@@ -123,10 +123,13 @@ export function createShareLink(playId: string, kind: "public" | "one_to_one") {
   return flight;
 }
 
-export async function disableShareLink(linkId: string): Promise<ShareLink> {
+export async function disableShareLink(
+  playId: string,
+  linkId: string,
+): Promise<ShareLink> {
   const response = await fetch(
     `/api/links/${linkPath(linkId)}`,
-    request("PATCH", {}),
+    request("PATCH", { playId }),
   );
   return decodeShareLinkHttpUpdated(await json(response)).link as ShareLink;
 }
@@ -136,12 +139,12 @@ const rotateFlights = new Map<
   Promise<{ link: ShareLink; inviteUrl: string }>
 >();
 
-export function rotateShareLink(linkId: string) {
+export function rotateShareLink(playId: string, linkId: string) {
   const existing = rotateFlights.get(linkId);
   if (existing) return existing;
   const flight = fetch(
     `/api/links/${linkPath(linkId)}/rotate`,
-    request("POST", {}),
+    request("POST", { playId }),
   ).then(
     async (response) =>
       decodeShareLinkHttpCreated(await json(response)) as {
