@@ -75,9 +75,11 @@ fi
 sh -n "$ROOT/scripts/task-harness"
 sh -n "$ROOT/scripts/install-codex-skills"
 sh -n "$ROOT/ops/http-boundary/haproxy-origin-wrapper"
+sh -n "$ROOT/ops/render-entrypoint.sh"
 sh -n "$ROOT/ops/http-boundary/gyeop-loopback-firewall-restore"
 sh -n "$ROOT/ops/http-boundary/gyeop-loopback-firewall-probe"
 sh -n "$ROOT/tests/integration/http-boundary-host.test.sh"
+sh -n "$ROOT/tests/integration/render-deploy.test.sh"
 sh -n "$ROOT/tests/integration/visitor-assignment-upgrade.test.sh"
 sh -n "$ROOT/tests/integration/eligibility-cutover-upgrade.test.sh"
 
