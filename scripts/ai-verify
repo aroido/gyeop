@@ -25,6 +25,12 @@ fi
 
 cd "$ROOT"
 
+VERIFY_SHA="$(git rev-parse HEAD)"
+VERIFY_CLEAN=0
+if [[ -z "$(git status --porcelain=v1)" ]]; then
+  VERIFY_CLEAN=1
+fi
+
 if ! command -v pnpm >/dev/null 2>&1; then
   echo "pnpm is required. Run: corepack enable && pnpm install --frozen-lockfile" >&2
   exit 1
@@ -48,39 +54,32 @@ cleanup() {
 }
 trap cleanup EXIT
 
-harness_tests_required() {
-  local base=""
-  local merge_base=""
-  local candidate=""
-
-  if [[ -n "$(git status --porcelain -- scripts/task-harness.mjs scripts/task-harness.test.mjs)" ]]; then
-    return 0
-  fi
-
-  for candidate in "${GYEOP_VERIFY_BASE_REF:-}" origin/main main; do
-    [[ -n "$candidate" ]] || continue
-    if git rev-parse --verify --quiet "$candidate" >/dev/null; then
-      base="$candidate"
-      break
-    fi
-  done
-  [[ -n "$base" ]] || return 0
-
-  merge_base="$(git merge-base "$base" HEAD)" || return 0
-  ! git diff --quiet "$merge_base" HEAD -- \
-    scripts/task-harness.mjs \
-    scripts/task-harness.test.mjs
-}
-
 python3 "$ROOT/scripts/verify_project.py"
 node --check "$ROOT/scripts/task-harness.mjs"
-if harness_tests_required; then
-  node --test "$ROOT/scripts/task-harness.test.mjs"
+TASK_HARNESS_PATHS=(
+  scripts/ai-verify
+  scripts/task-harness
+  scripts/task-harness.mjs
+  scripts/task-harness.test.mjs
+)
+VERIFY_BASE_REF="${GYEOP_VERIFY_BASE_REF:-origin/main}"
+if git rev-parse --verify --quiet "${VERIFY_BASE_REF}^{commit}" >/dev/null &&
+  VERIFY_BASE_SHA="$(git merge-base HEAD "$VERIFY_BASE_REF")" &&
+  git diff --quiet "$VERIFY_BASE_SHA" -- "${TASK_HARNESS_PATHS[@]}" &&
+  git diff --quiet -- "${TASK_HARNESS_PATHS[@]}" &&
+  git diff --cached --quiet -- "${TASK_HARNESS_PATHS[@]}"; then
+  echo "Task harness regression tests skipped: no harness changes."
 else
-  echo "Skipping unchanged task-harness regression tests."
+  node --test "$ROOT/scripts/task-harness.test.mjs"
 fi
 sh -n "$ROOT/scripts/task-harness"
 sh -n "$ROOT/scripts/install-codex-skills"
+sh -n "$ROOT/ops/http-boundary/haproxy-origin-wrapper"
+sh -n "$ROOT/ops/http-boundary/gyeop-loopback-firewall-restore"
+sh -n "$ROOT/ops/http-boundary/gyeop-loopback-firewall-probe"
+sh -n "$ROOT/tests/integration/http-boundary-host.test.sh"
+sh -n "$ROOT/tests/integration/visitor-assignment-upgrade.test.sh"
+sh -n "$ROOT/tests/integration/eligibility-cutover-upgrade.test.sh"
 
 VALIDATOR="${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py"
 if [[ -f "$VALIDATOR" ]]; then
@@ -110,6 +109,16 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm test:secrets
+node scripts/verify-data-access.mjs
+node scripts/verify-http-boundary.mjs
+node scripts/verify-pack-catalog.mjs
+node scripts/verify-owner-flow.mjs
+node scripts/verify-owner-profile.mjs
+node scripts/verify-private-one-to-one.mjs
+node scripts/verify-share-links.mjs
+node scripts/verify-visitor-response.mjs
+node --test tests/integration/http-boundary.test.mjs
+tests/integration/http-boundary-host.test.sh
 
 if ! pnpm exec supabase status --output json >/dev/null 2>&1; then
   SUPABASE_STARTED_BY_VERIFY=1
@@ -118,9 +127,34 @@ if ! pnpm supabase:start >/dev/null; then
   echo "Local Supabase failed to start." >&2
   exit 1
 fi
+tests/integration/visitor-assignment-upgrade.test.sh
+tests/integration/eligibility-cutover-upgrade.test.sh
 pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
 pnpm test:db
-pnpm build
-pnpm test:e2e --project=mobile-chromium
+pnpm supabase:lint
+node scripts/verify-supabase-types.mjs
+node --test tests/integration/data-access.test.mjs
+node --test tests/integration/pack-catalog.test.mjs
+node --test tests/integration/pack-publication-concurrency.test.mjs
+node --test tests/integration/owner-play-session.test.mjs
+node --test tests/integration/owner-profile-session.test.mjs
+node --test tests/integration/owner-play-concurrency.test.mjs
+node --test tests/integration/share-link-concurrency.test.mjs
+node --test tests/integration/visitor-response-concurrency.test.mjs
+node --test tests/integration/visitor-withdrawal-concurrency.test.mjs
+env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SECRET_KEY pnpm build
+node --test tests/integration/pack-runtime.test.mjs
+GYEOP_E2E_PORT=3110 pnpm test:e2e:live
+GYEOP_E2E_PORT=3110 pnpm test:e2e --project=mobile-chromium
+
+if [[ "$VERIFY_CLEAN" == "1" ]] &&
+  [[ "$(git rev-parse HEAD)" == "$VERIFY_SHA" ]] &&
+  [[ -z "$(git status --porcelain=v1)" ]]; then
+  VERIFY_MARKER_DIR="$(git rev-parse --path-format=absolute --git-common-dir)/gyeop-full-verify"
+  mkdir -p "$VERIFY_MARKER_DIR"
+  touch "$VERIFY_MARKER_DIR/$VERIFY_SHA"
+else
+  echo "Full verification passed, but its SHA was not cached because the checkout changed or was dirty."
+fi
 
 echo "GYEOP full verification passed."

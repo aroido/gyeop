@@ -1,0 +1,15 @@
+[Unit]
+Description=GYEOP disposable HAProxy
+Requires=gyeop-loopback-firewall.service
+After=gyeop-loopback-firewall.service
+
+[Service]
+Type=notify
+EnvironmentFile=/etc/gyeop/origin.env
+ExecStart=/usr/local/libexec/haproxy-origin-wrapper -Ws -f /etc/haproxy/gyeop.cfg -p /run/haproxy-gyeop.pid
+ExecReload=/bin/kill -USR2 $MAINPID
+KillMode=mixed
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

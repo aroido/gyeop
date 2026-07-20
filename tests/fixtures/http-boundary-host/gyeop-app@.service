@@ -1,0 +1,14 @@
+[Unit]
+Description=GYEOP disposable %i app
+Requires=gyeop-loopback-firewall.service
+After=gyeop-loopback-firewall.service
+
+[Service]
+Type=simple
+User=gyeop-app
+Group=gyeop-app
+EnvironmentFile=/etc/gyeop/%i/http-boundary.env
+RuntimeDirectory=gyeop
+RuntimeDirectoryMode=0750
+ExecStart=/usr/local/libexec/gyeop-dummy-app ${GYEOP_APP_PORT}
+Restart=on-failure

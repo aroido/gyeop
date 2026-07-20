@@ -1,0 +1,401 @@
+.shell {
+  --lime: #dfff00;
+  --ink: #050505;
+  --blue: #315cff;
+
+  display: grid;
+  width: 100%;
+  min-height: 100svh;
+  padding: 1rem 0.85rem 1.25rem;
+  place-items: center;
+  overflow-x: clip;
+  background: var(--ink);
+  color: #fff;
+}
+
+.play,
+.complete,
+.message {
+  width: min(100%, 30rem);
+}
+
+.navHeader {
+  display: grid;
+  grid-template-columns: minmax(4.25rem, auto) 1fr minmax(4.25rem, auto);
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.navHeader button,
+.messageActions button,
+.homeButton,
+.profileButton,
+.completionRetry,
+.dialogActions button {
+  min-height: 2.75rem;
+  border: 1px solid #6a6a6a;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.navHeader button:disabled {
+  opacity: 0.35;
+}
+
+.brand {
+  margin: 0;
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progressHeader {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.progressHeader > span:first-child {
+  color: #bdbdbd;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.saveChip {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid #626262;
+  border-radius: 999px;
+  background: #191919;
+  color: #d8d8d8;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+button.saveChip {
+  min-height: 2.75rem;
+  border-color: #ff7a70;
+  color: #ffd3cf;
+  text-decoration: underline;
+  text-underline-offset: 0.16rem;
+}
+
+.saveChip[data-state="saved"] {
+  border-color: #7ea274;
+  color: #d7ffd0;
+}
+
+.progress {
+  display: block;
+  width: 100%;
+  height: 0.42rem;
+  margin: 0.15rem 0 1.15rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  appearance: none;
+}
+
+.progress::-webkit-progress-bar {
+  background: #303030;
+}
+
+.progress::-webkit-progress-value {
+  border-radius: inherit;
+  background: var(--lime);
+}
+
+.progress::-moz-progress-bar {
+  border-radius: inherit;
+  background: var(--lime);
+}
+
+.questionCard {
+  padding: clamp(1.05rem, 4.5vw, 1.4rem);
+  border: 1px solid #fff;
+  border-radius: 1rem;
+  background: var(--lime);
+  box-shadow: 0.35rem 0.35rem 0 var(--blue);
+  color: var(--ink);
+  transform: rotate(-0.35deg);
+}
+
+.questionCard h1,
+.complete h1,
+.message h1 {
+  margin: 0;
+  font-size: clamp(1.7rem, 8vw, 2.5rem);
+  font-weight: 950;
+  line-height: 1.08;
+  letter-spacing: -0.065em;
+  word-break: keep-all;
+}
+
+.questionCard h1:focus,
+.complete h1:focus,
+.message h1:focus {
+  outline: none;
+}
+
+.choices {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: clamp(1.25rem, 5vh, 2rem);
+}
+
+.choices button {
+  display: flex;
+  width: 100%;
+  min-height: 4rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--ink);
+  border-radius: 0.65rem;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 850;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.choices button > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 1.85rem;
+  height: 1.85rem;
+  place-items: center;
+  border-radius: 0.45rem;
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.choices button[aria-pressed="true"] {
+  background: var(--lime);
+  box-shadow: 0.18rem 0.18rem 0 var(--blue);
+}
+
+.choices button:disabled {
+  opacity: 0.7;
+}
+
+.navHeader button:focus-visible,
+.saveChip:focus-visible,
+.choices button:focus-visible,
+.messageActions button:focus-visible,
+.homeButton:focus-visible,
+.profileButton:focus-visible,
+.completionRetry:focus-visible,
+.dialogActions button:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}
+
+.completionStatus {
+  margin: 1.1rem 0 0;
+  color: #d8d8d8;
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.completionRetry {
+  display: block;
+  width: 100%;
+  margin-top: 1rem;
+  border-color: #fff;
+}
+
+.complete,
+.message {
+  padding: 1rem;
+  border: 1px solid #454545;
+  border-top: 0.6rem solid var(--lime);
+  border-radius: 1rem;
+  background: var(--ink);
+  color: #fff;
+}
+
+.complete .brand,
+.message .brand {
+  text-align: left;
+}
+
+.complete h1,
+.message h1 {
+  margin-top: 0.65rem;
+}
+
+.completeCopy,
+.message > p:not(.brand, .error) {
+  margin: 0.85rem 0 1.25rem;
+  color: #bdbdbd;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.summary {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.summary li {
+  display: grid;
+  grid-template-columns: 1.75rem 1fr;
+  gap: 0.65rem;
+  padding: 0.8rem;
+  border-radius: 0.65rem;
+  background: #fff;
+  color: var(--ink);
+}
+
+.summary li > span {
+  display: grid;
+  width: 1.75rem;
+  height: 1.75rem;
+  place-items: center;
+  border-radius: 0.45rem;
+  background: var(--ink);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.summary p,
+.summary strong {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.summary strong {
+  display: block;
+  margin-top: 0.2rem;
+}
+
+.homeButton {
+  width: 100%;
+  margin-top: 1rem;
+  border-color: #fff;
+}
+
+.profileButton {
+  width: 100%;
+  margin-top: 0.65rem;
+  border-color: var(--lime);
+  color: var(--lime);
+}
+
+.messageActions {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.messageActions button:last-child {
+  border-color: var(--lime);
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.error {
+  color: #ffd3cf;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.loading {
+  margin: 0;
+  color: #d8d8d8;
+  font-size: 0.88rem;
+  font-weight: 850;
+}
+
+.dialog {
+  width: min(calc(100% - 2rem), 26rem);
+  padding: 1rem;
+  border: 1px solid #fff;
+  border-radius: 1rem;
+  background: #111;
+  color: #fff;
+}
+
+.dialog::backdrop {
+  background: rgb(0 0 0 / 72%);
+}
+
+.dialog h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.04em;
+}
+
+.dialog p {
+  margin: 0.7rem 0 1rem;
+  color: #c8c8c8;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.dialogActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+
+.dialogActions button:last-child {
+  border-color: var(--lime);
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 21rem) {
+  .shell {
+    padding-inline: 0.7rem;
+  }
+
+  .questionCard h1 {
+    font-size: 1.65rem;
+  }
+
+  .choices {
+    margin-top: 1.1rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .questionCard {
+    transition: opacity 120ms ease-out;
+  }
+}

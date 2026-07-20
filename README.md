@@ -63,7 +63,8 @@ pnpm install --frozen-lockfile
 pnpm supabase:start
 pnpm exec supabase status -o env \
   --override-name api.url=NEXT_PUBLIC_SUPABASE_URL \
-  --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_ANON_KEY > .env.local
+  --override-name auth.anon_key=NEXT_PUBLIC_SUPABASE_ANON_KEY \
+  --override-name auth.secret_key=SUPABASE_SECRET_KEY > .env.local
 node --input-type=module -e 'import { randomBytes } from "node:crypto"; import { appendFileSync } from "node:fs"; const key=randomBytes(32).toString("base64url"); appendFileSync(".env.local", `ACCOUNT_DELETE_REAUTH_KEYRING=${JSON.stringify({local:key})}\nACCOUNT_DELETE_REAUTH_ACTIVE_VERSION=local\n`)'
 pnpm dev
 ```
@@ -77,4 +78,4 @@ pnpm exec playwright install chromium
 ./scripts/run-ai-verify --mode full
 ```
 
-full verify는 Docker를 확인하고 Supabase start·reset·pgTAP, format, lint, typecheck, unit test, production build, mobile Chromium E2E를 실행한다. 검증 전에 local stack이 없었을 때만 종료 시 stack을 정리한다.
+full verify는 Docker를 확인하고 Supabase start·reset·lint·pgTAP, server-only 접근 정적 검사, anon key 우회·경쟁 rate-limit integration, format, lint, typecheck, unit test, production build, mobile Chromium E2E를 실행한다. 검증 전에 local stack이 없었을 때만 종료 시 stack을 정리한다.

@@ -2001,11 +2001,20 @@ function assertFilesUnchanged(snapshot, label) {
   }
 }
 
+function fullVerifyMarker(sha) {
+  return path.join(gitCommonDir(), "gyeop-full-verify", sha);
+}
+
 function verifyCheckout(expected, label, guardedFiles = []) {
   const before = checkoutState();
   assertCheckout(before, expected, `${label} before verify`);
   const guardedSnapshot = fileSnapshot(guardedFiles);
-  run("./scripts/run-ai-verify", ["--mode", "full"], { stdio: "inherit" });
+  const marker = fullVerifyMarker(before.sha);
+  if (fs.existsSync(marker)) {
+    console.log(`Reusing full verification for ${before.sha}.`);
+  } else {
+    run("./scripts/run-ai-verify", ["--mode", "full"], { stdio: "inherit" });
+  }
   const after = checkoutState();
   assertCheckout(
     after,
@@ -2013,6 +2022,11 @@ function verifyCheckout(expected, label, guardedFiles = []) {
     `${label} after verify`,
   );
   assertFilesUnchanged(guardedSnapshot, label);
+  if (!fs.existsSync(marker)) {
+    throw new Error(
+      `full verification passed without recording SHA ${before.sha}`,
+    );
+  }
   return before.sha;
 }
 

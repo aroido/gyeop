@@ -1,0 +1,62 @@
+.shell {
+  display: grid;
+  min-height: 100svh;
+  padding: max(1rem, env(safe-area-inset-top)) 1rem
+    max(1rem, env(safe-area-inset-bottom));
+  place-items: center;
+  overflow-x: clip;
+  background: #050505;
+  color: #fff;
+}
+
+.card {
+  width: min(100%, 34rem);
+  padding: clamp(1.1rem, 5vw, 1.6rem);
+  border: 1px solid #fff;
+  border-top: 0.65rem solid #dfff00;
+  border-radius: 1rem;
+  background: #0d0d0d;
+}
+
+.brand {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.card h1 {
+  margin: 0.7rem 0 1.2rem;
+  font-size: clamp(2rem, 10vw, 3rem);
+  line-height: 1.06;
+  letter-spacing: -0.07em;
+  word-break: keep-all;
+}
+
+.card h2 {
+  margin: 1.5rem 0 0.45rem;
+  font-size: 1rem;
+}
+
+.card p:not(.brand) {
+  margin: 0;
+  color: #c5c5c5;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.card a {
+  display: grid;
+  min-height: 3rem;
+  margin-top: 1.5rem;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: #dfff00;
+  color: #050505;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.card a:focus-visible {
+  outline: 3px solid #315cff;
+  outline-offset: 3px;
+}

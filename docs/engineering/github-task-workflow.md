@@ -137,9 +137,11 @@ scripts/task-harness qa-check docs/temp/qa/issue-<number>.md
 scripts/task-harness pr <issue-number>
 ```
 
+개발 중에는 변경 범위의 빠른 테스트만 실행하고, 전체 검증은 최종 clean commit에서 PR 직전에 한 번 실행한다. 성공한 전체 검증은 shared Git directory에 commit SHA marker로 기록된다. `pr`과 `merge`는 현재 HEAD와 marker SHA가 정확히 같을 때 결과를 재사용하고, marker가 없을 때만 안전하게 전체 검증을 한 번 실행한다. 제품 변경에서 task harness 파일이 바뀌지 않았으면 full verify의 장시간 harness regression suite도 생략한다.
+
 `resume`·`pr`·`merge`·`close`·`cleanup`은 설정된 GitHub repository와 local `origin`의 모든 fetch·push URL에서 파싱한 repository가 정확히 같아야 시작한다. fork, 별도 push URL, 잘못된 환경 변수로 GitHub 증거와 git mutation 대상이 갈리면 fail-closed한다.
 
-`pr`은 열린 이슈에 정확히 `status:qa` 하나가 있고 blocked provenance가 없는지 full verify 전·후, push 직전, PR 생성 직전, ready-for-review write 직전에 다시 확인한다. 최초 검사가 실패하면 verify·push·GitHub write를 실행하지 않고, ready 직전 drift면 draft를 닫지 않고 남겨 재실행으로 복구한다. 이어 예상 branch, clean working tree, spec·QA gate를 검사한다. 전체 검증 전후의 branch, working tree, HEAD와 QA artifact 원문이 같아야 한다. 전체 검증 전과 직후 push 전에 예상 base/head의 기존 open PR 후보를 각각 조회해 0건 또는 정확히 한 건인지, 후보가 있으면 같은 PR인지와 repository·base/head·현재 remote SHA를 검사한다. PR 본문은 첫 line 전체가 exact `Closes #<issue>`이고 colon 형식을 포함한 그 밖의 GitHub closing keyword reference가 없어야 하며, 통과한 HEAD를 `- 검증 HEAD: <sha>`로 기록한다. 후보가 추가·교체되거나 둘 이상이거나 어느 조건이라도 다르면 local upstream과 원격을 변경하지 않고 실패한다. origin fetch·push URL도 push 직전에 다시 검사한다. 통과한 SHA만 push하고 remote head를 대조한 뒤 기존 PR을 재조회하거나 새 draft PR을 만든다. 검증된 draft만 ready로 전환하고 다시 조회해 non-draft 상태를 확인한다. ready 전환 성공 여부를 네트워크 오류로 확정할 수 없으면 PR을 닫지 않고 실패해 다음 재실행에서 복구한다. 유효한 기존 non-draft PR은 재실행 성공으로 반환한다.
+`pr`은 열린 이슈에 정확히 `status:qa` 하나가 있고 blocked provenance가 없는지 full verify marker 확인 전·후, push 직전, PR 생성 직전, ready-for-review write 직전에 다시 확인한다. 최초 검사가 실패하면 verify·push·GitHub write를 실행하지 않고, ready 직전 drift면 draft를 닫지 않고 남겨 재실행으로 복구한다. 이어 예상 branch, clean working tree, spec·QA gate를 검사한다. exact HEAD marker가 없을 때만 전체 검증을 실행하며, 확인 전후의 branch, working tree, HEAD와 QA artifact 원문이 같아야 한다. PR 본문은 첫 line 전체가 exact `Closes #<issue>`이고 colon 형식을 포함한 그 밖의 GitHub closing keyword reference가 없어야 하며, 통과한 HEAD를 `- 검증 HEAD: <sha>`로 기록한다. 후보가 추가·교체되거나 둘 이상이거나 어느 조건이라도 다르면 local upstream과 원격을 변경하지 않고 실패한다. origin fetch·push URL도 push 직전에 다시 검사한다. 검증된 SHA만 push하고 remote head를 대조한 뒤 기존 PR을 재조회하거나 새 draft PR을 만든다. 검증된 draft만 ready로 전환하고 다시 조회해 non-draft 상태를 확인한다. ready 전환 성공 여부를 네트워크 오류로 확정할 수 없으면 PR을 닫지 않고 실패해 다음 재실행에서 복구한다. 유효한 기존 non-draft PR은 재실행 성공으로 반환한다.
 
 이슈 worktree에서 다음 명령을 실행한다. 아직 병합되지 않은 PR의 `merge`는 CI 대기 전·CI 통과 후·merge write 직전에 열린 이슈의 exact `status:qa`와 blocked provenance 부재를 확인한다. 이미 병합된 PR 재실행만 repository·issue 관계, head SHA, merge SHA를 읽어 검증한 뒤 이슈가 닫혀 있어도 write 없이 `alreadyMerged: true`로 성공할 수 있다. 이 예외로 branch를 복원하거나 다른 gate를 건너뛰지 않는다.
 
@@ -171,7 +173,7 @@ Git은 worktree registry, ref, branch config, working tree 파일, remote 설정
 - Spec은 열 시작 위치의 `Status`, `Reviewer Agent`, `Review Status`, `P0/P1 Findings`가 각각 정확히 한 번이고 값이 `Reviewed`, 유효 reviewer, `PASS`, `0`이어야 한다.
 - QA는 열 시작 위치의 `Reviewer Agent`, `Status`, `P0/P1 Findings`가 각각 정확히 한 번이고 값이 유효 reviewer, `PASS`, `0`이어야 한다. focused check 또는 manual evidence를 검증 섹션에 기록한다.
 - 이슈 연결 증거는 본문 첫 line 전체가 정확히 `Closes #<issue-number>`이고 그 밖의 GitHub closing keyword reference가 없어야 한다.
-- PR full verification 또는 merge 전후 QA artifact 원문이 달라지거나 QA gate가 다시 실패하면 진행하지 않는다.
+- PR full verification marker 확인 또는 merge 전후 QA artifact 원문이 달라지거나 QA gate가 다시 실패하면 진행하지 않는다.
 - `./scripts/run-ai-verify --mode full`이 실패하면 완료로 보고하지 않는다.
 - CI 결과가 없거나 pending·실패 결과가 하나라도 있으면 병합하지 않는다.
 - 병합된 PR과 이슈의 연결을 확인할 수 없으면 이슈를 닫거나 worktree·branch를 정리하지 않는다.

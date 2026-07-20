@@ -1,0 +1,10 @@
+[Unit]
+Description=Probe GYEOP %i loopback owner boundary
+Requires=gyeop-app@%i.service gyeop-loopback-firewall.service
+After=gyeop-app@%i.service gyeop-loopback-firewall.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/gyeop/%i/http-boundary.env
+ExecStart=/usr/local/libexec/gyeop-loopback-firewall-probe %i
+RemainAfterExit=yes

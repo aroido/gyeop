@@ -1,5 +1,66 @@
 # 제품 의사결정 기록
 
+## 2026-07-20 — 링크·사용자 데이터의 보관·완전 삭제 상한 확정
+
+- 결정: public link 30일, 1:1 link 7일 또는 첫 제출, 비로그인 owner inactivity 7일, visitor draft activity 24시간, submitted response와 로그인 owner inactivity 1년을 기본 보유 상한으로 정한다. 보유 종료부터 운영 DB hard-delete는 24시간, backup 잔존은 hard-delete부터 30일을 넘지 않는다. Auth adoption grace는 7일이고 owner-request·unclaimed Auth provider 삭제는 eligible 시점부터 24시간 안에 완료한다.
+- 이유: 같은-browser 비공개 핵심 루프의 복구 약속은 지키되 목적이 끝난 답변·token·식별자를 무기한 남기지 않고, 후속 schema·cleanup·계정 삭제·알림 구현이 공유할 하나의 수치 계약이 필요하다.
+- 결과: 철회 tombstone은 최소 4개 필드만 30일 유지하고, raw analytics는 30일, 비식별 집계는 1년 유지한다. rate-limit bucket은 window 종료+24시간에 cleanup eligible이 되고 다음 24시간 안에 삭제한다. notification은 terminal 직접 ID 제거→24시간 최소 tombstone→payload row→key reader 순서로 정리한다. 승인 일일 peak와 2배 staging fixture, reason별 overdue 0, 50% 경보·70% 재검토·4시간 catch-up을 release 기준으로 삼는다. 상세 SSOT는 `docs/product/data-retention-and-deletion-policy.md`다.
+- 출시 조건: 이 결정은 비공개 MVP의 잠정 제품 승인이다. 현행 한국 개인정보 법률 서면 검토, provider backup 30일 증빙, 2배 peak cleanup·격리 restore drill, 공개 privacy 연락 채널이 없으면 production beta를 열지 않는다.
+
+## 2026-07-19 — 대한민국 우선 베타는 만 19세 이상만 참여
+
+- 결정: private MVP 모집과 production beta의 주인·무가입 방문자를 모두 `대한민국에서 이용하는 만 19세 이상`으로 제한한다. 보호자 동의 흐름을 제공하지 않고 생년월일·신분증·보호자 정보·IP geolocation을 수집하지 않으며, 새 play/response 생성 직전 exact 자기확인만 받는다.
+- 이유: 개인정보 보호법 제22조의2와 현행 시행령 제17조의2는 만 14세 미만 아동 동의에 법정대리인 확인을 요구하고, 민법 제4조는 19세를 성년으로 정한다. 관계 맥락과 타인에 대한 판단을 외부 공유하는 초기 서비스에서는 법적 미성년자 전체를 의도적으로 제외하는 편이 더 보수적이며, 별도 보호자 개인정보 처리 시스템을 만들지 않고 핵심 재미를 검증할 수 있다.
+- 결과: #16은 owner·visitor 생성 API에서 `eligibilityConfirmed: true`를 domain write보다 먼저 강제하고 정책 이전 row를 자동 승계하지 않는다. 신고된 미성년자 데이터는 안전하게 특정한 때부터 live 72시간, hard delete부터 backup 30일 상한을 적용하며 #7은 backup 밖 최소 45일 삭제 ledger와 격리 restore 재삭제를 집행한다. 현행 한국 법률 서면 검토, #16, #7, privacy 연락 채널 중 하나라도 없으면 production beta를 열지 않는다. 상세 SSOT는 `docs/product/age-and-minor-policy.md`다.
+
+## 2026-07-19 — 1:1 응답은 두 참여자에게만 개별 비교 허용
+
+- 결정: 완료된 1:1 응답 한 건의 카드 비교를 해당 링크를 만든 현재 play 주인과 만료 전 동일 response session을 가진 방문자에게만 제공한다. 주인은 owner capability로, 방문자는 response capability로 각각 검증하며 어느 한쪽 capability도 다른 API의 대체물로 인정하지 않는다.
+- 이유: 1:1 공유의 보상은 두 사람이 서로 다르게 본 답을 함께 확인하는 데 있다. visitor만 비교를 보면 링크를 보낸 주인의 보상이 끊기지만, 이름이나 공개 집계 없이 한 건 단위로 열면 핵심 재미를 보존하면서 추적 위험을 제한할 수 있다.
+- 결과: 2026-07-18 결정 중 “방문자 본인의 즉시 비교에만”이라는 제한은 이 결정으로 대체한다. 1:1 응답은 `/me` 전체 시선·관계 레이어·질문 표본·공개 프로필에 계속 포함하지 않으며, 철회 즉시 양쪽 상세 선택을 제거하고 사용된 링크는 닫힌 상태로 유지한다.
+
+## 2026-07-19 — 공식 팩 제목을 상대의 시선으로 통일
+
+- 결정: 비공개 MVP 공식 팩의 사용자 노출 제목을 `오래 본 너의 시선`, `처음 만난 너의 시선`, `같이 일한 너의 시선`, `가까운 너의 시선`로 변경한다.
+- 이유: 기존 제목은 관계 분류, 자기 질문, 상대 질문이 섞여 한 서비스의 팩처럼 보이지 않았다. 네 제목을 모두 `관계가 다른 상대에게 나는 어떻게 보이는가`로 통일하면 누구에게 공유할 팩인지와 비교 보상을 함께 전달할 수 있다.
+- 결과: template title과 이를 사용하는 홈·공유·비교·프로필 문구만 바꾼다. slug, version, 카드 40장, Signature, 관계·민감도·기본 공유 권장값은 유지하며, 제목은 정답·친밀도·점수를 암시하지 않는다.
+
+## 2026-07-19 — 비공개 MVP에서 검수된 공식 팩 4개 활성화
+
+- 결정: 기존 `old-friend-v1`과 이슈 #54에서 사람 검수를 마친 `first-impression-v1`, `coworker-v1`, `honest-self-v1`을 비공개 MVP 홈에서 함께 활성화한다. 제목은 각각 `우리 아직 통할까?`, `나, 첫눈에 어땠어?`, `같이 일할 때 나는?`, `가까운 사람만 아는 나`로 고정한다.
+- 이유: 단일 팩으로 서버 저장·공유·비교·프로필 루프가 완성됐으므로, 이제 같은 핵심 루프가 관계와 민감도가 다른 팩에서도 재미있고 다시 공유되는지 빠르게 비교해야 한다. 새 질문을 만들지 않고 이미 검수된 30장을 재사용해 콘텐츠 변수만 넓힌다.
+- 결과: 2026-07-15의 `P0 첫 공식 팩은 오래된 친구팩 하나로 시작`과 2026-07-18의 `오래된 친구팩 private MVP 진입 활성화` 중 단일 팩 제한은 이 결정으로 대체한다. 네 팩 활성화는 비공개 테스트 진입 승인일 뿐 public/production beta 승인이 아니며, 로그인·계정 귀속·공개 팩 탐색·새 질문 생성은 계속 제외한다.
+
+## 2026-07-18 — 비공개 최소 프로필은 공개 링크 시선만 누적
+
+- 결정: 비공개 재미 검증의 `/me` 전체 시선 수와 질문별 A/B 표본은 `submitted` 공개 링크 응답만 live query로 집계한다. 1:1 응답은 방문자 본인의 즉시 비교에만 남기고 private 프로필 누적에서도 제외한다.
+- 이유: 지금 검증할 세 번째 가설은 공개 링크로 도착한 익명 시선이 쌓여 재공유를 만드는지다. 1:1 owner 비교, 관계별 이중 threshold, 별도 aggregate를 함께 열면 핵심 재공유 동기와 구현 범위가 섞인다.
+- 결과: `/me`는 셀프 10장, 공개 링크 완료 수, 카드별 3표본 threshold, same-browser 새 시선 count watermark, 시선 1건 이상에서 같은 owner play로 돌아가는 단일 재공유 CTA만 제공한다. profile 재공유 진입은 fixed `profile_reshare` code로만 방향성을 측정하고 raw link secret을 복원하지 않는다. 공개 프로필·관계 레이어·1:1 포함은 production beta 재승인 또는 후속 이슈 전에는 열지 않는다.
+
+## 2026-07-18 — 오래된 친구팩 private MVP 진입 활성화
+
+- 결정: 사람 검수를 마친 `old-friend-v1`의 카드·문구·version은 그대로 두고 manifest와 generated seed의 `active`를 `true`로 전환해 비공개 재미 검증의 신규 owner 진입을 연다. 셀프 A/B 조작은 44px 이상 버튼과 키보드를 필수로 하고 swipe는 후속 interaction 검증으로 미룬다.
+- 이유: 지금은 `주인 10장 → 신뢰할 수 있는 저장 → 완료`가 재미있는지 실제 server-backed 화면에서 확인해야 한다. 여러 팩, swipe gesture, public beta rollout을 함께 열면 핵심 가설과 이탈 원인을 구분하기 어렵다.
+- 결과: 홈의 유일한 owner CTA는 `/play/new?pack=old-friend`이고 #17 same-browser capability로만 create/resume한다. `active=true`는 private MVP create gate 승인이지 public beta 배포 승인이 아니다. 다른 팩은 inactive이며 swipe는 핵심 loop 결과 뒤 별도 결정한다.
+
+## 2026-07-18 — 비공개 재미 검증은 무이메일 same-browser owner capability로 진행
+
+- 결정: Project #5의 비공개 재미 검증에서는 이메일·표시 이름·전화번호·Supabase Auth owner 계정을 만들지 않는다. owner play 하나에 결합한 256-bit 관리 secret을 `Secure`·`HttpOnly`·`SameSite=Lax` cookie에만 두고 DB에는 domain-separated hash만 저장하며, 같은 play id+hash를 검증한 RPC만 7일 inactivity window를 갱신한다.
+- 이유: 지금 확인할 제품 가설은 계정 복구가 아니라 `주인 10장 → 공유 → 친구 비교·새 주인 전환 → 누적 프로필 재공유`가 실제로 재미있는지다. 이메일·삭제 worker·알림 운영은 이 검증보다 크고 느린 선행 조건을 만든다.
+- 결과: 2026-07-15의 `P0 계정 연결과 알림은 이메일`, `P0 draft 귀속`, `P0 production beta owner 계정 삭제` 결정은 폐기하지 않되 현재 비공개 재미 검증에는 적용하지 않는다. 세 결정은 개인정보·보관·운영 정책과 함께 `production beta 재승인`을 통과할 때만 다시 활성화한다. cookie 유실·만료·로그아웃 뒤 cross-device·이메일·운영자 복구는 제공하지 않는다.
+
+## 2026-07-18 — 비공개 검증용 오래된 친구팩 v1 동결
+
+- 결정: #46에서 검수한 `old-friend-v1-draft`의 카드 id·순서·주인 질문·A/B 선택지를 유지하고, 자연스러운 방문자 질문을 짝지어 `old-friend-v1` 검증 계약으로 동결한다.
+- 이유: 새 질문을 더 만드는 대신 이미 로컬 플레이를 통과한 한 팩으로 주인 공유, 방문자 비교·전환, 프로필 재공유의 재미를 먼저 확인한다.
+- 결과: 당시 `old-friend-v1`은 `active=false`로 동결했다. 이 activation gate는 위의 2026-07-18 private MVP 진입 승인으로 supersede됐지만, public beta 배포는 여전히 별도 rollout 승인이 필요하다.
+
+## 2026-07-17 — 팩 선택 후 첫 질문 즉시 표시
+
+- 결정: 팩을 선택하면 별도 개봉 대기 화면이나 고정 타이머 없이 첫 질문과 선택지를 즉시 표시한다.
+- 이유: 1~2초 개봉 연출이 실제 콘텐츠 진입을 늦추고 개발 서버의 첫 컴파일 시간과 겹쳐 체감 대기를 키웠다.
+- 결과: 메인의 팩 카드 자체가 개봉 맥락을 담당하며, 셀프 응답 화면은 진행률과 첫 A/B 질문으로 바로 시작한다.
+
 ## 2026-07-15 — 모바일 웹 우선
 
 - 결정: P0는 모바일 웹으로 만들고 방문자 응답은 앱 출시 후에도 웹에서 가능하게 유지한다.
@@ -17,6 +78,18 @@
 - 결정: 팩 주인이 공유 전에 관계를 지정하지 않는다.
 - 이유: 공개 링크는 친구뿐 아니라 온라인 친구와 SNS 팔로워도 참여할 수 있다.
 - 결과: 방문자가 관계와 알게 된 시점을 직접 선택하고 관계별 프로필 집계에 사용한다.
+
+## 2026-07-18 — P0 관계·알게 된 시점 code와 문구
+
+- 결정: P0 방문자 관계는 `old_friend|school_friend|coworker|romantic|family|online_friend|social_follower|other` exact 8개 code를 사용한다. 알게 된 시점은 현재 시각 기준 `<1`, `>=1 <3`, `>=3 <5`, `>=5 <10`, `>=10`, `unknown`의 비중첩 6개 code를 사용한다.
+- 이유: 관계·시점은 장기 집계 key이므로 사용자 문구와 stable code를 분리하고, 경계가 겹치지 않아야 같은 선택을 일관되게 해석할 수 있다.
+- 결과: DB와 analytics에는 code만 저장하고 한글 label은 `docs/product/question-pack-spec.md` §7의 검수 registry에서 derive한다. 저장된 시점 code는 선택 당시 구간이며 시간이 지나도 자동 변경하지 않는다. 기존 #9의 code·label 확정 범위는 #22에 흡수한다.
+
+## 2026-07-18 — 방문자 필수 카드는 최소 표본 정렬과 결정적 hash로 배정
+
+- 결정: Signature 1장을 제외한 필수 2장은 같은 팩 플레이의 제출된 필수 카드 표본 수 오름차순으로 고른다. 동률은 `response ID + card ID`의 domain-separated SHA-256 순서로 풀고, 최소 표본 그룹이 1장뿐이면 그 카드와 차순위 최소 표본 카드 1장을 사용한다.
+- 이유: 비-Signature 카드가 9장이라 최소 표본 그룹이 1장만 남을 수 있으므로 “최소 그룹 안에서 2장”만으로는 항상 정확히 2장을 배정할 수 없다. 완전 무작위 대신 표본 우선과 같은 response 재현성을 동시에 보장해야 한다.
+- 결과: draft·withdrawn·invalid는 표본에서 제외하고 submitted 필수 assignment만 센다. 제출 뒤 session이 만료되거나 source link가 비활성화되어도 과거 표본은 유지한다. 배정 결과는 response에 저장하며 reload·재시도 때 다시 계산하지 않는다.
 
 ## 2026-07-15 — 방문자를 다음 주인으로 전환
 
@@ -82,4 +155,4 @@
 
 - 결정: 인증된 팩 주인이 자신의 계정과 연결된 live application 데이터를 삭제할 수 있어야 production beta를 연다.
 - 이유: 셀프 응답, 공유 링크, 방문자 응답이 한 owner의 팩 플레이에 연결되므로 계정만 비활성화하고 내용을 남기면 삭제 기대를 충족하지 못한다.
-- 결과: 정확한 데이터별 보관 기간과 backup 완전 삭제 시한은 별도 정책 결정으로 확정한다. 이 결정 전 계정 삭제 구현과 production release는 차단 상태를 유지한다.
+- 결과: 당시 미정이던 데이터별 보관 기간과 backup 완전 삭제 시한은 2026-07-20 결정과 `docs/product/data-retention-and-deletion-policy.md`로 확정했다. 계정 삭제 구현은 그 수치를 따르고 production release는 법률·provider·restore 증거가 마련될 때까지 차단한다.

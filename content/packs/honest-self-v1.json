@@ -1,0 +1,106 @@
+{
+  "slug": "honest-self",
+  "version": "honest-self-v1",
+  "title": "가까운 너의 시선",
+  "targetRelationship": "close_relationship",
+  "sensitivity": "medium",
+  "active": true,
+  "presentation": {
+    "moodLabel": "차분한 솔직함",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "one_to_one",
+    "coverRecipe": "honest-self-card-v1"
+  },
+  "cards": [
+    {
+      "id": "busy-mind",
+      "position": 1,
+      "ownerPrompt": "마음이 복잡한 날 나는?",
+      "visitorPrompt": "마음이 복잡한 날 이 사람은?",
+      "optionA": "누군가에게 말하며 정리한다",
+      "optionB": "혼자 시간을 보내며 정리한다",
+      "isSignature": true
+    },
+    {
+      "id": "compliment",
+      "position": 2,
+      "ownerPrompt": "칭찬을 들으면 나는?",
+      "visitorPrompt": "칭찬을 들으면 이 사람은?",
+      "optionA": "기분 좋은 티가 바로 난다",
+      "optionB": "쑥스러워도 조용히 받아들인다",
+      "isSignature": false
+    },
+    {
+      "id": "big-choice",
+      "position": 3,
+      "ownerPrompt": "중요한 선택 앞에서 나는?",
+      "visitorPrompt": "중요한 선택 앞에서 이 사람은?",
+      "optionA": "주변 의견을 들어 본다",
+      "optionB": "내 기준부터 정리한다",
+      "isSignature": false
+    },
+    {
+      "id": "letdown",
+      "position": 4,
+      "ownerPrompt": "기대했던 일이 어긋난 직후 나는?",
+      "visitorPrompt": "기대했던 일이 어긋난 직후 이 사람은?",
+      "optionA": "아쉬움을 말로 표현한다",
+      "optionB": "다음 방법부터 찾는다",
+      "isSignature": false
+    },
+    {
+      "id": "misunderstood",
+      "position": 5,
+      "ownerPrompt": "오해받았다고 느끼면 나는?",
+      "visitorPrompt": "오해받았다고 느끼면 이 사람은?",
+      "optionA": "그 자리에서 바로 풀려고 한다",
+      "optionB": "감정이 가라앉은 뒤 이야기한다",
+      "isSignature": false
+    },
+    {
+      "id": "free-day",
+      "position": 6,
+      "ownerPrompt": "아무 약속 없는 하루가 생기면 나는?",
+      "visitorPrompt": "아무 약속 없는 하루가 생기면 이 사람은?",
+      "optionA": "하고 싶던 일을 찾아 움직인다",
+      "optionB": "쉬면서 그날 기분을 따른다",
+      "isSignature": false
+    },
+    {
+      "id": "need-help",
+      "position": 7,
+      "ownerPrompt": "도움이 필요할 때 나는?",
+      "visitorPrompt": "도움이 필요할 때 이 사람은?",
+      "optionA": "구체적으로 부탁한다",
+      "optionB": "혼자 해본 뒤 부탁한다",
+      "isSignature": false
+    },
+    {
+      "id": "new-start",
+      "position": 8,
+      "ownerPrompt": "새로운 일을 시작할 때 나는?",
+      "visitorPrompt": "새로운 일을 시작할 때 이 사람은?",
+      "optionA": "일단 해보며 감을 잡는다",
+      "optionB": "충분히 알아본 뒤 시작한다",
+      "isSignature": false
+    },
+    {
+      "id": "attention",
+      "position": 9,
+      "ownerPrompt": "사람들이 나를 주목하면 나는?",
+      "visitorPrompt": "사람들이 이 사람을 주목하면?",
+      "optionA": "그 분위기를 즐기는 편이다",
+      "optionB": "조금 뒤로 물러나는 편이다",
+      "isSignature": false
+    },
+    {
+      "id": "affection",
+      "position": 10,
+      "ownerPrompt": "좋아하는 사람에게 마음을 표현할 때 나는 주로?",
+      "visitorPrompt": "좋아하는 사람에게 이 사람은 마음을 주로 어떻게 표현할까?",
+      "optionA": "말로 직접 전한다",
+      "optionB": "행동으로 자연스럽게 보여 준다",
+      "isSignature": false
+    }
+  ]
+}
