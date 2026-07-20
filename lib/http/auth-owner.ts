@@ -14,18 +14,10 @@ import {
 import type { ParsedOwnerCookie } from "../owner-play/owner-play-session.ts";
 import { parseRateLimitSecret } from "../security/network-key.mjs";
 import { validateAppUrl } from "./http-boundary-core.mjs";
+import { ownerAuthRequiredResponse } from "./auth-errors.ts";
 import { ownerNotFoundResponse, privateNoStore } from "./owner-play.ts";
 
 type OwnerCookie = Extract<ParsedOwnerCookie, { outcome: "valid" }>;
-
-const AUTH_REQUIRED = Object.freeze({
-  code: "OWNER_AUTH_REQUIRED",
-  message: "로그인한 뒤 내 질문팩을 불러올 수 있어요.",
-});
-
-export function ownerAuthRequiredResponse() {
-  return privateNoStore(Response.json(AUTH_REQUIRED, { status: 401 }));
-}
 
 export async function sendOwnerMagicLinkResponse(input: {
   cookie: OwnerCookie | null;

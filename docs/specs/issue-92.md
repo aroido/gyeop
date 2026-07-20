@@ -14,7 +14,7 @@ Issue: https://github.com/aroido/gyeop/issues/92
 - 같은 익명 owner가 공식 팩별 play를 하나씩 생성·재개하고 다른 팩 진입 때문에 기존 play가 폐기되거나 고립되지 않게 한다.
 - 셀프 10장 완료 전에는 공유 링크를 만들 수 없고, 완료 뒤 `내 질문팩 저장하고 공유하기`에서 Supabase Auth 이메일 매직 링크 로그인을 시작한다.
 - callback에서 PKCE code를 교환한 직후 fresh `auth.getUser()`와 익명 owner capability를 함께 검증하고 단일 RPC transaction으로 claim한다.
-- claim 뒤 owner 공유·프로필 API는 fresh Auth actor를 검증하며, 다른 브라우저의 같은 계정에서도 연결된 play 목록과 상세 화면을 연다.
+- claim 뒤 owner play 조회·저장·완료와 공유·프로필 API는 fresh Auth actor를 검증하며, 다른 브라우저의 같은 계정에서도 연결된 draft를 이어 답하고 완료한 play를 관리한다.
 - 공개/1:1 링크 방문자 흐름은 로그인 없이 그대로 유지한다.
 - active SSOT, 데이터 보관 정책, 구현 문서와 개인정보 문구를 실제 동작에 맞춘다.
 - schema/RPC pgTAP, server 단위·통합 테스트, 모바일 Chromium E2E와 기존 방문자 회귀 테스트를 추가한다.
@@ -50,7 +50,7 @@ Issue: https://github.com/aroido/gyeop/issues/92
 5. 이메일을 입력하면 앱의 전송 제한을 통과한 뒤 Supabase Auth가 매직 링크를 보낸다. 같은 브라우저에서 링크를 열어 callback이 성공하면 anonymous owner의 모든 play가 해당 Auth UID에 연결되고 원래 완료 화면으로 돌아간다.
 6. 완료 화면에서 공개 또는 1:1 링크를 생성한다. 로그인하지 않았거나 claim되지 않은 요청은 일반화된 `auth_required` 응답만 받고 row를 만들지 않는다.
 7. `/me`는 인증 계정에 연결된 owner가 가진 공식 팩 play 목록을 보여주고, `/me/plays/[playId]`는 선택한 play의 프로필·공유 관리 화면을 연다.
-8. 다른 브라우저에서 `/auth/sign-in?returnTo=/me`로 같은 계정에 로그인하면 claim된 play 목록을 복구한다.
+8. 다른 브라우저에서 `/auth/sign-in?returnTo=/me`로 같은 계정에 로그인하면 claim된 play 목록을 복구하고 draft는 `/play/[playId]`에서 이어 답는다.
 9. 방문자는 기존 공유 URL에서 회원가입 없이 관계·시점을 고르고 3장 응답·비교·같은 팩 새 owner 시작을 완료한다.
 
 ## 디자인 영향
@@ -87,6 +87,7 @@ Issue: https://github.com/aroido/gyeop/issues/92
 - `POST /api/plays`: cookie가 없으면 owner+play를 생성하고, 있으면 같은 owner의 요청 팩 play를 재개하거나 새로 만든다. 현재 팩과 다르다는 이유로 오류나 기존 play 교체를 만들지 않는다.
 - 기존 `/api/plays/[playId]/**` 저장·완료 route는 cookie의 owner secret hash와 path play ID를 함께 넘겨 owner-play 소속을 다시 검증한다. cookie UUID 자체는 create/resume에서 anonymous owner selector로만 쓴다.
 - `GET /api/me/plays`: fresh Auth actor에 연결된 모든 owner의 play 요약을 최신 활동순으로 반환한다. private `no-store`와 일반화된 401/404를 사용한다.
+- `GET /api/plays/[playId]`와 answer save/complete는 anonymous capability가 없거나 다른 owner를 가리켜도 fresh Auth UID가 대상 `pack_plays.owner_id`와 일치하면 연결된 draft를 읽고 이어 저장·완료한다. 미로그인은 401 `OWNER_AUTH_REQUIRED`, 다른 actor나 없는 play는 404로 구분한다.
 - `POST /api/plays/[playId]/links`, link list/rotate/disable, owner profile/1:1 comparison은 기존 capability 검증에 더해 대상 `pack_plays.owner_id is not null`을 DB에서 요구한다. 따라서 가입 전 secret만으로 공유 row를 만들 수 없다. callback 성공 뒤 같은 브라우저의 capability cookie는 7일 inactivity 범위에서 유지해 기존 공유 관리 코드를 재사용한다.
 - `/auth/sign-in`은 allowlisted `returnTo`, completed `playId`, anonymous owner ID를 nonce가 있는 10분 `HttpOnly; Secure; SameSite=Lax` claim-context cookie에 보존한다. owner capability 원문·email은 넣지 않는다. OTP 호출 전 `magic_link_send`를 network+owner context 기준 5회/시간으로 제한하고 provider cooldown도 그대로 적용한다.
 - private local MVP에서는 Supabase local SMTP/Inbucket으로 확인한다. CAPTCHA가 구성된 환경에서는 `signInWithOtp`에 검증 token을 전달하며, CAPTCHA와 production custom SMTP가 없는 환경은 public signup/public beta로 승격하지 않는다. 이번 로컬 수직 슬라이스가 CAPTCHA를 우회 가능한 production 인증으로 승인하지 않는다.
@@ -113,7 +114,7 @@ Issue: https://github.com/aroido/gyeop/issues/92
 - [ ] 10장 완료 owner만 로그인 CTA와 claim을 진행하며, callback 성공은 기존 play ID와 답변을 복사 없이 동일 owner에 연결한다.
 - [ ] callback 재실행/claim 재호출은 같은 UID에 idempotent하고 다른 UID·invalid/stale capability·만료 claim context·PKCE verifier가 없는 다른 브라우저·동시 claim loser가 owner 존재나 데이터를 알아내지 못한다.
 - [ ] claim 성공 뒤 공개와 1:1 링크를 생성·관리하고 기존 visitor 무가입 3장·비교·same-pack 전환이 끝까지 동작한다.
-- [ ] 다른 브라우저의 같은 계정 로그인에서 claim된 모든 play 목록과 선택한 프로필을 복구한다.
+- [ ] 다른 브라우저의 같은 계정 로그인에서 claim된 모든 play 목록과 선택한 프로필을 복구하고, 연결된 draft의 남은 답을 저장·완료한다.
 - [ ] Auth email, UID, capability, 질문·응답 값은 app log와 analytics properties에 기록되지 않는다.
 - [ ] active 문서·개인정보 문구가 실제 owner/Auth/보관 동작과 모순되지 않는다.
 
@@ -121,8 +122,8 @@ Issue: https://github.com/aroido/gyeop/issues/92
 
 - [ ] migration pgTAP: 기존 row backfill/ID 보존, anonymous owner+version uniqueness, adopted `owner_id` anchor, RLS/privilege, anonymous capability 격리, claim idempotency·different UID·expiry·동시성, anonymous share gate
 - [ ] 단위: v1 cookie compatibility, owner credential hash, strict same-origin `returnTo`, claim-context TTL/nonce, `magic_link_send`, sign-in/callback error mapping, fresh Auth actor enforcement
-- [ ] 통합: anonymous owner 두 팩 create/resume/save, legacy cookie 복구, claim 뒤 Auth read/mutation, 다른 계정 거부, 링크 생성 0-row/성공 전환
-- [ ] mobile Chromium E2E: 익명 두 팩 저장 → 한 팩 10장 → 로그인 → 공유 → 방문자 제출 → 다른 browser context 계정 복구
+- [ ] 통합: anonymous owner 두 팩 create/resume/save, legacy cookie 복구, claim 뒤 Auth read/save/complete, 다른 계정 거부, 링크 생성 0-row/성공 전환
+- [ ] mobile Chromium E2E: 익명 두 팩 저장 → 한 팩 10장 → 로그인 → 공유 → 방문자 제출 → 다른 browser context에서 남은 draft 저장·완료와 계정 복구
 - [ ] 기존 owner self-answer, 공개/1:1 visitor, profile, withdrawal 회귀
 - [ ] `./scripts/run-ai-verify --mode full`
 

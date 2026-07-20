@@ -258,6 +258,7 @@ select is(
   array[
     'assign_optional_cards(uuid,bytea)',
     'claim_anonymous_owner(uuid,bytea,uuid,jsonb)',
+    'complete_authenticated_owner_play(uuid,uuid)',
     'complete_owner_play(uuid,bytea)',
     'consume_rate_limit(bytea,text,integer,integer)',
     'create_authenticated_share_link(uuid,uuid,uuid,text,bytea,text,timestamp with time zone)',
@@ -293,6 +294,7 @@ select is(
     'revoke_owner_play_session(uuid,bytea)',
     'rotate_authenticated_share_link(uuid,uuid,uuid,uuid,text,bytea)',
     'rotate_share_link(uuid,bytea,uuid,uuid,text,bytea)',
+    'save_authenticated_owner_answer(uuid,uuid,text,text,smallint)',
     'save_owner_answer(uuid,bytea,text,text,smallint)',
     'save_response_answer(uuid,bytea,text,text)',
     'start_required_response(text,bytea,text,uuid,bytea,uuid,bytea,text,text,bytea)',

@@ -491,6 +491,55 @@ export async function getAuthenticatedOwnerPlay(input: {
   });
 }
 
+export async function saveAuthenticatedOwnerAnswer(input: {
+  playId: string;
+  cardId: string;
+  choice: "a" | "b";
+  currentPosition: number;
+}): Promise<SaveOwnerAnswerResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("save_authenticated_owner_answer", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+        p_card_id: input.cardId,
+        p_choice: input.choice,
+        p_current_position: input.currentPosition,
+      })
+      .abortSignal(signal);
+    if (error) {
+      throw new Error("Internal authenticated owner answer RPC failed");
+    }
+    return decodeOwnerPlayOutcome(data, [
+      "saved",
+      "completed",
+      "not_found",
+      "invalid_card",
+    ]) as SaveOwnerAnswerResult;
+  });
+}
+
+export async function completeAuthenticatedOwnerPlay(input: {
+  playId: string;
+}): Promise<CompleteOwnerPlayResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("complete_authenticated_owner_play", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+      })
+      .abortSignal(signal);
+    if (error) {
+      throw new Error("Internal authenticated owner completion RPC failed");
+    }
+    return decodeOwnerPlayOutcome(data, [
+      "completed",
+      "incomplete",
+      "not_found",
+    ]) as CompleteOwnerPlayResult;
+  });
+}
+
 export async function getAuthenticatedOwnerProfile(input: {
   playId: string;
 }): Promise<OwnerProfileResult> {

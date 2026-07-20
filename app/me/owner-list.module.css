@@ -126,10 +126,6 @@
   text-decoration: none;
 }
 
-.localOnly {
-  line-height: 1.4;
-}
-
 .primary:focus-visible,
 .secondary:focus-visible,
 .plays a:focus-visible {

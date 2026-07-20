@@ -66,7 +66,7 @@ flowchart LR
 - 팩 주인은 이메일·전화번호·표시 이름 없이 익명으로 시작한다. 서버가 발급한 256-bit owner 관리 secret은 `Secure`·`HttpOnly`·`SameSite=Lax` same-browser cookie에만 두고 DB에는 domain-separated hash만 저장한다.
 - 같은 브라우저에서 공식 팩을 바꾸면 기존 진행을 버리지 않고, 하나의 익명 owner 아래 팩별 play를 하나씩 만들거나 재개한다. 성공한 owner 접근부터 7일 inactivity 동안 draft·완료 상태를 복구한다.
 - 셀프 10장을 완료하고 공유하려는 시점에만 Supabase Auth 이메일 매직 링크를 요청한다. 같은 브라우저에서 링크를 열면 익명 owner의 모든 play를 Auth 계정에 원자적으로 연결한 뒤 공유 화면을 연다.
-- 계정에 연결된 완료 play 목록·답변·공유 관리·누적 프로필은 같은 이메일로 다른 브라우저에서도 다시 열 수 있다. 서버는 fresh Auth UID와 play 소유권을 매 요청에서 함께 검증하며 anonymous capability secret을 브라우저에 재발급하지 않는다.
+- 계정에 연결된 play 목록·답변·공유 관리·누적 프로필은 같은 이메일로 다른 브라우저에서도 다시 열 수 있다. 연결된 draft는 남은 답을 이어 저장·완료할 수 있다. 서버는 fresh Auth UID와 play 소유권을 매 요청에서 함께 검증하며 anonymous capability secret을 브라우저에 재발급하지 않는다.
 - cookie를 잃거나 만료·로그아웃한 미귀속 draft는 이메일·운영자 경로로 복구하거나 재발급하지 않는다. 이메일 알림과 owner 계정 삭제 worker는 `production beta 재승인` 후보로 남긴다.
 - 첫 화면의 주 CTA는 `질문 시작하기`다.
 

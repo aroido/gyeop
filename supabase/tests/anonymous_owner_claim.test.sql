@@ -293,6 +293,60 @@ select is(
 reset role;
 
 select is(
+  public.save_authenticated_owner_answer(
+    (
+      select play.id
+      from public.pack_plays as play
+      where play.anonymous_owner_id = '32000000-0000-4000-8000-000000000100'
+        and play.id <> '32000000-0000-4000-8000-000000000100'
+    ),
+    '32000000-0000-4000-8000-000000000002',
+    'honest-self-v1-card-01',
+    'a',
+    2::smallint
+  )->>'outcome',
+  'not_found',
+  'a different Auth actor cannot continue the linked draft'
+);
+select is(
+  (
+    select count(*)
+    from (
+      select public.save_authenticated_owner_answer(
+        play.id,
+        '32000000-0000-4000-8000-000000000001',
+        card.id,
+        'a',
+        least(card.position + 1, 10)::smallint
+      ) as result
+      from public.pack_plays as play
+      join public.pack_cards as card
+        on card.pack_version_id = play.pack_version_id
+      where play.anonymous_owner_id = '32000000-0000-4000-8000-000000000100'
+        and play.id <> '32000000-0000-4000-8000-000000000100'
+    ) as saved
+    where saved.result->>'outcome' = 'saved'
+  ),
+  10::bigint,
+  'the authenticated owner saves every answer in a linked draft'
+);
+select is(
+  public.complete_authenticated_owner_play(
+    (
+      select play.id
+      from public.pack_plays as play
+      where play.anonymous_owner_id = '32000000-0000-4000-8000-000000000100'
+        and play.id <> '32000000-0000-4000-8000-000000000100'
+    ),
+    '32000000-0000-4000-8000-000000000001'
+  )->>'outcome',
+  'completed',
+  'the authenticated owner completes the linked draft without an anonymous cookie'
+);
+
+reset role;
+
+select is(
   (
     select count(*)
     from public.pack_plays as play

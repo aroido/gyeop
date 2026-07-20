@@ -5,6 +5,7 @@ import {
   listAuthenticatedOwnerOneToOneResponses,
 } from "../db/internal-rpc.ts";
 import { errorResponse } from "./errors.ts";
+import { authenticatedOwnerFailureResponse } from "./auth-errors.ts";
 import { ownerNotFoundResponse, privateNoStore } from "./owner-play.ts";
 
 export function privateOneToOneInvalidRequest() {
@@ -28,10 +29,14 @@ export async function listPrivateOneToOneResponsesResponse(input: {
   playId: string;
   signal: AbortSignal;
 }) {
-  const result = await listAuthenticatedOwnerOneToOneResponses({
-    playId: input.playId,
-  }).catch(() => null);
-  if (!result) return ownerNotFoundResponse();
+  let result;
+  try {
+    result = await listAuthenticatedOwnerOneToOneResponses({
+      playId: input.playId,
+    });
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
   if (result.outcome !== "listed") return failure(result.outcome);
   return privateNoStore(Response.json({ responses: result.responses }));
 }
@@ -41,11 +46,15 @@ export async function readPrivateOneToOneComparisonResponse(input: {
   responseId: string;
   signal: AbortSignal;
 }) {
-  const result = await getAuthenticatedPrivateOneToOneComparison({
-    playId: input.playId,
-    responseId: input.responseId,
-  }).catch(() => null);
-  if (!result) return ownerNotFoundResponse();
+  let result;
+  try {
+    result = await getAuthenticatedPrivateOneToOneComparison({
+      playId: input.playId,
+      responseId: input.responseId,
+    });
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
   if (result.outcome !== "authorized") return failure(result.outcome);
   return privateNoStore(Response.json(result.comparison));
 }

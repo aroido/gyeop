@@ -577,6 +577,10 @@ export type Database = {
         };
         Returns: Json;
       };
+      complete_authenticated_owner_play: {
+        Args: { p_actor_id: string; p_play_id: string };
+        Returns: Json;
+      };
       complete_owner_play: {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: Json;
@@ -810,6 +814,16 @@ export type Database = {
           p_new_link_id: string;
           p_new_public_id: string;
           p_new_secret_hash: string;
+          p_play_id: string;
+        };
+        Returns: Json;
+      };
+      save_authenticated_owner_answer: {
+        Args: {
+          p_actor_id: string;
+          p_card_id: string;
+          p_choice: string;
+          p_current_position: number;
           p_play_id: string;
         };
         Returns: Json;

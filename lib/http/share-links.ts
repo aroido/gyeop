@@ -11,6 +11,7 @@ import {
   createAuthenticatedShareLinkWithCredential,
   rotateAuthenticatedShareLinkWithCredential,
 } from "../share-links/share-links.ts";
+import { authenticatedOwnerFailureResponse } from "./auth-errors.ts";
 import { ownerNotFoundResponse, privateNoStore } from "./owner-play.ts";
 
 const LINK_NOT_ACTIVE = Object.freeze({
@@ -41,11 +42,15 @@ export async function createShareLinkResponse(input: {
   kind: "public" | "one_to_one";
   signal: AbortSignal;
 }) {
-  const result = await createAuthenticatedShareLinkWithCredential({
-    playId: input.playId,
-    kind: input.kind,
-  }).catch(() => null);
-  if (!result) return ownerNotFoundResponse();
+  let result;
+  try {
+    result = await createAuthenticatedShareLinkWithCredential({
+      playId: input.playId,
+      kind: input.kind,
+    });
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
   if (result.outcome !== "created") return ownerFailure(result.outcome);
   return ownerJson({ link: result.link, inviteUrl: result.inviteUrl }, 201);
 }
@@ -54,10 +59,12 @@ export async function listShareLinksResponse(input: {
   playId: string;
   signal: AbortSignal;
 }) {
-  const result = await listAuthenticatedShareLinks({
-    playId: input.playId,
-  }).catch(() => null);
-  if (!result) return ownerNotFoundResponse();
+  let result;
+  try {
+    result = await listAuthenticatedShareLinks({ playId: input.playId });
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
   if (result.outcome !== "listed") return ownerFailure(result.outcome);
   return ownerJson({ links: result.links });
 }
@@ -67,11 +74,15 @@ export async function disableShareLinkResponse(input: {
   linkId: string;
   signal: AbortSignal;
 }) {
-  const result = await disableAuthenticatedShareLink({
-    playId: input.playId,
-    linkId: input.linkId,
-  }).catch(() => null);
-  if (!result) return ownerNotFoundResponse();
+  let result;
+  try {
+    result = await disableAuthenticatedShareLink({
+      playId: input.playId,
+      linkId: input.linkId,
+    });
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
   if (result.outcome !== "disabled") return ownerFailure(result.outcome);
   return ownerJson({ link: result.link });
 }
@@ -81,11 +92,15 @@ export async function rotateShareLinkResponse(input: {
   linkId: string;
   signal: AbortSignal;
 }) {
-  const result = await rotateAuthenticatedShareLinkWithCredential({
-    playId: input.playId,
-    linkId: input.linkId,
-  }).catch(() => null);
-  if (!result) return ownerNotFoundResponse();
+  let result;
+  try {
+    result = await rotateAuthenticatedShareLinkWithCredential({
+      playId: input.playId,
+      linkId: input.linkId,
+    });
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
   if (result.outcome === "link_not_active") {
     return ownerJson(LINK_NOT_ACTIVE, 409);
   }
@@ -100,13 +115,17 @@ export async function recordShareActionResponse(input: {
   entrySource: "profile_reshare" | null;
   signal: AbortSignal;
 }) {
-  const result = await recordAuthenticatedOwnerShareAction({
-    playId: input.playId,
-    linkId: input.linkId,
-    event: input.event,
-    entrySource: input.entrySource,
-  }).catch(() => null);
-  if (!result) return ownerNotFoundResponse();
+  let result;
+  try {
+    result = await recordAuthenticatedOwnerShareAction({
+      playId: input.playId,
+      linkId: input.linkId,
+      event: input.event,
+      entrySource: input.entrySource,
+    });
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
   if (result.outcome !== "recorded") return ownerFailure(result.outcome);
   return privateNoStore(new Response(null, { status: 204 }));
 }

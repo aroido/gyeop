@@ -798,6 +798,55 @@ begin
 end
 $function$;
 
+create function public.save_authenticated_owner_answer(
+  p_play_id uuid,
+  p_actor_id uuid,
+  p_card_id text,
+  p_choice text,
+  p_current_position smallint
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_hash bytea;
+begin
+  v_hash := private.authenticated_owner_capability(p_play_id, p_actor_id);
+  if v_hash is null then
+    return jsonb_build_object('outcome', 'not_found');
+  end if;
+  return public.save_owner_answer(
+    p_play_id,
+    v_hash,
+    p_card_id,
+    p_choice,
+    p_current_position
+  );
+end
+$function$;
+
+create function public.complete_authenticated_owner_play(
+  p_play_id uuid,
+  p_actor_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+declare
+  v_hash bytea;
+begin
+  v_hash := private.authenticated_owner_capability(p_play_id, p_actor_id);
+  if v_hash is null then
+    return jsonb_build_object('outcome', 'not_found');
+  end if;
+  return public.complete_owner_play(p_play_id, v_hash);
+end
+$function$;
+
 create function public.get_authenticated_owner_profile(
   p_play_id uuid,
   p_actor_id uuid
@@ -1020,6 +1069,11 @@ alter function public.list_authenticated_owner_plays(uuid)
   owner to gyeop_internal_rpc;
 alter function public.get_authenticated_owner_play(uuid, uuid)
   owner to gyeop_internal_rpc;
+alter function public.save_authenticated_owner_answer(
+  uuid, uuid, text, text, smallint
+) owner to gyeop_internal_rpc;
+alter function public.complete_authenticated_owner_play(uuid, uuid)
+  owner to gyeop_internal_rpc;
 alter function public.create_claimed_share_link(
   uuid, bytea, uuid, text, bytea, text, timestamptz
 ) owner to gyeop_internal_rpc;
@@ -1081,6 +1135,11 @@ revoke execute on function public.list_authenticated_owner_plays(uuid)
   from public, anon, authenticated;
 revoke execute on function public.get_authenticated_owner_play(uuid, uuid)
   from public, anon, authenticated;
+revoke execute on function public.save_authenticated_owner_answer(
+  uuid, uuid, text, text, smallint
+) from public, anon, authenticated;
+revoke execute on function public.complete_authenticated_owner_play(uuid, uuid)
+  from public, anon, authenticated;
 revoke execute on function public.create_claimed_share_link(
   uuid, bytea, uuid, text, bytea, text, timestamptz
 ) from public, anon, authenticated;
@@ -1113,6 +1172,11 @@ grant execute on function public.claim_anonymous_owner(uuid, bytea, uuid, jsonb)
 grant execute on function public.list_authenticated_owner_plays(uuid)
   to service_role;
 grant execute on function public.get_authenticated_owner_play(uuid, uuid)
+  to service_role;
+grant execute on function public.save_authenticated_owner_answer(
+  uuid, uuid, text, text, smallint
+) to service_role;
+grant execute on function public.complete_authenticated_owner_play(uuid, uuid)
   to service_role;
 grant execute on function public.create_claimed_share_link(
   uuid, bytea, uuid, text, bytea, text, timestamptz

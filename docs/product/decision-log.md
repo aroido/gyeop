@@ -4,7 +4,7 @@
 
 - 결정: 팩 주인은 가입 없이 익명 owner로 시작하고 같은 브라우저의 공식 팩별 play를 모두 그 owner 아래 보존한다. 셀프 10장 완료 뒤 `내 질문팩 저장하고 공유하기`에서 Supabase Auth 이메일 매직 링크를 열어 owner의 모든 play를 같은 Auth UID에 원자적으로 연결한 뒤에만 공유 링크를 만든다.
 - 이유: 시작 전에 가입을 요구하지 않으면서도 팩을 바꿀 때 기존 답을 잃지 않고, 실제 공유 의도가 생긴 순간에만 계정 연결 비용을 받으면 저장·공유·다른 브라우저 복구가 하나의 이해 가능한 흐름이 된다.
-- 결과: 2026-07-18의 무이메일·play-bound 단일 owner 결정과 2026-07-15의 단일 draft 귀속 결정 중 활성 비공개 MVP와 충돌하는 부분은 이 결정으로 대체한다. 기존 v1 owner cookie 형식은 유지하되 UUID는 anonymous owner를 가리키고, 같은 owner가 팩별 play를 하나씩 가진다. 방문자는 계속 무가입이다. claim 뒤 공유 생성·관리·프로필 조회는 fresh Auth UID와 play 소유권을 함께 검증하므로 같은 이메일로 다른 브라우저에서도 복구되며, anonymous capability secret은 브라우저에 복원하지 않는다. 이메일 알림·계정 삭제·public signup 운영 승인은 별도 release gate다.
+- 결과: 2026-07-18의 무이메일·play-bound 단일 owner 결정과 2026-07-15의 단일 draft 귀속 결정 중 활성 비공개 MVP와 충돌하는 부분은 이 결정으로 대체한다. 기존 v1 owner cookie 형식은 유지하되 UUID는 anonymous owner를 가리키고, 같은 owner가 팩별 play를 하나씩 가진다. 방문자는 계속 무가입이다. claim 뒤 draft 이어답기·완료, 공유 생성·관리, 프로필 조회는 fresh Auth UID와 play 소유권을 함께 검증하므로 같은 이메일로 다른 브라우저에서도 복구되며, anonymous capability secret은 브라우저에 복원하지 않는다. 이메일 알림·계정 삭제·public signup 운영 승인은 별도 release gate다.
 
 ## 2026-07-20 — 연령·국가 확인 없이 전체 연령용 질문팩으로 전환
 

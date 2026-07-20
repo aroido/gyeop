@@ -8,7 +8,11 @@ import {
   type Page,
 } from "@playwright/test";
 
-import { claimCompletedOwner } from "./owner-auth-live-fixture";
+import {
+  claimCompletedOwner,
+  claimCompletedOwnerAccount,
+  signInOwnerAccount,
+} from "./owner-auth-live-fixture";
 
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
@@ -670,6 +674,7 @@ test.describe("live owner flow", () => {
   test.afterAll(() => setOldFriendActive());
 
   test("keeps multiple packs under one anonymous owner and resumes each pack", async ({
+    browser,
     context,
     page,
   }) => {
@@ -702,6 +707,67 @@ test.describe("live owner flow", () => {
       "aria-pressed",
       "true",
     );
+    await page.locator('button[data-choice="a"]').click();
+    for (let position = 2; position <= 10; position += 1) {
+      await page.locator('button[data-choice="a"]').click();
+    }
+    await expect(
+      page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
+    ).toBeVisible({ timeout: 15_000 });
+    const account = await claimCompletedOwnerAccount(page);
+
+    const recoveredContext = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+      extraHTTPHeaders: {
+        ...visitorHeaders,
+        "x-forwarded-for": "198.51.100.220",
+      },
+    });
+    const recoveredPage = await recoveredContext.newPage();
+    await recoveredPage.goto("/play/new?pack=coworker");
+    await waitForOwnerPlayStart(recoveredPage);
+    expect(
+      (await recoveredContext.cookies()).some(
+        (cookie) => cookie.name === "__Host-gyeop-owner",
+      ),
+    ).toBe(true);
+    await recoveredPage.goto("/me");
+    const signedOutStatuses = await recoveredPage.evaluate(
+      async (playId) =>
+        Promise.all([
+          fetch(`/api/me/plays/${playId}/links`, {
+            credentials: "same-origin",
+          }).then((response) => response.status),
+          fetch(`/api/me/profile?playId=${playId}`, {
+            credentials: "same-origin",
+          }).then((response) => response.status),
+          fetch(`/api/me/plays/${playId}/responses?kind=one_to_one`, {
+            credentials: "same-origin",
+          }).then((response) => response.status),
+        ]),
+      account.playId,
+    );
+    expect(signedOutStatuses).toEqual([401, 401, 401]);
+
+    await signInOwnerAccount(recoveredPage, account.email);
+    await recoveredPage.getByRole("link", { name: "이어서 답하기" }).click();
+    await expect(recoveredPage).toHaveURL(/\/play\/[0-9a-f-]{36}$/);
+    expect(
+      (await recoveredContext.cookies()).some(
+        (cookie) => cookie.name === "__Host-gyeop-owner",
+      ),
+    ).toBe(true);
+    for (let position = 2; position <= 10; position += 1) {
+      await recoveredPage.locator('button[data-choice="a"]').click();
+    }
+    await expect(
+      recoveredPage.getByRole("heading", {
+        name: "내 답변 10개가 저장됐어요",
+      }),
+    ).toBeVisible({ timeout: 15_000 });
+    await recoveredContext.close();
   });
 
   test("keeps a Secure HttpOnly capability through save, reload, and completion", async ({

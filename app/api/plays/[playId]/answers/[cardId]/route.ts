@@ -1,5 +1,6 @@
 import {
   ownerNotFoundResponse,
+  saveAuthenticatedOwnerAnswerResponse,
   saveOwnerAnswerResponse,
 } from "../../../../../../lib/http/owner-play.ts";
 import { saveOwnerAnswerSchema } from "../../../../../../lib/http/owner-play-schemas.ts";
@@ -38,11 +39,19 @@ export function PUT(
             throw new Error("INTERNAL_ERROR");
           }
           const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
-          if (cookie.outcome === "absent") return ownerNotFoundResponse();
-          if (cookie.outcome === "malformed")
-            return ownerNotFoundResponse(true);
           const { playId, cardId } = await context.params;
           if (!isOwnerPlayId(playId)) return ownerNotFoundResponse();
+          if (cookie.outcome === "absent") {
+            return saveAuthenticatedOwnerAnswerResponse({
+              playId,
+              cardId,
+              choice: input.choice,
+              currentPosition: input.currentPosition,
+            });
+          }
+          if (cookie.outcome === "malformed") {
+            return ownerNotFoundResponse(true);
+          }
           return saveOwnerAnswerResponse({
             cookie,
             playId,

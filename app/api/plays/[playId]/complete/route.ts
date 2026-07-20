@@ -1,4 +1,5 @@
 import {
+  completeAuthenticatedOwnerPlayResponse,
   completeOwnerPlayResponse,
   ownerNotFoundResponse,
 } from "../../../../../lib/http/owner-play.ts";
@@ -30,11 +31,14 @@ export function POST(
         },
         async () => {
           const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
-          if (cookie.outcome === "absent") return ownerNotFoundResponse();
-          if (cookie.outcome === "malformed")
-            return ownerNotFoundResponse(true);
           const { playId } = await context.params;
           if (!isOwnerPlayId(playId)) return ownerNotFoundResponse();
+          if (cookie.outcome === "absent") {
+            return completeAuthenticatedOwnerPlayResponse({ playId });
+          }
+          if (cookie.outcome === "malformed") {
+            return ownerNotFoundResponse(true);
+          }
           return completeOwnerPlayResponse({ cookie, playId, signal });
         },
       ),

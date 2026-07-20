@@ -16,6 +16,8 @@ const ALLOWED_RPC_EXPORTS = new Map([
   ["claimAnonymousOwner", "claim_anonymous_owner"],
   ["listAuthenticatedOwnerPlays", "list_authenticated_owner_plays"],
   ["getAuthenticatedOwnerPlay", "get_authenticated_owner_play"],
+  ["saveAuthenticatedOwnerAnswer", "save_authenticated_owner_answer"],
+  ["completeAuthenticatedOwnerPlay", "complete_authenticated_owner_play"],
   ["getAuthenticatedOwnerProfile", "get_authenticated_owner_profile"],
   [
     "recordAuthenticatedOwnerProfileEvent",

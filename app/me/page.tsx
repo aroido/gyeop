@@ -63,9 +63,7 @@ export default async function OwnerPage() {
                 {play.status === "completed" ? (
                   <Link href={`/me/plays/${play.id}`}>프로필·공유 관리</Link>
                 ) : (
-                  <span className={styles.localOnly}>
-                    시작한 브라우저에서 이어서 답할 수 있어요
-                  </span>
+                  <Link href={`/play/${play.id}`}>이어서 답하기</Link>
                 )}
               </li>
             ))}

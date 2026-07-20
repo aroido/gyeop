@@ -11,6 +11,7 @@ import {
 } from "@/lib/owner-profile/owner-profile-core.mjs";
 import {
   loadOwnerProfile,
+  OwnerProfileHttpError,
   recordOwnerProfileReshareClicked,
   recordOwnerProfileViewed,
 } from "@/lib/owner-profile/owner-profile-client";
@@ -24,6 +25,7 @@ import styles from "./owner-profile.module.css";
 type SightNotice = "empty" | "new" | "existing";
 type State =
   | { kind: "loading" }
+  | { kind: "auth" }
   | { kind: "terminal" }
   | { kind: "ready"; profile: OwnerProfile; notice: SightNotice };
 
@@ -139,8 +141,15 @@ export default function OwnerProfileView({
           setState({ kind: "ready", profile, notice: readNotice(profile) });
         }
       })
-      .catch(() => {
-        if (active) setState({ kind: "terminal" });
+      .catch((error: unknown) => {
+        if (active) {
+          setState({
+            kind:
+              error instanceof OwnerProfileHttpError && error.status === 401
+                ? "auth"
+                : "terminal",
+          });
+        }
       });
     return () => {
       active = false;
@@ -189,6 +198,23 @@ export default function OwnerProfileView({
           <p>진행 정보가 만료됐거나 이 브라우저에서 열 수 없는 프로필이에요.</p>
           <Link className={styles.primary} href="/">
             홈으로
+          </Link>
+        </section>
+      </section>
+    );
+  }
+
+  if (state.kind === "auth") {
+    return (
+      <section className={styles.shell}>
+        <section className={styles.terminal}>
+          <p className={styles.brand}>겹</p>
+          <h1 ref={headingRef} tabIndex={-1}>
+            다시 로그인해 주세요
+          </h1>
+          <p>계정을 확인하면 저장해 둔 내 시선 프로필을 다시 볼 수 있어요.</p>
+          <Link className={styles.primary} href="/auth/sign-in?returnTo=%2Fme">
+            이메일로 로그인
           </Link>
         </section>
       </section>
