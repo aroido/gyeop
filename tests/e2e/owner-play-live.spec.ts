@@ -13,6 +13,7 @@ import {
   claimCompletedOwnerAccount,
   signInOwnerAccount,
 } from "./owner-auth-live-fixture";
+import honestSelfManifest from "../../content/packs/honest-self-v1.json" with { type: "json" };
 
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
@@ -690,6 +691,7 @@ test.describe("live owner flow", () => {
 
     await page.goto("/play/new?pack=honest-self");
     await waitForOwnerPlayStart(page);
+    const honestSelfUrl = page.url();
     expect(page.url()).not.toBe(oldFriendUrl);
     await page.locator('button[data-choice="b"]').click();
     await expect(page.locator('[data-state="saved"]')).toBeVisible();
@@ -734,22 +736,50 @@ test.describe("live owner flow", () => {
       ),
     ).toBe(true);
     await recoveredPage.goto("/me");
+    const claimedDraftId = honestSelfUrl.split("/").at(-1)!;
     const signedOutStatuses = await recoveredPage.evaluate(
-      async (playId) =>
+      async ({ cardId, claimedDraftId, completedPlayId }) =>
         Promise.all([
-          fetch(`/api/me/plays/${playId}/links`, {
+          fetch(`/api/plays/${claimedDraftId}`, {
             credentials: "same-origin",
           }).then((response) => response.status),
-          fetch(`/api/me/profile?playId=${playId}`, {
+          fetch(`/api/plays/${claimedDraftId}/answers/${cardId}`, {
+            method: "PUT",
+            credentials: "same-origin",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ choice: "a", currentPosition: 2 }),
+          }).then((response) => response.status),
+          fetch(`/api/plays/${claimedDraftId}/complete`, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "content-type": "application/json" },
+            body: "{}",
+          }).then((response) => response.status),
+          fetch(`/api/me/plays/${completedPlayId}/links`, {
             credentials: "same-origin",
           }).then((response) => response.status),
-          fetch(`/api/me/plays/${playId}/responses?kind=one_to_one`, {
+          fetch(`/api/me/profile?playId=${completedPlayId}`, {
+            credentials: "same-origin",
+          }).then((response) => response.status),
+          fetch(`/api/me/plays/${completedPlayId}/responses?kind=one_to_one`, {
             credentials: "same-origin",
           }).then((response) => response.status),
         ]),
-      account.playId,
+      {
+        cardId: honestSelfManifest.cards[0].id,
+        claimedDraftId,
+        completedPlayId: account.playId,
+      },
     );
-    expect(signedOutStatuses).toEqual([401, 401, 401]);
+    expect(signedOutStatuses).toEqual([401, 401, 401, 401, 401, 401]);
+
+    await recoveredPage.goto(honestSelfUrl);
+    await expect(
+      recoveredPage.getByRole("heading", { name: "다시 로그인해 주세요" }),
+    ).toBeFocused();
+    await expect(
+      recoveredPage.getByRole("link", { name: "이메일로 로그인" }),
+    ).toHaveAttribute("href", "/auth/sign-in?returnTo=%2Fme");
 
     await signInOwnerAccount(recoveredPage, account.email);
     await recoveredPage.getByRole("link", { name: "이어서 답하기" }).click();

@@ -28,6 +28,7 @@
 
 .navHeader button,
 .messageActions button,
+.authLink,
 .homeButton,
 .profileButton,
 .completionRetry,
@@ -40,6 +41,15 @@
   font: inherit;
   font-size: 0.8rem;
   font-weight: 850;
+}
+
+.authLink {
+  display: grid;
+  place-items: center;
+  border-color: var(--lime);
+  background: var(--lime);
+  color: var(--ink);
+  text-decoration: none;
 }
 
 .navHeader button:disabled {

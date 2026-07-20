@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -45,6 +46,7 @@ type Flow = Readonly<{
 type LoadState =
   | { kind: "loading" }
   | { kind: "ready" }
+  | { kind: "auth" }
   | { kind: "retryable" }
   | { kind: "terminal" };
 
@@ -53,6 +55,14 @@ function isRetryable(error: unknown) {
     !(error instanceof OwnerFlowHttpError) ||
     error.status === 429 ||
     error.status >= 500
+  );
+}
+
+function isAuthenticationRequired(error: unknown) {
+  return (
+    error instanceof OwnerFlowHttpError &&
+    error.status === 401 &&
+    error.code === "OWNER_AUTH_REQUIRED"
   );
 }
 
@@ -116,9 +126,11 @@ function ExitDialog({
 }
 
 function TerminalScreen({
+  authRequired,
   retryable,
   onRetry,
 }: {
+  authRequired: boolean;
   retryable: boolean;
   onRetry: () => void;
 }) {
@@ -149,18 +161,31 @@ function TerminalScreen({
       <section className={styles.message} aria-labelledby="ended-title">
         <p className={styles.brand}>겹 · 질문팩</p>
         <h1 id="ended-title" ref={headingRef} tabIndex={-1}>
-          이 팩을 이어갈 수 없어요
+          {authRequired ? "다시 로그인해 주세요" : "이 팩을 이어갈 수 없어요"}
         </h1>
-        <p>진행 정보가 만료됐거나 이 브라우저에서 열 수 없는 팩이에요.</p>
+        <p>
+          {authRequired
+            ? "계정을 확인하면 저장해 둔 답부터 계속 이어갈 수 있어요."
+            : "진행 정보가 만료됐거나 이 브라우저에서 열 수 없는 팩이에요."}
+        </p>
         <div className={styles.messageActions}>
-          {retryable ? (
+          {authRequired ? (
+            <Link
+              className={styles.authLink}
+              href="/auth/sign-in?returnTo=%2Fme"
+            >
+              이메일로 로그인
+            </Link>
+          ) : retryable ? (
             <button type="button" onClick={onRetry}>
               다시 불러오기
             </button>
           ) : null}
-          <button type="button" onClick={startNew} disabled={clearing}>
-            {clearing ? "홈으로 이동하는 중…" : "다른 팩 고르기"}
-          </button>
+          {!authRequired ? (
+            <button type="button" onClick={startNew} disabled={clearing}>
+              {clearing ? "홈으로 이동하는 중…" : "다른 팩 고르기"}
+            </button>
+          ) : null}
         </div>
         {clearFailed ? (
           <p className={styles.error} role="alert">
@@ -197,7 +222,13 @@ export default function OwnerPlay({ playId }: { playId: string | null }) {
       })
       .catch((error: unknown) => {
         if (!active) return;
-        setLoad({ kind: isRetryable(error) ? "retryable" : "terminal" });
+        setLoad({
+          kind: isAuthenticationRequired(error)
+            ? "auth"
+            : isRetryable(error)
+              ? "retryable"
+              : "terminal",
+        });
       });
     return () => {
       active = false;
@@ -297,10 +328,20 @@ export default function OwnerPlay({ playId }: { playId: string | null }) {
               );
               return;
             }
-          } catch {
+          } catch (readError) {
+            if (isAuthenticationRequired(readError)) {
+              setLoad({ kind: "auth" });
+              setFlow(null);
+              return;
+            }
             // The same generic terminal path is used below.
           }
           setLoad({ kind: "terminal" });
+          setFlow(null);
+          return;
+        }
+        if (isAuthenticationRequired(error)) {
+          setLoad({ kind: "auth" });
           setFlow(null);
           return;
         }
@@ -374,11 +415,18 @@ export default function OwnerPlay({ playId }: { playId: string | null }) {
                 : value,
             );
             return;
-          } catch {
-            setLoad({ kind: "terminal" });
+          } catch (readError) {
+            setLoad({
+              kind: isAuthenticationRequired(readError) ? "auth" : "terminal",
+            });
             setFlow(null);
             return;
           }
+        }
+        if (isAuthenticationRequired(error)) {
+          setLoad({ kind: "auth" });
+          setFlow(null);
+          return;
         }
         if (isRetryable(error)) {
           setFlow((value) =>
@@ -406,9 +454,15 @@ export default function OwnerPlay({ playId }: { playId: string | null }) {
     );
   }
 
-  if (load.kind === "retryable" || load.kind === "terminal" || !flow) {
+  if (
+    load.kind === "auth" ||
+    load.kind === "retryable" ||
+    load.kind === "terminal" ||
+    !flow
+  ) {
     return (
       <TerminalScreen
+        authRequired={load.kind === "auth"}
         retryable={load.kind === "retryable"}
         onRetry={() => {
           setFlow(null);

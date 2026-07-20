@@ -19,10 +19,7 @@ import type {
   OwnerPlayState,
   ParsedOwnerCookie,
 } from "../owner-play/owner-play-session.ts";
-import {
-  authenticatedOwnerFailureResponse,
-  isOwnerAuthenticationUnavailable,
-} from "./auth-errors.ts";
+import { authenticatedOwnerFailureResponse } from "./auth-errors.ts";
 import { errorResponse } from "./errors.ts";
 
 const PACK_NOT_FOUND = Object.freeze({
@@ -233,9 +230,7 @@ export async function readOwnerPlayResponse(input: {
       ? ownerJson(authenticated.play)
       : ownerNotFoundResponse(true);
   } catch (error) {
-    return isOwnerAuthenticationUnavailable(error)
-      ? ownerNotFoundResponse(true)
-      : authenticatedOwnerFailureResponse(error);
+    return authenticatedOwnerFailureResponse(error);
   }
 }
 
@@ -276,9 +271,7 @@ export async function saveOwnerAnswerResponse(input: {
     choice: input.choice,
     currentPosition: input.currentPosition,
   });
-  return authenticated.status === 401
-    ? ownerNotFoundResponse(true)
-    : authenticated;
+  return authenticated;
 }
 
 export async function saveAuthenticatedOwnerAnswerResponse(input: {
@@ -327,9 +320,7 @@ export async function completeOwnerPlayResponse(input: {
   const authenticated = await completeAuthenticatedOwnerPlayResponse({
     playId: input.playId,
   });
-  return authenticated.status === 401
-    ? ownerNotFoundResponse(true)
-    : authenticated;
+  return authenticated;
 }
 
 export async function completeAuthenticatedOwnerPlayResponse(input: {
