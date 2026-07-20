@@ -46,4 +46,4 @@ Do not silently revive behavior that exists only in archived or older documents.
 
 ## Completion gate
 
-Run `./scripts/run-ai-verify --mode full` before declaring meaningful project work complete. Report the failing command and cause when verification does not pass.
+For issue work, `scripts/task-harness pr` runs `./scripts/run-ai-verify --mode full` once for the exact clean checkout; do not run it separately before `pr`. Outside the harness, run it before declaring meaningful project work complete. Report the failing command and cause when verification does not pass.

@@ -671,7 +671,7 @@ detached
   ]);
 });
 
-test("QA gate requires reviewer, zero P0/P1 findings, and full verify PASS", () => {
+test("QA gate requires reviewer and zero P0/P1 findings", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "gyeop-qa-fields-"));
   const valid = completeQaText();
   const cases = [
