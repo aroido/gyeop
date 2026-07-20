@@ -1,4 +1,0 @@
-interface:
-  display_name: "GYEOP Spec Writer"
-  short_description: "겹 이슈를 구현 가능한 스펙 문서로 구체화합니다"
-  default_prompt: "Use $gyeop-spec-writer to turn this GYEOP issue into a reviewed implementation spec."

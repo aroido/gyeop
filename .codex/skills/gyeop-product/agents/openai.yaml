@@ -1,0 +1,4 @@
+interface:
+  display_name: "GYEOP Product"
+  short_description: "겹의 제품 결정·기획 SSOT·바이럴 흐름을 함께 다룹니다"
+  default_prompt: "Use $gyeop-product to evaluate this GYEOP idea and update the active Korean product SSOT when requested."
