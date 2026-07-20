@@ -27,13 +27,10 @@
 
 ## 프로젝트 스킬
 
-- `$gyeop-product-doc-writer`: 아이디어·메모를 활성 기획 SSOT로 작성
-- `$gyeop-product-guardrails`: 기능·우선순위·SSOT 변경
+- `$gyeop-product`: 제품 결정·기획 SSOT·바이럴 흐름 검토
 - `$gyeop-question-pack-design`: A/B 질문팩 생성과 검수
-- `$gyeop-viral-flow-review`: 모바일 공유·응답·재공유 흐름 검증
-- `$gyeop-spec-writer`: GitHub 이슈 구현 스펙 작성과 검토 준비
 - `$gyeop-issue-writer`: GitHub Issue·Project 일감 작성과 등록
-- `$gyeop-task`: ready 이슈부터 PR·병합·정리까지 작업 하네스 실행
+- `$gyeop-task`: 구현 스펙부터 PR·병합·정리까지 작업 하네스 실행
 
 프로젝트 스킬을 전역 Codex 스킬 경로에 설치하거나 갱신하려면:
 

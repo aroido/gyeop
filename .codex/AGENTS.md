@@ -37,13 +37,13 @@ Do not silently revive behavior that exists only in archived or older documents.
 - Prefer one clear path over speculative modes in P0.
 - Keep A/B as the only answer format in P0.
 - Do not add payments, ads, public user search, chat, comments, rankings, or MBTI-style fixed labels without an explicit product decision.
-- Use the project skills in `.codex/skills/` for relevant planning and review work.
-- Use `$gyeop-product-doc-writer` when turning rough ideas or notes into product planning documents.
-- Use `$gyeop-spec-writer` before implementing a GitHub issue.
+- Use one matching project skill in `.codex/skills/`; do not chain skills when one entry point covers the work.
+- Use `$gyeop-product` for product decisions, planning documents, and viral-flow review.
+- Use `$gyeop-question-pack-design` for pack and card content.
 - Use `$gyeop-issue-writer` when creating or splitting GitHub work.
-- Use `$gyeop-task` for issue execution; keep one issue per worktree, branch, spec, and PR.
+- Use `$gyeop-task` for issue execution and its implementation spec; keep one issue per worktree, branch, spec, and PR.
 - Treat `status:*` labels as task workflow truth and GitHub Project as an optional synchronized view.
 
 ## Completion gate
 
-For issue work, `scripts/task-harness pr` runs `./scripts/run-ai-verify --mode full` once for the exact clean checkout; do not run it separately before `pr`. Outside the harness, run it before declaring meaningful project work complete. Report the failing command and cause when verification does not pass.
+For issue work, `scripts/task-harness pr` reuses an exact clean-HEAD verification marker or runs `./scripts/run-ai-verify --mode full` once when absent; do not run it separately before `pr`. Outside the harness, run it before declaring meaningful project work complete. Report the failing command and cause when verification does not pass.

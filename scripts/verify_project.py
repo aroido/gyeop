@@ -22,12 +22,9 @@ REQUIRED_FILES = [
 ]
 EXPECTED_SKILLS = {
     "gyeop-issue-writer",
-    "gyeop-product-doc-writer",
-    "gyeop-product-guardrails",
+    "gyeop-product",
     "gyeop-question-pack-design",
-    "gyeop-spec-writer",
     "gyeop-task",
-    "gyeop-viral-flow-review",
 }
 EXPECTED_MOCKUPS = 6
 LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")

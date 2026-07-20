@@ -108,7 +108,7 @@ scripts/task-harness resume <issue-number>
 scripts/task-harness spec <issue-number>
 ```
 
-새 작업은 `start`, 중단 작업은 `resume`을 사용한다. 명령이 출력한 canonical `worktree` 경로로 이동한 뒤 `spec`과 이후 작업을 실행한다. `$gyeop-spec-writer`로 `docs/specs/issue-<number>.md`를 완성하고 독립 검토 결과를 기록한다.
+새 작업은 `start`, 중단 작업은 `resume`을 사용한다. 명령이 출력한 canonical `worktree` 경로로 이동한 뒤 `spec`과 이후 작업을 실행한다. `$gyeop-task` 흐름으로 `docs/specs/issue-<number>.md`를 완성하고 독립 검토 결과를 기록한다.
 
 `start`는 첫 Git mutation 전에 열린 이슈의 exact `status:ready` 또는 재실행 가능한 exact `status:spec`, blocked provenance 부재, 예상 branch/path를 확인한다. worktree 생성 뒤 status 또는 Project write가 실패하면 안전한 부분 상태를 자동 삭제하지 않는다. 같은 `start` 또는 `resume`으로 검증·재사용하며, Project 호출 뒤 exact spec status와 checkout gate를 다시 확인해야 성공한다.
 

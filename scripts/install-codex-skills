@@ -14,10 +14,25 @@ for SOURCE_DIR in "$SOURCE_ROOT"/*; do
     exit 1
   }
 
+done
+
+for LEGACY_SKILL in \
+  gyeop-product-doc-writer \
+  gyeop-product-guardrails \
+  gyeop-spec-writer \
+  gyeop-viral-flow-review
+do
+  TARGET_DIR="$TARGET_ROOT/$LEGACY_SKILL"
+  [ -d "$TARGET_DIR" ] || continue
+  rm -rf "$TARGET_DIR"
+  echo "removed $TARGET_DIR"
+done
+
+for SOURCE_DIR in "$SOURCE_ROOT"/*; do
+  [ -d "$SOURCE_DIR" ] || continue
   SKILL_NAME="$(basename "$SOURCE_DIR")"
   TARGET_DIR="$TARGET_ROOT/$SKILL_NAME"
   rm -rf "$TARGET_DIR"
   cp -R "$SOURCE_DIR" "$TARGET_DIR"
   echo "installed $TARGET_DIR"
 done
-
