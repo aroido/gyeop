@@ -93,7 +93,7 @@ export function verifyVisitorResponse() {
   assert.match(route, /maximumBodyBytes:\s*256/);
   assert.match(route, /privateNoStore:\s*true/);
   assert.match(route, /deriveResponseStartRateLimitKey/);
-  assert.match(route, /eligibilityConfirmed === true/);
+  assert.doesNotMatch(route, /eligibilityConfirmed/);
   assert.doesNotMatch(route, /runRateLimitedDomain/);
   const idCheck = route.indexOf("isSharePublicId(publicId)");
   const cookieParse = route.indexOf(
@@ -111,7 +111,7 @@ export function verifyVisitorResponse() {
   );
 
   const client = source("lib/visitor-response/visitor-response-client.ts");
-  assert.match(client, /eligibilityConfirmed: true/);
+  assert.doesNotMatch(client, /eligibilityConfirmed/);
   for (const contract of [
     'credentials: "same-origin"',
     'cache: "no-store"',

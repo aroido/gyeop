@@ -16,7 +16,6 @@ const canonicalUuidV4 = z
 export const createOwnerPlaySchema = strictJsonObject({
   packSlug: lowerKebab,
   entrySource: z.enum(["home", "same_pack_cta"]),
-  eligibilityConfirmed: z.literal(true).optional(),
 });
 
 export const saveOwnerAnswerSchema = strictJsonObject({
@@ -47,7 +46,6 @@ export const inviteMetadataSchema = strictJsonObject({
 export const visitorResponseSchema = strictJsonObject({
   intent: z.enum(["resume", "start"]),
   secret: z.string().regex(/^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/),
-  eligibilityConfirmed: z.literal(true).optional(),
   relationshipCode: z
     .enum([
       "old_friend",

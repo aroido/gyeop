@@ -160,6 +160,25 @@ test("reveals exact counts at three samples and shows each increase only once", 
   await expect.poll(() => api.eventCalls).toBe(3);
 });
 
+test("refreshes newly submitted public sights when the owner returns", async ({
+  page,
+}) => {
+  const api = await installProfileApi(page, profile());
+  await page.goto("/me");
+  await expect(page.getByText("아직 도착한 시선이 없어요")).toBeVisible();
+
+  api.profile = profile(1, 1);
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event("visibilitychange")),
+  );
+
+  await expect(page.getByText("새 시선 도착")).toBeVisible();
+  await expect(page.getByText("시선을 모으는 중 · 1/3")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "시선 더 모으기" }),
+  ).toBeVisible();
+});
+
 for (const activation of ["pointer", "keyboard"] as const) {
   test(`${activation} profile reshare records the click and keeps the same play`, async ({
     page,

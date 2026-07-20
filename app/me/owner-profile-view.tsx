@@ -119,6 +119,7 @@ function ProfileCard({ card }: { card: OwnerProfileCard }) {
 
 export default function OwnerProfileView() {
   const [state, setState] = useState<State>({ kind: "loading" });
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const eventPlayRef = useRef<string | null>(null);
   const reshareClickRef = useRef(false);
@@ -137,6 +138,17 @@ export default function OwnerProfileView() {
     return () => {
       active = false;
     };
+  }, [refreshVersion]);
+
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        setRefreshVersion((value) => value + 1);
+      }
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () =>
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
   }, []);
 
   useEffect(() => {

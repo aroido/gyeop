@@ -27,17 +27,14 @@ export function POST(
         throw new Error("INTERNAL_ERROR");
       }
       const intent = input.intent;
-      const eligibilityConfirmed = input.eligibilityConfirmed;
       const relationshipCode = input.relationshipCode;
       const knownSinceCode = input.knownSinceCode;
       const resume =
         intent === "resume" &&
-        eligibilityConfirmed === undefined &&
         relationshipCode === undefined &&
         knownSinceCode === undefined;
       const start =
         intent === "start" &&
-        eligibilityConfirmed === true &&
         typeof relationshipCode === "string" &&
         typeof knownSinceCode === "string";
       if (!resume && !start) throw new Error("INVALID_INPUT");

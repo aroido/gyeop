@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
-import EligibilityGate from "@/app/components/eligibility-gate";
 import {
   buildManagementUrl,
   completeManagementRecord,
@@ -62,7 +61,6 @@ export default function InviteEntry({ publicId }: { publicId: string | null }) {
   const [relationshipCode, setRelationshipCode] = useState("");
   const [knownSinceCode, setKnownSinceCode] = useState("");
   const [starting, setStarting] = useState(false);
-  const [eligibilityConfirmed, setEligibilityConfirmed] = useState(false);
   const [startError, setStartError] = useState<"rate" | "retry" | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const submitLatch = useRef(false);
@@ -83,7 +81,6 @@ export default function InviteEntry({ publicId }: { publicId: string | null }) {
     let active = true;
     queueMicrotask(() => {
       if (active) {
-        setEligibilityConfirmed(false);
         setState({ kind: "loading" });
       }
     });
@@ -137,7 +134,7 @@ export default function InviteEntry({ publicId }: { publicId: string | null }) {
       : state.kind;
   useEffect(() => {
     if (focusKey !== "loading") headingRef.current?.focus();
-  }, [eligibilityConfirmed, focusKey]);
+  }, [focusKey]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -145,7 +142,6 @@ export default function InviteEntry({ publicId }: { publicId: string | null }) {
       !publicId ||
       state.kind !== "active" ||
       state.response ||
-      !eligibilityConfirmed ||
       !relationshipCode ||
       !knownSinceCode ||
       submitLatch.current
@@ -226,10 +222,6 @@ export default function InviteEntry({ publicId }: { publicId: string | null }) {
     return (
       <ResponseFlow initialResponse={state.response} headingRef={headingRef} />
     );
-  }
-
-  if (!eligibilityConfirmed) {
-    return <EligibilityGate onConfirm={() => setEligibilityConfirmed(true)} />;
   }
 
   return (

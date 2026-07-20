@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 
 import { installOwnerFlowApi, playId } from "./owner-flow-fixture";
-import { confirmEligibility } from "./eligibility-fixture";
 
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -51,19 +50,20 @@ test("shows four active private-MVP packs before the owner flow", async ({
   await expect(page.locator("[data-choice]")).toHaveCount(0);
   await expect(
     page.getByText(
-      "겹은 대한민국에서 이용하는 만 19세 이상만 참여할 수 있어요. 생년월일이나 신분증은 받지 않아요.",
+      "생년월일이나 신분증 없이 질문에 답하고 서로의 시선을 비교해요.",
       { exact: false },
     ),
   ).toBeVisible();
-  await page.getByRole("link", { name: "정책과 문의" }).click();
+  const policyLink = page.getByRole("link", { name: "정책과 문의" });
+  await policyLink.focus();
+  await policyLink.press("Enter");
   await expect(
-    page.getByRole("heading", { name: "만 19세 이상만 참여할 수 있어요" }),
+    page.getByRole("heading", { name: "개인정보와 문의" }),
   ).toBeVisible();
   await expect(page.getByText("문의 접수 채널을 준비 중이에요.")).toBeVisible();
   await page.getByRole("link", { name: "홈으로" }).click();
 
   await packLinks.first().click();
-  await confirmEligibility(page);
 
   await expect(page).toHaveURL(`/play/${playId}`);
   await expect(

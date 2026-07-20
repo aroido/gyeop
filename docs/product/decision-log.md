@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-20 — 연령·국가 확인 없이 전체 연령용 질문팩으로 전환
+
+- 결정: 주인·방문자·same-pack 전환에 만 19세·대한민국 자기확인과 `eligibilityConfirmed` API 필드를 두지 않는다. 연령·국가 확인 없이 참여할 수 있다.
+- 이유: MBTI형 A/B 질문과 비교·공유의 핵심 루프는 성인 전용 서비스가 아니며, 진입 차단은 재미 검증에 불필요한 마찰을 만든다.
+- 결과: 공식 질문팩은 전체 연령용으로 검수하고 성적·성인 전용 주제, 제3자의 민감한 개인정보 요구, 위험 행동 조장 질문을 발행하지 않는다. 생년월일·신분증·보호자 정보·IP geolocation은 계속 수집하지 않으며, 답변 철회·삭제는 모든 참여자에게 같은 관리 capability와 보관 정책으로 제공한다. 공개 beta 전에는 현행 개인정보 법률 검토와 공개 문의 채널을 다시 확인한다.
+
 ## 2026-07-20 — 링크·사용자 데이터의 보관·완전 삭제 상한 확정
 
 - 결정: public link 30일, 1:1 link 7일 또는 첫 제출, 비로그인 owner inactivity 7일, visitor draft activity 24시간, submitted response와 로그인 owner inactivity 1년을 기본 보유 상한으로 정한다. 보유 종료부터 운영 DB hard-delete는 24시간, backup 잔존은 hard-delete부터 30일을 넘지 않는다. Auth adoption grace는 7일이고 owner-request·unclaimed Auth provider 삭제는 eligible 시점부터 24시간 안에 완료한다.

@@ -111,6 +111,42 @@ test("rejects spoofed, missing, duplicate-list, and unexpected forwarding header
   assert.throws(() => validateProxyRequest(missing, env()), /INVALID_REQUEST/);
 });
 
+test("accepts only opt-in direct loopback development requests", () => {
+  const direct = new Headers({ origin: "http://127.0.0.1:3000" });
+  assert.equal(
+    validateProxyRequest(
+      direct,
+      env({ NODE_ENV: "development", GYEOP_LOCAL_DEV_DIRECT: "1" }),
+    ).forwardedFor,
+    "127.0.0.1",
+  );
+  assert.equal(
+    validateProxyRequest(
+      new Headers({
+        origin: "http://127.0.0.1:3000",
+        "x-forwarded-for": "127.0.0.1",
+        "x-forwarded-host": "127.0.0.1:3000",
+        "x-forwarded-proto": "http",
+        "x-forwarded-port": "3000",
+      }),
+      env({ NODE_ENV: "development", GYEOP_LOCAL_DEV_DIRECT: "1" }),
+    ).forwardedFor,
+    "127.0.0.1",
+  );
+  assert.throws(() => validateProxyRequest(direct, env()), /INVALID_REQUEST/);
+  assert.throws(
+    () =>
+      validateProxyRequest(
+        new Headers({
+          origin: "http://127.0.0.1:3000",
+          "x-forwarded-for": "198.51.100.1",
+        }),
+        env({ NODE_ENV: "development", GYEOP_LOCAL_DEV_DIRECT: "1" }),
+      ),
+    /INVALID_REQUEST/,
+  );
+});
+
 test("validates production and local APP_URL origins", () => {
   assert.equal(
     validateAppUrl("https://gyeop.example", "production").origin,

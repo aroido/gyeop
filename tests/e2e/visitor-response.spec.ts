@@ -1,7 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-import { confirmEligibility } from "./eligibility-fixture";
-
 const publicId = "AAAAAAAAAAAAAAAAAAAAAA";
 const oneToOneId = "AQEBAQEBAQEBAQEBAQEBAQ";
 const secret = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8";
@@ -155,7 +153,6 @@ async function installVisitorApi(
     const url = new URL(request.url());
     const body = request.postDataJSON() as {
       intent?: "resume" | "start";
-      eligibilityConfirmed?: true;
       relationshipCode?: string;
       knownSinceCode?: string;
     };
@@ -186,7 +183,6 @@ async function installVisitorApi(
             body: "",
           });
     }
-    expect(body.eligibilityConfirmed).toBe(true);
     starts += 1;
     if (options.rateLimitFirstStart && starts === 1) {
       return json(
@@ -365,21 +361,17 @@ async function answerThree(page: Page) {
   await page.getByRole("button", { name: /^A / }).click();
 }
 
-test("blocks an ineligible visitor before relationship and response creation", async ({
+test("shows relationship choices without an intermediate gate", async ({
   page,
 }) => {
   const api = await installVisitorApi(page);
   await page.goto(`/i/${publicId}#k=${secret}`);
   await expect(
     page.getByRole("heading", {
-      name: "겹은 만 19세 이상만 이용할 수 있어요",
+      name: "이 사람과 어떤 사이인가요?",
     }),
-  ).toBeFocused();
-  await page.getByRole("button", { name: "아직 만 19세가 아니에요" }).click();
-  await expect(
-    page.getByRole("heading", { name: "지금은 겹을 이용할 수 없어요" }),
-  ).toBeFocused();
-  await expect(page.getByRole("radio")).toHaveCount(0);
+  ).toBeVisible();
+  await expect(page.getByRole("radio")).toHaveCount(14);
   expect(api.starts()).toBe(0);
 });
 
@@ -389,7 +381,6 @@ test("public invite completes three cards, compares, copies, and reloads", async
   await installClipboard(page);
   const api = await installVisitorApi(page);
   await page.goto(`/i/${publicId}#k=${secret}`);
-  await confirmEligibility(page);
   await expect(
     page.getByRole("heading", { name: "이 사람과 어떤 사이인가요?" }),
   ).toBeFocused();
@@ -463,7 +454,6 @@ test("optional two cards resume after reload and compare without outranking the 
   await installClipboard(page);
   const api = await installVisitorApi(page);
   await page.goto(`/i/${publicId}#k=${secret}`);
-  await confirmEligibility(page);
   await chooseContext(page);
   await answerThree(page);
 
@@ -541,7 +531,6 @@ test("one-to-one invite uses the same flow and only its response resumes after c
   await installClipboard(page);
   const api = await installVisitorApi(page, { kind: "one_to_one" });
   await page.goto(`/i/${oneToOneId}#k=${secret}`);
-  await confirmEligibility(page);
   await expect(page.getByText("나에게 온 1:1 초대")).toBeVisible();
   await chooseContext(page);
   await answerThree(page);
@@ -557,7 +546,6 @@ test("does not skip a card when the same rendered answer is tapped twice", async
   await installClipboard(page);
   const api = await installVisitorApi(page);
   await page.goto(`/i/${publicId}#k=${secret}`);
-  await confirmEligibility(page);
   await chooseContext(page);
 
   await page.getByRole("button", { name: /^B / }).evaluate((element) => {
@@ -590,7 +578,6 @@ test("keeps comparison but discards a mismatched pending management secret", asy
     submitConflictAfterCommit: true,
   });
   await page.goto(`/i/${publicId}#k=${secret}`);
-  await confirmEligibility(page);
   await chooseContext(page);
   await page.evaluate(
     ({ id, pendingSecret }) => {
@@ -631,7 +618,6 @@ test("keeps context after rate limit and retries without a default", async ({
 }) => {
   const api = await installVisitorApi(page, { rateLimitFirstStart: true });
   await page.goto(`/i/${publicId}#k=${secret}`);
-  await confirmEligibility(page);
   await expect(page.getByRole("radio", { checked: true })).toHaveCount(0);
   await page.getByRole("radio", { name: "가족", exact: true }).check();
   await page.getByRole("radio", { name: "잘 모르겠어요" }).check();
@@ -655,7 +641,6 @@ test("retries the ordered save queue without losing later choices", async ({
   await installClipboard(page);
   const api = await installVisitorApi(page, { failFirstSave: true });
   await page.goto(`/i/${publicId}#k=${secret}`);
-  await confirmEligibility(page);
   await chooseContext(page);
   await page.getByRole("button", { name: /^B / }).click();
   await expect(page.getByText("답변을 저장하지 못했어요.")).toBeVisible();
@@ -677,7 +662,6 @@ test("shows a readonly management fallback when clipboard is denied", async ({
   await installClipboard(page, "failure");
   await installVisitorApi(page);
   await page.goto(`/i/${publicId}#k=${secret}`);
-  await confirmEligibility(page);
   await chooseContext(page);
   await answerThree(page);
   await page.getByRole("button", { name: "내 관리 링크 복사" }).click();
@@ -701,7 +685,6 @@ for (const width of [320, 390, 430]) {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await installVisitorApi(page);
     await page.goto(`/i/${publicId}#k=${secret}`);
-    await confirmEligibility(page);
     const radios = page.getByRole("radio");
     expect(
       (await radios.first().locator("..").boundingBox())?.height,
