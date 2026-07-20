@@ -13,6 +13,11 @@ import {
 } from "@playwright/test";
 
 import { hashVisitorManagementSecret } from "../../lib/visitor-response/visitor-session-core.mjs";
+import {
+  claimCompletedOwner,
+  claimCompletedOwnerAccount,
+  signInOwnerAccount,
+} from "./owner-auth-live-fixture";
 
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
@@ -249,7 +254,7 @@ async function waitForOwnerPlayStart(page: Page) {
   }
 }
 
-async function completeOwner(page: Page) {
+async function completeOwnerAccount(page: Page) {
   await page.goto("/play/new?pack=old-friend");
   await waitForOwnerPlayStart(page);
   await expect(
@@ -266,9 +271,13 @@ async function completeOwner(page: Page) {
   await expect(
     page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
   ).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("button", { name: "친구에게 공유하기" }).click();
-  await expect(page.getByRole("heading", { name: "공유 링크" })).toBeFocused();
+  const account = await claimCompletedOwnerAccount(page);
   await expectNoHighImpactA11yViolations(page);
+  return account;
+}
+
+async function completeOwner(page: Page) {
+  return (await completeOwnerAccount(page)).playId;
 }
 
 async function completeVisitor(
@@ -357,7 +366,8 @@ test.describe("core MVP live gate", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await installFailedClipboard(context);
-    await completeOwner(page);
+    const ownerAccount = await completeOwnerAccount(page);
+    const ownerPlayId = ownerAccount.playId;
 
     const createLink = page.getByRole("button", {
       name: "공유 링크 만들기",
@@ -427,7 +437,7 @@ test.describe("core MVP live gate", () => {
     );
 
     await page.setViewportSize({ width: 320, height: 800 });
-    await page.goto("/me");
+    await page.goto(`/me/profile/${ownerPlayId}`);
     await expect(
       page.getByRole("heading", { name: "내 시선 프로필" }),
     ).toBeFocused();
@@ -439,8 +449,46 @@ test.describe("core MVP live gate", () => {
 
     visitors.push(await completeVisitor(browser, inviteUrl, visitorInputs[2]));
 
+    const accountContext = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+      reducedMotion: "reduce",
+      extraHTTPHeaders: {
+        ...visitorHeaders,
+        "x-forwarded-for": "198.51.100.234",
+      },
+    });
+    const accountPage = await accountContext.newPage();
+    await signInOwnerAccount(accountPage, ownerAccount.email);
+    expect(
+      (await accountContext.cookies()).some(
+        (cookie) => cookie.name === "__Host-gyeop-owner",
+      ),
+    ).toBe(false);
+    await expect(
+      accountPage.getByRole("heading", {
+        name: "오래 본 너의 시선",
+        level: 2,
+      }),
+    ).toBeVisible();
+    await accountPage.getByRole("link", { name: "프로필·공유 관리" }).click();
+    await expect(accountPage).toHaveURL(`/me/plays/${ownerPlayId}`);
+    await expect(
+      accountPage.getByRole("heading", { name: "공유 링크" }),
+    ).toBeFocused();
+    await expect(accountPage.getByText("사용 중")).toHaveCount(1);
+    await accountPage.goto(`/me/profile/${ownerPlayId}`);
+    await expect(
+      accountPage.getByRole("heading", { name: "내 시선 프로필" }),
+    ).toBeFocused();
+    await expect(
+      accountPage.getByText("공개 링크로 도착한 시선"),
+    ).toBeVisible();
+    await accountContext.close();
+
     await page.setViewportSize({ width: 430, height: 932 });
-    await page.goto("/me");
+    await page.goto(`/me/profile/${ownerPlayId}`);
     const signatureHeading = page.getByRole("heading", {
       name: "서운한 일이 생기면 나는?",
     });
@@ -560,7 +608,7 @@ test.describe("core MVP live gate", () => {
     await expect(
       page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
     ).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("button", { name: "친구에게 공유하기" }).click();
+    const ownerPlayId = await claimCompletedOwner(page);
     await expect(page.getByText("겹 · 처음 만난 너의 시선")).toBeVisible();
 
     await page.getByRole("button", { name: "공유 링크 만들기" }).click();
@@ -601,7 +649,13 @@ test.describe("core MVP live gate", () => {
     ).toBeFocused();
 
     await page.goto("/me");
-    await expect(page.getByText("겹 · 처음 만난 너의 시선")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "저장한 질문팩" }),
+    ).toBeFocused();
+    await expect(
+      page.getByRole("heading", { name: "처음 만난 너의 시선", level: 2 }),
+    ).toBeVisible();
+    await page.goto(`/me/profile/${ownerPlayId}`);
     await expect(page.locator("article")).toHaveCount(10);
     await visitor.context.close();
   });
@@ -615,7 +669,7 @@ test.describe("core MVP live gate", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await installFailedClipboard(context);
-    await completeOwner(page);
+    const ownerPlayId = await completeOwner(page);
     await page.getByRole("button", { name: "공유 링크 만들기" }).click();
     const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
 
@@ -650,7 +704,7 @@ test.describe("core MVP live gate", () => {
       .inputValue();
     expect(managementUrl).toMatch(/\/responses\/manage#token=/);
 
-    await page.goto("/me");
+    await page.goto(`/me/profile/${ownerPlayId}`);
     await expect(page.getByText("시선을 모으는 중 · 1/3")).toHaveCount(3);
 
     await visitor.page.goto(managementUrl);

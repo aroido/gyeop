@@ -228,13 +228,14 @@ test("holds all later choices behind a failed save and completes after retry", a
     page.getByRole("list", { name: "내 선택 10장" }).getByRole("listitem"),
   ).toHaveCount(10);
   await expect(
-    page.getByRole("button", { name: "내 시선 프로필" }),
+    page.getByRole("button", { name: "내 질문팩 저장하고 공유하기" }),
   ).toBeVisible();
   await page.keyboard.press("Tab");
-  await page.keyboard.press("Tab");
-  const profileButton = page.getByRole("button", { name: "내 시선 프로필" });
-  await expect(profileButton).toBeFocused();
-  await expect(profileButton).toHaveCSS("outline-color", "rgb(49, 92, 255)");
+  const saveButton = page.getByRole("button", {
+    name: "내 질문팩 저장하고 공유하기",
+  });
+  await expect(saveButton).toBeFocused();
+  await expect(saveButton).toHaveCSS("outline-color", "rgb(49, 92, 255)");
 });
 
 test("exposes an explicit completion retry after authoritative ten-answer incomplete", async ({

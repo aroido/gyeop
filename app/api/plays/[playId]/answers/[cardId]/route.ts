@@ -6,6 +6,7 @@ import { saveOwnerAnswerSchema } from "../../../../../../lib/http/owner-play-sch
 import { runRateLimitedDomain } from "../../../../../../lib/http/rate-limit.ts";
 import { withPublicRequest } from "../../../../../../lib/http/request-boundary.ts";
 import { parseOwnerCookieHeader } from "../../../../../../lib/owner-play/owner-play-session-core.mjs";
+import { isOwnerPlayId } from "../../../../../../lib/owner-play/owner-play-state-core.mjs";
 
 export function PUT(
   request: Request,
@@ -41,9 +42,10 @@ export function PUT(
           if (cookie.outcome === "malformed")
             return ownerNotFoundResponse(true);
           const { playId, cardId } = await context.params;
-          if (cookie.playId !== playId) return ownerNotFoundResponse();
+          if (!isOwnerPlayId(playId)) return ownerNotFoundResponse();
           return saveOwnerAnswerResponse({
             cookie,
+            playId,
             cardId,
             choice: input.choice,
             currentPosition: input.currentPosition,

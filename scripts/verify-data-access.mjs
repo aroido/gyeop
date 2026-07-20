@@ -13,6 +13,30 @@ const ALLOWED_RPC_EXPORTS = new Map([
   ["getPublishedPack", "get_published_pack"],
   ["createOrResumeOwnerPlay", "create_or_resume_play_with_source"],
   ["getOwnerPlay", "get_owner_play"],
+  ["claimAnonymousOwner", "claim_anonymous_owner"],
+  ["listAuthenticatedOwnerPlays", "list_authenticated_owner_plays"],
+  ["getAuthenticatedOwnerPlay", "get_authenticated_owner_play"],
+  ["getAuthenticatedOwnerProfile", "get_authenticated_owner_profile"],
+  [
+    "recordAuthenticatedOwnerProfileEvent",
+    "record_authenticated_owner_profile_event",
+  ],
+  ["createAuthenticatedShareLink", "create_authenticated_share_link"],
+  ["listAuthenticatedShareLinks", "list_authenticated_share_links"],
+  ["disableAuthenticatedShareLink", "disable_authenticated_share_link"],
+  ["rotateAuthenticatedShareLink", "rotate_authenticated_share_link"],
+  [
+    "recordAuthenticatedOwnerShareAction",
+    "record_authenticated_owner_share_action",
+  ],
+  [
+    "listAuthenticatedOwnerOneToOneResponses",
+    "list_authenticated_owner_1to1_responses",
+  ],
+  [
+    "getAuthenticatedPrivateOneToOneComparison",
+    "get_authenticated_private_1to1_comparison",
+  ],
   ["saveOwnerAnswer", "save_owner_answer"],
   ["completeOwnerPlay", "complete_owner_play"],
   ["revokeOwnerPlaySession", "revoke_owner_play_session"],
@@ -53,7 +77,8 @@ const PLAY_CAPABILITY_EXPORTS = new Map([
   ["listOwnerOneToOneResponses", "list_owner_1to1_responses"],
   ["getPrivateOneToOneComparison", "get_private_1to1_comparison"],
   ["recordOwnerProfileEvent", "record_owner_profile_event"],
-  ["createShareLink", "create_share_link"],
+  ["getOwnerClaimState", "get_owner_claim_state"],
+  ["createShareLink", "create_claimed_share_link"],
   ["rotateShareLink", "rotate_share_link"],
   ["disableShareLink", "disable_share_link"],
   ["listOwnerShareLinks", "list_owner_share_links"],
@@ -1420,13 +1445,16 @@ export function verifyOwnerCapabilitySql(sql, filePath = "migration.sql") {
       (name === "create_or_resume_play" &&
         priorGuarded &&
         /public\s*\.\s*create_or_resume_play_with_source\s*\(/i.test(body) &&
-        /private\s*\.\s*create_or_resume_play_core\s*\(/i.test(
+        ((/private\s*\.\s*create_or_resume_play_core\s*\(/i.test(
           sourceCreate?.body ?? "",
         ) &&
-        /alter\s+function\s+public\.create_or_resume_play\s*\([\s\S]*?set\s+schema\s+private/i.test(
-          sql,
-        ) &&
-        /rename\s+to\s+create_or_resume_play_core/i.test(sql)) ||
+          /alter\s+function\s+public\.create_or_resume_play\s*\([\s\S]*?set\s+schema\s+private/i.test(
+            sql,
+          ) &&
+          /rename\s+to\s+create_or_resume_play_core/i.test(sql)) ||
+          (sourceCreate?.body.match(
+            /private\s*\.\s*authorize_owner_play_capability\s*\(/gi,
+          )?.length ?? 0) === 1)) ||
       (name === "complete_owner_play" &&
         priorGuarded &&
         /begin\s+(?:v_result\s*:=|return)\s+private\s*\.\s*complete_owner_play_core\s*\(/i.test(

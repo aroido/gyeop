@@ -161,6 +161,13 @@ export async function resumeOwnerPlayResponse(input: {
       result.play,
     );
   }
+  if (result.outcome === "created") {
+    return setOwnerCookie(
+      ownerJson(result.play, 201),
+      input.cookie.value,
+      result.play,
+    );
+  }
   if (result.outcome === "expired" || result.outcome === "not_found") {
     return createOwnerPlayResponse({
       packSlug: input.packSlug,
@@ -196,10 +203,11 @@ export async function resumeOwnerPlayResponse(input: {
 
 export async function readOwnerPlayResponse(input: {
   cookie: ValidOwnerCookie;
+  playId: string;
   signal: AbortSignal;
 }) {
   const result = await getOwnerPlay({
-    playId: input.cookie.playId,
+    playId: input.playId,
     managementSecretHash: input.cookie.managementSecretHash,
     signal: input.signal,
   });
@@ -215,13 +223,14 @@ export async function readOwnerPlayResponse(input: {
 
 export async function saveOwnerAnswerResponse(input: {
   cookie: ValidOwnerCookie;
+  playId: string;
   cardId: string;
   choice: "a" | "b";
   currentPosition: number;
   signal: AbortSignal;
 }) {
   const result = await saveOwnerAnswer({
-    playId: input.cookie.playId,
+    playId: input.playId,
     managementSecretHash: input.cookie.managementSecretHash,
     cardId: input.cardId,
     choice: input.choice,
@@ -248,10 +257,11 @@ export async function saveOwnerAnswerResponse(input: {
 
 export async function completeOwnerPlayResponse(input: {
   cookie: ValidOwnerCookie;
+  playId: string;
   signal: AbortSignal;
 }) {
   const result = await completeOwnerPlay({
-    playId: input.cookie.playId,
+    playId: input.playId,
     managementSecretHash: input.cookie.managementSecretHash,
     signal: input.signal,
   });

@@ -25,6 +25,10 @@ export const saveOwnerAnswerSchema = strictJsonObject({
 
 export const emptyOwnerMutationSchema = strictJsonObject({});
 
+export const playOwnerMutationSchema = strictJsonObject({
+  playId: canonicalUuidV4,
+});
+
 export const createShareLinkSchema = strictJsonObject({
   kind: z.enum(["public", "one_to_one"]),
 });
@@ -37,6 +41,7 @@ export const recordShareActionSchema = strictJsonObject({
 
 export const ownerProfileEventSchema = strictJsonObject({
   event: z.enum(["profile_viewed", "profile_reshare_clicked"]),
+  playId: canonicalUuidV4,
 });
 
 export const inviteMetadataSchema = strictJsonObject({

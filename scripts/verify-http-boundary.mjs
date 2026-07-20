@@ -54,6 +54,7 @@ const HTTP_METHODS = new Set([
 ]);
 const PUBLIC_BOUNDARY_FILE = "lib/http/request-boundary.ts";
 const REVIEWED_INTERNAL_ADAPTERS = new Set([
+  "lib/http/auth-owner.ts",
   "lib/http/rate-limit.ts",
   "lib/http/owner-play.ts",
   "lib/http/owner-profile.ts",
@@ -575,10 +576,6 @@ const OWNER_ROUTE_CONTRACTS = new Map([
       sequence: [
         ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
         [
-          "lib/owner-play/owner-play-session-core.mjs",
-          "parseOwnerCookieHeader",
-        ],
-        [
           "lib/http/private-one-to-one.ts",
           "listPrivateOneToOneResponsesResponse",
         ],
@@ -593,10 +590,6 @@ const OWNER_ROUTE_CONTRACTS = new Map([
       sequence: [
         ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
         [
-          "lib/owner-play/owner-play-session-core.mjs",
-          "parseOwnerCookieHeader",
-        ],
-        [
           "lib/http/private-one-to-one.ts",
           "readPrivateOneToOneComparisonResponse",
         ],
@@ -610,10 +603,6 @@ const OWNER_ROUTE_CONTRACTS = new Map([
       method: "GET",
       sequence: [
         ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
-        [
-          "lib/owner-play/owner-play-session-core.mjs",
-          "parseOwnerCookieHeader",
-        ],
         ["lib/http/owner-profile.ts", "readOwnerProfileResponse"],
       ],
       limited: true,
@@ -624,10 +613,6 @@ const OWNER_ROUTE_CONTRACTS = new Map([
     {
       method: "POST",
       sequence: [
-        [
-          "lib/owner-play/owner-play-session-core.mjs",
-          "parseOwnerCookieHeader",
-        ],
         ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
         ["lib/http/owner-profile.ts", "recordOwnerProfileEventResponse"],
       ],
@@ -715,10 +700,6 @@ const OWNER_ROUTE_CONTRACTS = new Map([
       method: "POST",
       sequence: [
         ["lib/http/rate-limit.ts", "runRateLimitedDomain"],
-        [
-          "lib/owner-play/owner-play-session-core.mjs",
-          "parseOwnerCookieHeader",
-        ],
         ["lib/owner-play/owner-play-state-core.mjs", "isOwnerPlayId"],
         ["lib/http/share-links.ts", "recordShareActionResponse"],
       ],

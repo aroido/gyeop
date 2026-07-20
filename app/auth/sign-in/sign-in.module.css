@@ -1,0 +1,139 @@
+.shell {
+  --lime: #dfff00;
+  --blue: #315cff;
+
+  display: grid;
+  min-height: 100svh;
+  padding: 1rem 0.85rem 1.25rem;
+  place-items: center;
+  background: #050505;
+  color: #fff;
+}
+
+.card {
+  width: min(100%, 30rem);
+  padding: 1rem;
+  border: 1px solid #454545;
+  border-top: 0.6rem solid var(--lime);
+  border-radius: 1rem;
+  background: #050505;
+}
+
+.brand {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.card h1 {
+  margin: 0.85rem 0 0;
+  font-size: clamp(2rem, 10vw, 3rem);
+  font-weight: 950;
+  line-height: 1.03;
+  letter-spacing: -0.065em;
+  word-break: keep-all;
+}
+
+.lead {
+  margin: 1rem 0 0;
+  color: #bdbdbd;
+  font-size: 0.93rem;
+  font-weight: 700;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.form {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1.5rem;
+}
+
+.form label {
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.form input {
+  min-height: 3.25rem;
+  padding: 0 0.85rem;
+  border: 1px solid #777;
+  border-radius: 0.7rem;
+  background: #171717;
+  color: #fff;
+  font: inherit;
+}
+
+.form button,
+.sent button,
+.sent a {
+  display: grid;
+  min-height: 3rem;
+  place-items: center;
+  border: 1px solid #050505;
+  border-radius: 0.7rem;
+  background: var(--lime);
+  color: #050505;
+  font: inherit;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.form button:disabled {
+  opacity: 0.65;
+}
+
+.sent {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--lime);
+  border-radius: 0.8rem;
+}
+
+.sent strong {
+  font-size: 1.1rem;
+}
+
+.sent p {
+  margin: 0;
+  color: #cfcfcf;
+  line-height: 1.5;
+}
+
+.sent button {
+  border-color: #6a6a6a;
+  background: transparent;
+  color: #fff;
+}
+
+.alert {
+  margin: 1rem 0 0;
+  padding: 0.8rem;
+  border-radius: 0.7rem;
+  background: #3d1717;
+  color: #ffd3cf;
+  font-size: 0.84rem;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.back {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  margin-top: 1rem;
+  color: #d9d9d9;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.form input:focus-visible,
+.form button:focus-visible,
+.sent button:focus-visible,
+.sent a:focus-visible,
+.back:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}

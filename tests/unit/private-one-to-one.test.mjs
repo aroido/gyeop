@@ -14,6 +14,7 @@ import {
 } from "../../lib/private-one-to-one/private-one-to-one-client.ts";
 
 const responseId = "28000000-0000-4000-8000-000000000001";
+const playId = "27000000-0000-4000-8000-000000000001";
 const shareLinkId = "28100000-0000-4000-8000-000000000001";
 const submitted = Object.freeze({
   id: responseId,
@@ -201,12 +202,8 @@ test("uses exact no-store endpoints and single-flights browser reads", async () 
     });
   };
   try {
-    const first = listPrivateOneToOneResponses(
-      "27000000-0000-4000-8000-000000000001",
-    );
-    const second = listPrivateOneToOneResponses(
-      "27000000-0000-4000-8000-000000000001",
-    );
+    const first = listPrivateOneToOneResponses(playId);
+    const second = listPrivateOneToOneResponses(playId);
     assert.equal(first, second);
     assert.equal(calls.length, 1);
     release();
@@ -220,8 +217,12 @@ test("uses exact no-store endpoints and single-flights browser reads", async () 
       },
     });
 
-    const detail = getPrivateOneToOneComparison(responseId);
+    const detail = getPrivateOneToOneComparison(playId, responseId);
     assert.equal(calls.length, 2);
+    assert.equal(
+      calls[1].url,
+      `/api/me/responses/${responseId}?playId=${playId}`,
+    );
     release();
     assert.deepEqual(await detail, comparison);
   } finally {
@@ -241,7 +242,7 @@ test("maps private read failures to status-only errors", async () => {
     );
   try {
     await assert.rejects(
-      getPrivateOneToOneComparison(responseId),
+      getPrivateOneToOneComparison(playId, responseId),
       (error) =>
         error instanceof PrivateOneToOneHttpError && error.status === 404,
     );
@@ -259,7 +260,8 @@ test("rejects invalid identifiers and cacheable responses before decoding", asyn
   };
   try {
     await assert.rejects(listPrivateOneToOneResponses("bad-id"));
-    await assert.rejects(getPrivateOneToOneComparison("bad-id"));
+    await assert.rejects(getPrivateOneToOneComparison("bad-id", responseId));
+    await assert.rejects(getPrivateOneToOneComparison(playId, "bad-id"));
     assert.equal(calls, 0);
     await assert.rejects(
       listPrivateOneToOneResponses("27000000-0000-4000-8000-000000000001"),

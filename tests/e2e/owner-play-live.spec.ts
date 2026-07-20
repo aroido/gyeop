@@ -8,6 +8,8 @@ import {
   type Page,
 } from "@playwright/test";
 
+import { claimCompletedOwner } from "./owner-auth-live-fixture";
+
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
 const proxyKey = Buffer.alloc(32, 8).toString("base64url");
@@ -667,6 +669,41 @@ test.describe("live owner flow", () => {
   test.beforeAll(() => setOldFriendActive());
   test.afterAll(() => setOldFriendActive());
 
+  test("keeps multiple packs under one anonymous owner and resumes each pack", async ({
+    context,
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    await page.goto("/play/new?pack=old-friend");
+    await waitForOwnerPlayStart(page);
+    const oldFriendUrl = page.url();
+    await page.locator('button[data-choice="a"]').click();
+    await expect(page.locator('[data-state="saved"]')).toBeVisible();
+    const ownerCookie = (await context.cookies()).find(
+      (cookie) => cookie.name === "__Host-gyeop-owner",
+    );
+
+    await page.goto("/play/new?pack=honest-self");
+    await waitForOwnerPlayStart(page);
+    expect(page.url()).not.toBe(oldFriendUrl);
+    await page.locator('button[data-choice="b"]').click();
+    await expect(page.locator('[data-state="saved"]')).toBeVisible();
+    expect(
+      (await context.cookies()).find(
+        (cookie) => cookie.name === "__Host-gyeop-owner",
+      )?.value,
+    ).toBe(ownerCookie?.value);
+
+    await page.goto("/play/new?pack=old-friend");
+    await waitForOwnerPlayStart(page);
+    await expect(page).toHaveURL(oldFriendUrl);
+    await page.getByRole("button", { name: "이전" }).click();
+    await expect(page.locator('button[data-choice="a"]')).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
   test("keeps a Secure HttpOnly capability through save, reload, and completion", async ({
     browser,
     context,
@@ -742,10 +779,7 @@ test.describe("live owner flow", () => {
     ).toBeVisible();
     await expect(page.locator("[data-choice]")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "친구에게 공유하기" }).click();
-    await expect(
-      page.getByRole("heading", { name: "공유 링크" }),
-    ).toBeFocused();
+    const claimedPlayId = await claimCompletedOwner(page);
     await page.getByRole("button", { name: "공유 링크 만들기" }).click();
     const inviteUrl = await page.getByLabel("공유 링크 직접 복사").inputValue();
     expect(
@@ -1372,7 +1406,7 @@ test.describe("live owner flow", () => {
         packVersion: string;
         entrySource: string;
       }>;
-    await page.goto("/me");
+    await page.goto(`/me/profile/${claimedPlayId}`);
     await expect(
       page.getByRole("heading", { name: "내 시선 프로필" }),
     ).toBeFocused();

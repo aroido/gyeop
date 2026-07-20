@@ -130,7 +130,7 @@ export default function PrivateOneToOnePanel({ playId }: { playId: string }) {
     try {
       setState({
         kind: "detail",
-        comparison: await getPrivateOneToOneComparison(responseId),
+        comparison: await getPrivateOneToOneComparison(playId, responseId),
       });
     } catch (error) {
       if (error instanceof PrivateOneToOneHttpError && error.status === 404) {

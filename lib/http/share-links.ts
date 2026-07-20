@@ -1,21 +1,17 @@
 import "server-only";
 
 import {
-  disableShareLink,
+  disableAuthenticatedShareLink,
   getInviteMetadata,
-  listOwnerShareLinks,
-  recordOwnerShareAction,
+  listAuthenticatedShareLinks,
+  recordAuthenticatedOwnerShareAction,
 } from "../db/internal-rpc.ts";
-import { serializeOwnerCookie } from "../owner-play/owner-play-session-core.mjs";
-import type { ParsedOwnerCookie } from "../owner-play/owner-play-session.ts";
 import { hashShareSecret } from "../share-links/share-link-session-core.mjs";
 import {
-  createShareLinkWithCredential,
-  rotateShareLinkWithCredential,
+  createAuthenticatedShareLinkWithCredential,
+  rotateAuthenticatedShareLinkWithCredential,
 } from "../share-links/share-links.ts";
 import { ownerNotFoundResponse, privateNoStore } from "./owner-play.ts";
-
-type OwnerCookie = Extract<ParsedOwnerCookie, { outcome: "valid" }>;
 
 const LINK_NOT_ACTIVE = Object.freeze({
   code: "SHARE_LINK_NOT_ACTIVE",
@@ -34,125 +30,85 @@ function ownerJson(value: unknown, status = 200) {
   return privateNoStore(Response.json(value, { status }));
 }
 
-function renewOwnerCookie<
-  T extends { managementExpiresAt: string; managementTtlSeconds: number },
->(response: Response, cookie: OwnerCookie, result: T) {
-  response.headers.set(
-    "Set-Cookie",
-    serializeOwnerCookie(
-      cookie.value,
-      result.managementTtlSeconds,
-      result.managementExpiresAt,
-    ),
-  );
-  return response;
-}
-
 function ownerFailure(outcome: string) {
-  if (outcome === "expired" || outcome === "not_found") {
-    return ownerNotFoundResponse(true);
-  }
+  if (outcome === "expired" || outcome === "not_found")
+    return ownerNotFoundResponse();
   return ownerNotFoundResponse();
 }
 
 export async function createShareLinkResponse(input: {
-  cookie: OwnerCookie;
+  playId: string;
   kind: "public" | "one_to_one";
   signal: AbortSignal;
 }) {
-  const result = await createShareLinkWithCredential({
-    playId: input.cookie.playId,
-    managementSecretHash: input.cookie.managementSecretHash,
+  const result = await createAuthenticatedShareLinkWithCredential({
+    playId: input.playId,
     kind: input.kind,
-    signal: input.signal,
-  });
+  }).catch(() => null);
+  if (!result) return ownerNotFoundResponse();
   if (result.outcome !== "created") return ownerFailure(result.outcome);
-  return renewOwnerCookie(
-    ownerJson({ link: result.link, inviteUrl: result.inviteUrl }, 201),
-    input.cookie,
-    result,
-  );
+  return ownerJson({ link: result.link, inviteUrl: result.inviteUrl }, 201);
 }
 
 export async function listShareLinksResponse(input: {
-  cookie: OwnerCookie;
+  playId: string;
   signal: AbortSignal;
 }) {
-  const result = await listOwnerShareLinks({
-    playId: input.cookie.playId,
-    managementSecretHash: input.cookie.managementSecretHash,
-    signal: input.signal,
-  });
+  const result = await listAuthenticatedShareLinks({
+    playId: input.playId,
+  }).catch(() => null);
+  if (!result) return ownerNotFoundResponse();
   if (result.outcome !== "listed") return ownerFailure(result.outcome);
-  return renewOwnerCookie(
-    ownerJson({ links: result.links }),
-    input.cookie,
-    result,
-  );
+  return ownerJson({ links: result.links });
 }
 
 export async function disableShareLinkResponse(input: {
-  cookie: OwnerCookie;
+  playId: string;
   linkId: string;
   signal: AbortSignal;
 }) {
-  const result = await disableShareLink({
-    playId: input.cookie.playId,
-    managementSecretHash: input.cookie.managementSecretHash,
+  const result = await disableAuthenticatedShareLink({
+    playId: input.playId,
     linkId: input.linkId,
-    signal: input.signal,
-  });
+  }).catch(() => null);
+  if (!result) return ownerNotFoundResponse();
   if (result.outcome !== "disabled") return ownerFailure(result.outcome);
-  return renewOwnerCookie(
-    ownerJson({ link: result.link }),
-    input.cookie,
-    result,
-  );
+  return ownerJson({ link: result.link });
 }
 
 export async function rotateShareLinkResponse(input: {
-  cookie: OwnerCookie;
+  playId: string;
   linkId: string;
   signal: AbortSignal;
 }) {
-  const result = await rotateShareLinkWithCredential({
-    playId: input.cookie.playId,
-    managementSecretHash: input.cookie.managementSecretHash,
+  const result = await rotateAuthenticatedShareLinkWithCredential({
+    playId: input.playId,
     linkId: input.linkId,
-    signal: input.signal,
-  });
+  }).catch(() => null);
+  if (!result) return ownerNotFoundResponse();
   if (result.outcome === "link_not_active") {
     return ownerJson(LINK_NOT_ACTIVE, 409);
   }
   if (result.outcome !== "rotated") return ownerFailure(result.outcome);
-  return renewOwnerCookie(
-    ownerJson({ link: result.link, inviteUrl: result.inviteUrl }, 201),
-    input.cookie,
-    result,
-  );
+  return ownerJson({ link: result.link, inviteUrl: result.inviteUrl }, 201);
 }
 
 export async function recordShareActionResponse(input: {
-  cookie: OwnerCookie;
+  playId: string;
   linkId: string;
   event: "share_handoff_succeeded" | "share_link_copied";
   entrySource: "profile_reshare" | null;
   signal: AbortSignal;
 }) {
-  const result = await recordOwnerShareAction({
-    playId: input.cookie.playId,
-    managementSecretHash: input.cookie.managementSecretHash,
+  const result = await recordAuthenticatedOwnerShareAction({
+    playId: input.playId,
     linkId: input.linkId,
     event: input.event,
     entrySource: input.entrySource,
-    signal: input.signal,
-  });
+  }).catch(() => null);
+  if (!result) return ownerNotFoundResponse();
   if (result.outcome !== "recorded") return ownerFailure(result.outcome);
-  return renewOwnerCookie(
-    privateNoStore(new Response(null, { status: 204 })),
-    input.cookie,
-    result,
-  );
+  return privateNoStore(new Response(null, { status: 204 }));
 }
 
 export async function inviteMetadataResponse(input: {

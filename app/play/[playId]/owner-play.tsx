@@ -453,15 +453,14 @@ export default function OwnerPlay({ playId }: { playId: string | null }) {
           </ol>
           <button
             className={styles.homeButton}
-            onClick={() => router.push(`/me/plays/${flow.play.id}`)}
+            onClick={() => {
+              const returnTo = `/me/plays/${flow.play.id}`;
+              router.push(
+                `/auth/sign-in?playId=${flow.play.id}&returnTo=${encodeURIComponent(returnTo)}`,
+              );
+            }}
           >
-            친구에게 공유하기
-          </button>
-          <button
-            className={styles.profileButton}
-            onClick={() => router.push("/me")}
-          >
-            내 시선 프로필
+            내 질문팩 저장하고 공유하기
           </button>
         </section>
       </main>

@@ -60,21 +60,26 @@ export function listPrivateOneToOneResponses(
 }
 
 export function getPrivateOneToOneComparison(
+  playId: string,
   responseId: string,
 ): Promise<PrivateOneToOneComparison> {
-  if (!isVisitorResponseId(responseId)) {
+  if (!isOwnerPlayId(playId) || !isVisitorResponseId(responseId)) {
     return Promise.reject(new PrivateOneToOneHttpError(400));
   }
-  const existing = pendingComparisons.get(responseId);
+  const key = `${playId}:${responseId}`;
+  const existing = pendingComparisons.get(key);
   if (existing) return existing;
-  const request = fetch(`/api/me/responses/${encodeURIComponent(responseId)}`, {
-    method: "GET",
-    cache: "no-store",
-    credentials: "same-origin",
-  })
+  const request = fetch(
+    `/api/me/responses/${encodeURIComponent(responseId)}?playId=${encodeURIComponent(playId)}`,
+    {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin",
+    },
+  )
     .then(readJson)
     .then((value) => decodePrivateOneToOneComparison(value))
-    .finally(() => pendingComparisons.delete(responseId));
-  pendingComparisons.set(responseId, request);
+    .finally(() => pendingComparisons.delete(key));
+  pendingComparisons.set(key, request);
   return request;
 }

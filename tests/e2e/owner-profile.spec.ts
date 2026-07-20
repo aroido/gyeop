@@ -67,6 +67,7 @@ async function installProfileApi(
     eventCalls: 0,
     eventBodies: [] as Array<{
       event: "profile_viewed" | "profile_reshare_clicked";
+      playId: string;
     }>,
   };
   await page.route("**/api/me/profile**", async (route) => {
@@ -77,10 +78,12 @@ async function installProfileApi(
       expect(request.method()).toBe("POST");
       const body = request.postDataJSON() as {
         event: "profile_viewed" | "profile_reshare_clicked";
+        playId: string;
       };
       expect(["profile_viewed", "profile_reshare_clicked"]).toContain(
         body.event,
       );
+      expect(body.playId).toBe(playId);
       state.eventBodies.push(body);
       return route.fulfill({
         status: 204,
@@ -114,7 +117,7 @@ test("renders the private zero-sight profile and records viewing after render", 
   page,
 }) => {
   const api = await installProfileApi(page, profile());
-  await page.goto("/me");
+  await page.goto(`/me/profile/${playId}`);
 
   await expect(
     page.getByRole("heading", { name: "내 시선 프로필", level: 1 }),
@@ -131,14 +134,14 @@ test("renders the private zero-sight profile and records viewing after render", 
   await expect(backLink).toBeFocused();
   await expect(backLink).toHaveCSS("outline-color", "rgb(49, 92, 255)");
   await expect.poll(() => api.eventCalls).toBe(1);
-  expect(api.eventBodies).toEqual([{ event: "profile_viewed" }]);
+  expect(api.eventBodies).toEqual([{ event: "profile_viewed", playId }]);
 });
 
 test("reveals exact counts at three samples and shows each increase only once", async ({
   page,
 }) => {
   const api = await installProfileApi(page, profile(2, 2));
-  await page.goto("/me");
+  await page.goto(`/me/profile/${playId}`);
   await expect(page.getByText("새 시선 도착")).toBeVisible();
   await expect(page.getByText("시선을 모으는 중 · 2/3")).toBeVisible();
   await expect(page.getByText("A · 바로 이야기한다")).toHaveCount(0);
@@ -164,7 +167,7 @@ test("refreshes newly submitted public sights when the owner returns", async ({
   page,
 }) => {
   const api = await installProfileApi(page, profile());
-  await page.goto("/me");
+  await page.goto(`/me/profile/${playId}`);
   await expect(page.getByText("아직 도착한 시선이 없어요")).toBeVisible();
 
   api.profile = profile(1, 1);
@@ -184,7 +187,7 @@ for (const activation of ["pointer", "keyboard"] as const) {
     page,
   }) => {
     const api = await installProfileApi(page, profile(1, 1));
-    await page.goto("/me");
+    await page.goto(`/me/profile/${playId}`);
     const cta = page.getByRole("link", { name: "시선 더 모으기" });
     if (activation === "pointer") {
       await cta.click();
@@ -198,15 +201,15 @@ for (const activation of ["pointer", "keyboard"] as const) {
     await expect
       .poll(() => api.eventBodies)
       .toEqual([
-        { event: "profile_viewed" },
-        { event: "profile_reshare_clicked" },
+        { event: "profile_viewed", playId },
+        { event: "profile_reshare_clicked", playId },
       ]);
   });
 }
 
 test("deduplicates same-tick profile reshare activation", async ({ page }) => {
   const api = await installProfileApi(page, profile(1, 1));
-  await page.goto("/me");
+  await page.goto(`/me/profile/${playId}`);
   await page
     .getByRole("link", { name: "시선 더 모으기" })
     .evaluate((element) => {
@@ -219,8 +222,8 @@ test("deduplicates same-tick profile reshare activation", async ({ page }) => {
   await expect
     .poll(() => api.eventBodies)
     .toEqual([
-      { event: "profile_viewed" },
-      { event: "profile_reshare_clicked" },
+      { event: "profile_viewed", playId },
+      { event: "profile_reshare_clicked", playId },
     ]);
 });
 
@@ -238,7 +241,7 @@ test("never claims a new sight when browser storage is unavailable", async ({
     }
   });
   await installProfileApi(page, profile(3, 3));
-  await page.goto("/me");
+  await page.goto(`/me/profile/${playId}`);
 
   await expect(page.getByText("새 시선 도착")).toHaveCount(0);
   await expect(page.getByText("시선이 쌓여 있어요")).toBeVisible();
@@ -248,7 +251,7 @@ test("renders one generic terminal state without recording a view", async ({
   page,
 }) => {
   const api = await installProfileApi(page, profile(), { status: 404 });
-  await page.goto("/me");
+  await page.goto(`/me/profile/${playId}`);
 
   await expect(
     page.getByRole("heading", { name: "이 프로필을 열 수 없어요" }),
@@ -267,7 +270,7 @@ for (const viewport of [
   }) => {
     await page.setViewportSize(viewport);
     await installProfileApi(page, profile(3, 3));
-    await page.goto("/me");
+    await page.goto(`/me/profile/${playId}`);
 
     await expect(
       page.getByRole("heading", { name: "내 시선 프로필", level: 1 }),
