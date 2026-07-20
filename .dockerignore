@@ -1,0 +1,14 @@
+.git
+.codex
+.lazyweb
+.omx
+.env
+.env.*
+node_modules
+.next
+coverage
+playwright-report
+test-results
+tests
+docs
+supabase

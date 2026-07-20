@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: gyeop-private-mvp
+    runtime: docker
+    plan: free
+    healthCheckPath: /
+    autoDeployTrigger: commit
+    envVars:
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: ORIGIN_PROXY_SECRET
+        sync: false
+      - key: RATE_LIMIT_SECRET
+        sync: false
+      - key: ACCOUNT_DELETE_REAUTH_KEYRING
+        sync: false
+      - key: ACCOUNT_DELETE_REAUTH_ACTIVE_VERSION
+        sync: false

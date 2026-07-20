@@ -68,6 +68,42 @@ pnpm dev
 
 `.env.local`은 local 전용 값도 포함하므로 출력·커밋·artifact 업로드를 하지 않는다. 작업을 마치면 `pnpm supabase:stop`으로 local stack을 내린다.
 
+## 비공개 MVP 무료 배포
+
+`render.yaml`은 도메인 없이 `https://<service>.onrender.com`에서 동작하는 Render Free Web Service용 설정이다. 앱과 HAProxy를 한 컨테이너에 두어 public Route가 기존 proxy 신뢰 경계를 계속 통과한다. Render가 전달하는 Cloudflare client IP를 우선 사용하고, 없을 때는 Render 연결 IP로 안전하게 축소한다.
+
+1. Supabase에서 Free project를 만들고 아래 명령으로 migration과 공식 pack seed를 올린다.
+
+   ```bash
+   pnpm exec supabase login
+   pnpm exec supabase link --project-ref <project-ref>
+   pnpm exec supabase db push --include-seed
+   ```
+
+2. Render Dashboard에서 GitHub repository를 연결해 Blueprint `render.yaml`을 적용한다. Free plan을 유지하고, 생성된 `https://<service>.onrender.com` 주소만 비공개 테스트 참가자에게 전달한다.
+
+3. Render Environment에 `.env.example`의 다음 값을 설정한다. `NEXT_PUBLIC_SUPABASE_*` 두 값은 build 시에도 필요하며 나머지는 runtime secret이다. `APP_URL`은 비워두면 Render가 제공한 URL을 사용하고, 나중에 커스텀 도메인을 붙일 때만 HTTPS origin으로 명시한다.
+
+   ```text
+   NEXT_PUBLIC_SUPABASE_URL
+   NEXT_PUBLIC_SUPABASE_ANON_KEY
+   SUPABASE_SECRET_KEY
+   ORIGIN_PROXY_SECRET
+   RATE_LIMIT_SECRET
+   ACCOUNT_DELETE_REAUTH_KEYRING
+   ACCOUNT_DELETE_REAUTH_ACTIVE_VERSION
+   ```
+
+   `ORIGIN_PROXY_SECRET`와 `RATE_LIMIT_SECRET`은 각각 `node -e 'console.log(require("node:crypto").randomBytes(32).toString("base64url"))'`로 만들고, account-delete 값은 로컬 개발 안내의 keyring 형식을 사용한다. `.env.local` 전체를 업로드하거나 commit하지 않는다.
+
+4. 첫 배포 뒤 Supabase Auth URL Configuration의 Site URL과 Redirect URL에 `https://<service>.onrender.com` 및 `https://<service>.onrender.com/auth/callback`을 넣고, 홈·팩 시작·방문자 제출·공유 직전 이메일 claim 흐름을 실제 URL에서 확인한다. Render Free service는 15분 유휴 뒤 잠들 수 있고, Supabase Free project는 7일 저활동 뒤 일시 정지될 수 있으므로 지금 단계의 소규모 재미 검증에만 쓴다.
+
+배포 artifact 자체는 아래로 Docker build, HAProxy header injection, 홈과 cookie 없는 logout API까지 점검한다.
+
+```bash
+pnpm test:render-deploy
+```
+
 ## 검증
 
 ```bash
