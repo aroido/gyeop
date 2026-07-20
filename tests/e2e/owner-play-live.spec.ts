@@ -1031,7 +1031,7 @@ test.describe("live owner flow", () => {
         ownerCookie!.value.split(".")[1],
         activeOneToOne!.id,
       ),
-    ).toMatchObject({ status: 404, cacheControl: "private, no-store" });
+    ).toMatchObject({ status: 401, cacheControl: "private, no-store" });
     await missingCookieContext.close();
 
     const crossPlay = await postShareAction(
@@ -1059,7 +1059,7 @@ test.describe("live owner flow", () => {
         ownerCookie!.value.split(".")[1],
         activeOneToOne!.id,
       ),
-    ).toMatchObject({ status: 404, cacheControl: "private, no-store" });
+    ).toMatchObject({ status: 401, cacheControl: "private, no-store" });
     await tamperedContext.close();
     expect(readShareActionEventsSince(initialShareActionEvents)).toHaveLength(
       2,
