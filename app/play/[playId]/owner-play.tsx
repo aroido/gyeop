@@ -13,6 +13,7 @@ import {
 import {
   clearOwnerSession,
   completeOwnerPlay,
+  consumePreloadedOwnerFlow,
   loadOwnerFlow,
   type OwnerPack,
   OwnerFlowHttpError,
@@ -210,13 +211,23 @@ export default function OwnerPlay({ playId }: { playId: string | null }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const saveFlightRef = useRef<number | null>(null);
   const completionFlightRef = useRef(false);
+  const loadFlightRef = useRef<{
+    key: string;
+    request: ReturnType<typeof loadOwnerFlow>;
+  } | null>(null);
   const currentIndex = flow?.currentIndex;
   const phase = flow?.phase;
 
   useEffect(() => {
     if (!playId) return;
     let active = true;
-    void loadOwnerFlow(playId)
+    const key = `${playId}\0${loadKey}`;
+    const request =
+      loadFlightRef.current?.key === key
+        ? loadFlightRef.current.request
+        : (consumePreloadedOwnerFlow(playId) ?? loadOwnerFlow(playId));
+    loadFlightRef.current = { key, request };
+    void request
       .then(({ play, pack }) => {
         if (!active) return;
         setFlow(decodeOwnerFlow(play, pack));

@@ -155,6 +155,37 @@ const ownerFlowLoads = new Map<
   string,
   Promise<{ play: OwnerPlayState; pack: OwnerPack }>
 >();
+const preloadedOwnerFlows = new Map<
+  string,
+  Promise<{ play: OwnerPlayState; pack: OwnerPack }>
+>();
+
+export function preloadOwnerFlow(
+  play: OwnerPlayState,
+): Promise<{ play: OwnerPlayState; pack: OwnerPack }> {
+  if (!isOwnerPlayId(play.id) || !isOfficialPackSlug(play.packSlug)) {
+    invalidResponse(400);
+  }
+  const existing = preloadedOwnerFlows.get(play.id);
+  if (existing) return existing;
+  const request = readOwnerPack(play.packSlug).then((pack) => ({ play, pack }));
+  preloadedOwnerFlows.set(play.id, request);
+  void request.catch(() => {
+    if (preloadedOwnerFlows.get(play.id) === request) {
+      preloadedOwnerFlows.delete(play.id);
+    }
+  });
+  return request;
+}
+
+export function consumePreloadedOwnerFlow(
+  playId: string,
+): Promise<{ play: OwnerPlayState; pack: OwnerPack }> | null {
+  if (!isOwnerPlayId(playId)) invalidResponse(400);
+  const preload = preloadedOwnerFlows.get(playId) ?? null;
+  if (preload) preloadedOwnerFlows.delete(playId);
+  return preload;
+}
 
 export function loadOwnerFlow(
   playId: string,

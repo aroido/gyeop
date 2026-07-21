@@ -7,6 +7,7 @@ import {
   bootstrapOwnerPlay,
   clearOwnerSession,
   OwnerFlowHttpError,
+  preloadOwnerFlow,
 } from "@/lib/owner-flow/owner-flow-client";
 
 import styles from "../[playId]/page.module.css";
@@ -42,7 +43,12 @@ export default function BootstrapOwnerPlay({
     let active = true;
     beginOpening(pack, packTitle);
     void bootstrapOwnerPlay(pack, entrySource)
-      .then((play) => {
+      .then(async (play) => {
+        try {
+          await preloadOwnerFlow(play);
+        } catch {
+          // The routed owner screen retries through its normal load path.
+        }
         if (active) resolveOpening(play.id);
       })
       .catch((error: unknown) => {
