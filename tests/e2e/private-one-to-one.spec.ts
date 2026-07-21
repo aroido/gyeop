@@ -164,7 +164,7 @@ test("offers sign-in when private responses require authentication", async ({
     page.getByText("다시 로그인하면 저장된 1:1 답변을 볼 수 있어요."),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: "이메일로 로그인" }),
+    page.getByRole("link", { name: "Google로 로그인" }),
   ).toHaveAttribute("href", "/auth/sign-in?returnTo=%2Fme");
 });
 

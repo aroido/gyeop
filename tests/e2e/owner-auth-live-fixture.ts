@@ -43,12 +43,53 @@ async function latestMagicLink(email: string) {
   );
 }
 
-async function submitMagicLink(page: Page, email: string) {
-  await page.getByLabel("이메일").fill(email);
-  await page.getByRole("button", { name: "로그인 링크 보내기" }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "로그인 링크를 보냈어요",
+export async function verifyGoogleOAuthStart(page: Page) {
+  const googleLink = page.getByRole("link", {
+    name: "Google로 계속하기",
+  });
+  await expect(googleLink).toBeVisible();
+  await expect(page.getByRole("textbox")).toHaveCount(0);
+  const href = await googleLink.getAttribute("href");
+  expect(href).toMatch(/^\/auth\/google\?/);
+
+  const signInUrl = page.url();
+  await googleLink.click();
+  await page.waitForURL(/\/auth\/v1\/authorize\?/);
+  const authorize = new URL(page.url());
+  expect(authorize.pathname).toBe("/auth/v1/authorize");
+  expect(authorize.searchParams.get("provider")).toBe("google");
+  expect(authorize.searchParams.get("redirect_to")).toBe(
+    new URL("/auth/callback", signInUrl).toString(),
   );
+  await page.goto(signInUrl);
+  const authCookies = await page.context().cookies();
+  expect(
+    authCookies.some((cookie) => cookie.name === "__Secure-gyeop-owner-claim"),
+  ).toBe(true);
+  expect(
+    authCookies.some((cookie) => cookie.name.endsWith("-code-verifier")),
+  ).toBe(true);
+}
+
+async function submitTestMagicLink(
+  page: Page,
+  input: { email: string; playId: string | null; returnTo: string },
+) {
+  await verifyGoogleOAuthStart(page);
+  const result = await page.evaluate(async (body) => {
+    const response = await fetch("/api/auth/test-magic-link", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return {
+      status: response.status,
+      cacheControl: response.headers.get("cache-control"),
+    };
+  }, input);
+  expect(result).toEqual({ status: 202, cacheControl: "private, no-store" });
+
   const authCookies = await page.context().cookies();
   expect(
     authCookies.some((cookie) => cookie.name === "__Secure-gyeop-owner-claim"),
@@ -60,7 +101,7 @@ async function submitMagicLink(page: Page, email: string) {
   let magicLink: string | null = null;
   await expect
     .poll(async () => {
-      magicLink = await latestMagicLink(email);
+      magicLink = await latestMagicLink(input.email);
       return magicLink;
     })
     .not.toBeNull();
@@ -76,13 +117,21 @@ export async function claimCompletedOwnerAccount(page: Page) {
   ).toBeFocused();
 
   const email = `gyeop-e2e-${randomUUID()}@example.com`;
-  await submitMagicLink(page, email);
+  const signInUrl = new URL(page.url());
+  const playId = signInUrl.searchParams.get("playId");
+  expect(playId).toMatch(/^[0-9a-f-]{36}$/);
+  if (!playId) throw new Error("Missing owner play sign-in target");
+  await submitTestMagicLink(page, {
+    email,
+    playId,
+    returnTo: `/me/plays/${playId}`,
+  });
   await expect(page).toHaveURL(/\/me\/plays\/[0-9a-f-]{36}$/, {
     timeout: 15_000,
   });
   await expect(page.getByRole("heading", { name: "공유 링크" })).toBeFocused();
-  const playId = page.url().split("/").at(-1)!;
-  return { email, playId };
+  const claimedPlayId = page.url().split("/").at(-1)!;
+  return { email, playId: claimedPlayId };
 }
 
 export async function claimCompletedOwner(page: Page) {
@@ -94,7 +143,7 @@ export async function signInOwnerAccount(page: Page, email: string) {
   await expect(
     page.getByRole("heading", { name: "내 질문팩 불러오기" }),
   ).toBeFocused();
-  await submitMagicLink(page, email);
+  await submitTestMagicLink(page, { email, playId: null, returnTo: "/me" });
   await expect(page).toHaveURL(/\/me$/);
   await expect(
     page.getByRole("heading", { name: "저장한 질문팩" }),

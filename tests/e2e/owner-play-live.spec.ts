@@ -12,6 +12,7 @@ import {
   claimCompletedOwner,
   claimCompletedOwnerAccount,
   signInOwnerAccount,
+  verifyGoogleOAuthStart,
 } from "./owner-auth-live-fixture";
 import honestSelfManifest from "../../content/packs/honest-self-v1.json" with { type: "json" };
 
@@ -682,6 +683,20 @@ test.describe("live owner flow", () => {
   test.beforeAll(() => setOldFriendActive());
   test.afterAll(() => setOldFriendActive());
 
+  test("starts the Google owner login with PKCE cookies", async ({ page }) => {
+    await page.goto("/auth/sign-in?returnTo=%2Fme");
+    await expect(
+      page.getByRole("heading", { name: "내 질문팩 불러오기" }),
+    ).toBeFocused();
+    await verifyGoogleOAuthStart(page);
+  });
+
+  test("keeps the local Auth callback fixture behind the E2E gate", async ({
+    page,
+  }) => {
+    await signInOwnerAccount(page, `gyeop-oauth-${Date.now()}@example.com`);
+  });
+
   test("keeps multiple packs under one anonymous owner and resumes each pack", async ({
     browser,
     context,
@@ -786,7 +801,7 @@ test.describe("live owner flow", () => {
       recoveredPage.getByRole("heading", { name: "다시 로그인해 주세요" }),
     ).toBeFocused();
     await expect(
-      recoveredPage.getByRole("link", { name: "이메일로 로그인" }),
+      recoveredPage.getByRole("link", { name: "Google로 로그인" }),
     ).toHaveAttribute("href", "/auth/sign-in?returnTo=%2Fme");
 
     await signInOwnerAccount(recoveredPage, account.email);

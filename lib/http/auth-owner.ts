@@ -19,12 +19,10 @@ import { ownerNotFoundResponse, privateNoStore } from "./owner-play.ts";
 
 type OwnerCookie = Extract<ParsedOwnerCookie, { outcome: "valid" }>;
 
-export async function sendOwnerMagicLinkResponse(input: {
+async function requireCompletedOwnerClaim(input: {
   cookie: OwnerCookie | null;
-  email: string;
   ownerId: string | null;
   playId: string | null;
-  returnTo: string;
   signal: AbortSignal;
 }) {
   if (input.playId !== null) {
@@ -40,6 +38,74 @@ export async function sendOwnerMagicLinkResponse(input: {
       throw new Error("INVALID_REQUEST");
     }
   }
+}
+
+function trustedSupabaseAuthorizeUrl(value: string) {
+  const configuredValue = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!configuredValue) throw new Error("INTERNAL_ERROR");
+  let configured: URL;
+  let candidate: URL;
+  try {
+    configured = new URL(configuredValue);
+    candidate = new URL(value);
+  } catch {
+    throw new Error("INTERNAL_ERROR");
+  }
+  const basePath = configured.pathname.replace(/\/$/, "");
+  if (
+    candidate.origin !== configured.origin ||
+    candidate.pathname !== `${basePath}/auth/v1/authorize`
+  ) {
+    throw new Error("INTERNAL_ERROR");
+  }
+  return candidate.toString();
+}
+
+export async function startOwnerGoogleOAuthResponse(input: {
+  cookie: OwnerCookie | null;
+  ownerId: string | null;
+  playId: string | null;
+  returnTo: string;
+  signal: AbortSignal;
+}) {
+  await requireCompletedOwnerClaim(input);
+
+  const auth = await createFreshServerAuthClient();
+  const appUrl = validateAppUrl(process.env.APP_URL, process.env.NODE_ENV);
+  const result = await auth.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: new URL("/auth/callback", appUrl).toString(),
+      skipBrowserRedirect: true,
+    },
+  });
+  if (result.error || !result.data.url) throw new Error("INTERNAL_ERROR");
+
+  const context = createOwnerClaimContext({
+    ownerId: input.ownerId,
+    playId: input.playId,
+    returnTo: input.returnTo,
+    key: parseRateLimitSecret(process.env.RATE_LIMIT_SECRET),
+  });
+  const response = privateNoStore(
+    new Response(null, {
+      status: 303,
+      headers: { Location: trustedSupabaseAuthorizeUrl(result.data.url) },
+    }),
+  );
+  response.headers.append("Set-Cookie", serializeOwnerClaimCookie(context));
+  return response;
+}
+
+export async function sendOwnerTestMagicLinkResponse(input: {
+  cookie: OwnerCookie | null;
+  email: string;
+  ownerId: string | null;
+  playId: string | null;
+  returnTo: string;
+  signal: AbortSignal;
+}) {
+  await requireCompletedOwnerClaim(input);
 
   const auth = await createFreshServerAuthClient();
   const appUrl = validateAppUrl(process.env.APP_URL, process.env.NODE_ENV);

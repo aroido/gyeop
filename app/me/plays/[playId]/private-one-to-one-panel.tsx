@@ -217,7 +217,7 @@ export default function PrivateOneToOnePanel({ playId }: { playId: string }) {
       ) : state.kind === "auth" ? (
         <div className={styles.privateEmpty}>
           <p role="alert">다시 로그인하면 저장된 1:1 답변을 볼 수 있어요.</p>
-          <Link href="/auth/sign-in?returnTo=%2Fme">이메일로 로그인</Link>
+          <Link href="/auth/sign-in?returnTo=%2Fme">Google로 로그인</Link>
         </div>
       ) : state.kind === "error" ? (
         <div className={styles.privateEmpty}>

@@ -9,6 +9,7 @@ import {
   parseNamedCookie,
   parseOwnerClaimContext,
   parseOwnerReturnTo,
+  parseOwnerSignInTarget,
   serializeDeletedOwnerClaimCookie,
   serializeOwnerClaimCookie,
 } from "../../lib/auth/owner-claim-context-core.mjs";
@@ -57,6 +58,29 @@ test("allows only the private owner destinations", () => {
     "/me/plays/bad-id",
   ]) {
     assert.throws(() => parseOwnerReturnTo(value));
+  }
+});
+
+test("pairs a sign-in play with its exact private return target", () => {
+  assert.deepEqual(
+    parseOwnerSignInTarget({
+      playId,
+      returnTo: `/me/plays/${playId}`,
+    }),
+    { playId, returnTo: `/me/plays/${playId}` },
+  );
+  assert.deepEqual(parseOwnerSignInTarget({ playId: null, returnTo: "/me" }), {
+    playId: null,
+    returnTo: "/me",
+  });
+  for (const value of [
+    { playId, returnTo: "/me" },
+    { playId: null, returnTo: `/me/plays/${playId}` },
+    { playId: "bad-id", returnTo: "/me" },
+    { playId: null, returnTo: "https://example.com/me" },
+    { playId: null, returnTo: "/me", extra: true },
+  ]) {
+    assert.throws(() => parseOwnerSignInTarget(value));
   }
 });
 

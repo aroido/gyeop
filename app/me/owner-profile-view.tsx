@@ -214,7 +214,7 @@ export default function OwnerProfileView({
           </h1>
           <p>계정을 확인하면 저장해 둔 내 시선 프로필을 다시 볼 수 있어요.</p>
           <Link className={styles.primary} href="/auth/sign-in?returnTo=%2Fme">
-            이메일로 로그인
+            Google로 로그인
           </Link>
         </section>
       </section>

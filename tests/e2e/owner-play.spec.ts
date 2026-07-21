@@ -288,11 +288,57 @@ test("offers sign-in when an account-owned play requires authentication", async 
     page.getByRole("heading", { name: "다시 로그인해 주세요" }),
   ).toBeFocused();
   await expect(
-    page.getByRole("link", { name: "이메일로 로그인" }),
+    page.getByRole("link", { name: "Google로 로그인" }),
   ).toHaveAttribute("href", "/auth/sign-in?returnTo=%2Fme");
   await expect(
     page.getByRole("button", { name: "다른 팩 고르기" }),
   ).toHaveCount(0);
+});
+
+test("shows Google as the only owner sign-in path", async ({ page }) => {
+  await page.goto("/auth/sign-in?returnTo=%2Fme");
+
+  await expect(
+    page.getByRole("heading", { name: "내 질문팩 불러오기" }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("link", { name: "Google로 계속하기" }),
+  ).toHaveAttribute("href", "/auth/google?returnTo=%2Fme");
+  await expect(page.getByRole("textbox")).toHaveCount(0);
+  await expect(page.getByText(/매직 링크|카카오|네이버/)).toHaveCount(0);
+  const testOnlyStatus = await page.evaluate(async () => {
+    const response = await fetch("/api/auth/test-magic-link", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "disabled@example.com",
+        playId: null,
+        returnTo: "/me",
+      }),
+    });
+    return response.status;
+  });
+  expect(testOnlyStatus).toBe(404);
+
+  const invalidStarts = await page.evaluate(async () =>
+    Promise.all(
+      [
+        "/auth/google?returnTo=https%3A%2F%2Fexample.com%2Fme",
+        "/auth/google?returnTo=%2Fme&returnTo=%2Fme",
+        "/auth/google?returnTo=%2Fme&extra=1",
+      ].map((path) => fetch(path).then((response) => response.status)),
+    ),
+  );
+  expect(invalidStarts).toEqual([400, 400, 400]);
+
+  await page.goto(
+    "/auth/callback?error=access_denied&error_description=cancelled",
+  );
+  await expect(page).toHaveURL("/auth/sign-in?error=callback");
+  await expect(
+    page.getByText("Google 로그인을 완료하지 못했어요. 다시 시도해 주세요."),
+  ).toBeVisible();
 });
 
 test("rejects an unknown bootstrap pack without an API request", async ({
