@@ -137,7 +137,7 @@ test("one production build reflects runtime activation and fails closed", async 
     assert.match(active.body, /낮은 민감도/);
     const play = await html(3106, "/play/new?pack=old-friend");
     assert.equal(play.response.status, 200);
-    assert.match(play.body, /첫 장을 꺼내는 중/);
+    assert.match(play.body, /질문팩을 준비하고 있어요/);
     assert.doesNotMatch(play.body, /만 19세 이상/);
 
     setOldFriendActive(false);
