@@ -18,10 +18,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "$MODE" != "full" ]]; then
-  echo "Only --mode full is supported." >&2
-  exit 2
-fi
+case "$MODE" in
+  full | ci-base | ci-live-mvp | ci-live-owner) ;;
+  *)
+    echo "Unsupported verification mode: $MODE" >&2
+    exit 2
+    ;;
+esac
 
 cd "$ROOT"
 
@@ -64,6 +67,34 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+
+start_supabase() {
+  if ! pnpm exec supabase status --output json >/dev/null 2>&1; then
+    SUPABASE_STARTED_BY_VERIFY=1
+  fi
+  if ! pnpm supabase:start >/dev/null; then
+    echo "Local Supabase failed to start." >&2
+    exit 1
+  fi
+}
+
+restart_supabase() {
+  pnpm supabase:stop >/dev/null
+  SUPABASE_STARTED_BY_VERIFY=1
+  start_supabase
+}
+
+if [[ "$MODE" == "ci-live-mvp" || "$MODE" == "ci-live-owner" ]]; then
+  start_supabase
+  if [[ "$MODE" == "ci-live-mvp" ]]; then
+    pnpm test:e2e:mvp
+    echo "GYEOP CI live MVP verification passed."
+  else
+    pnpm test:e2e:owner
+    echo "GYEOP CI live owner verification passed."
+  fi
+  exit 0
+fi
 
 python3 "$ROOT/scripts/verify_project.py"
 node --check "$ROOT/scripts/task-harness.mjs"
@@ -131,13 +162,7 @@ node scripts/verify-visitor-response.mjs
 node --test tests/integration/http-boundary.test.mjs
 tests/integration/http-boundary-host.test.sh
 
-if ! pnpm exec supabase status --output json >/dev/null 2>&1; then
-  SUPABASE_STARTED_BY_VERIFY=1
-fi
-if ! pnpm supabase:start >/dev/null; then
-  echo "Local Supabase failed to start." >&2
-  exit 1
-fi
+start_supabase
 UPGRADE_TEST_PATHS=(
   scripts/ai-verify
   scripts/verify-path-changes
@@ -170,19 +195,26 @@ node --test tests/integration/visitor-response-concurrency.test.mjs
 node --test tests/integration/visitor-withdrawal-concurrency.test.mjs
 env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SECRET_KEY pnpm build
 node --test tests/integration/pack-runtime.test.mjs
-GYEOP_E2E_PORT=3110 pnpm test:e2e:live
+if [[ "$MODE" == "full" ]]; then
+  restart_supabase
+  GYEOP_E2E_PORT=3110 pnpm test:e2e:live
+fi
 GYEOP_E2E_PORT=3110 pnpm test:e2e --project=mobile-chromium
 
 restore_generated_config
 
-if [[ "$VERIFY_CLEAN" == "1" ]] &&
-  [[ "$(git rev-parse HEAD)" == "$VERIFY_SHA" ]] &&
-  [[ -z "$(git status --porcelain=v1)" ]]; then
-  VERIFY_MARKER_DIR="$(git rev-parse --path-format=absolute --git-common-dir)/gyeop-full-verify"
-  mkdir -p "$VERIFY_MARKER_DIR"
-  touch "$VERIFY_MARKER_DIR/$VERIFY_SHA"
-else
-  echo "Full verification passed, but its SHA was not cached because the checkout changed or was dirty."
-fi
+if [[ "$MODE" == "full" ]]; then
+  if [[ "$VERIFY_CLEAN" == "1" ]] &&
+    [[ "$(git rev-parse HEAD)" == "$VERIFY_SHA" ]] &&
+    [[ -z "$(git status --porcelain=v1)" ]]; then
+    VERIFY_MARKER_DIR="$(git rev-parse --path-format=absolute --git-common-dir)/gyeop-full-verify"
+    mkdir -p "$VERIFY_MARKER_DIR"
+    touch "$VERIFY_MARKER_DIR/$VERIFY_SHA"
+  else
+    echo "Full verification passed, but its SHA was not cached because the checkout changed or was dirty."
+  fi
 
-echo "GYEOP full verification passed."
+  echo "GYEOP full verification passed."
+else
+  echo "GYEOP CI base verification passed."
+fi

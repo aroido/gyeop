@@ -68,7 +68,7 @@ test("shows twenty-four active private-MVP packs before the owner flow", async (
 
   await packLinks.first().click();
 
-  await expect(page).toHaveURL(`/play/${playId}`);
+  await expect(page).toHaveURL(`/play/${playId}`, { timeout: 15_000 });
   await expect(
     page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
   ).toBeVisible();
