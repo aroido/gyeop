@@ -19,7 +19,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$MODE" in
-  full | ci-base | ci-live-mvp | ci-live-owner) ;;
+  full | ci-static | ci-data | ci-mock | ci-live-mvp | ci-live-owner) ;;
   *)
     echo "Unsupported verification mode: $MODE" >&2
     exit 2
@@ -53,7 +53,8 @@ if [[ ! -d "$ROOT/node_modules" ]]; then
   exit 1
 fi
 
-if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+if [[ "$MODE" != "ci-mock" ]] &&
+  { ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; }; then
   echo "A running Docker daemon is required for local Supabase verification." >&2
   exit 1
 fi
@@ -84,137 +85,162 @@ restart_supabase() {
   start_supabase
 }
 
-if [[ "$MODE" == "ci-live-mvp" || "$MODE" == "ci-live-owner" ]]; then
-  start_supabase
-  if [[ "$MODE" == "ci-live-mvp" ]]; then
-    pnpm test:e2e:mvp
-    echo "GYEOP CI live MVP verification passed."
-  else
-    pnpm test:e2e:owner
-    echo "GYEOP CI live owner verification passed."
-  fi
-  exit 0
-fi
-
-python3 "$ROOT/scripts/verify_project.py"
-node --check "$ROOT/scripts/task-harness.mjs"
-TASK_HARNESS_PATHS=(
-  scripts/ai-verify
-  scripts/verify-path-changes
-  scripts/task-harness
-  scripts/task-harness.mjs
-  scripts/task-harness.test.mjs
-)
 VERIFY_BASE_REF="${GYEOP_VERIFY_BASE_REF:-origin/main}"
-if [[ "$("$ROOT/scripts/verify-path-changes" "$VERIFY_BASE_REF" "${TASK_HARNESS_PATHS[@]}")" == "skip" ]]; then
-  echo "Task harness regression tests skipped: no harness changes."
-else
-  node --test "$ROOT/scripts/task-harness.test.mjs"
-fi
-sh -n "$ROOT/scripts/task-harness"
-sh -n "$ROOT/scripts/verify-path-changes"
-sh -n "$ROOT/scripts/install-codex-skills"
-sh -n "$ROOT/ops/http-boundary/haproxy-origin-wrapper"
-sh -n "$ROOT/ops/render-entrypoint.sh"
-sh -n "$ROOT/ops/http-boundary/gyeop-loopback-firewall-restore"
-sh -n "$ROOT/ops/http-boundary/gyeop-loopback-firewall-probe"
-sh -n "$ROOT/tests/integration/http-boundary-host.test.sh"
-sh -n "$ROOT/tests/integration/render-deploy.test.sh"
-sh -n "$ROOT/tests/integration/visitor-assignment-upgrade.test.sh"
-sh -n "$ROOT/tests/integration/eligibility-cutover-upgrade.test.sh"
 
-VALIDATOR="${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py"
-if [[ -f "$VALIDATOR" ]]; then
-  if python3 -c 'import yaml' >/dev/null 2>&1; then
-    SKILL_VALIDATOR=(python3)
-  elif command -v uv >/dev/null 2>&1; then
-    SKILL_VALIDATOR=(uv run --quiet --with pyyaml python)
+run_static_verification() {
+  python3 "$ROOT/scripts/verify_project.py"
+  node --check "$ROOT/scripts/task-harness.mjs"
+  TASK_HARNESS_PATHS=(
+    scripts/ai-verify
+    scripts/verify-path-changes
+    scripts/task-harness
+    scripts/task-harness.mjs
+    scripts/task-harness.test.mjs
+  )
+  if [[ "$("$ROOT/scripts/verify-path-changes" "$VERIFY_BASE_REF" "${TASK_HARNESS_PATHS[@]}")" == "skip" ]]; then
+    echo "Task harness regression tests skipped: no harness changes."
   else
-    echo "Skill validation requires PyYAML or uv." >&2
+    node --test "$ROOT/scripts/task-harness.test.mjs"
+  fi
+  sh -n "$ROOT/scripts/task-harness"
+  sh -n "$ROOT/scripts/verify-path-changes"
+  sh -n "$ROOT/scripts/install-codex-skills"
+  sh -n "$ROOT/ops/http-boundary/haproxy-origin-wrapper"
+  sh -n "$ROOT/ops/render-entrypoint.sh"
+  sh -n "$ROOT/ops/http-boundary/gyeop-loopback-firewall-restore"
+  sh -n "$ROOT/ops/http-boundary/gyeop-loopback-firewall-probe"
+  sh -n "$ROOT/tests/integration/http-boundary-host.test.sh"
+  sh -n "$ROOT/tests/integration/render-deploy.test.sh"
+  sh -n "$ROOT/tests/integration/visitor-assignment-upgrade.test.sh"
+  sh -n "$ROOT/tests/integration/eligibility-cutover-upgrade.test.sh"
+
+  VALIDATOR="${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py"
+  if [[ -f "$VALIDATOR" ]]; then
+    if python3 -c 'import yaml' >/dev/null 2>&1; then
+      SKILL_VALIDATOR=(python3)
+    elif command -v uv >/dev/null 2>&1; then
+      SKILL_VALIDATOR=(uv run --quiet --with pyyaml python)
+    else
+      echo "Skill validation requires PyYAML or uv." >&2
+      exit 1
+    fi
+
+    for skill in "$ROOT"/.codex/skills/*; do
+      "${SKILL_VALIDATOR[@]}" "$VALIDATOR" "$skill"
+    done
+  else
+    echo "External skill validator unavailable; repository frontmatter checks passed."
+  fi
+
+  if rg -n "TODO|TBD" "$ROOT/.codex/skills" --glob 'SKILL.md'; then
+    echo "Unresolved skill placeholders found." >&2
     exit 1
   fi
 
-  for skill in "$ROOT"/.codex/skills/*; do
-    "${SKILL_VALIDATOR[@]}" "$VALIDATOR" "$skill"
-  done
-else
-  echo "External skill validator unavailable; repository frontmatter checks passed."
-fi
+  pnpm format:check
+  pnpm lint
+  pnpm typecheck
+  pnpm test
+  pnpm test:secrets
+  node scripts/verify-data-access.mjs
+  node scripts/verify-http-boundary.mjs
+  node scripts/verify-pack-catalog.mjs
+  node scripts/verify-owner-flow.mjs
+  node scripts/verify-owner-profile.mjs
+  node scripts/verify-private-one-to-one.mjs
+  node scripts/verify-share-links.mjs
+  node scripts/verify-visitor-response.mjs
+  node --test tests/integration/http-boundary.test.mjs
+  tests/integration/http-boundary-host.test.sh
+}
 
-if rg -n "TODO|TBD" "$ROOT/.codex/skills" --glob 'SKILL.md'; then
-  echo "Unresolved skill placeholders found." >&2
-  exit 1
-fi
+run_data_verification() {
+  start_supabase
+  UPGRADE_TEST_PATHS=(
+    scripts/ai-verify
+    scripts/verify-path-changes
+    package.json
+    pnpm-lock.yaml
+    supabase/config.toml
+    supabase/seed.sql
+    supabase/migrations
+    tests/integration/visitor-assignment-upgrade.test.sh
+    tests/integration/eligibility-cutover-upgrade.test.sh
+  )
+  if [[ "$("$ROOT/scripts/verify-path-changes" "$VERIFY_BASE_REF" "${UPGRADE_TEST_PATHS[@]}")" == "skip" ]]; then
+    echo "Upgrade regression tests skipped: no migration-path changes."
+  else
+    tests/integration/visitor-assignment-upgrade.test.sh
+    tests/integration/eligibility-cutover-upgrade.test.sh
+  fi
+  pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
+  pnpm test:db
+  pnpm supabase:lint
+  node scripts/verify-supabase-types.mjs
+  node --test tests/integration/data-access.test.mjs
+  node --test tests/integration/pack-catalog.test.mjs
+  node --test tests/integration/pack-publication-concurrency.test.mjs
+  node --test tests/integration/owner-play-session.test.mjs
+  node --test tests/integration/owner-profile-session.test.mjs
+  node --test tests/integration/owner-play-concurrency.test.mjs
+  node --test tests/integration/share-link-concurrency.test.mjs
+  node --test tests/integration/visitor-response-concurrency.test.mjs
+  node --test tests/integration/visitor-withdrawal-concurrency.test.mjs
+  env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SECRET_KEY pnpm build
+  node --test tests/integration/pack-runtime.test.mjs
+}
 
-pnpm format:check
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:secrets
-node scripts/verify-data-access.mjs
-node scripts/verify-http-boundary.mjs
-node scripts/verify-pack-catalog.mjs
-node scripts/verify-owner-flow.mjs
-node scripts/verify-owner-profile.mjs
-node scripts/verify-private-one-to-one.mjs
-node scripts/verify-share-links.mjs
-node scripts/verify-visitor-response.mjs
-node --test tests/integration/http-boundary.test.mjs
-tests/integration/http-boundary-host.test.sh
+run_mock_verification() {
+  GYEOP_E2E_PORT=3110 pnpm test:e2e --project=mobile-chromium
+}
 
-start_supabase
-UPGRADE_TEST_PATHS=(
-  scripts/ai-verify
-  scripts/verify-path-changes
-  package.json
-  pnpm-lock.yaml
-  supabase/config.toml
-  supabase/seed.sql
-  supabase/migrations
-  tests/integration/visitor-assignment-upgrade.test.sh
-  tests/integration/eligibility-cutover-upgrade.test.sh
-)
-if [[ "$("$ROOT/scripts/verify-path-changes" "$VERIFY_BASE_REF" "${UPGRADE_TEST_PATHS[@]}")" == "skip" ]]; then
-  echo "Upgrade regression tests skipped: no migration-path changes."
-else
-  tests/integration/visitor-assignment-upgrade.test.sh
-  tests/integration/eligibility-cutover-upgrade.test.sh
-fi
-pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
-pnpm test:db
-pnpm supabase:lint
-node scripts/verify-supabase-types.mjs
-node --test tests/integration/data-access.test.mjs
-node --test tests/integration/pack-catalog.test.mjs
-node --test tests/integration/pack-publication-concurrency.test.mjs
-node --test tests/integration/owner-play-session.test.mjs
-node --test tests/integration/owner-profile-session.test.mjs
-node --test tests/integration/owner-play-concurrency.test.mjs
-node --test tests/integration/share-link-concurrency.test.mjs
-node --test tests/integration/visitor-response-concurrency.test.mjs
-node --test tests/integration/visitor-withdrawal-concurrency.test.mjs
-env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SECRET_KEY pnpm build
-node --test tests/integration/pack-runtime.test.mjs
-if [[ "$MODE" == "full" ]]; then
-  restart_supabase
-  GYEOP_E2E_PORT=3110 pnpm test:e2e:live
-fi
-GYEOP_E2E_PORT=3110 pnpm test:e2e --project=mobile-chromium
+case "$MODE" in
+  ci-live-mvp)
+    start_supabase
+    pnpm test:e2e:mvp
+    echo "GYEOP CI live MVP verification passed."
+    exit 0
+    ;;
+  ci-live-owner)
+    start_supabase
+    pnpm test:e2e:owner
+    echo "GYEOP CI live owner verification passed."
+    exit 0
+    ;;
+  ci-static)
+    run_static_verification
+    echo "GYEOP CI static verification passed."
+    exit 0
+    ;;
+  ci-data)
+    run_data_verification
+    echo "GYEOP CI data verification passed."
+    exit 0
+    ;;
+  ci-mock)
+    run_mock_verification
+    echo "GYEOP CI mock E2E verification passed."
+    exit 0
+    ;;
+  full)
+    run_static_verification
+    run_data_verification
+    restart_supabase
+    GYEOP_E2E_PORT=3110 pnpm test:e2e:live
+    run_mock_verification
+    ;;
+esac
 
 restore_generated_config
 
-if [[ "$MODE" == "full" ]]; then
-  if [[ "$VERIFY_CLEAN" == "1" ]] &&
-    [[ "$(git rev-parse HEAD)" == "$VERIFY_SHA" ]] &&
-    [[ -z "$(git status --porcelain=v1)" ]]; then
-    VERIFY_MARKER_DIR="$(git rev-parse --path-format=absolute --git-common-dir)/gyeop-full-verify"
-    mkdir -p "$VERIFY_MARKER_DIR"
-    touch "$VERIFY_MARKER_DIR/$VERIFY_SHA"
-  else
-    echo "Full verification passed, but its SHA was not cached because the checkout changed or was dirty."
-  fi
-
-  echo "GYEOP full verification passed."
+if [[ "$VERIFY_CLEAN" == "1" ]] &&
+  [[ "$(git rev-parse HEAD)" == "$VERIFY_SHA" ]] &&
+  [[ -z "$(git status --porcelain=v1)" ]]; then
+  VERIFY_MARKER_DIR="$(git rev-parse --path-format=absolute --git-common-dir)/gyeop-full-verify"
+  mkdir -p "$VERIFY_MARKER_DIR"
+  touch "$VERIFY_MARKER_DIR/$VERIFY_SHA"
 else
-  echo "GYEOP CI base verification passed."
+  echo "Full verification passed, but its SHA was not cached because the checkout changed or was dirty."
 fi
+
+echo "GYEOP full verification passed."

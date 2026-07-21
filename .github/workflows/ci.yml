@@ -14,9 +14,13 @@ concurrency:
 
 jobs:
   base:
-    name: base
+    name: base (${{ matrix.mode }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [ci-static, ci-data, ci-mock]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -27,8 +31,9 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: ./scripts/run-ai-verify --mode ci-base
+      - if: ${{ matrix.mode == 'ci-mock' }}
+        run: pnpm exec playwright install --with-deps chromium
+      - run: ./scripts/run-ai-verify --mode ${{ matrix.mode }}
         env:
           GYEOP_VERIFY_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
 
