@@ -1171,7 +1171,7 @@ test.describe("live owner flow", () => {
     await visitors[0].visitor
       .getByRole("link", { name: "나도 이 팩으로 시작하기" })
       .click();
-    await visitors[0].visitor.waitForURL(/\/play\/[0-9a-f-]{36}$/);
+    await waitForOwnerPlayStart(visitors[0].visitor);
     await expect(
       visitors[0].visitor.getByRole("heading", {
         name: "서운한 일이 생기면 나는?",
