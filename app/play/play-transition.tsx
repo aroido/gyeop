@@ -1,5 +1,6 @@
 "use client";
 
+import type { AnimationItem } from "lottie-web";
 import {
   animate,
   motion,
@@ -7,8 +8,7 @@ import {
   useMotionValueEvent,
   useReducedMotion,
   useScroll,
-  useSpring,
-  useTransform,
+  type MotionValue,
 } from "motion/react";
 import { useRouter } from "next/navigation";
 import {
@@ -41,9 +41,98 @@ type PlayTransitionContextValue = Readonly<{
 }>;
 
 const SNAP_PROGRESS = 0.85;
+const LAST_LOTTIE_FRAME = 119;
 const PlayTransitionContext = createContext<PlayTransitionContextValue | null>(
   null,
 );
+
+function PackOpeningAnimation({
+  progress,
+  opened,
+}: {
+  progress: MotionValue<number>;
+  opened: boolean;
+}) {
+  const [renderer, setRenderer] = useState<"loading" | "lottie" | "fallback">(
+    "loading",
+  );
+  const stageRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<AnimationItem | null>(null);
+
+  const setFrame = useCallback((value: number) => {
+    const frame = Math.round(
+      Math.max(0, Math.min(value, 1)) * LAST_LOTTIE_FRAME,
+    );
+    stageRef.current?.setAttribute("data-frame", String(frame));
+    animationRef.current?.goToAndStop(frame, true);
+  }, []);
+
+  useMotionValueEvent(progress, "change", setFrame);
+
+  useEffect(() => {
+    setFrame(progress.get());
+  }, [progress, setFrame]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    let active = true;
+    let animation: AnimationItem | null = null;
+    const handleLoadError = () => {
+      if (active) setRenderer("fallback");
+    };
+
+    void import("lottie-web")
+      .then(({ default: lottie }) => {
+        if (!active) return;
+        animation = lottie.loadAnimation({
+          container,
+          renderer: "svg",
+          loop: false,
+          autoplay: false,
+          path: "/animations/gyeop-pack-opening.json",
+        });
+        animationRef.current = animation;
+        animation.addEventListener("DOMLoaded", () => {
+          if (!active) return;
+          setRenderer("lottie");
+          setFrame(progress.get());
+        });
+        animation.addEventListener("data_failed", handleLoadError);
+      })
+      .catch(handleLoadError);
+
+    return () => {
+      active = false;
+      animationRef.current = null;
+      animation?.destroy();
+    };
+  }, [progress, setFrame]);
+
+  return (
+    <div
+      ref={stageRef}
+      className={styles.packArt}
+      data-testid="pack-opening-stage"
+      data-frame="0"
+      data-renderer={renderer}
+      data-opened={opened || undefined}
+      aria-hidden="true"
+    >
+      <div className={styles.fallbackArt}>
+        <i className={styles.fallbackHalo} />
+        <i className={styles.fallbackCard} />
+        <i className={styles.fallbackPack} />
+      </div>
+      <div
+        ref={containerRef}
+        className={styles.lottieCanvas}
+        data-testid="pack-opening-lottie"
+      />
+    </div>
+  );
+}
 
 export function usePlayTransition() {
   const value = useContext(PlayTransitionContext);
@@ -56,12 +145,6 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
   const shouldReduceMotion = useReducedMotion();
   const { scrollYProgress } = useScroll();
   const progress = useMotionValue(0);
-  const smoothProgress = useSpring(progress, {
-    stiffness: 260,
-    damping: 34,
-    mass: 0.72,
-    restDelta: 0.001,
-  });
   const [opening, setOpening] = useState<OpeningState | null>(null);
   const openingRef = useRef<OpeningState | null>(null);
   const lockedRef = useRef(false);
@@ -184,86 +267,6 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const cardX = useTransform(
-    smoothProgress,
-    [0, 0.3, 0.58, 0.84, 1],
-    [0, 0, -4, 3, 0],
-  );
-  const cardY = useTransform(
-    smoothProgress,
-    [0, 0.18, 0.34, 0.72, 0.9, 1],
-    [16, 18, 8, -86, -138, -132],
-  );
-  const cardScale = useTransform(
-    smoothProgress,
-    [0, 0.28, 0.72, 0.9, 1],
-    [0.96, 0.96, 0.985, 1.02, 1],
-  );
-  const cardRotate = useTransform(
-    smoothProgress,
-    [0, 0.3, 0.62, 0.88, 1],
-    [-1.2, -1.2, -0.5, 1.2, 0],
-  );
-  const shellY = useTransform(
-    smoothProgress,
-    [0, 0.12, 0.24, 0.66, 0.86, 1],
-    [0, 3, 0, 6, 72, 118],
-  );
-  const shellScaleY = useTransform(
-    smoothProgress,
-    [0, 0.12, 0.25],
-    [1, 0.985, 1],
-  );
-  const shellRotate = useTransform(
-    smoothProgress,
-    [0, 0.13, 0.3, 1],
-    [0, -0.7, 0.25, 0],
-  );
-  const shellOpacity = useTransform(smoothProgress, [0.82, 1], [1, 0]);
-  const tearX = useTransform(
-    smoothProgress,
-    [0, 0.1, 0.28, 0.5, 0.72],
-    [0, 0, -12, -78, -98],
-  );
-  const tearY = useTransform(
-    smoothProgress,
-    [0, 0.12, 0.3, 0.52, 0.72],
-    [0, 1, -5, -24, -34],
-  );
-  const tearRotate = useTransform(
-    smoothProgress,
-    [0, 0.12, 0.34, 0.72],
-    [0, -1, -7, -18],
-  );
-  const tearScaleX = useTransform(
-    smoothProgress,
-    [0, 0.14, 0.32, 0.58],
-    [1, 0.98, 1.02, 1],
-  );
-  const tearOpacity = useTransform(smoothProgress, [0.62, 0.82], [1, 0]);
-  const mouthScaleY = useTransform(
-    smoothProgress,
-    [0.12, 0.28, 0.42],
-    [0.05, 0.32, 1],
-  );
-  const mouthOpacity = useTransform(smoothProgress, [0.12, 0.22], [0, 1]);
-  const haloScale = useTransform(smoothProgress, [0, 0.72, 1], [0.86, 1, 1.08]);
-  const haloOpacity = useTransform(
-    smoothProgress,
-    [0, 0.68, 1],
-    [0.16, 0.28, 0.12],
-  );
-  const cardShadow = useTransform(
-    smoothProgress,
-    [0, 0.5, 0.78, 1],
-    [
-      "2px 3px 0 #315cff",
-      "3px 4px 0 #315cff",
-      "8px 12px 0 #315cff",
-      "6px 7px 0 #315cff",
-    ],
-  );
-
   const hiddenFromAccessibility =
     opening?.phase === "route-loading" || opening?.phase === "handoff-complete";
 
@@ -294,58 +297,10 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
         >
           <div className={styles.stage}>
             <p className={styles.brand}>겹 · CARD PACK</p>
-            <div className={styles.packArt} aria-hidden="true">
-              <motion.i
-                className={styles.halo}
-                style={{ scale: haloScale, opacity: haloOpacity }}
-              />
-              <div className={styles.cardAnchor}>
-                <motion.div
-                  className={styles.innerCard}
-                  data-testid="pack-inner-card"
-                  style={{
-                    x: cardX,
-                    y: cardY,
-                    scale: cardScale,
-                    rotate: cardRotate,
-                    boxShadow: cardShadow,
-                  }}
-                >
-                  <span>겹 · 첫 질문</span>
-                  <strong>{opening.packTitle}</strong>
-                  <i />
-                  <i />
-                </motion.div>
-              </div>
-              <motion.div
-                className={styles.packShell}
-                data-testid="pack-shell"
-                style={{
-                  y: shellY,
-                  scaleY: shellScaleY,
-                  rotate: shellRotate,
-                  opacity: shellOpacity,
-                }}
-              >
-                <motion.i
-                  className={styles.packMouth}
-                  data-testid="pack-mouth"
-                  style={{ scaleY: mouthScaleY, opacity: mouthOpacity }}
-                />
-                <motion.i
-                  className={styles.tearStrip}
-                  data-testid="pack-tear-strip"
-                  style={{
-                    x: tearX,
-                    y: tearY,
-                    rotate: tearRotate,
-                    scaleX: tearScaleX,
-                    opacity: tearOpacity,
-                  }}
-                />
-                <span className={styles.seal}>GYEOP</span>
-              </motion.div>
-            </div>
+            <PackOpeningAnimation
+              progress={progress}
+              opened={opening.phase !== "opening"}
+            />
             <div className={styles.copy}>
               <h1>{opening.packTitle}</h1>
               {opening.phase === "opening" ? (
