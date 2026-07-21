@@ -31,6 +31,15 @@ if [[ -z "$(git status --porcelain=v1)" ]]; then
   VERIFY_CLEAN=1
 fi
 
+VERIFY_CONFIG_SNAPSHOT="$(mktemp -d "${TMPDIR:-/tmp}/gyeop-ai-verify.XXXXXX")"
+cp -p "$ROOT/next-env.d.ts" "$VERIFY_CONFIG_SNAPSHOT/next-env.d.ts"
+cp -p "$ROOT/tsconfig.json" "$VERIFY_CONFIG_SNAPSHOT/tsconfig.json"
+
+restore_generated_config() {
+  cp -p "$VERIFY_CONFIG_SNAPSHOT/next-env.d.ts" "$ROOT/next-env.d.ts"
+  cp -p "$VERIFY_CONFIG_SNAPSHOT/tsconfig.json" "$ROOT/tsconfig.json"
+}
+
 if ! command -v pnpm >/dev/null 2>&1; then
   echo "pnpm is required. Run: corepack enable && pnpm install --frozen-lockfile" >&2
   exit 1
@@ -48,6 +57,8 @@ fi
 
 SUPABASE_STARTED_BY_VERIFY=0
 cleanup() {
+  restore_generated_config
+  rm -rf -- "$VERIFY_CONFIG_SNAPSHOT"
   if [[ "$SUPABASE_STARTED_BY_VERIFY" == "1" ]]; then
     pnpm exec supabase stop --no-backup >/dev/null 2>&1 || true
   fi
@@ -148,6 +159,8 @@ env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SECRET_KEY pnpm build
 node --test tests/integration/pack-runtime.test.mjs
 GYEOP_E2E_PORT=3110 pnpm test:e2e:live
 GYEOP_E2E_PORT=3110 pnpm test:e2e --project=mobile-chromium
+
+restore_generated_config
 
 if [[ "$VERIFY_CLEAN" == "1" ]] &&
   [[ "$(git rev-parse HEAD)" == "$VERIFY_SHA" ]] &&

@@ -21,6 +21,7 @@ import {
 } from "@/lib/owner-flow/owner-flow-client";
 import type { OwnerPlayState } from "@/lib/owner-play/owner-play-session";
 
+import { usePlayTransition } from "../play-transition";
 import styles from "./page.module.css";
 
 type Choice = "a" | "b";
@@ -199,6 +200,7 @@ function TerminalScreen({
 
 export default function OwnerPlay({ playId }: { playId: string | null }) {
   const router = useRouter();
+  const { abortOpening, completeHandoff } = usePlayTransition();
   const [loadKey, setLoadKey] = useState(0);
   const [load, setLoad] = useState<LoadState>(
     playId ? { kind: "loading" } : { kind: "terminal" },
@@ -234,6 +236,14 @@ export default function OwnerPlay({ playId }: { playId: string | null }) {
       active = false;
     };
   }, [loadKey, playId]);
+
+  useEffect(() => {
+    if (!playId || load.kind !== "ready") {
+      if (load.kind !== "loading") abortOpening();
+      return;
+    }
+    if (flow) completeHandoff(playId);
+  }, [abortOpening, completeHandoff, flow, load.kind, playId]);
 
   useEffect(() => {
     if (phase !== "draft" && phase !== "completed") return;
