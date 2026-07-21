@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-22 — 선택한 질문팩의 시각 정체성을 개봉까지 유지
+
+- 결정: 홈의 공식 팩 manifest가 가진 `presentation.coverTone`, `coverRecipe`, 제목을 `/play/new` 개봉 overlay까지 전달한다. 개봉은 기존 Lottie 한 벌의 정적 fill만 여섯 tone 팔레트로 복제·치환하고, 닫힌 포장에 recipe 기반 mark와 pattern을 표시한다. 새 identity와 겹치는 기존 generic pill/bars는 themed clone에서만 제외한다.
+- 이유: 팩마다 홈 카드 색과 이름이 다른데 실제 개봉 포장은 모두 같아, 사용자가 고른 상품과 여는 상품이 분리되어 보였다. 팩별 애니메이션 asset을 복제하면 동일한 물리 타임라인을 여러 벌 유지해야 한다.
+- 결과: scroll scrub, 94번 frame handoff, 119번 settle, 키보드, reduced motion과 실패 fallback은 유지한다. 실제 질문 route는 published pack API를 SSOT로 쓰므로 이번 변경에서 테마를 확장하지 않으며, 알 수 없는 tone은 lime으로 복구한다.
+
 ## 2026-07-22 — 상단 뜯기 제거와 첫 질문 즉시 연결
 
 - 결정: 사용자 제어 개봉의 상단 실링 조각을 뜯어내는 장면을 제거하고, 팩 입구가 벌어진 뒤 5:7 질문 카드가 올라오는 동작만 남긴다. 스크롤은 Lottie 94번 프레임까지만 제어하며 첫 질문 데이터가 준비되면 119번 마지막 프레임과 실제 질문 화면 전환을 연속 실행한다.

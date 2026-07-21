@@ -26,10 +26,14 @@ function isRetryable(error: unknown) {
 export default function BootstrapOwnerPlay({
   pack,
   packTitle,
+  packTone,
+  packRecipe,
   entrySource,
 }: {
   pack: string | null;
   packTitle: string | null;
+  packTone: string | null;
+  packRecipe: string | null;
   entrySource: "home" | "same_pack_cta";
 }) {
   const router = useRouter();
@@ -41,7 +45,7 @@ export default function BootstrapOwnerPlay({
   useEffect(() => {
     if (!pack || state !== "loading") return;
     let active = true;
-    beginOpening(pack, packTitle);
+    beginOpening(pack, packTitle, packTone, packRecipe);
     void bootstrapOwnerPlay(pack, entrySource)
       .then(async (play) => {
         try {
@@ -65,7 +69,9 @@ export default function BootstrapOwnerPlay({
     beginOpening,
     entrySource,
     pack,
+    packRecipe,
     packTitle,
+    packTone,
     resolveOpening,
     state,
   ]);
