@@ -74,8 +74,11 @@ start_supabase() {
     SUPABASE_STARTED_BY_VERIFY=1
   fi
   if ! pnpm supabase:start >/dev/null; then
-    echo "Local Supabase failed to start." >&2
-    exit 1
+    sleep 5
+    if ! pnpm supabase:start >/dev/null; then
+      echo "Local Supabase failed to start." >&2
+      exit 1
+    fi
   fi
   "$ROOT/scripts/wait-for-supabase-db"
 }
