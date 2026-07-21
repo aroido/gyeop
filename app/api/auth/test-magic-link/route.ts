@@ -1,8 +1,8 @@
 import {
   deriveMagicLinkRateLimitKey,
-  parseOwnerReturnTo,
+  parseOwnerSignInTarget,
 } from "../../../../lib/auth/owner-claim-context-core.mjs";
-import { sendOwnerMagicLinkResponse } from "../../../../lib/http/auth-owner.ts";
+import { sendOwnerTestMagicLinkResponse } from "../../../../lib/http/auth-owner.ts";
 import { magicLinkSchema } from "../../../../lib/http/auth-schemas.ts";
 import { runRateLimitedDomain } from "../../../../lib/http/rate-limit.ts";
 import { withPublicRequest } from "../../../../lib/http/request-boundary.ts";
@@ -18,6 +18,12 @@ export function POST(request: Request) {
     },
     async ({ input, networkKey, signal }) => {
       if (
+        process.env.NODE_ENV === "production" ||
+        process.env.GYEOP_E2E_LIVE !== "1"
+      ) {
+        return new Response(null, { status: 404 });
+      }
+      if (
         !input ||
         typeof input.email !== "string" ||
         (input.playId !== null && typeof input.playId !== "string") ||
@@ -25,24 +31,24 @@ export function POST(request: Request) {
       ) {
         throw new Error("INTERNAL_ERROR");
       }
-
-      let returnTo: string;
       const email = input.email;
-      const playId = input.playId;
+
+      let target;
       try {
-        returnTo = parseOwnerReturnTo(input.returnTo);
+        target = parseOwnerSignInTarget({
+          playId: input.playId,
+          returnTo: input.returnTo,
+        });
       } catch {
         throw new Error("INVALID_REQUEST");
       }
 
       const cookie = parseOwnerCookieHeader(request.headers.get("cookie"));
-      let ownerId: string | null = null;
-      if (playId !== null) {
-        if (returnTo !== `/me/plays/${playId}` || cookie.outcome !== "valid") {
-          throw new Error("INVALID_REQUEST");
-        }
-        ownerId = cookie.playId;
-      } else if (returnTo !== "/me") {
+      const ownerId =
+        target.playId !== null && cookie.outcome === "valid"
+          ? cookie.playId
+          : null;
+      if (target.playId !== null && ownerId === null) {
         throw new Error("INVALID_REQUEST");
       }
 
@@ -55,12 +61,12 @@ export function POST(request: Request) {
           signal,
         },
         () =>
-          sendOwnerMagicLinkResponse({
+          sendOwnerTestMagicLinkResponse({
             cookie: cookie.outcome === "valid" ? cookie : null,
             email,
             ownerId,
-            playId,
-            returnTo,
+            playId: target.playId,
+            returnTo: target.returnTo,
             signal,
           }),
       );

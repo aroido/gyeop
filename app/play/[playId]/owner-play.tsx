@@ -175,7 +175,7 @@ function TerminalScreen({
               className={styles.authLink}
               href="/auth/sign-in?returnTo=%2Fme"
             >
-              이메일로 로그인
+              Google로 로그인
             </Link>
           ) : retryable ? (
             <button type="button" onClick={onRetry}>

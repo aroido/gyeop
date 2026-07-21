@@ -53,7 +53,7 @@ Issue: https://github.com/aroido/gyeop/issues/102
 - [ ] `GET /auth/google`: 허용 query key는 singleton `playId`·`returnTo`뿐이다. key 중복·추가 key를 거부하고 `/me` 또는 `/me/plays/{canonical UUID}`만 허용한다. play claim이면 owner capability와 completed play를 먼저 검증한다.
 - [ ] Supabase SSR client의 `signInWithOAuth({ provider: "google", options: { redirectTo, skipBrowserRedirect: true } })` 결과 URL로 303 이동하며, 같은 응답에 signed owner-claim cookie와 PKCE verifier cookie를 설정한다.
 - [ ] `GET /auth/callback`은 query가 정확히 singleton `code` 하나일 때만 exchange를 시도한다. Google 취소·provider 오류의 `error*` query, 추가·중복·누락 query는 내용을 반영하거나 기록하지 않고 `/auth/sign-in?error=callback`으로 보낸다. code exchange 뒤 owner cookie/context/RPC가 실패한 경우만 `/auth/sign-in?error=claim`으로 보낸다.
-- [ ] 기존 `POST /api/auth/magic-link`는 제거한다. 로컬 E2E용 `POST /api/auth/test-magic-link`는 `NODE_ENV !== "production" && GYEOP_E2E_LIVE === "1"`일 때만 연다. JSON body는 기존과 같은 `{ email, playId, returnTo }`, 성공은 private no-store `202 { message }`, 이중 gate가 맞지 않으면 body 처리·Supabase 호출 전에 private no-store 404다.
+- [ ] 기존 `POST /api/auth/magic-link`는 제거한다. 로컬 E2E용 `POST /api/auth/test-magic-link`는 `NODE_ENV !== "production" && GYEOP_E2E_LIVE === "1"`일 때만 연다. JSON body는 기존과 같은 `{ email, playId, returnTo }`, 성공은 private no-store `202 { message }`, 이중 gate가 맞지 않으면 Supabase 호출 없이 private no-store 404다.
 - [ ] Google client ID·secret은 Google Cloud와 Supabase dashboard에만 저장하며 repo env·코드·문서·테스트 fixture에는 기록하지 않는다.
 
 ## 구현 계획

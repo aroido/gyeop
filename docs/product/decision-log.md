@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-21 — owner 계정 연결을 Google OAuth 단일 경로로 전환
+
+- 결정: 익명 owner 시작과 공유 직전 account claim 시점은 유지하되, 사용자에게 노출하는 로그인은 Supabase Auth Google OAuth 하나만 제공한다. 카카오·네이버·비밀번호·이메일 매직 링크 로그인은 제공하지 않는다.
+- 이유: 이메일을 입력하고 메일함에서 일회용 링크를 다시 여는 흐름보다 이미 쓰는 Google 계정으로 한 번에 이어가는 경로가 질문팩 저장·공유 의도에 맞고, 여러 소셜 provider를 동시에 운영할 초기 필요도 없다.
+- 결과: `Google로 계속하기` 뒤 같은 브라우저의 PKCE verifier, 10분 signed claim context, anonymous owner capability와 completed play를 검증해 기존 owner의 모든 play를 Auth UID에 원자적으로 연결한다. Google 계정 이메일·이름·사진은 친구·방문자 화면, 공유 문구, analytics와 app log에 사용하지 않는다. 이 결정은 2026-07-20의 이메일 account claim 부분, 2026-07-15의 이메일 전용 로그인 결정과 `docs/specs/issue-92.md`의 이메일 시작 경로를 대체하며, 방문자 무가입·owner claim·내부 redirect allowlist 계약은 유지한다.
+
 ## 2026-07-21 — 카드팩 개봉 시각 문법을 단일 실링 찢기와 TCG 카드 추출로 교정
 
 - 결정: 사용자 제어 개봉과 API 병렬 실행 계약은 유지하되 좌우 대칭 플랩을 없애고, 세로형 포일 팩의 상단 실링 한 조각이 비대칭으로 찢긴 뒤 표준 TCG 5:7 비율 카드가 거의 같은 크기로 위로 빠져나오게 한다.

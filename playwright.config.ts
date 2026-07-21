@@ -82,6 +82,7 @@ export default defineConfig({
       APP_URL: e2eBaseUrl,
       GYEOP_NEXT_DIST_DIR:
         process.env.GYEOP_NEXT_DIST_DIR ?? `.next/e2e-${e2ePort}`,
+      ...(liveOwnerFlow ? { GYEOP_E2E_LIVE: "1" } : {}),
       ORIGIN_PROXY_SECRET: proxyKey,
       RATE_LIMIT_SECRET: rateLimitKey,
       ...supabaseEnv,

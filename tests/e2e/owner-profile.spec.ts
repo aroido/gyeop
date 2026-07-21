@@ -270,7 +270,7 @@ test("offers sign-in instead of a missing-profile message on 401", async ({
     page.getByRole("heading", { name: "다시 로그인해 주세요" }),
   ).toBeFocused();
   await expect(
-    page.getByRole("link", { name: "이메일로 로그인" }),
+    page.getByRole("link", { name: "Google로 로그인" }),
   ).toHaveAttribute("href", "/auth/sign-in?returnTo=%2Fme");
   expect(api.eventCalls).toBe(0);
 });

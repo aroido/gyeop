@@ -22,9 +22,9 @@ export default async function OwnerPage() {
           <h1 tabIndex={-1} autoFocus>
             로그인하면 저장한 팩을 다시 볼 수 있어요
           </h1>
-          <p>이메일 링크 하나로 다른 브라우저에서도 불러올 수 있어요.</p>
+          <p>Google 계정으로 다른 브라우저에서도 다시 열 수 있어요.</p>
           <Link className={styles.primary} href="/auth/sign-in?returnTo=%2Fme">
-            이메일로 로그인
+            Google로 로그인
           </Link>
           <Link className={styles.secondary} href="/">
             홈으로

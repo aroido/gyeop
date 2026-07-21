@@ -43,69 +43,17 @@
   word-break: keep-all;
 }
 
-.form {
+.providerLink {
   display: grid;
-  gap: 0.55rem;
-  margin-top: 1.5rem;
-}
-
-.form label {
-  font-size: 0.8rem;
-  font-weight: 900;
-}
-
-.form input {
   min-height: 3.25rem;
-  padding: 0 0.85rem;
-  border: 1px solid #777;
-  border-radius: 0.7rem;
-  background: #171717;
-  color: #fff;
-  font: inherit;
-}
-
-.form button,
-.sent button,
-.sent a {
-  display: grid;
-  min-height: 3rem;
+  margin-top: 1.5rem;
   place-items: center;
-  border: 1px solid #050505;
+  border: 1px solid #dedede;
   border-radius: 0.7rem;
-  background: var(--lime);
-  color: #050505;
-  font: inherit;
+  background: #fff;
+  color: #171717;
   font-weight: 900;
   text-decoration: none;
-}
-
-.form button:disabled {
-  opacity: 0.65;
-}
-
-.sent {
-  display: grid;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
-  padding: 1rem;
-  border: 1px solid var(--lime);
-  border-radius: 0.8rem;
-}
-
-.sent strong {
-  font-size: 1.1rem;
-}
-
-.sent p {
-  margin: 0;
-  color: #cfcfcf;
-  line-height: 1.5;
-}
-
-.sent button {
-  border-color: #6a6a6a;
-  background: transparent;
-  color: #fff;
 }
 
 .alert {
@@ -129,10 +77,7 @@
   font-weight: 800;
 }
 
-.form input:focus-visible,
-.form button:focus-visible,
-.sent button:focus-visible,
-.sent a:focus-visible,
+.providerLink:focus-visible,
 .back:focus-visible {
   outline: 3px solid var(--blue);
   outline-offset: 3px;

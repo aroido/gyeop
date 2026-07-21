@@ -375,7 +375,7 @@ export default function ShareLinkManager({
             className={styles.primaryLink}
             href="/auth/sign-in?returnTo=%2Fme"
           >
-            이메일로 로그인
+            Google로 로그인
           </Link>
         </section>
       </main>
