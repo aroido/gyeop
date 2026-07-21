@@ -352,6 +352,13 @@ test("shows Google as the only owner sign-in path", async ({ page }) => {
   await expect(
     page.getByRole("link", { name: "Google로 계속하기" }),
   ).toHaveAttribute("href", "/auth/google?returnTo=%2Fme");
+  await expect(page.getByRole("link", { name: "홈으로" })).toHaveAttribute(
+    "href",
+    "/",
+  );
+  await expect(
+    page.getByRole("link", { name: "다른 질문팩 보기" }),
+  ).toHaveCount(0);
   await expect(page.getByRole("textbox")).toHaveCount(0);
   await expect(page.getByText(/매직 링크|카카오|네이버/)).toHaveCount(0);
   const testOnlyStatus = await page.evaluate(async () => {
@@ -387,6 +394,41 @@ test("shows Google as the only owner sign-in path", async ({ page }) => {
   await expect(
     page.getByText("Google 로그인을 완료하지 못했어요. 다시 시도해 주세요."),
   ).toBeVisible();
+});
+
+test("shows pack escape routes on owner sign-in at 320px", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto(
+    `/auth/sign-in?playId=${playId}&returnTo=${encodeURIComponent(`/me/plays/${playId}`)}`,
+  );
+
+  await expect(
+    page.getByRole("heading", { name: "내 질문팩을 계정에 저장해요" }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("link", { name: "Google로 계속하기" }),
+  ).toHaveAttribute(
+    "href",
+    `/auth/google?returnTo=${encodeURIComponent(`/me/plays/${playId}`)}&playId=${playId}`,
+  );
+  const resumeLink = page.getByRole("link", { name: "내 질문으로 돌아가기" });
+  const packsLink = page.getByRole("link", { name: "다른 질문팩 보기" });
+  await expect(resumeLink).toHaveAttribute("href", `/play/${playId}`);
+  await expect(packsLink).toHaveAttribute("href", "/");
+
+  const resumeBox = await resumeLink.boundingBox();
+  const packsBox = await packsLink.boundingBox();
+  expect(resumeBox).not.toBeNull();
+  expect(packsBox).not.toBeNull();
+  expect((resumeBox?.x ?? -1) + (resumeBox?.width ?? 321)).toBeLessThanOrEqual(
+    320,
+  );
+  expect((packsBox?.x ?? -1) + (packsBox?.width ?? 321)).toBeLessThanOrEqual(
+    320,
+  );
+  expect((resumeBox?.y ?? 801) + (resumeBox?.height ?? 0)).toBeLessThanOrEqual(
+    packsBox?.y ?? 0,
+  );
 });
 
 test("rejects an unknown bootstrap pack without an API request", async ({

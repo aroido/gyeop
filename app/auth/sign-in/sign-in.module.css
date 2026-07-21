@@ -68,7 +68,8 @@
 }
 
 .back {
-  display: inline-flex;
+  display: flex;
+  width: fit-content;
   min-height: 2.75rem;
   align-items: center;
   margin-top: 1rem;

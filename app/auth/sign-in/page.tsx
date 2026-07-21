@@ -65,6 +65,11 @@ export default async function SignInPage({
         >
           {target.playId ? "내 질문으로 돌아가기" : "홈으로"}
         </Link>
+        {target.playId ? (
+          <Link className={styles.back} href="/">
+            다른 질문팩 보기
+          </Link>
+        ) : null}
       </section>
     </main>
   );
