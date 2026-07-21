@@ -2,16 +2,71 @@
   --lime: #dfff00;
   --ink: #050505;
   --blue: #315cff;
+  --pack-primary: #111;
+  --pack-accent: var(--lime);
+  --pack-secondary: var(--blue);
+  --pack-label: var(--lime);
+  --pack-halo: 49 92 255;
+  --ui-accent: var(--lime);
+  --ui-on-accent: var(--ink);
 
   position: fixed;
   z-index: 100;
   inset: 0;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 38%, rgb(49 92 255 / 15%), transparent 35%),
+    radial-gradient(
+      circle at 50% 38%,
+      rgb(var(--pack-halo) / 15%),
+      transparent 35%
+    ),
     var(--ink);
   color: #fff;
   touch-action: pan-y;
+}
+
+.overlay[data-cover-tone="blue"] {
+  --pack-primary: #315cff;
+  --pack-accent: #dfff00;
+  --pack-secondary: #7d94ff;
+  --pack-label: #dfff00;
+}
+
+.overlay[data-cover-tone="coral"] {
+  --pack-primary: #ff4d42;
+  --pack-accent: #050505;
+  --pack-secondary: #ffe8b5;
+  --pack-label: #050505;
+  --pack-halo: 255 77 66;
+  --ui-accent: #ff4d42;
+  --ui-on-accent: #fff;
+}
+
+.overlay[data-cover-tone="ink"] {
+  --pack-primary: #0a0a0a;
+  --pack-accent: #dfff00;
+  --pack-secondary: #315cff;
+  --pack-label: #dfff00;
+}
+
+.overlay[data-cover-tone="violet"] {
+  --pack-primary: #7654ff;
+  --pack-accent: #dfff00;
+  --pack-secondary: #c2b3ff;
+  --pack-label: #dfff00;
+  --pack-halo: 118 84 255;
+  --ui-accent: #7654ff;
+  --ui-on-accent: #fff;
+}
+
+.overlay[data-cover-tone="cream"] {
+  --pack-primary: #ffe8b5;
+  --pack-accent: #ff4d42;
+  --pack-secondary: #315cff;
+  --pack-label: #4d3512;
+  --pack-halo: 255 77 66;
+  --ui-accent: #ff4d42;
+  --ui-on-accent: #fff;
 }
 
 .overlay[aria-hidden="true"] {
@@ -29,7 +84,7 @@
 
 .brand {
   margin: 0;
-  color: var(--lime);
+  color: var(--ui-accent);
   font-size: 0.75rem;
   font-weight: 950;
   letter-spacing: 0.08em;
@@ -82,7 +137,11 @@
   width: 84%;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(circle, rgb(49 92 255 / 48%), transparent 68%);
+  background: radial-gradient(
+    circle,
+    rgb(var(--pack-halo) / 48%),
+    transparent 68%
+  );
   filter: blur(0.75rem);
 }
 
@@ -98,45 +157,45 @@
 
 .fallbackCard {
   z-index: 1;
-  border: 2px solid var(--lime);
+  border: 2px solid var(--pack-accent);
   border-radius: 0.75rem;
   background:
     linear-gradient(#171b19 0 0) 50% 29% / 46% 0.55rem no-repeat,
     linear-gradient(#171b19 0 0) 50% 38% / 62% 0.55rem no-repeat,
     #f2f5ef;
-  box-shadow: 0.45rem 0.55rem 0 #315cff;
+  box-shadow: 0.45rem 0.55rem 0 var(--pack-secondary);
 }
 
 .fallbackPack {
   z-index: 2;
-  border: 2px solid var(--lime);
+  border: 2px solid var(--pack-accent);
   border-radius: 0.3rem 0.3rem 0.9rem 0.9rem;
   background:
     linear-gradient(
       105deg,
       transparent 26%,
-      rgb(223 255 0 / 15%) 39%,
+      color-mix(in srgb, var(--pack-accent) 15%, transparent) 39%,
       transparent 52%
     ),
     linear-gradient(
       135deg,
       transparent 0 46%,
-      rgb(223 255 0 / 10%) 47% 53%,
+      color-mix(in srgb, var(--pack-accent) 10%, transparent) 47% 53%,
       transparent 54%
     ),
-    #111;
-  box-shadow: 0.35rem 0.35rem 0 var(--blue);
+    var(--pack-primary);
+  box-shadow: 0.35rem 0.35rem 0 var(--pack-secondary);
 }
 
 .fallbackPack::before {
   position: absolute;
   inset: 2rem 0.7rem 1.5rem;
-  border: 1px solid rgb(223 255 0 / 45%);
+  border: 1px solid color-mix(in srgb, var(--pack-accent) 45%, transparent);
   background:
     linear-gradient(
       135deg,
       transparent 48%,
-      rgb(49 92 255 / 28%) 49% 51%,
+      color-mix(in srgb, var(--pack-secondary) 28%, transparent) 49% 51%,
       transparent 52%
     ),
     rgb(5 5 5 / 20%);
@@ -149,13 +208,96 @@
   top: 0;
   left: 0;
   height: 1.25rem;
-  border-bottom: 1px solid var(--lime);
+  border-bottom: 1px solid var(--pack-accent);
   background: repeating-linear-gradient(
     90deg,
-    rgb(223 255 0 / 18%) 0 2px,
+    color-mix(in srgb, var(--pack-accent) 18%, transparent) 0 2px,
     transparent 2px 7px
   );
   content: "";
+}
+
+.packIdentity {
+  position: absolute;
+  z-index: 3;
+  top: 52%;
+  left: 50%;
+  display: grid;
+  width: 55%;
+  min-height: 22%;
+  padding: 0.9rem 0.75rem;
+  overflow: hidden;
+  place-content: center;
+  gap: 0.6rem;
+  translate: -50% -50%;
+  border-top: 1px solid color-mix(in srgb, var(--pack-label) 58%, transparent);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--pack-label) 58%, transparent);
+  color: var(--pack-label);
+  text-align: center;
+  text-shadow: 0 1px 8px rgb(0 0 0 / 28%);
+  pointer-events: none;
+}
+
+.packIdentity::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.14;
+  content: "";
+}
+
+.packArt[data-pattern="bars"] .packIdentity::before {
+  background: repeating-linear-gradient(
+    105deg,
+    currentcolor 0 2px,
+    transparent 2px 12px
+  );
+}
+
+.packArt[data-pattern="grid"] .packIdentity::before {
+  background:
+    linear-gradient(currentcolor 1px, transparent 1px) 0 0 / 16px 16px,
+    linear-gradient(90deg, currentcolor 1px, transparent 1px) 0 0 / 16px 16px;
+}
+
+.packArt[data-pattern="orbit"] .packIdentity::before {
+  background: repeating-radial-gradient(
+    circle at 50% 45%,
+    transparent 0 10px,
+    currentcolor 11px 12px
+  );
+}
+
+.packArt[data-pattern="slash"] .packIdentity::before {
+  background: linear-gradient(
+    135deg,
+    transparent 34%,
+    currentcolor 35% 41%,
+    transparent 42% 58%,
+    currentcolor 59% 65%,
+    transparent 66%
+  );
+}
+
+.packIdentity span,
+.packIdentity strong {
+  position: relative;
+}
+
+.packIdentity span {
+  font-size: clamp(0.7rem, 2.8vw, 0.82rem);
+  font-weight: 950;
+  letter-spacing: 0.18em;
+  line-height: 1;
+}
+
+.packIdentity strong {
+  font-size: clamp(0.82rem, 3.4vw, 1rem);
+  font-weight: 950;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+  word-break: keep-all;
 }
 
 .packArt[data-opened="true"] .fallbackCard {
@@ -199,10 +341,10 @@
   min-width: 8rem;
   min-height: 2.75rem;
   padding: 0.55rem 1rem;
-  border: 1px solid var(--lime);
+  border: 1px solid var(--ui-accent);
   border-radius: 999px;
-  background: var(--lime);
-  color: var(--ink);
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
   font: inherit;
   font-size: 0.84rem;
   font-weight: 950;

@@ -8,6 +8,7 @@ import {
   useMotionValueEvent,
   useReducedMotion,
   useScroll,
+  useTransform,
   type MotionValue,
 } from "motion/react";
 import { useRouter } from "next/navigation";
@@ -21,6 +22,12 @@ import {
   type ReactNode,
 } from "react";
 
+import {
+  normalizeOpeningTone,
+  openingPackIdentity,
+  themePackOpeningAnimation,
+} from "@/lib/packs/opening-theme.mjs";
+
 import styles from "./play-transition.module.css";
 
 type OpeningPhase =
@@ -29,12 +36,19 @@ type OpeningPhase =
 type OpeningState = Readonly<{
   pack: string;
   packTitle: string;
+  coverTone: string;
+  coverRecipe: string;
   phase: OpeningPhase;
   readyPlayId: string | null;
 }>;
 
 type PlayTransitionContextValue = Readonly<{
-  beginOpening: (pack: string, packTitle: string | null) => void;
+  beginOpening: (
+    pack: string,
+    packTitle: string | null,
+    coverTone: string | null,
+    coverRecipe: string | null,
+  ) => void;
   resolveOpening: (playId: string) => void;
   abortOpening: () => void;
   completeHandoff: (playId: string) => void;
@@ -51,9 +65,15 @@ const PlayTransitionContext = createContext<PlayTransitionContextValue | null>(
 function PackOpeningAnimation({
   progress,
   opened,
+  packTitle,
+  coverTone,
+  coverRecipe,
 }: {
   progress: MotionValue<number>;
   opened: boolean;
+  packTitle: string;
+  coverTone: string;
+  coverRecipe: string;
 }) {
   const [renderer, setRenderer] = useState<"loading" | "lottie" | "fallback">(
     "loading",
@@ -61,6 +81,9 @@ function PackOpeningAnimation({
   const stageRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animationRef = useRef<AnimationItem | null>(null);
+  const identity = openingPackIdentity(coverRecipe);
+  const identityOpacity = useTransform(progress, [0, 0.18, 0.34], [1, 1, 0]);
+  const identityY = useTransform(progress, [0, 0.18, 0.34], [0, 0, -16]);
 
   const setFrame = useCallback((value: number) => {
     const frame = Math.round(
@@ -85,15 +108,21 @@ function PackOpeningAnimation({
       if (active) setRenderer("fallback");
     };
 
-    void import("lottie-web")
-      .then(({ default: lottie }) => {
+    void Promise.all([
+      import("lottie-web"),
+      fetch("/animations/gyeop-pack-opening.json").then((response) => {
+        if (!response.ok) throw new Error("Pack opening animation failed");
+        return response.json();
+      }),
+    ])
+      .then(([{ default: lottie }, baseAnimation]) => {
         if (!active) return;
         animation = lottie.loadAnimation({
           container,
           renderer: "svg",
           loop: false,
           autoplay: false,
-          path: "/animations/gyeop-pack-opening.json",
+          animationData: themePackOpeningAnimation(baseAnimation, coverTone),
         });
         animationRef.current = animation;
         animation.addEventListener("DOMLoaded", () => {
@@ -110,7 +139,7 @@ function PackOpeningAnimation({
       animationRef.current = null;
       animation?.destroy();
     };
-  }, [progress, setFrame]);
+  }, [coverTone, progress, setFrame]);
 
   return (
     <div
@@ -120,6 +149,10 @@ function PackOpeningAnimation({
       data-frame="0"
       data-renderer={renderer}
       data-opened={opened || undefined}
+      data-cover-tone={coverTone}
+      data-cover-recipe={coverRecipe}
+      data-pack-mark={identity.mark}
+      data-pattern={identity.pattern}
       aria-hidden="true"
     >
       <div className={styles.fallbackArt}>
@@ -132,6 +165,14 @@ function PackOpeningAnimation({
         className={styles.lottieCanvas}
         data-testid="pack-opening-lottie"
       />
+      <motion.div
+        className={styles.packIdentity}
+        data-testid="pack-opening-identity"
+        style={{ opacity: identityOpacity, y: identityY }}
+      >
+        <span>{identity.mark}</span>
+        <strong>{packTitle}</strong>
+      </motion.div>
     </div>
   );
 }
@@ -160,12 +201,19 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
   }, [progress]);
 
   const beginOpening = useCallback(
-    (pack: string, packTitle: string | null) => {
+    (
+      pack: string,
+      packTitle: string | null,
+      coverTone: string | null,
+      coverRecipe: string | null,
+    ) => {
       resetMotion();
       window.scrollTo({ top: 0, behavior: "instant" });
       const next: OpeningState = {
         pack,
         packTitle: packTitle ?? "새 질문팩",
+        coverTone: normalizeOpeningTone(coverTone),
+        coverRecipe: coverRecipe ?? "",
         phase: "opening",
         readyPlayId: null,
       };
@@ -311,6 +359,7 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
           className={styles.overlay}
           data-opening-state={opening.phase}
           data-pack={opening.pack}
+          data-cover-tone={opening.coverTone}
           aria-hidden={hiddenFromAccessibility || undefined}
           animate={{ opacity: opening.phase === "handoff-complete" ? 0 : 1 }}
           transition={{ duration: 0.12, ease: "easeOut" }}
@@ -325,6 +374,9 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
             <p className={styles.brand}>겹 · CARD PACK</p>
             <PackOpeningAnimation
               progress={progress}
+              packTitle={opening.packTitle}
+              coverTone={opening.coverTone}
+              coverRecipe={opening.coverRecipe}
               opened={
                 opening.phase === "route-loading" ||
                 opening.phase === "handoff-complete"

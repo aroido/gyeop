@@ -10,6 +10,40 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
+for (const theme of [
+  {
+    slug: "first-impression",
+    title: "첫 장면, 네 버전",
+    tone: "blue",
+    mark: "FI",
+  },
+  {
+    slug: "after-work",
+    title: "퇴근 후 본캐",
+    tone: "coral",
+    mark: "AW",
+  },
+]) {
+  test(`inherits the ${theme.tone} pack identity during opening`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await installOwnerFlowApi(page, { createDelayMs: 2_000 });
+    await page.goto(`/play/new?pack=${theme.slug}`);
+
+    const stage = page.getByTestId("pack-opening-stage");
+    await expect(stage).toHaveAttribute("data-renderer", "lottie");
+    await expect(stage).toHaveAttribute("data-cover-tone", theme.tone);
+    await expect(stage).toHaveAttribute("data-pack-mark", theme.mark);
+    await expect(page.getByTestId("pack-opening-identity")).toContainText(
+      theme.title,
+    );
+    await expect(page.getByTestId("pack-opening-identity")).toContainText(
+      theme.mark,
+    );
+  });
+}
+
 test("scrubs the pack open, reverses before the snap, and hands off to the question", async ({
   page,
 }) => {
@@ -108,6 +142,11 @@ test("keeps a usable static pack when the Lottie asset fails", async ({
 
   const stage = page.getByTestId("pack-opening-stage");
   await expect(stage).toHaveAttribute("data-renderer", "fallback");
+  await expect(stage).toHaveAttribute("data-cover-tone", "lime");
+  await expect(stage).toHaveAttribute("data-pack-mark", "OF");
+  await expect(page.getByTestId("pack-opening-identity")).toContainText(
+    "우리는 아직도 통하는 편",
+  );
   await expect(stage).not.toHaveAttribute("data-opened");
 
   await page.getByRole("button", { name: "팩 열기" }).click();

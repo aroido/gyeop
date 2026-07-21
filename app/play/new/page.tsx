@@ -18,6 +18,8 @@ export default async function NewOwnerPlayPage({
     <BootstrapOwnerPlay
       pack={manifest?.slug ?? null}
       packTitle={manifest?.title ?? null}
+      packTone={manifest?.presentation.coverTone ?? null}
+      packRecipe={manifest?.presentation.coverRecipe ?? null}
       entrySource={entrySource}
     />
   );

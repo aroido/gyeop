@@ -48,6 +48,7 @@ Issue: https://github.com/aroido/gyeop/issues/120
 - [ ] tone 팔레트는 홈 카드의 현재 색 조합을 계승한다: lime `#dfff00/#315cff`, blue `#315cff/#dfff00`, coral `#ff4d42/#050505`, ink `#0a0a0a/#dfff00`, violet `#7654ff/#dfff00`, cream `#ffe8b5/#ff4d42`.
 - [ ] 포장 body·detail·halo·추출 카드 accent는 tone 팔레트로 치환한다. contrast를 위해 off-white와 dark 단계는 tone별 고정 shade를 사용한다.
 - [ ] pack identity overlay는 title과 recipe 기반 영문 mark(예: `first-impression-card-v1` → `FI`)를 보이며, recipe hash로 소수의 CSS pattern 중 하나를 고른다. 별도 이미지 asset은 없다.
+- [ ] 새 identity와 겹치는 기존 generic `brand pill`/`brand bars`는 themed clone에서만 제외하고 원본 Lottie는 보존한다.
 - [ ] identity overlay는 초기 닫힌 팩에서만 읽히고 extraction 구간 전에 opacity/transform으로 사라져 Lottie 움직임과 분리되어 떠 보이지 않게 한다.
 
 ## API와 데이터 영향
