@@ -77,6 +77,7 @@ start_supabase() {
     echo "Local Supabase failed to start." >&2
     exit 1
   fi
+  "$ROOT/scripts/wait-for-supabase-db"
 }
 
 restart_supabase() {
@@ -113,6 +114,9 @@ run_static_verification() {
   sh -n "$ROOT/tests/integration/render-deploy.test.sh"
   sh -n "$ROOT/tests/integration/visitor-assignment-upgrade.test.sh"
   sh -n "$ROOT/tests/integration/eligibility-cutover-upgrade.test.sh"
+  bash -n "$ROOT/scripts/wait-for-supabase-db"
+  bash -n "$ROOT/tests/integration/supabase-readiness.test.sh"
+  "$ROOT/tests/integration/supabase-readiness.test.sh"
 
   VALIDATOR="${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py"
   if [[ -f "$VALIDATOR" ]]; then
@@ -174,6 +178,7 @@ run_data_core_verification() {
     tests/integration/eligibility-cutover-upgrade.test.sh
   fi
   pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
+  "$ROOT/scripts/wait-for-supabase-db"
   pnpm test:db
   pnpm supabase:lint
   node scripts/verify-supabase-types.mjs
@@ -223,6 +228,7 @@ case "$MODE" in
   ci-data-app)
     start_supabase
     pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
+    "$ROOT/scripts/wait-for-supabase-db"
     run_data_app_verification
     echo "GYEOP CI data app verification passed."
     exit 0
