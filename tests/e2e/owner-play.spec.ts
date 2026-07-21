@@ -19,24 +19,46 @@ test("scrubs the pack open, reverses before the snap, and hands off to the quest
 
   const overlay = page.locator('[data-opening-state="opening"]');
   const card = page.getByTestId("pack-inner-card");
+  const tearStrip = page.getByTestId("pack-tear-strip");
   await expect(overlay).toBeVisible();
+  await expect(tearStrip).toBeVisible();
+  await expect(page.getByTestId("pack-mouth")).toBeVisible();
   await expect(page.getByRole("button", { name: "팩 열기" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
     360,
   );
-  const closedY = (await card.boundingBox())?.y;
+  const closedCard = await card.boundingBox();
+  const closedY = closedCard?.y;
+  const closedTearX = (await tearStrip.boundingBox())?.x;
   expect(closedY).toBeDefined();
+  expect(closedTearX).toBeDefined();
+  expect(
+    Math.abs((closedCard?.width ?? 0) / (closedCard?.height ?? 1) - 5 / 7),
+  ).toBeLessThanOrEqual(0.02);
 
   await page.mouse.wheel(0, 90);
   await expect
     .poll(async () => (await card.boundingBox())?.y ?? Number.POSITIVE_INFINITY)
     .toBeLessThan((closedY as number) - 12);
+  await expect
+    .poll(
+      async () =>
+        (await tearStrip.boundingBox())?.x ?? Number.POSITIVE_INFINITY,
+    )
+    .toBeLessThan((closedTearX as number) - 20);
   const openedY = (await card.boundingBox())?.y as number;
+  const tornTearX = (await tearStrip.boundingBox())?.x as number;
 
   await page.mouse.wheel(0, -90);
   await expect
     .poll(async () => (await card.boundingBox())?.y ?? Number.NEGATIVE_INFINITY)
     .toBeGreaterThan(openedY + 8);
+  await expect
+    .poll(
+      async () =>
+        (await tearStrip.boundingBox())?.x ?? Number.NEGATIVE_INFINITY,
+    )
+    .toBeGreaterThan(tornTearX + 16);
 
   await page.mouse.wheel(0, 240);
   await page.waitForURL(`/play/${playId}`);
@@ -50,6 +72,39 @@ test("scrubs the pack open, reverses before the snap, and hands off to the quest
     ),
   ).toHaveLength(1);
 });
+
+for (const viewport of [
+  { width: 320, height: 800 },
+  { width: 390, height: 844 },
+  { width: 430, height: 932 },
+]) {
+  test(`keeps the unopened pack and card at TCG proportions on ${viewport.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await installOwnerFlowApi(page, { createDelayMs: 2_000 });
+    await page.goto("/play/new?pack=old-friend");
+
+    const card = await page.getByTestId("pack-inner-card").boundingBox();
+    const shell = await page.getByTestId("pack-shell").boundingBox();
+    expect(card).not.toBeNull();
+    expect(shell).not.toBeNull();
+    expect(
+      Math.abs((card?.width ?? 0) / (card?.height ?? 1) - 5 / 7),
+    ).toBeLessThanOrEqual(0.02);
+    expect(
+      Math.abs((shell?.width ?? 0) / (shell?.height ?? 1) - 5 / 7),
+    ).toBeLessThanOrEqual(0.02);
+    expect((card?.width ?? 0) / viewport.width).toBeGreaterThanOrEqual(0.55);
+    expect((card?.width ?? 0) / viewport.width).toBeLessThanOrEqual(0.61);
+    expect((shell?.width ?? 0) / viewport.width).toBeGreaterThanOrEqual(0.6);
+    expect((shell?.width ?? 0) / viewport.width).toBeLessThanOrEqual(0.69);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth),
+    ).toBe(viewport.width);
+  });
+}
 
 test("opens from the keyboard button and waits in the extracted pose for a slow API", async ({
   page,
