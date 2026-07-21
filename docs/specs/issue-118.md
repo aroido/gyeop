@@ -15,12 +15,14 @@ PR #117 이후 가장 긴 `ci-data` 검증을 서로 독립적인 두 러너로 
 - [ ] `ci-live-mvp`와 `ci-live-owner`는 방금 시작한 Supabase를 그대로 사용하도록 reset 없는 내부 실행 스크립트를 호출한다.
 - [ ] 개발자가 직접 실행하는 `test:e2e:mvp`, `test:e2e:owner`, `test:e2e:live`는 기존처럼 reset을 포함하는 독립 실행 계약을 유지한다.
 - [ ] GitHub Actions base matrix를 `ci-static`, `ci-data-core`, `ci-data-app`, `ci-mock` 네 lane으로 구성한다.
+- [ ] Supabase CLI가 start/reset 성공 직후에도 DB 연결 준비가 늦는 경우를 위해, Postgres readiness를 짧게 재확인한 뒤 DB 의존 검증을 시작한다.
 - [ ] 변경 전·후 실제 GitHub Actions 실행 시간을 기록하고 flaky 재실행 없이 통과했는지 확인한다.
 
 ## 제외 범위
 
 - [ ] 테스트 케이스 삭제, skip, assertion 완화, 테스트 대상 축소는 하지 않는다.
 - [ ] GitHub Actions 러너 사양, 캐시 키, Supabase/Playwright 버전은 바꾸지 않는다.
+- [ ] Supabase CLI 명령 자체를 대체하거나 DB 준비 실패를 성공으로 숨기지 않는다.
 - [ ] 제품 기능, 화면, API, DB schema·migration·seed는 바꾸지 않는다.
 - [ ] 이미 충분히 짧은 static/mock/live lane의 추가 분할은 하지 않는다.
 - [ ] 러너 사용량 증가를 감추기 위한 복잡한 공유 서비스나 캐시 계층은 도입하지 않는다.
@@ -53,6 +55,9 @@ PR #117 이후 가장 긴 `ci-data` 검증을 서로 독립적인 두 러너로 
 ## 구현 계획
 
 - [ ] `scripts/ai-verify`의 기존 data 검증을 `run_data_core_verification`과 `run_data_app_verification`으로 나눈다. 기존 명령은 두 함수에 정확히 한 번씩 배치하고 실행 순서는 유지한다.
+- [ ] 신규 `scripts/wait-for-supabase-db`는 `supabase/config.toml`에서 정확히 한 개의 따옴표 문자열 `project_id`를 읽고, 비어 있거나 중복되면 실패한다. 도출한 `supabase_db_<project_id>` 컨테이너 안의 `pg_isready -U postgres -d postgres`만 확인한다.
+- [ ] `scripts/ai-verify`는 성공한 start와 reset 뒤에 readiness helper를 호출한다. start/reset 자체의 nonzero는 readiness로 성공 전환하지 않고 기존처럼 즉시 실패하며, readiness 제한 시간 초과도 명확히 실패한다.
+- [ ] 신규 `tests/integration/supabase-readiness.test.sh`는 기본 30회·1초인 재시도를 `GYEOP_SUPABASE_READY_ATTEMPTS`, `GYEOP_SUPABASE_READY_INTERVAL_SECONDS`로 각각 3회·0초로 제한한다. fake `docker`가 두 번 실패 후 성공할 때 정확히 세 번 `exec supabase_db_gyeop pg_isready -U postgres -d postgres`로 호출되고 exit 0인지, 항상 실패할 때 세 번 호출 후 exit 1인지 검증한다.
 - [ ] `ci-data-core`는 core 함수만 실행한다. `ci-data-app`은 새 Supabase 시작과 reset 후 app 함수를 실행한다.
 - [ ] `full` 모드는 static → data core → data app 순으로 같은 로컬 Supabase 상태를 이어서 사용해 기존 data 실행 의미를 유지한다.
 - [ ] `package.json`에 reset 없는 `test:e2e:mvp:run`, `test:e2e:owner:run` 내부 스크립트를 추가하고, 공개 직접 실행 스크립트는 `supabase:reset` 뒤 내부 스크립트를 부르게 한다.
@@ -63,6 +68,8 @@ PR #117 이후 가장 긴 `ci-data` 검증을 서로 독립적인 두 러너로 
 ## 완료 기준
 
 - [ ] 기존 `ci-data`의 모든 검증 명령이 `ci-data-core`와 `ci-data-app` 전체에서 누락·중복 없이 실행된다. 단, 독립 러너 초기화를 위한 Supabase 시작/reset은 각 lane에 존재한다.
+- [ ] start/reset 뒤 DB 의존 명령은 `pg_isready` 성공 후에만 실행되고 readiness 제한 시간 초과는 nonzero로 종료한다.
+- [ ] readiness 성공이 start/reset 자체의 nonzero를 가리지 않으며, 다른 프로젝트나 임의의 로컬 Postgres가 준비돼 있어도 성공 조건이 되지 않는다.
 - [ ] `full` 모드는 기존 data 명령 순서와 테스트 범위를 유지하고, 깨끗한 동일 HEAD에서 성공하면 기존 `gyeop-full-verify/<SHA>` 마커를 생성한다. `scripts/task-harness.mjs`는 이 마커가 정확한 HEAD와 일치하는지 검증한다.
 - [ ] 직접 실행하는 `pnpm test:e2e:mvp`, `pnpm test:e2e:owner`, `pnpm test:e2e:live`는 계속 reset을 포함한다.
 - [ ] CI 전용 live 모드는 새 Supabase 시작 직후 reset 없는 내부 실행 스크립트를 사용한다.
@@ -77,6 +84,8 @@ PR #117 이후 가장 긴 `ci-data` 검증을 서로 독립적인 두 러너로 
 - [ ] 제거된 `ci-data` 모드가 사용법 오류로 종료하고 새 `ci-data-core`, `ci-data-app` 모드가 각각 통과하는지 확인한다.
 - [ ] `ci-live-mvp`, `ci-live-owner`를 순차 실행해 reset 없는 내부 경로가 새 Supabase에서 통과하는지 확인한다.
 - [ ] package script 구성을 확인해 직접 실행 wrapper에 reset이 남아 있고 CI 내부 script에는 reset이 없는지 확인한다.
+- [ ] 깨끗한 Supabase 기동과 reset 직후 readiness barrier를 거쳐 `ci-data-core`가 통과하는지 확인한다.
+- [ ] `tests/integration/supabase-readiness.test.sh`로 지연 후 성공(exit 0·3회 호출)과 timeout 실패(exit 1·3회 호출) 두 분기 및 정확한 argv `exec supabase_db_gyeop pg_isready -U postgres -d postgres`를 확인한다.
 - [ ] PR exact HEAD의 모든 GitHub Actions job과 최종 named `verify` 성공 및 재실행 횟수 0을 확인한다.
 
 ## 분석과 관측성
