@@ -29,7 +29,7 @@ function keyframes(value, matches = []) {
   return matches;
 }
 
-test("pack opening Lottie keeps the reviewed seal and card geometry", () => {
+test("pack opening Lottie keeps the reviewed open pack and card geometry", () => {
   assert.deepEqual(
     [animation.w, animation.h, animation.fr, animation.ip, animation.op],
     [360, 520, 60, 0, 120],
@@ -40,7 +40,6 @@ test("pack opening Lottie keeps the reviewed seal and card geometry", () => {
   assert.deepEqual(
     animation.layers.map(({ nm }) => nm),
     [
-      "tear-strip",
       "front-lip",
       "front-details",
       "front-pack",
@@ -50,20 +49,7 @@ test("pack opening Lottie keeps the reviewed seal and card geometry", () => {
       "halo",
     ],
   );
-
-  const tear = layer("tear-strip");
-  assert.deepEqual(tear.ks.s.k, [100, 100, 100]);
-  assert.ok(
-    tear.ks.o.k.some(({ t, s }) => t <= 29 && s?.[0] === 0),
-    "tear strip must disappear in the first 24%",
-  );
-
-  const sealPath = walk(tear.shapes).find(({ nm }) => nm === "seal path");
-  const pathStates = sealPath.ks.k.flatMap(({ s, e }) => [s?.[0], e?.[0]]);
-  for (const state of pathStates.filter(Boolean)) {
-    const xs = state.v.map(([x]) => x);
-    assert.equal(Math.max(...xs) - Math.min(...xs), 236);
-  }
+  assert.equal(layer("tear-strip"), undefined);
 
   for (const lip of [layer("front-lip"), layer("back-lip")]) {
     assert.equal(

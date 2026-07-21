@@ -24,7 +24,7 @@ import {
 import styles from "./play-transition.module.css";
 
 type OpeningPhase =
-  "opening" | "opened-waiting" | "route-loading" | "handoff-complete";
+  "opening" | "committing" | "route-loading" | "handoff-complete";
 
 type OpeningState = Readonly<{
   pack: string;
@@ -42,6 +42,8 @@ type PlayTransitionContextValue = Readonly<{
 
 const SNAP_PROGRESS = 0.85;
 const LAST_LOTTIE_FRAME = 119;
+const HANDOFF_FRAME = 94;
+const HANDOFF_PROGRESS = HANDOFF_FRAME / LAST_LOTTIE_FRAME;
 const PlayTransitionContext = createContext<PlayTransitionContextValue | null>(
   null,
 );
@@ -199,6 +201,28 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
     [progress, router],
   );
 
+  const finishOpening = useCallback(
+    (playId: string) => {
+      settlingRef.current?.stop();
+      const controls = animate(progress, 1, {
+        type: "spring",
+        stiffness: 300,
+        damping: 30,
+        mass: 0.7,
+      });
+      settlingRef.current = controls;
+      void controls.then(() => {
+        if (settlingRef.current === controls) settlingRef.current = null;
+        const current = openingRef.current;
+        if (current?.phase !== "committing" || current.readyPlayId !== playId) {
+          return;
+        }
+        navigateToPlay(playId);
+      });
+    },
+    [navigateToPlay, progress],
+  );
+
   const resolveOpening = useCallback(
     (playId: string) => {
       const current = openingRef.current;
@@ -206,11 +230,13 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
       const next: OpeningState = { ...current, readyPlayId: playId };
       openingRef.current = next;
       setOpening(next);
-      if (shouldReduceMotion || current.phase === "opened-waiting") {
+      if (shouldReduceMotion) {
         navigateToPlay(playId);
+      } else if (current.phase === "committing") {
+        finishOpening(playId);
       }
     },
-    [navigateToPlay, shouldReduceMotion],
+    [finishOpening, navigateToPlay, shouldReduceMotion],
   );
 
   const completeHandoff = useCallback((playId: string) => {
@@ -228,7 +254,14 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
     if (!current || current.phase !== "opening" || lockedRef.current) return;
     lockedRef.current = true;
     settlingRef.current?.stop();
-    const controls = animate(progress, 1, {
+    const next: OpeningState = { ...current, phase: "committing" };
+    openingRef.current = next;
+    setOpening(next);
+    if (next.readyPlayId) {
+      finishOpening(next.readyPlayId);
+      return;
+    }
+    const controls = animate(progress, HANDOFF_PROGRESS, {
       type: "spring",
       stiffness: 300,
       damping: 30,
@@ -236,15 +269,9 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
     });
     settlingRef.current = controls;
     void controls.then(() => {
-      settlingRef.current = null;
-      const value = openingRef.current;
-      if (value?.phase !== "opening") return;
-      const next: OpeningState = { ...value, phase: "opened-waiting" };
-      openingRef.current = next;
-      setOpening(next);
-      if (next.readyPlayId) navigateToPlay(next.readyPlayId);
+      if (settlingRef.current === controls) settlingRef.current = null;
     });
-  }, [navigateToPlay, progress]);
+  }, [finishOpening, progress]);
 
   useMotionValueEvent(scrollYProgress, "change", (value) => {
     const current = openingRef.current;
@@ -256,7 +283,7 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
     ) {
       return;
     }
-    progress.set(Math.min(value / SNAP_PROGRESS, 1));
+    progress.set(Math.min(value / SNAP_PROGRESS, 1) * HANDOFF_PROGRESS);
     if (value >= SNAP_PROGRESS) settleOpening();
   });
 
@@ -267,8 +294,7 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const hiddenFromAccessibility =
-    opening?.phase === "route-loading" || opening?.phase === "handoff-complete";
+  const hiddenFromAccessibility = opening?.phase !== "opening";
 
   return (
     <PlayTransitionContext.Provider
@@ -299,7 +325,10 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
             <p className={styles.brand}>겹 · CARD PACK</p>
             <PackOpeningAnimation
               progress={progress}
-              opened={opening.phase !== "opening"}
+              opened={
+                opening.phase === "route-loading" ||
+                opening.phase === "handoff-complete"
+              }
             />
             <div className={styles.copy}>
               <h1>{opening.packTitle}</h1>
@@ -310,8 +339,6 @@ export function PlayTransitionProvider({ children }: { children: ReactNode }) {
                     팩 열기
                   </button>
                 </>
-              ) : opening.phase === "opened-waiting" ? (
-                <p role="status">첫 질문을 준비하고 있어요…</p>
               ) : null}
             </div>
           </div>

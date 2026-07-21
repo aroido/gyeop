@@ -111,15 +111,13 @@ test("keeps a usable static pack when the Lottie asset fails", async ({
   await expect(stage).not.toHaveAttribute("data-opened");
 
   await page.getByRole("button", { name: "팩 열기" }).click();
-  await expect(
-    page.locator('[data-opening-state="opened-waiting"]'),
-  ).toBeVisible();
-  await expect(stage).toHaveAttribute("data-opened", "true");
+  await expect(page.locator('[data-opening-state="committing"]')).toBeVisible();
+  await expect(stage).not.toHaveAttribute("data-opened");
   await expect(stage).toHaveAttribute("data-renderer", "fallback");
   await page.waitForURL(`/play/${playId}`);
 });
 
-test("opens from the keyboard button and waits in the extracted pose for a slow API", async ({
+test("opens from the keyboard button and holds before settle for a slow API", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
@@ -127,10 +125,16 @@ test("opens from the keyboard button and waits in the extracted pose for a slow 
   await page.goto("/play/new?pack=old-friend");
 
   await page.getByRole("button", { name: "팩 열기" }).click();
-  await expect(
-    page.locator('[data-opening-state="opened-waiting"]'),
-  ).toBeVisible();
-  await expect(page.getByText("첫 질문을 준비하고 있어요…")).toBeVisible();
+  await expect(page.locator('[data-opening-state="committing"]')).toBeVisible();
+  await expect
+    .poll(() =>
+      page
+        .getByTestId("pack-opening-stage")
+        .getAttribute("data-frame")
+        .then(Number),
+    )
+    .toBe(94);
+  await expect(page.getByText("첫 질문을 준비하고 있어요…")).toHaveCount(0);
   await expect(page).toHaveURL(/\/play\/new\?pack=old-friend$/);
 
   await page.waitForURL(`/play/${playId}`);
@@ -139,15 +143,12 @@ test("opens from the keyboard button and waits in the extracted pose for a slow 
   ).toBeFocused();
 });
 
-test("removes the handoff overlay when the routed owner read fails", async ({
+test("keeps the direct owner route error when the owner read fails", async ({
   page,
 }) => {
-  await page.emulateMedia({ reducedMotion: "no-preference" });
   await installOwnerFlowApi(page, { readMissingCount: 1 });
-  await page.goto("/play/new?pack=old-friend");
-  await page.getByRole("button", { name: "팩 열기" }).click();
+  await page.goto(`/play/${playId}`);
 
-  await page.waitForURL(`/play/${playId}`);
   await expect(
     page.getByRole("heading", { name: "이 팩을 이어갈 수 없어요" }),
   ).toBeFocused();
@@ -157,29 +158,41 @@ test("removes the handoff overlay when the routed owner read fails", async ({
   ).toBeVisible();
 });
 
-test("keeps the extracted card while the routed owner read is slow", async ({
+test("preloads the first question before the final handoff frame", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await installOwnerFlowApi(page, { readDelayMs: 1_000 });
+  const api = await installOwnerFlowApi(page, { packDelayMs: 1_000 });
   await page.goto("/play/new?pack=old-friend");
   await page.getByRole("button", { name: "팩 열기" }).click();
 
+  await expect(page.locator('[data-opening-state="committing"]')).toBeVisible();
+  await expect
+    .poll(() =>
+      page
+        .getByTestId("pack-opening-stage")
+        .getAttribute("data-frame")
+        .then(Number),
+    )
+    .toBe(94);
   await page.waitForURL(`/play/${playId}`);
-  await expect(
-    page.locator('[data-opening-state="route-loading"]'),
-  ).toHaveAttribute("aria-hidden", "true");
   await expect(
     page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
   ).toBeFocused();
   await expect(page.locator("[data-opening-state]")).toHaveCount(0);
+  expect(
+    api.calls.filter(
+      (call) =>
+        call.method === "GET" && call.pathname === `/api/plays/${playId}`,
+    ),
+  ).toHaveLength(0);
 });
 
 test("removes the handoff overlay when the routed pack read fails", async ({
   page,
 }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await installOwnerFlowApi(page, { packFailureCount: 1 });
+  await installOwnerFlowApi(page, { packFailureCount: 2 });
   await page.goto("/play/new?pack=old-friend");
   await page.getByRole("button", { name: "팩 열기" }).click();
 
@@ -191,6 +204,29 @@ test("removes the handoff overlay when the routed pack read fails", async ({
   await expect(
     page.getByRole("button", { name: "다시 불러오기" }),
   ).toBeVisible();
+});
+
+test("falls back to the routed load after one preload pack failure", async ({
+  page,
+}) => {
+  const api = await installOwnerFlowApi(page, { packFailureCount: 1 });
+  await page.goto("/play/new?pack=old-friend");
+
+  await expect(
+    page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
+  ).toBeVisible();
+  expect(
+    api.calls.filter(
+      (call) =>
+        call.method === "GET" && call.pathname === "/api/packs/old-friend",
+    ),
+  ).toHaveLength(2);
+  expect(
+    api.calls.filter(
+      (call) =>
+        call.method === "GET" && call.pathname === `/api/plays/${playId}`,
+    ),
+  ).toHaveLength(1);
 });
 
 test("bootstraps once and shows the first server-backed question", async ({
@@ -207,9 +243,8 @@ test("bootstraps once and shows the first server-backed question", async ({
     packSlug: "old-friend",
     entrySource: "home",
   });
-  expect(api.calls.slice(0, 3).map((call) => call.pathname)).toEqual([
+  expect(api.calls.slice(0, 2).map((call) => call.pathname)).toEqual([
     "/api/plays",
-    `/api/plays/${playId}`,
     "/api/packs/old-friend",
   ]);
   await expect(page.locator('main[data-pack="old-friend"]')).toHaveCount(1);
