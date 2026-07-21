@@ -19,7 +19,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$MODE" in
-  full | ci-static | ci-data | ci-mock | ci-live-mvp | ci-live-owner) ;;
+  full | ci-static | ci-data-core | ci-data-app | ci-mock | ci-live-mvp | ci-live-owner) ;;
   *)
     echo "Unsupported verification mode: $MODE" >&2
     exit 2
@@ -154,7 +154,7 @@ run_static_verification() {
   tests/integration/http-boundary-host.test.sh
 }
 
-run_data_verification() {
+run_data_core_verification() {
   start_supabase
   UPGRADE_TEST_PATHS=(
     scripts/ai-verify
@@ -177,6 +177,9 @@ run_data_verification() {
   pnpm test:db
   pnpm supabase:lint
   node scripts/verify-supabase-types.mjs
+}
+
+run_data_app_verification() {
   node --test tests/integration/data-access.test.mjs
   node --test tests/integration/pack-catalog.test.mjs
   node --test tests/integration/pack-publication-concurrency.test.mjs
@@ -197,13 +200,13 @@ run_mock_verification() {
 case "$MODE" in
   ci-live-mvp)
     start_supabase
-    pnpm test:e2e:mvp
+    pnpm test:e2e:mvp:run
     echo "GYEOP CI live MVP verification passed."
     exit 0
     ;;
   ci-live-owner)
     start_supabase
-    pnpm test:e2e:owner
+    pnpm test:e2e:owner:run
     echo "GYEOP CI live owner verification passed."
     exit 0
     ;;
@@ -212,9 +215,16 @@ case "$MODE" in
     echo "GYEOP CI static verification passed."
     exit 0
     ;;
-  ci-data)
-    run_data_verification
-    echo "GYEOP CI data verification passed."
+  ci-data-core)
+    run_data_core_verification
+    echo "GYEOP CI data core verification passed."
+    exit 0
+    ;;
+  ci-data-app)
+    start_supabase
+    pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
+    run_data_app_verification
+    echo "GYEOP CI data app verification passed."
     exit 0
     ;;
   ci-mock)
@@ -224,9 +234,11 @@ case "$MODE" in
     ;;
   full)
     run_static_verification
-    run_data_verification
+    run_data_core_verification
+    run_data_app_verification
     restart_supabase
-    GYEOP_E2E_PORT=3110 pnpm test:e2e:live
+    pnpm test:e2e:mvp:run
+    pnpm test:e2e:owner
     run_mock_verification
     ;;
 esac
