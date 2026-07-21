@@ -69,21 +69,19 @@ python3 "$ROOT/scripts/verify_project.py"
 node --check "$ROOT/scripts/task-harness.mjs"
 TASK_HARNESS_PATHS=(
   scripts/ai-verify
+  scripts/verify-path-changes
   scripts/task-harness
   scripts/task-harness.mjs
   scripts/task-harness.test.mjs
 )
 VERIFY_BASE_REF="${GYEOP_VERIFY_BASE_REF:-origin/main}"
-if git rev-parse --verify --quiet "${VERIFY_BASE_REF}^{commit}" >/dev/null &&
-  VERIFY_BASE_SHA="$(git merge-base HEAD "$VERIFY_BASE_REF")" &&
-  git diff --quiet "$VERIFY_BASE_SHA" -- "${TASK_HARNESS_PATHS[@]}" &&
-  git diff --quiet -- "${TASK_HARNESS_PATHS[@]}" &&
-  git diff --cached --quiet -- "${TASK_HARNESS_PATHS[@]}"; then
+if [[ "$("$ROOT/scripts/verify-path-changes" "$VERIFY_BASE_REF" "${TASK_HARNESS_PATHS[@]}")" == "skip" ]]; then
   echo "Task harness regression tests skipped: no harness changes."
 else
   node --test "$ROOT/scripts/task-harness.test.mjs"
 fi
 sh -n "$ROOT/scripts/task-harness"
+sh -n "$ROOT/scripts/verify-path-changes"
 sh -n "$ROOT/scripts/install-codex-skills"
 sh -n "$ROOT/ops/http-boundary/haproxy-origin-wrapper"
 sh -n "$ROOT/ops/render-entrypoint.sh"
@@ -140,8 +138,23 @@ if ! pnpm supabase:start >/dev/null; then
   echo "Local Supabase failed to start." >&2
   exit 1
 fi
-tests/integration/visitor-assignment-upgrade.test.sh
-tests/integration/eligibility-cutover-upgrade.test.sh
+UPGRADE_TEST_PATHS=(
+  scripts/ai-verify
+  scripts/verify-path-changes
+  package.json
+  pnpm-lock.yaml
+  supabase/config.toml
+  supabase/seed.sql
+  supabase/migrations
+  tests/integration/visitor-assignment-upgrade.test.sh
+  tests/integration/eligibility-cutover-upgrade.test.sh
+)
+if [[ "$("$ROOT/scripts/verify-path-changes" "$VERIFY_BASE_REF" "${UPGRADE_TEST_PATHS[@]}")" == "skip" ]]; then
+  echo "Upgrade regression tests skipped: no migration-path changes."
+else
+  tests/integration/visitor-assignment-upgrade.test.sh
+  tests/integration/eligibility-cutover-upgrade.test.sh
+fi
 pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
 pnpm test:db
 pnpm supabase:lint

@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [[ $# -lt 2 ]]; then
+  echo "Usage: scripts/verify-path-changes <base-ref> <path>..." >&2
+  exit 2
+fi
+
+BASE_REF="$1"
+shift
+
+if ! git rev-parse --verify --quiet "${BASE_REF}^{commit}" >/dev/null ||
+  ! BASE_SHA="$(git merge-base HEAD "$BASE_REF")"; then
+  echo "run"
+  exit 0
+fi
+
+if ! WORKTREE_CHANGES="$(git status --porcelain=v1 --untracked-files=all -- "$@")"; then
+  echo "run"
+  exit 0
+fi
+
+if git diff --quiet "$BASE_SHA" -- "$@" &&
+  [[ -z "$WORKTREE_CHANGES" ]]; then
+  echo "skip"
+else
+  echo "run"
+fi
