@@ -52,6 +52,7 @@ async function waitForOwnerPlayStart(page: Page) {
   const playUrl = /\/play\/[0-9a-f-]{36}$/;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const retry = page.getByRole("button", { name: "다시 시도" });
+    const open = page.getByRole("button", { name: "팩 열기" });
     const outcome = await Promise.race([
       page
         .waitForURL(playUrl, { timeout: 15_000 })
@@ -59,8 +60,15 @@ async function waitForOwnerPlayStart(page: Page) {
       retry
         .waitFor({ state: "visible", timeout: 15_000 })
         .then(() => "retry" as const),
+      open
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => "open" as const),
     ]);
     if (outcome === "started") return;
+    if (outcome === "open") {
+      await open.click();
+      continue;
+    }
     await retry.click();
     await expect(retry).toBeHidden();
   }
