@@ -65,7 +65,7 @@ Issue: https://github.com/aroido/gyeop/issues/112
 - [ ] workflow의 `base`와 `live` matrix는 checkout, pnpm/node setup, install, Chromium install을 각각 수행한다.
 - [ ] workflow의 `base` job은 `GYEOP_VERIFY_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}`를 `ci-base`에 전달해 PR과 main push의 diff-gated 검증 의미를 유지한다.
 - [ ] `live` matrix는 `ci-live-mvp`, `ci-live-owner` 두 mode를 서로 다른 runner에서 실행한다.
-- [ ] 최종 `verify` job은 `if: always()`, `needs: [base, live]`로 실행한다. `BASE_RESULT=${{ needs.base.result }}`, `LIVE_RESULT=${{ needs.live.result }}`를 env로 받고 `test "$BASE_RESULT" = success`와 `test "$LIVE_RESULT" = success`를 모두 통과해야 성공한다.
+- [ ] 최종 `verify` job은 `if: always()`, `needs: [base, live]`로 실행한다. `BASE_RESULT=${{ needs.base.result }}`, `LIVE_RESULT=${{ needs.live.result }}`를 env로 받고 `test "$BASE_RESULT" = success && test "$LIVE_RESULT" = success` 단일 조건을 통과해야 성공한다.
 
 ## 완료 기준
 

@@ -36,7 +36,8 @@
     "test:render-deploy": "bash tests/integration/render-deploy.test.sh",
     "test:e2e": "playwright test",
     "test:e2e:mvp": "pnpm supabase:reset && GYEOP_NEXT_DIST_DIR=.next/e2e-3111 GYEOP_E2E_PORT=3111 GYEOP_E2E_LIVE=1 playwright test tests/e2e/core-mvp-live.spec.ts --project=mobile-chromium --workers=1",
-    "test:e2e:live": "pnpm test:e2e:mvp && pnpm supabase:reset && GYEOP_NEXT_DIST_DIR=.next/e2e-3112 GYEOP_E2E_PORT=3112 GYEOP_E2E_LIVE=1 playwright test tests/e2e/owner-play-live.spec.ts --project=mobile-chromium --workers=1"
+    "test:e2e:owner": "pnpm supabase:reset && GYEOP_NEXT_DIST_DIR=.next/e2e-3112 GYEOP_E2E_PORT=3112 GYEOP_E2E_LIVE=1 playwright test tests/e2e/owner-play-live.spec.ts --project=mobile-chromium --workers=1",
+    "test:e2e:live": "pnpm test:e2e:mvp && pnpm test:e2e:owner"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.3",
