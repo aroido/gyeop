@@ -78,6 +78,12 @@ start_supabase() {
   fi
 }
 
+restart_supabase() {
+  pnpm supabase:stop >/dev/null
+  SUPABASE_STARTED_BY_VERIFY=1
+  start_supabase
+}
+
 if [[ "$MODE" == "ci-live-mvp" || "$MODE" == "ci-live-owner" ]]; then
   start_supabase
   if [[ "$MODE" == "ci-live-mvp" ]]; then
@@ -190,6 +196,7 @@ node --test tests/integration/visitor-withdrawal-concurrency.test.mjs
 env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SECRET_KEY pnpm build
 node --test tests/integration/pack-runtime.test.mjs
 if [[ "$MODE" == "full" ]]; then
+  restart_supabase
   GYEOP_E2E_PORT=3110 pnpm test:e2e:live
 fi
 GYEOP_E2E_PORT=3110 pnpm test:e2e --project=mobile-chromium

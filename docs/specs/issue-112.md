@@ -58,7 +58,7 @@ Issue: https://github.com/aroido/gyeop/issues/112
 - [ ] 공통 dependency·Docker·생성 설정 snapshot/restore·Supabase cleanup 계약은 모든 mode가 재사용한다.
 - [ ] 기존 검증 본문을 base phase로 묶되 `full`과 `ci-base`에서만 실행한다.
 - [ ] base phase는 현재 `verify_project`부터 static/unit/security/HTTP boundary, diff-gated harness/upgrade, DB/schema/integration, build, `pack-runtime`, 일반 mock E2E까지 모두 보존한다. `ci-base`에서는 이 전체 base phase 뒤 종료한다.
-- [ ] `full`은 base phase 뒤 기존처럼 core MVP live, owner live, 일반 mock E2E를 모두 직렬 실행한다.
+- [ ] `full`은 base phase 뒤 Supabase를 한 번 깨끗이 재시작하고 core MVP live, owner live, 일반 mock E2E를 모두 직렬 실행한다. 반복 DB reset 누적으로 live 진입 reset이 멈추지 않게 하되 검증 범위는 유지한다.
 - [ ] `ci-live-mvp`와 `ci-live-owner`는 Supabase start 뒤 각 전용 package script만 실행한다.
 - [ ] `package.json`에 owner live 전용 script를 추가하고 기존 `test:e2e:live`는 core와 owner 전용 script를 순서대로 조합한다.
 - [ ] full-verify SHA marker와 `GYEOP full verification passed.` 문구는 `full` 성공 때만 기록한다. CI 전용 mode는 full marker를 만들지 않는다.
