@@ -54,6 +54,23 @@ test("starts a new owner play without an intermediate gate", async ({
   ).toHaveLength(1);
 });
 
+test("starts an expanded active pack without the generic error boundary", async ({
+  page,
+}) => {
+  const api = await installOwnerFlowApi(page, { packSlug: "deadline-mode" });
+  await page.goto("/play/new?pack=deadline-mode");
+
+  await expect(
+    page.getByRole("heading", { name: "마감이 잡히면 나는?" }),
+  ).toBeVisible();
+  await expect(page.locator('main[data-pack="deadline-mode"]')).toHaveCount(1);
+  expect(
+    api.calls.find(
+      (call) => call.method === "POST" && call.pathname === "/api/plays",
+    )?.body,
+  ).toEqual({ packSlug: "deadline-mode", entrySource: "home" });
+});
+
 test("reports the reviewed same-pack entry source", async ({ page }) => {
   const api = await installOwnerFlowApi(page);
   await page.goto("/play/new?pack=old-friend&source=same_pack_cta");

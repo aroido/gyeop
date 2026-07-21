@@ -23,3 +23,33 @@ test("owner client sends the create contract", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test("owner client accepts every active pack through the create contract", async () => {
+  const originalFetch = globalThis.fetch;
+  const bodies = [];
+  try {
+    globalThis.fetch = async (_url, init) => {
+      bodies.push(JSON.parse(init.body));
+      return Response.json(
+        {
+          id: "19000000-0000-4000-8000-000000000010",
+          packSlug: "deadline-mode",
+          packVersion: "deadline-mode-v1",
+          status: "draft",
+          currentPosition: 1,
+          answers: [],
+          managementExpiresAt: "2026-07-25T00:00:00.000Z",
+          managementTtlSeconds: 604800,
+        },
+        { headers: { "cache-control": "private, no-store" } },
+      );
+    };
+    const play = await createOrResumeOwnerPlay("deadline-mode");
+    assert.equal(play.packSlug, "deadline-mode");
+    assert.deepEqual(bodies, [
+      { packSlug: "deadline-mode", entrySource: "home" },
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});

@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { readPackManifests, renderPackSeed } from "./render-pack-seed.mjs";
+import { OFFICIAL_PACKS } from "../lib/packs/official-pack-registry.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOWER_KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -115,6 +116,28 @@ export async function verifyPackCatalog(root = ROOT) {
     assert.ok(manifests.some((pack) => pack.slug === slug));
   }
   for (const manifest of manifests) validatePackManifest(manifest);
+  const registryByVersion = new Map(
+    OFFICIAL_PACKS.map((pack) => [`${pack.slug}\0${pack.version}`, pack]),
+  );
+  assert.equal(
+    registryByVersion.size,
+    manifests.length,
+    "the owner-flow registry must list every active pack exactly once",
+  );
+  for (const manifest of manifests) {
+    const registryPack = registryByVersion.get(
+      `${manifest.slug}\0${manifest.version}`,
+    );
+    assert.ok(
+      registryPack,
+      `the owner-flow registry is missing ${manifest.slug}@${manifest.version}`,
+    );
+    assert.deepEqual(
+      registryPack.cardIds,
+      manifest.cards.map((card) => card.id),
+      `the owner-flow registry card order drifted for ${manifest.slug}@${manifest.version}`,
+    );
+  }
   const oldFriend = manifests.find((pack) => pack.slug === "old-friend");
   assert.ok(oldFriend);
   const manifestBytes = readFileSync(
