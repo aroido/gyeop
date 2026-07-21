@@ -29,6 +29,7 @@ ENV NODE_ENV=production
 
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
 COPY --from=build /app/lib ./lib
 COPY --from=build /app/scripts/validate-env.mjs ./scripts/validate-env.mjs
 COPY ops/render-entrypoint.sh ops/http-boundary/haproxy-origin-wrapper ./ops/
