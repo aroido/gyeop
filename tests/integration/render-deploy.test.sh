@@ -49,6 +49,14 @@ if [[ "$home_status" != 200 ]]; then
   exit 1
 fi
 
+animation_result=$(curl --silent --output /dev/null --write-out '%{http_code} %{content_type}' --max-time 5 \
+  "http://127.0.0.1:${port}/animations/gyeop-pack-opening.json")
+animation_status=${animation_result%% *}
+animation_content_type=${animation_result#* }
+
+[[ "$animation_status" == 200 ]]
+[[ "$animation_content_type" == application/json* ]]
+
 api_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
   -X DELETE "http://127.0.0.1:${port}/api/me/session" \
   -H 'Origin: https://gyeop.example' \
@@ -56,4 +64,4 @@ api_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-t
   --data '{}')
 
 [[ "$api_status" == 204 ]]
-echo "Render deploy check passed: home=${home_status} api=${api_status}"
+echo "Render deploy check passed: home=${home_status} animation=${animation_status} animation_type=${animation_content_type} api=${api_status}"
