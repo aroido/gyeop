@@ -66,6 +66,7 @@ Issue: https://github.com/aroido/gyeop/issues/112
 - [ ] workflow의 `base` job은 `GYEOP_VERIFY_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}`를 `ci-base`에 전달해 PR과 main push의 diff-gated 검증 의미를 유지한다.
 - [ ] `live` matrix는 `ci-live-mvp`, `ci-live-owner` 두 mode를 서로 다른 runner에서 실행한다.
 - [ ] 최종 `verify` job은 `if: always()`, `needs: [base, live]`로 실행한다. `BASE_RESULT=${{ needs.base.result }}`, `LIVE_RESULT=${{ needs.live.result }}`를 env로 받고 `test "$BASE_RESULT" = success && test "$LIVE_RESULT" = success` 단일 조건을 통과해야 성공한다.
+- [ ] mock E2E의 첫 owner route 냉시작은 5초를 넘을 수 있으므로 해당 URL 이동 assertion만 15초까지 기다리되 assertion과 owner-flow 범위는 유지한다.
 
 ## 완료 기준
 
@@ -85,6 +86,7 @@ Issue: https://github.com/aroido/gyeop/issues/112
 - [ ] 같은 조건을 `BASE_RESULT=failure`와 `LIVE_RESULT=cancelled` 각각으로 실행하면 nonzero인지 확인한다.
 - [ ] `pnpm format:check && pnpm lint && pnpm typecheck`
 - [ ] `python3 scripts/verify_project.py`
+- [ ] `CI=1 GYEOP_E2E_PORT=3110 GYEOP_NEXT_DIST_DIR=.next/e2e-3110 pnpm exec playwright test tests/e2e/home.spec.ts --project=mobile-chromium --workers=1 --repeat-each=3`으로 첫 owner route 이동이 재시도 없이 반복 통과하는지 확인한다.
 - [ ] `./scripts/task-harness pr 112`가 exact clean HEAD에서 소유하는 `./scripts/run-ai-verify --mode full`
 - [ ] `gh pr view <pr> --json headRefOid,statusCheckRollup`로 final named `verify`와 모든 lane 성공을 확인한다.
 - [ ] `gh run view <run-id> --json jobs`로 lane 시작·종료와 병렬 overlap을 확인한다.
