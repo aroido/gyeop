@@ -20,6 +20,9 @@ const root = path.resolve(
 const manifest = JSON.parse(
   readFileSync(path.join(root, "content/packs/old-friend-v1.json"), "utf8"),
 );
+const deadlineModeManifest = JSON.parse(
+  readFileSync(path.join(root, "content/packs/deadline-mode-v1.json"), "utf8"),
+);
 
 function profile(overrides = {}) {
   return {
@@ -93,6 +96,25 @@ test("strictly decodes the ten-card owner profile allowlist", () => {
   ]) {
     assert.throws(() => decodeOwnerProfile(invalid), /Invalid owner profile/);
   }
+});
+
+test("decodes an owner profile for an expanded active pack", () => {
+  const expandedProfile = profile({
+    packSlug: deadlineModeManifest.slug,
+    packVersion: deadlineModeManifest.version,
+    packTitle: deadlineModeManifest.title,
+    cards: deadlineModeManifest.cards.map((card, index) => ({
+      cardId: card.id,
+      position: card.position,
+      ownerPrompt: card.ownerPrompt,
+      optionA: card.optionA,
+      optionB: card.optionB,
+      selfChoice: index % 2 === 0 ? "a" : "b",
+      sampleCount: 0,
+      counts: null,
+    })),
+  });
+  assert.equal(decodeOwnerProfile(expandedProfile).packSlug, "deadline-mode");
 });
 
 test("strictly decodes profile and event RPC outcomes", () => {

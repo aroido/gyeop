@@ -1,5 +1,6 @@
 import type { Page, Route } from "@playwright/test";
 
+import deadlineModeManifest from "../../content/packs/deadline-mode-v1.json" with { type: "json" };
 import manifest from "../../content/packs/old-friend-v1.json" with { type: "json" };
 
 export const playId = "18181818-1818-4181-8181-181818181818";
@@ -42,6 +43,22 @@ const pack = {
   cards: manifest.cards,
 };
 
+const deadlineModePack = {
+  slug: deadlineModeManifest.slug,
+  version: deadlineModeManifest.version,
+  title: deadlineModeManifest.title,
+  targetRelationship: deadlineModeManifest.targetRelationship,
+  sensitivity: deadlineModeManifest.sensitivity,
+  cards: deadlineModeManifest.cards,
+};
+
+const fixturePacks = {
+  "old-friend": pack,
+  "deadline-mode": deadlineModePack,
+} as const;
+
+type FixturePackSlug = keyof typeof fixturePacks;
+
 function noStoreJson(route: Route, status: number, body: unknown) {
   return route.fulfill({
     status,
@@ -71,14 +88,15 @@ export async function installOwnerFlowApi(
       | "incompleteAnswerCount"
       | "readMissingCount"
     >
-  > = {},
+  > & { packSlug?: FixturePackSlug } = {},
 ): Promise<OwnerFlowApi> {
+  const selectedPack = fixturePacks[options.packSlug ?? "old-friend"];
   const api: OwnerFlowApi = {
     calls: [],
     state: {
       id: playId,
-      packSlug: manifest.slug,
-      packVersion: manifest.version,
+      packSlug: selectedPack.slug,
+      packVersion: selectedPack.version,
       status: "draft",
       currentPosition: 1,
       answers: [],
@@ -118,11 +136,14 @@ export async function installOwnerFlowApi(
       }
       return noStoreJson(route, 200, api.state);
     }
-    if (method === "GET" && url.pathname === "/api/packs/old-friend") {
+    if (
+      method === "GET" &&
+      url.pathname === `/api/packs/${selectedPack.slug}`
+    ) {
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify(pack),
+        body: JSON.stringify(selectedPack),
       });
     }
     const save = url.pathname.match(
@@ -146,7 +167,7 @@ export async function installOwnerFlowApi(
         api.state.answers.map((answer) => [answer.cardId, answer.choice]),
       );
       existing.set(save[1], input.choice);
-      api.state.answers = manifest.cards
+      api.state.answers = selectedPack.cards
         .filter((card) => existing.has(card.id))
         .map((card) => ({
           cardId: card.id,
@@ -165,7 +186,7 @@ export async function installOwnerFlowApi(
           );
           api.state.currentPosition = Math.min(
             api.incompleteAnswerCount + 1,
-            manifest.cards.length,
+            selectedPack.cards.length,
           );
         }
         return ownerError(

@@ -16,6 +16,7 @@ import {
   serializeDeletedOwnerCookie,
   serializeOwnerCookie,
 } from "../../lib/owner-play/owner-play-session-core.mjs";
+import { OFFICIAL_PACKS } from "../../lib/packs/official-pack-registry.mjs";
 
 const root = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -156,6 +157,22 @@ test("strictly decodes the owner-state allowlist", () => {
     ).answers.length,
     10,
   );
+});
+
+test("decodes a draft state from every active official pack", () => {
+  for (const pack of OFFICIAL_PACKS) {
+    const decoded = decodeOwnerPlayState(
+      state({
+        packSlug: pack.slug,
+        packVersion: pack.version,
+        answers: [{ cardId: pack.cardIds[0], choice: "a" }],
+      }),
+    );
+    assert.equal(decoded.packSlug, pack.slug);
+    assert.deepEqual(decoded.answers, [
+      { cardId: pack.cardIds[0], choice: "a" },
+    ]);
+  }
 });
 
 test("strictly decodes route-specific outcomes", () => {
