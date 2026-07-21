@@ -18,47 +18,33 @@ test("scrubs the pack open, reverses before the snap, and hands off to the quest
   await page.goto("/play/new?pack=old-friend");
 
   const overlay = page.locator('[data-opening-state="opening"]');
-  const card = page.getByTestId("pack-inner-card");
-  const tearStrip = page.getByTestId("pack-tear-strip");
+  const stage = page.getByTestId("pack-opening-stage");
   await expect(overlay).toBeVisible();
-  await expect(tearStrip).toBeVisible();
-  await expect(page.getByTestId("pack-mouth")).toBeVisible();
+  await expect(stage).toHaveAttribute("data-renderer", "lottie");
+  await expect(stage).toHaveAttribute("data-frame", "0");
+  await expect
+    .poll(() =>
+      page
+        .getByTestId("pack-opening-lottie")
+        .locator('path[d]:not([d=""])')
+        .count(),
+    )
+    .toBeGreaterThan(0);
   await expect(page.getByRole("button", { name: "팩 열기" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
     360,
   );
-  const closedCard = await card.boundingBox();
-  const closedY = closedCard?.y;
-  const closedTearX = (await tearStrip.boundingBox())?.x;
-  expect(closedY).toBeDefined();
-  expect(closedTearX).toBeDefined();
-  expect(
-    Math.abs((closedCard?.width ?? 0) / (closedCard?.height ?? 1) - 5 / 7),
-  ).toBeLessThanOrEqual(0.02);
 
   await page.mouse.wheel(0, 90);
   await expect
-    .poll(async () => (await card.boundingBox())?.y ?? Number.POSITIVE_INFINITY)
-    .toBeLessThan((closedY as number) - 12);
-  await expect
-    .poll(
-      async () =>
-        (await tearStrip.boundingBox())?.x ?? Number.POSITIVE_INFINITY,
-    )
-    .toBeLessThan((closedTearX as number) - 20);
-  const openedY = (await card.boundingBox())?.y as number;
-  const tornTearX = (await tearStrip.boundingBox())?.x as number;
+    .poll(async () => Number(await stage.getAttribute("data-frame")))
+    .toBeGreaterThan(24);
+  const openedFrame = Number(await stage.getAttribute("data-frame"));
 
   await page.mouse.wheel(0, -90);
   await expect
-    .poll(async () => (await card.boundingBox())?.y ?? Number.NEGATIVE_INFINITY)
-    .toBeGreaterThan(openedY + 8);
-  await expect
-    .poll(
-      async () =>
-        (await tearStrip.boundingBox())?.x ?? Number.NEGATIVE_INFINITY,
-    )
-    .toBeGreaterThan(tornTearX + 16);
+    .poll(async () => Number(await stage.getAttribute("data-frame")))
+    .toBeLessThan(openedFrame - 16);
 
   await page.mouse.wheel(0, 240);
   await page.waitForURL(`/play/${playId}`);
@@ -78,7 +64,7 @@ for (const viewport of [
   { width: 390, height: 844 },
   { width: 430, height: 932 },
 ]) {
-  test(`keeps the unopened pack and card at TCG proportions on ${viewport.width}px`, async ({
+  test(`keeps the Lottie stage inside the ${viewport.width}px viewport`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
@@ -86,25 +72,52 @@ for (const viewport of [
     await installOwnerFlowApi(page, { createDelayMs: 2_000 });
     await page.goto("/play/new?pack=old-friend");
 
-    const card = await page.getByTestId("pack-inner-card").boundingBox();
-    const shell = await page.getByTestId("pack-shell").boundingBox();
-    expect(card).not.toBeNull();
-    expect(shell).not.toBeNull();
+    const stage = page.getByTestId("pack-opening-stage");
+    await expect(stage).toHaveAttribute("data-renderer", "lottie");
+    const stageBox = await stage.boundingBox();
+    const canvasBox = await page
+      .getByTestId("pack-opening-lottie")
+      .boundingBox();
+    expect(stageBox).not.toBeNull();
+    expect(canvasBox).not.toBeNull();
     expect(
-      Math.abs((card?.width ?? 0) / (card?.height ?? 1) - 5 / 7),
+      Math.abs((stageBox?.width ?? 0) / (stageBox?.height ?? 1) - 9 / 13),
     ).toBeLessThanOrEqual(0.02);
-    expect(
-      Math.abs((shell?.width ?? 0) / (shell?.height ?? 1) - 5 / 7),
-    ).toBeLessThanOrEqual(0.02);
-    expect((card?.width ?? 0) / viewport.width).toBeGreaterThanOrEqual(0.55);
-    expect((card?.width ?? 0) / viewport.width).toBeLessThanOrEqual(0.61);
-    expect((shell?.width ?? 0) / viewport.width).toBeGreaterThanOrEqual(0.6);
-    expect((shell?.width ?? 0) / viewport.width).toBeLessThanOrEqual(0.69);
+    expect((stageBox?.width ?? 0) / viewport.width).toBeGreaterThanOrEqual(0.8);
+    expect((stageBox?.width ?? 0) / viewport.width).toBeLessThanOrEqual(0.96);
+    expect(stageBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((stageBox?.x ?? 0) + (stageBox?.width ?? 0)).toBeLessThanOrEqual(
+      viewport.width,
+    );
+    expect(canvasBox).toEqual(stageBox);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
     ).toBe(viewport.width);
   });
 }
+
+test("keeps a usable static pack when the Lottie asset fails", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.route("**/animations/gyeop-pack-opening.json", (route) =>
+    route.abort(),
+  );
+  await installOwnerFlowApi(page, { createDelayMs: 2_000 });
+  await page.goto("/play/new?pack=old-friend");
+
+  const stage = page.getByTestId("pack-opening-stage");
+  await expect(stage).toHaveAttribute("data-renderer", "fallback");
+  await expect(stage).not.toHaveAttribute("data-opened");
+
+  await page.getByRole("button", { name: "팩 열기" }).click();
+  await expect(
+    page.locator('[data-opening-state="opened-waiting"]'),
+  ).toBeVisible();
+  await expect(stage).toHaveAttribute("data-opened", "true");
+  await expect(stage).toHaveAttribute("data-renderer", "fallback");
+  await page.waitForURL(`/play/${playId}`);
+});
 
 test("opens from the keyboard button and waits in the extracted pose for a slow API", async ({
   page,

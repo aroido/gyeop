@@ -36,7 +36,7 @@ Issue: https://github.com/aroido/gyeop/issues/103
 
 ## 디자인 영향
 
-- [x] `app/play/play-transition.tsx`의 DOM pack/card/mouth/tear 조각을 하나의 360×520, 120프레임 Lottie 캔버스로 교체한다.
+- [x] `app/play/play-transition.tsx`의 DOM pack/card/mouth/tear 조각을 하나의 360×520, 120프레임 Lottie SVG stage로 교체한다.
 - [x] 닫힘 → 왼쪽 일부 실링 들림과 제거(전체 진행 24% 이내) → 얇은 뒤쪽 입구 → 5:7 카드 상승 → 앞쪽 포장지 가림 → 포장지 퇴장 순서를 사용한다.
 - [x] 320·390·430px에서 비율과 화면 경계를 유지하고, reduced-motion에서는 기존처럼 개봉 오버레이를 생략한다.
 
@@ -48,16 +48,16 @@ Issue: https://github.com/aroido/gyeop/issues/103
 ## 구현 계획
 
 - [x] `public/animations/gyeop-pack-opening.json`에 검토한 맞춤 벡터 타임라인을 추가한다.
-- [x] `package.json`과 `pnpm-lock.yaml`에 공식 `@lottiefiles/dotlottie-react` 런타임만 추가한다.
-- [x] 공식 `@lottiefiles/dotlottie-react`의 imperative ref를 이용해 기존 `smoothProgress`를 0~119 프레임으로 매핑하고 autoplay를 끈다.
+- [x] `package.json`과 `pnpm-lock.yaml`에 공식 `lottie-web` 런타임만 추가한다. 외부 WASM·CDN 요청이 필요한 dotLottie React 런타임은 사용하지 않는다.
+- [x] `lottie-web`의 `goToAndStop`을 이용해 기존 progress를 0~119 프레임으로 매핑하고 autoplay를 끈다.
 - [x] `app/play/play-transition.tsx`는 기존 상태 머신과 motion scroll/snap만 유지하고, 기존 DOM pack 관련 transform과 마크업을 제거한다.
-- [x] `app/play/play-transition.module.css`는 Lottie 캔버스 크기와 로드 실패용 정적 pack/card 폴백만 남긴다. 폴백은 `opening` 동안 닫힌 팩을, snap 이후 `opened-waiting`·`route-loading`에서는 추출 완료 카드를 보여준다.
+- [x] `app/play/play-transition.module.css`는 Lottie SVG stage 크기와 로드 실패용 정적 pack/card 폴백만 남긴다. 폴백은 `opening` 동안 닫힌 팩을, snap 이후 `opened-waiting`·`route-loading`에서는 추출 완료 카드를 보여준다.
 - [x] `tests/unit/pack-opening-lottie.test.mjs`가 JSON의 frame/layer/실링 폭·scale·제거 시점/카드 비율을 직접 검증하고 `package.json`의 기본 unit test 목록에 포함된다.
 - [x] `tests/e2e/owner-play.spec.ts`는 `data-frame`으로 스크롤 역복원을, `data-renderer`로 로드 완료와 폴백을 관측하고 3개 viewport 경계, 키보드·대기·handoff·reduced-motion 회귀를 검증한다.
 
 ## 완료 기준
 
-- [x] 320·390·430px에서 Lottie 캔버스가 잘리지 않고 내부 카드가 5:7이며 가로 overflow가 없다.
+- [x] 320·390·430px에서 Lottie SVG stage가 잘리지 않고 내부 카드가 5:7이며 가로 overflow가 없다.
 - [x] 실링의 모든 animated path 상태 폭이 236이고 scaleX 애니메이션이 없으며 29프레임 이전에 사라진다.
 - [x] 같은 스크롤 위치는 같은 프레임을 만들고 역스크롤 시 이전 프레임으로 돌아간다.
 - [x] 카드가 `back-lip` 뒤에서 시작해 `front-lip`에 가려진 채 상승하고 타원형 입구 layer가 없다.
