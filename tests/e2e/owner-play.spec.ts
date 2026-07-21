@@ -10,6 +10,121 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
+test("scrubs the pack open, reverses before the snap, and hands off to the question", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const api = await installOwnerFlowApi(page);
+  await page.goto("/play/new?pack=old-friend");
+
+  const overlay = page.locator('[data-opening-state="opening"]');
+  const card = page.getByTestId("pack-inner-card");
+  await expect(overlay).toBeVisible();
+  await expect(page.getByRole("button", { name: "팩 열기" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(
+    360,
+  );
+  const closedY = (await card.boundingBox())?.y;
+  expect(closedY).toBeDefined();
+
+  await page.mouse.wheel(0, 90);
+  await expect
+    .poll(async () => (await card.boundingBox())?.y ?? Number.POSITIVE_INFINITY)
+    .toBeLessThan((closedY as number) - 12);
+  const openedY = (await card.boundingBox())?.y as number;
+
+  await page.mouse.wheel(0, -90);
+  await expect
+    .poll(async () => (await card.boundingBox())?.y ?? Number.NEGATIVE_INFINITY)
+    .toBeGreaterThan(openedY + 8);
+
+  await page.mouse.wheel(0, 240);
+  await page.waitForURL(`/play/${playId}`);
+  await expect(
+    page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
+  ).toBeFocused();
+  await expect(page.locator("[data-opening-state]")).toHaveCount(0);
+  expect(
+    api.calls.filter(
+      (call) => call.method === "POST" && call.pathname === "/api/plays",
+    ),
+  ).toHaveLength(1);
+});
+
+test("opens from the keyboard button and waits in the extracted pose for a slow API", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await installOwnerFlowApi(page, { createDelayMs: 2_000 });
+  await page.goto("/play/new?pack=old-friend");
+
+  await page.getByRole("button", { name: "팩 열기" }).click();
+  await expect(
+    page.locator('[data-opening-state="opened-waiting"]'),
+  ).toBeVisible();
+  await expect(page.getByText("첫 질문을 준비하고 있어요…")).toBeVisible();
+  await expect(page).toHaveURL(/\/play\/new\?pack=old-friend$/);
+
+  await page.waitForURL(`/play/${playId}`);
+  await expect(
+    page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
+  ).toBeFocused();
+});
+
+test("removes the handoff overlay when the routed owner read fails", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await installOwnerFlowApi(page, { readMissingCount: 1 });
+  await page.goto("/play/new?pack=old-friend");
+  await page.getByRole("button", { name: "팩 열기" }).click();
+
+  await page.waitForURL(`/play/${playId}`);
+  await expect(
+    page.getByRole("heading", { name: "이 팩을 이어갈 수 없어요" }),
+  ).toBeFocused();
+  await expect(page.locator("[data-opening-state]")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "다른 팩 고르기" }),
+  ).toBeVisible();
+});
+
+test("keeps the extracted card while the routed owner read is slow", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await installOwnerFlowApi(page, { readDelayMs: 1_000 });
+  await page.goto("/play/new?pack=old-friend");
+  await page.getByRole("button", { name: "팩 열기" }).click();
+
+  await page.waitForURL(`/play/${playId}`);
+  await expect(
+    page.locator('[data-opening-state="route-loading"]'),
+  ).toHaveAttribute("aria-hidden", "true");
+  await expect(
+    page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
+  ).toBeFocused();
+  await expect(page.locator("[data-opening-state]")).toHaveCount(0);
+});
+
+test("removes the handoff overlay when the routed pack read fails", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await installOwnerFlowApi(page, { packFailureCount: 1 });
+  await page.goto("/play/new?pack=old-friend");
+  await page.getByRole("button", { name: "팩 열기" }).click();
+
+  await page.waitForURL(`/play/${playId}`);
+  await expect(
+    page.getByRole("heading", { name: "이 팩을 이어갈 수 없어요" }),
+  ).toBeFocused();
+  await expect(page.locator("[data-opening-state]")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "다시 불러오기" }),
+  ).toBeVisible();
+});
+
 test("bootstraps once and shows the first server-backed question", async ({
   page,
 }) => {

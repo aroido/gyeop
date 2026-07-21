@@ -1,0 +1,204 @@
+.overlay {
+  --lime: #dfff00;
+  --ink: #050505;
+  --blue: #315cff;
+
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 38%, rgb(49 92 255 / 15%), transparent 35%),
+    var(--ink);
+  color: #fff;
+  touch-action: pan-y;
+}
+
+.overlay[aria-hidden="true"] {
+  pointer-events: none;
+}
+
+.stage {
+  display: grid;
+  min-height: 100svh;
+  padding: max(1rem, env(safe-area-inset-top)) 0.85rem
+    max(1.25rem, env(safe-area-inset-bottom));
+  grid-template-rows: auto 1fr auto;
+  place-items: center;
+}
+
+.brand {
+  margin: 0;
+  color: var(--lime);
+  font-size: 0.75rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+.packArt {
+  position: relative;
+  width: min(100%, 30rem);
+  height: min(27rem, 56svh);
+}
+
+.cardAnchor {
+  position: absolute;
+  z-index: 1;
+  inset: 50% auto auto 50%;
+  width: min(calc(100vw - 1.7rem), 30rem);
+  translate: -50% -50%;
+}
+
+.innerCard {
+  display: grid;
+  width: 100%;
+  min-height: clamp(15rem, 42svh, 20rem);
+  padding: clamp(1.1rem, 5vw, 1.5rem);
+  border: 1px solid #fff;
+  border-radius: 1rem;
+  background: var(--lime);
+  color: var(--ink);
+  transform-origin: 50% 60%;
+}
+
+.innerCard span {
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+}
+
+.innerCard strong {
+  align-self: end;
+  font-size: clamp(1.7rem, 8vw, 2.5rem);
+  font-weight: 950;
+  letter-spacing: -0.065em;
+  line-height: 1.08;
+  word-break: keep-all;
+}
+
+.innerCard i {
+  display: block;
+  height: 3.3rem;
+  border: 2px solid var(--ink);
+  border-radius: 0.72rem;
+  background: rgb(255 255 255 / 36%);
+}
+
+.packShell {
+  position: absolute;
+  z-index: 2;
+  top: 54%;
+  left: 50%;
+  width: 11rem;
+  height: 8.4rem;
+  border: 2px solid var(--lime);
+  border-radius: 0.85rem 0.85rem 1rem 1rem;
+  background:
+    linear-gradient(
+      135deg,
+      transparent 0 46%,
+      rgb(223 255 0 / 10%) 47% 53%,
+      transparent 54%
+    ),
+    #111;
+  box-shadow: 0.35rem 0.35rem 0 var(--blue);
+  translate: -50% -50%;
+  transform-origin: 50% 100%;
+}
+
+.leftFlap,
+.rightFlap {
+  position: absolute;
+  top: -1.2rem;
+  width: calc(50% + 1px);
+  height: 1.45rem;
+  border: 2px solid var(--lime);
+  background: #181818;
+}
+
+.leftFlap {
+  right: 50%;
+  border-radius: 0.65rem 0 0 0.25rem;
+  transform-origin: 100% 100%;
+}
+
+.rightFlap {
+  left: 50%;
+  border-radius: 0 0.65rem 0.25rem 0;
+  transform-origin: 0 100%;
+}
+
+.seal {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--lime);
+  border-radius: 999px;
+  color: var(--lime);
+  font-size: 0.68rem;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  translate: -50% -50%;
+}
+
+.copy {
+  display: grid;
+  width: min(calc(100vw - 1.7rem), 24rem);
+  place-items: center;
+  align-self: end;
+  gap: 0.65rem;
+  text-align: center;
+}
+
+.copy h1,
+.copy p {
+  margin: 0;
+}
+
+.copy h1 {
+  font-size: clamp(1.4rem, 7vw, 2rem);
+  font-weight: 950;
+  letter-spacing: -0.055em;
+  line-height: 1.1;
+  word-break: keep-all;
+}
+
+.copy p {
+  color: #d8d8d8;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.copy button {
+  min-width: 8rem;
+  min-height: 2.75rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--lime);
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 950;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.copy button:active {
+  transform: scale(0.97);
+}
+
+@media (max-height: 42rem) {
+  .packArt {
+    height: 22rem;
+  }
+
+  .innerCard {
+    min-height: 14rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay {
+    display: none;
+  }
+}

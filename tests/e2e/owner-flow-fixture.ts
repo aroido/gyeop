@@ -27,6 +27,10 @@ export type ApiCall = Readonly<{
 export type OwnerFlowApi = {
   calls: ApiCall[];
   state: OwnerState;
+  createDelayMs: number;
+  readDelayMs: number;
+  packDelayMs: number;
+  packFailureCount: number;
   failSaveCount: number;
   saveDelayMs: number;
   incompleteCompleteCount: number;
@@ -82,6 +86,10 @@ export async function installOwnerFlowApi(
   options: Partial<
     Pick<
       OwnerFlowApi,
+      | "createDelayMs"
+      | "readDelayMs"
+      | "packDelayMs"
+      | "packFailureCount"
       | "failSaveCount"
       | "saveDelayMs"
       | "incompleteCompleteCount"
@@ -103,6 +111,10 @@ export async function installOwnerFlowApi(
       managementExpiresAt: "2026-07-25T00:00:00Z",
       managementTtlSeconds: 604800,
     },
+    createDelayMs: options.createDelayMs ?? 0,
+    readDelayMs: options.readDelayMs ?? 0,
+    packDelayMs: options.packDelayMs ?? 0,
+    packFailureCount: options.packFailureCount ?? 0,
     failSaveCount: options.failSaveCount ?? 0,
     saveDelayMs: options.saveDelayMs ?? 0,
     incompleteCompleteCount: options.incompleteCompleteCount ?? 0,
@@ -118,6 +130,9 @@ export async function installOwnerFlowApi(
     api.calls.push({ method, pathname: url.pathname, body });
 
     if (method === "POST" && url.pathname === "/api/plays") {
+      if (api.createDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, api.createDelayMs));
+      }
       return noStoreJson(
         route,
         api.state.answers.length === 0 ? 201 : 200,
@@ -125,6 +140,9 @@ export async function installOwnerFlowApi(
       );
     }
     if (method === "GET" && url.pathname === `/api/plays/${playId}`) {
+      if (api.readDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, api.readDelayMs));
+      }
       if (api.readMissingCount > 0) {
         api.readMissingCount -= 1;
         return ownerError(
@@ -140,6 +158,18 @@ export async function installOwnerFlowApi(
       method === "GET" &&
       url.pathname === `/api/packs/${selectedPack.slug}`
     ) {
+      if (api.packDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, api.packDelayMs));
+      }
+      if (api.packFailureCount > 0) {
+        api.packFailureCount -= 1;
+        return ownerError(
+          route,
+          500,
+          "INTERNAL_ERROR",
+          "질문팩을 불러오지 못했습니다.",
+        );
+      }
       return route.fulfill({
         status: 200,
         contentType: "application/json",

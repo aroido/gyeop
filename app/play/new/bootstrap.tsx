@@ -10,6 +10,7 @@ import {
 } from "@/lib/owner-flow/owner-flow-client";
 
 import styles from "../[playId]/page.module.css";
+import { usePlayTransition } from "../play-transition";
 
 type State = "loading" | "retryable" | "terminal";
 
@@ -31,6 +32,7 @@ export default function BootstrapOwnerPlay({
   entrySource: "home" | "same_pack_cta";
 }) {
   const router = useRouter();
+  const { beginOpening, resolveOpening, abortOpening } = usePlayTransition();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<State>(pack ? "loading" : "terminal");
@@ -38,20 +40,29 @@ export default function BootstrapOwnerPlay({
   useEffect(() => {
     if (!pack || state !== "loading") return;
     let active = true;
-    const delay = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-      ? Promise.resolve()
-      : new Promise<void>((resolve) => window.setTimeout(resolve, 620));
-    void Promise.all([bootstrapOwnerPlay(pack, entrySource), delay])
+    beginOpening(pack, packTitle);
+    void bootstrapOwnerPlay(pack, entrySource)
       .then((play) => {
-        if (active) router.replace(`/play/${encodeURIComponent(play[0].id)}`);
+        if (active) resolveOpening(play.id);
       })
       .catch((error: unknown) => {
-        if (active) setState(isRetryable(error) ? "retryable" : "terminal");
+        if (!active) return;
+        abortOpening();
+        setState(isRetryable(error) ? "retryable" : "terminal");
       });
     return () => {
       active = false;
     };
-  }, [attempt, entrySource, pack, router, state]);
+  }, [
+    abortOpening,
+    attempt,
+    beginOpening,
+    entrySource,
+    pack,
+    packTitle,
+    resolveOpening,
+    state,
+  ]);
 
   useEffect(() => {
     if (state !== "loading") {
@@ -74,19 +85,13 @@ export default function BootstrapOwnerPlay({
 
   if (state === "loading") {
     return (
-      <main className={styles.shell} data-pack={pack ?? undefined}>
-        <section className={styles.packOpening} aria-labelledby="opening-title">
-          <div className={styles.openingCards} aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </div>
-          <p className={styles.brand}>겹 · PACK OPEN</p>
-          <h1 id="opening-title">{packTitle}</h1>
-          <p className={styles.loading} role="status">
-            첫 장을 꺼내는 중…
-          </p>
-        </section>
+      <main
+        className={`${styles.shell} ${styles.openingRunway}`}
+        data-pack={pack ?? undefined}
+      >
+        <span className={styles.live} role="status">
+          질문팩을 준비하고 있어요.
+        </span>
       </main>
     );
   }
