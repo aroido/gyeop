@@ -787,6 +787,52 @@ test.describe("live owner flow", () => {
       page.getByRole("heading", { name: "내 답변 10개가 저장됐어요" }),
     ).toBeVisible({ timeout: 15_000 });
     const account = await claimCompletedOwnerAccount(page);
+    const protectedShareUrl = page.url();
+
+    await page.goto("/me");
+    await expect(page.getByRole("button", { name: "로그아웃" })).toBeVisible();
+    const getLogout = await page.evaluate(async () => {
+      const response = await fetch("/api/auth/logout");
+      return {
+        status: response.status,
+        allow: response.headers.get("allow"),
+        cacheControl: response.headers.get("cache-control"),
+      };
+    });
+    expect(getLogout).toEqual({
+      status: 405,
+      allow: "POST",
+      cacheControl: "private, no-store",
+    });
+    const crossOriginLogout = await page.request.post(
+      `${e2eBaseUrl}/api/auth/logout`,
+      {
+        data: {},
+        headers: {
+          ...visitorHeaders,
+          "content-type": "application/json",
+          origin: "https://example.invalid",
+        },
+      },
+    );
+    expect(crossOriginLogout.status()).toBe(403);
+
+    await page.getByRole("button", { name: "로그아웃" }).click();
+    await expect(page).toHaveURL(`${e2eBaseUrl}/`);
+    expect(
+      (await context.cookies()).some((cookie) =>
+        cookie.name.includes("-auth-token"),
+      ),
+    ).toBe(false);
+    await page.goBack();
+    await expect(page).toHaveURL(protectedShareUrl);
+    await expect(
+      page.getByRole("heading", { name: "다시 로그인해 주세요" }),
+    ).toBeFocused();
+    await signInOwnerAccount(page, account.email);
+    await expect(
+      page.getByRole("link", { name: "프로필·공유 관리" }),
+    ).toHaveCount(1);
 
     const recoveredContext = await browser.newContext({
       viewport: { width: 390, height: 844 },

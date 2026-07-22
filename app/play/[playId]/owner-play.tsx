@@ -219,6 +219,17 @@ export default function OwnerPlay({ playId }: { playId: string | null }) {
   const phase = flow?.phase;
 
   useEffect(() => {
+    const refreshRestoredPage = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setLoad({ kind: "loading" });
+      setFlow(null);
+      window.location.reload();
+    };
+    window.addEventListener("pageshow", refreshRestoredPage);
+    return () => window.removeEventListener("pageshow", refreshRestoredPage);
+  }, []);
+
+  useEffect(() => {
     if (!playId) return;
     let active = true;
     const key = `${playId}\0${loadKey}`;

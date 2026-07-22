@@ -133,6 +133,16 @@ export default function OwnerProfileView({
   const reshareClickRef = useRef(false);
 
   useEffect(() => {
+    const refreshRestoredPage = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setState({ kind: "loading" });
+      window.location.reload();
+    };
+    window.addEventListener("pageshow", refreshRestoredPage);
+    return () => window.removeEventListener("pageshow", refreshRestoredPage);
+  }, []);
+
+  useEffect(() => {
     let active = true;
     if (!playId) return;
     void loadOwnerProfile(playId)

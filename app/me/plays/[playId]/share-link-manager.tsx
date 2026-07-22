@@ -127,6 +127,17 @@ export default function ShareLinkManager({
     setBusy(null);
   }
 
+  useEffect(() => {
+    const refreshRestoredPage = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setState({ kind: "loading" });
+      setReadyLink(null);
+      window.location.reload();
+    };
+    window.addEventListener("pageshow", refreshRestoredPage);
+    return () => window.removeEventListener("pageshow", refreshRestoredPage);
+  }, []);
+
   async function load() {
     if (!playId) return;
     setState({ kind: "loading" });

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { loadAuthenticatedOwnerPlays } from "@/lib/http/auth-owner";
 
+import LogoutButton from "./logout-button";
 import styles from "./owner-list.module.css";
 
 export const dynamic = "force-dynamic";
@@ -72,6 +73,7 @@ export default async function OwnerPage() {
         <Link className={styles.secondary} href="/">
           다른 질문팩 고르기
         </Link>
+        <LogoutButton />
       </section>
     </main>
   );

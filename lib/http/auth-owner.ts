@@ -170,6 +170,15 @@ export async function loadAuthenticatedOwnerPlays() {
   return listAuthenticatedOwnerPlays();
 }
 
+export async function signOutOwnerAccountResponse() {
+  const auth = await createFreshServerAuthClient({
+    requireCookieWrites: true,
+  });
+  const { error } = await auth.auth.signOut({ scope: "local" });
+  if (error) throw new Error("INTERNAL_ERROR");
+  return privateNoStore(new Response(null, { status: 204 }));
+}
+
 export async function listAuthenticatedOwnerPlaysResponse() {
   try {
     const plays = await listAuthenticatedOwnerPlays();
