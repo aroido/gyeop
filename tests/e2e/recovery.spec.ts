@@ -21,7 +21,9 @@ for (const viewport of [
   { width: 390, height: 844 },
   { width: 430, height: 932 },
 ]) {
-  test(`recovers from a missing page at ${viewport.width}px`, async ({ page }) => {
+  test(`recovers from a missing page at ${viewport.width}px`, async ({
+    page,
+  }) => {
     await page.setViewportSize(viewport);
     const response = await page.goto("/this-page-does-not-exist");
     expect(response?.status()).toBe(404);
