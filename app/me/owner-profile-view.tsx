@@ -225,9 +225,14 @@ export default function OwnerProfileView({
   return (
     <section className={styles.shell}>
       <section className={styles.profile} aria-labelledby="profile-title">
-        <Link className={styles.back} href={`/play/${profile.playId}`}>
-          ← 내 답변
-        </Link>
+        <nav className={styles.ownerNav} aria-label="내 질문팩 이동">
+          <Link className={styles.back} href="/me">
+            내 질문팩
+          </Link>
+          <Link className={styles.back} href={`/play/${profile.playId}`}>
+            ← 내 답변
+          </Link>
+        </nav>
         <p className={styles.brand}>겹 · {profile.packTitle}</p>
         <h1 id="profile-title" ref={headingRef} tabIndex={-1}>
           내 시선 프로필

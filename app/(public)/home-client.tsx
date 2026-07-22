@@ -30,6 +30,9 @@ export default function HomeClient({
           <span aria-hidden="true">✳</span>
           <strong>겹</strong>
           <small>GYEOP</small>
+          <Link className={styles.ownerEntry} href="/me">
+            내 질문팩
+          </Link>
         </header>
 
         <section className={styles.hero} aria-labelledby="home-title">
@@ -52,7 +55,7 @@ export default function HomeClient({
         <section className={styles.packs} aria-labelledby="pack-title">
           <div className={styles.packHeading}>
             <h2 id="pack-title">질문팩</h2>
-            <p>{packs.length}개 골라보기 →</p>
+            <p>{packs.length}개 골라보기</p>
           </div>
 
           <ul

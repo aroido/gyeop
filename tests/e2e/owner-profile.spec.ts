@@ -122,6 +122,10 @@ test("renders the private zero-sight profile and records viewing after render", 
   await expect(
     page.getByRole("heading", { name: "내 시선 프로필", level: 1 }),
   ).toBeFocused();
+  await expect(page.getByRole("link", { name: "내 질문팩" })).toHaveAttribute(
+    "href",
+    "/me",
+  );
   await expect(page.getByText("아직 도착한 시선이 없어요")).toBeVisible();
   await expect(page.locator("article")).toHaveCount(10);
   await expect(page.getByText("시선을 모으는 중 · 0/3")).toHaveCount(10);

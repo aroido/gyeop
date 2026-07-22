@@ -318,10 +318,13 @@ button.saveChip {
 }
 
 .profileButton {
+  display: grid;
   width: 100%;
   margin-top: 0.65rem;
+  place-items: center;
   border-color: var(--lime);
   color: var(--lime);
+  text-decoration: none;
 }
 
 .messageActions {

@@ -15,6 +15,14 @@
   width: min(100%, 30rem);
 }
 
+.ownerNav {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .back {
   display: inline-grid;
   min-height: 2.75rem;

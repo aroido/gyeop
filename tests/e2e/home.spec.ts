@@ -19,6 +19,11 @@ test("shows twenty-four active private-MVP packs before the owner flow", async (
     }),
   ).toBeVisible();
   await expect(page.getByLabel("겹")).toBeVisible();
+  await expect(page.getByRole("link", { name: "내 질문팩" })).toHaveAttribute(
+    "href",
+    "/me",
+  );
+  await expect(page.getByText("24개 골라보기", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("heading", { level: 2, name: "질문팩" }),
   ).toBeVisible();
@@ -74,12 +79,28 @@ test("shows twenty-four active private-MVP packs before the owner flow", async (
   ).toBeVisible();
 });
 
+test("opens the existing sign-in wall from the owner hub link", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "내 질문팩" }).click();
+
+  await expect(page).toHaveURL("/me");
+  await expect(
+    page.getByRole("link", { name: "Google로 로그인" }),
+  ).toHaveAttribute("href", "/auth/sign-in?returnTo=%2Fme");
+});
+
 test("supports keyboard pack preview navigation", async ({ page }) => {
   await page.goto("/");
   await page.waitForLoadState("networkidle");
 
   const rail = page.getByTestId("pack-rail");
   const cta = page.getByRole("link", { name: "질문 시작하기" }).first();
+  const ownerEntry = page.getByRole("link", { name: "내 질문팩" });
+  await page.keyboard.press("Tab");
+  await expect(ownerEntry).toBeFocused();
+  await expect(ownerEntry).toHaveCSS("outline-color", "rgb(49, 92, 255)");
   await page.keyboard.press("Tab");
   await expect(rail).toBeFocused();
   await expect(rail).toHaveCSS("outline-style", /^(?!none$).+/);
@@ -146,12 +167,14 @@ for (const viewport of [
       level: 3,
       name: "첫 장면, 네 버전",
     });
+    const ownerEntry = page.getByRole("link", { name: "내 질문팩" });
     const cta = page.getByRole("link", { name: "질문 시작하기" }).first();
     const ctaBox = await cta.boundingBox();
     const secondPackBox = await secondPack.boundingBox();
     expect(ctaBox?.height).toBeGreaterThanOrEqual(44);
     expect(ctaBox!.y + ctaBox!.height).toBeLessThanOrEqual(viewport.height);
     expect(secondPackBox!.x).toBeLessThan(viewport.width);
+    expect((await ownerEntry.boundingBox())?.height).toBeGreaterThanOrEqual(44);
 
     const titleLineCounts = await page
       .locator('[data-pack-state="active"] h3')
@@ -164,6 +187,8 @@ for (const viewport of [
     expect(titleLineCounts).toHaveLength(24);
     expect(titleLineCounts.every((lineCount) => lineCount <= 2.05)).toBe(true);
 
+    await page.keyboard.press("Tab");
+    await expect(ownerEntry).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(rail).toBeFocused();
   });
