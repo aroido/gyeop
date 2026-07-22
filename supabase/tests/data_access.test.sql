@@ -65,16 +65,16 @@ select ok(
 );
 
 select ok(
-  not has_table_privilege('gyeop_internal_rpc', 'public.rate_limit_buckets', 'DELETE'),
-  'internal RPC owner cannot delete rate limit buckets'
+  has_table_privilege('gyeop_internal_rpc', 'public.rate_limit_buckets', 'DELETE'),
+  'internal RPC owner can delete expired rate limit buckets'
 );
 
 select ok(
   not has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'SELECT')
   and has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'INSERT')
   and not has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'UPDATE')
-  and not has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'DELETE'),
-  'internal RPC owner can only insert allowlisted analytics events'
+  and has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'DELETE'),
+  'internal RPC owner can insert allowlisted and delete expired analytics events'
 );
 select is(
   (
@@ -96,7 +96,9 @@ select is(
       and grantee.rolname = 'gyeop_internal_rpc'
   ),
   array[
+    'analytics_events:DELETE',
     'analytics_events:INSERT',
+    'anonymous_owners:DELETE',
     'anonymous_owners:INSERT',
     'anonymous_owners:SELECT',
     'anonymous_owners:UPDATE',
@@ -108,6 +110,7 @@ select is(
     'pack_templates:UPDATE',
     'pack_versions:SELECT',
     'pack_versions:UPDATE',
+    'rate_limit_buckets:DELETE',
     'rate_limit_buckets:INSERT',
     'rate_limit_buckets:SELECT',
     'rate_limit_buckets:UPDATE',
@@ -124,6 +127,7 @@ select is(
     'visitor_assignments:DELETE',
     'visitor_assignments:INSERT',
     'visitor_assignments:SELECT',
+    'visitor_responses:DELETE',
     'visitor_responses:INSERT',
     'visitor_responses:SELECT',
     'visitor_responses:UPDATE'
@@ -294,6 +298,7 @@ select is(
     'revoke_owner_play_session(uuid,bytea)',
     'rotate_authenticated_share_link(uuid,uuid,uuid,uuid,text,bytea)',
     'rotate_share_link(uuid,bytea,uuid,uuid,text,bytea)',
+    'run_local_retention_cleanup()',
     'save_authenticated_owner_answer(uuid,uuid,text,text,smallint)',
     'save_owner_answer(uuid,bytea,text,text,smallint)',
     'save_response_answer(uuid,bytea,text,text)',

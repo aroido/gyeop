@@ -191,6 +191,7 @@ select is(
     select jsonb_build_object(
       'status', response.status,
       'managementBytes', octet_length(management_token_hash),
+      'sessionFollowsSubmit', response.session_expires_at = response.submitted_at + interval '24 hours',
       'submitted', submitted_at is not null,
       'linkStatus', link.status,
       'eventCount', count(event.id)
@@ -201,11 +202,17 @@ select is(
       on event.visitor_response_id = response.id
       and event.event_name = 'visitor_required_submitted'
     where response.id = '24200000-0000-4000-8000-000000000001'
-    group by response.status, response.management_token_hash, response.submitted_at, link.status
+    group by
+      response.status,
+      response.management_token_hash,
+      response.session_expires_at,
+      response.submitted_at,
+      link.status
   ),
   jsonb_build_object(
     'status', 'submitted',
     'managementBytes', 32,
+    'sessionFollowsSubmit', true,
     'submitted', true,
     'linkStatus', 'active',
     'eventCount', 1

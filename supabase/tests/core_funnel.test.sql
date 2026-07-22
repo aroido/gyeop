@@ -377,7 +377,8 @@ insert into public.visitor_responses (
   fixture.id, '31100000-0000-4000-8000-000000000002',
   'e05e6366-2a00-4798-8273-0af5f16aad10', 'old_friend', 'not_sure',
   'submitted', decode(repeat(fixture.token, 32), 'hex'),
-  value + interval '24 hours', decode(repeat(fixture.management, 32), 'hex'),
+  value + fixture.submitted_offset + interval '24 hours',
+  decode(repeat(fixture.management, 32), 'hex'),
   value, value + fixture.submitted_offset
 from fixed_time cross join fixture;
 

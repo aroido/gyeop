@@ -29,6 +29,19 @@ Render가 제공하는 HTTPS URL을 그대로 사용한다. 유료 server, domai
 
 `app/api/auth/test-magic-link/route.ts`는 local live E2E 전용이고 production에서는 404다. 제품 email claim이나 SMTP readiness로 세지 않는다.
 
+### 2.1 local 보관 cleanup 검증
+
+`public.run_local_retention_cleanup()`은 고정 category와 batch만 처리하는 service-role DB 함수다. 현재는 local Supabase와 public CI 검증용이며 hosted scheduler, HTTP route와 운영 DB 자동 실행에 연결하지 않는다.
+
+```bash
+pnpm supabase:start
+pnpm supabase:reset
+pnpm exec supabase test db supabase/tests/retention_cleanup.test.sql --local
+pnpm supabase:lint
+```
+
+pgTAP fixture는 transaction rollback 안에서 cleanup을 실행한다. 실제 local 개발 데이터를 물리 정리하는 수동 호출도 삭제 작업이므로 별도 확인 뒤 trusted local DB session에서만 수행한다. Hosted Supabase 호출, Cron 연결과 운영 데이터 변경은 이 명령의 승인 범위가 아니다.
+
 ## 3. 비활성·연기 경로
 
 - 별도 staging/production과 개인 Linux server

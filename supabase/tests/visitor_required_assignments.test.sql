@@ -287,7 +287,7 @@ select
   'ten_years_or_more',
   'submitted',
   decode(lpad(to_hex(series.value + 96), 2, '0') || repeat('00', 31), 'hex'),
-  fixed_time.created_at + interval '24 hours',
+  fixed_time.created_at + interval '36 hours',
   decode(lpad(to_hex(series.value + 112), 2, '0') || repeat('00', 31), 'hex'),
   fixed_time.created_at + interval '12 hours',
   fixed_time.created_at

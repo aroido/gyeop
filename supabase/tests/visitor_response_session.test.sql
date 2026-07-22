@@ -24,7 +24,7 @@ select ok(
   has_table_privilege('gyeop_internal_rpc', 'public.visitor_responses', 'SELECT')
   and has_table_privilege('gyeop_internal_rpc', 'public.visitor_responses', 'INSERT')
   and has_table_privilege('gyeop_internal_rpc', 'public.visitor_responses', 'UPDATE')
-  and not has_table_privilege('gyeop_internal_rpc', 'public.visitor_responses', 'DELETE'),
+  and has_table_privilege('gyeop_internal_rpc', 'public.visitor_responses', 'DELETE'),
   'internal role has the exact visitor response table allowlist'
 );
 select ok(
@@ -48,6 +48,7 @@ select is(
       and tablename = 'visitor_responses'
   ),
   array[
+    'visitor_responses_internal_delete',
     'visitor_responses_internal_insert',
     'visitor_responses_internal_select',
     'visitor_responses_internal_update'

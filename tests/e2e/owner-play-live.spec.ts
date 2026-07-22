@@ -390,7 +390,11 @@ select jsonb_build_object(
         'relationship', response.relationship_code,
         'knownSince', response.known_since_code,
         'status', response.status,
-        'fixedTtl', response.session_expires_at - response.created_at = interval '24 hours'
+        'retentionTtl', case
+          when response.status = 'submitted'
+            then response.session_expires_at - response.submitted_at = interval '24 hours'
+          else response.session_expires_at - response.created_at = interval '24 hours'
+        end
       ) order by response.relationship_code
     )
     from public.visitor_responses response
@@ -1313,13 +1317,13 @@ test.describe("live owner flow", () => {
             relationship: "family",
             knownSince: "one_to_three_years",
             status: "draft",
-            fixedTtl: true,
+            retentionTtl: true,
           },
           {
             relationship: "old_friend",
             knownSince: "ten_years_or_more",
             status: "submitted",
-            fixedTtl: true,
+            retentionTtl: true,
           },
         ],
         events: {
