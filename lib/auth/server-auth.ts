@@ -11,7 +11,9 @@ function requiredPublicEnv(name: string) {
   return value;
 }
 
-export async function createFreshServerAuthClient() {
+export async function createFreshServerAuthClient(options?: {
+  requireCookieWrites?: boolean;
+}) {
   const cookieStore = await cookies();
 
   return createServerClient(
@@ -27,7 +29,8 @@ export async function createFreshServerAuthClient() {
             for (const { name, value, options } of values) {
               cookieStore.set(name, value, options);
             }
-          } catch {
+          } catch (error) {
+            if (options?.requireCookieWrites) throw error;
             // Server Components cannot persist refreshed cookies. Route Handlers can.
           }
         },
