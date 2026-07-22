@@ -354,7 +354,7 @@ test.describe("core MVP live gate", () => {
   });
   test.afterAll(() => setOldFriendActive());
 
-  test("proves owner share, visitor conversion, and profile reshare", async ({
+  test("proves owner share, visitor conversion, and profile reshare @pr-core", async ({
     browser,
     context,
     page,

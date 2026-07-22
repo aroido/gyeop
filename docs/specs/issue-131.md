@@ -31,6 +31,7 @@ PR 검증에서는 핵심 제품 퍼널과 변경 영향이 큰 데이터 검증
 - `docs/engineering/github-task-workflow.md`: exact clean HEAD full verify와 named `verify` merge gate
 - `.github/workflows/ci.yml`: PR/push CI lane 구성
 - `scripts/ai-verify`: local full 및 CI mode 실행 계약
+- `scripts/wait-for-supabase-data-api.mjs`: reset 직후 PostgREST schema cache readiness 계약
 - `scripts/task-harness.mjs`: exact full-verify marker와 named `verify` check를 소비하는 merge gate
 - `package.json`: Playwright live MVP 실행 명령
 - `tests/e2e/core-mvp-live.spec.ts`: 핵심 퍼널과 보조 live 회귀의 test inventory
@@ -51,10 +52,11 @@ PR 검증에서는 핵심 제품 퍼널과 변경 영향이 큰 데이터 검증
 
 ## 구현 계획
 
-- [ ] `tests/e2e/core-mvp-live.spec.ts`의 첫 핵심 퍼널 test에 `@pr-core` tag를 부여한다.
+- [ ] `tests/e2e/core-mvp-live.spec.ts`의 첫 핵심 퍼널 test 제목에 `@pr-core` tag를 부여한다.
 - [ ] `package.json`에 `test:e2e:mvp:pr:run`과 `test:e2e:mvp:nightly:run`을 추가한다. PR 명령은 `@pr-core`만, nightly 명령은 `@pr-core`를 제외한 모든 test를 선택해 새 보조 test가 누락되지 않게 한다. 기존 `test:e2e:mvp:run`은 전체 5개 실행으로 유지한다.
 - [ ] `scripts/ai-verify`에 nightly live mode와 data-app 두 mode를 추가한다. `ci-data-app-catalog`은 `data-access`, `pack-catalog`, `pack-publication-concurrency`, Next build, `pack-runtime`을 소유한다. `ci-data-app-sessions`는 `owner-play-session`, `owner-profile-session`, `owner-play-concurrency`, `share-link-concurrency`, `visitor-response-concurrency`, `visitor-withdrawal-concurrency`를 소유한다.
 - [ ] data 검증은 카탈로그 integration, 세션 integration, build/runtime의 작은 함수로 나눈다. CI 두 mode는 각자 Supabase start/reset을 수행하지만 `full`은 두 mode를 호출하지 않고 현재 순서인 카탈로그 integration 3개 → 세션 integration 6개 → Next build → pack runtime을 같은 Supabase lifecycle 안에서 실행해 추가 reset/start 경계를 만들지 않는다.
+- [ ] 두 data-app CI mode의 reset 뒤 실제 service-role RPC가 성공할 때까지만 기다리는 Data API readiness probe를 공통으로 실행한다. local status health와 RPC 404/503만 합계 최대 10초 재시도하고 다른 HTTP 응답이나 제한 초과는 즉시 실패해 고정 sleep과 schema 오류 은폐를 피한다. API를 사용하지 않는 `ci-data-core`와 충분한 선행 검증이 있는 `full`에는 새 대기를 추가하지 않는다.
 - [ ] `.github/workflows/ci.yml`의 base matrix에서 단일 `ci-data-app`을 제거하고 두 mode를 넣으며 `ci-live-mvp`가 PR 전용 명령을 실행하도록 한다. named `verify`의 `needs` 계약은 유지한다.
 - [ ] `.github/workflows/nightly.yml`을 추가해 `workflow_dispatch`와 `0 17 * * *`(매일 02:00 KST)에서 nightly live mode를 실행한다. Chromium과 dependencies는 기존 live job과 동일하게 준비한다.
 - [ ] `package.json`의 format/format:check에 새 workflow를 포함하고, shell syntax·Playwright test listing·두 data mode의 명령 inventory를 focused check로 검증한다.
@@ -73,9 +75,11 @@ PR 검증에서는 핵심 제품 퍼널과 변경 영향이 큰 데이터 검증
 ## 테스트 계획
 
 - [ ] `bash -n scripts/ai-verify`
+- [ ] `node --check scripts/wait-for-supabase-data-api.mjs`
 - [ ] `pnpm format:check`
-- [ ] `GYEOP_E2E_LIVE=1 pnpm exec playwright test tests/e2e/core-mvp-live.spec.ts --project=mobile-chromium --workers=1 --grep @pr-core --list`
-- [ ] `GYEOP_E2E_LIVE=1 pnpm exec playwright test tests/e2e/core-mvp-live.spec.ts --project=mobile-chromium --workers=1 --grep-invert @pr-core --list`
+- [ ] `pnpm test:e2e:mvp:pr:run --list`
+- [ ] `pnpm test:e2e:mvp:nightly:run --list`
+- [ ] `pnpm test:e2e:mvp:run --list`
 - [ ] `./scripts/run-ai-verify --mode ci-data-app-catalog`
 - [ ] `./scripts/run-ai-verify --mode ci-data-app-sessions`
 - [ ] `.github/workflows/ci.yml`에서 base matrix가 새 data mode 두 개를 모두 포함하고 final `verify`가 `needs: [base, live]`를 유지하는지 확인한다.

@@ -20,7 +20,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [ci-static, ci-data-core, ci-data-app, ci-mock]
+        mode:
+          [
+            ci-static,
+            ci-data-core,
+            ci-data-app-catalog,
+            ci-data-app-sessions,
+            ci-mock,
+          ]
     steps:
       - uses: actions/checkout@v7
         with:
