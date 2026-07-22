@@ -19,6 +19,31 @@ import {
 
 const root = new URL("../../", import.meta.url);
 
+async function listenOnApprovedPort(server) {
+  const deadline = Date.now() + 2_000;
+  while (true) {
+    try {
+      await new Promise((resolve, reject) => {
+        const onError = (error) => {
+          server.off("listening", onListening);
+          reject(error);
+        };
+        const onListening = () => {
+          server.off("error", onError);
+          resolve();
+        };
+        server.once("error", onError);
+        server.once("listening", onListening);
+        server.listen(3120, "127.0.0.1");
+      });
+      return;
+    } catch (error) {
+      if (error?.code !== "EADDRINUSE" || Date.now() >= deadline) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+}
+
 test("accepts only the exact local and Render Free origins", () => {
   assert.equal(
     parseSecurityTarget(LOCAL_SECURITY_TARGET),
@@ -158,10 +183,7 @@ test("sends only the fixed body-free HEAD and GET plan", async (t) => {
       response.end(request.method === "HEAD" ? undefined : '{"ok":true}');
     });
   });
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(3120, "127.0.0.1", resolve);
-  });
+  await listenOnApprovedPort(server);
   t.after(
     () =>
       new Promise((resolve, reject) => {

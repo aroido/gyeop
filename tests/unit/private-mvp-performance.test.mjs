@@ -16,6 +16,31 @@ import {
   summarizeLcpSamples,
 } from "../../scripts/verify-private-mvp-performance.mjs";
 
+async function listenOnApprovedPort(server) {
+  const deadline = Date.now() + 2_000;
+  while (true) {
+    try {
+      await new Promise((resolve, reject) => {
+        const onError = (error) => {
+          server.off("listening", onListening);
+          reject(error);
+        };
+        const onListening = () => {
+          server.off("error", onError);
+          resolve();
+        };
+        server.once("error", onError);
+        server.once("listening", onListening);
+        server.listen(3120, "127.0.0.1");
+      });
+      return;
+    } catch (error) {
+      if (error?.code !== "EADDRINUSE" || Date.now() >= deadline) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+}
+
 test("allows only same-origin browser GET and HEAD requests", () => {
   assert.equal(
     isApprovedBrowserRequest(
@@ -142,10 +167,7 @@ test("runs the exact HEAD and GET sequence against a body-free local fixture", a
       response.end('{"ok":true}');
     });
   });
-  await new Promise((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(3120, "127.0.0.1", resolve);
-  });
+  await listenOnApprovedPort(server);
   t.after(
     () =>
       new Promise((resolve, reject) => {
