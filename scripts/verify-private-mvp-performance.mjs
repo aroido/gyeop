@@ -77,6 +77,18 @@ export function parsePerformanceTarget(value) {
   return target.origin;
 }
 
+export function isApprovedBrowserRequest(target, method, requestUrl) {
+  if (method !== "GET" && method !== "HEAD") {
+    return false;
+  }
+
+  try {
+    return new URL(requestUrl).origin === target;
+  } catch {
+    return false;
+  }
+}
+
 function sortedFiniteSamples(values) {
   return values
     .filter((value) => Number.isFinite(value) && value >= 0)
@@ -291,8 +303,19 @@ async function measureHomeLcp(browser, target) {
   });
   const page = await context.newPage();
   const client = await context.newCDPSession(page);
+  let unsafeRequest = false;
 
   try {
+    await page.route("**/*", async (route) => {
+      const request = route.request();
+      if (!isApprovedBrowserRequest(target, request.method(), request.url())) {
+        unsafeRequest = true;
+        await route.abort("blockedbyclient");
+        return;
+      }
+
+      await route.continue();
+    });
     await client.send("Network.enable");
     await client.send("Network.emulateNetworkConditions", {
       offline: false,
@@ -321,6 +344,9 @@ async function measureHomeLcp(browser, target) {
       timeout: 15_000,
     });
     await page.waitForTimeout(1_500);
+    if (unsafeRequest) {
+      return null;
+    }
     return await page.evaluate(() => {
       const samples = window.__gyeopLcpSamples ?? [];
       return samples.length > 0 ? Math.max(...samples) : null;

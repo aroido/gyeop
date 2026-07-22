@@ -7,6 +7,7 @@ import {
   READ_ONLY_HTTP_PLAN,
   RENDER_PERFORMANCE_TARGET,
   buildPerformanceResult,
+  isApprovedBrowserRequest,
   measureHttpEntries,
   measureReadOnlyRequest,
   median,
@@ -14,6 +15,45 @@ import {
   parsePerformanceTarget,
   summarizeLcpSamples,
 } from "../../scripts/verify-private-mvp-performance.mjs";
+
+test("allows only same-origin browser GET and HEAD requests", () => {
+  assert.equal(
+    isApprovedBrowserRequest(
+      LOCAL_PERFORMANCE_TARGET,
+      "GET",
+      `${LOCAL_PERFORMANCE_TARGET}/_next/static/app.js`,
+    ),
+    true,
+  );
+  assert.equal(
+    isApprovedBrowserRequest(
+      RENDER_PERFORMANCE_TARGET,
+      "HEAD",
+      `${RENDER_PERFORMANCE_TARGET}/api/packs/old-friend`,
+    ),
+    true,
+  );
+  assert.equal(
+    isApprovedBrowserRequest(
+      RENDER_PERFORMANCE_TARGET,
+      "POST",
+      `${RENDER_PERFORMANCE_TARGET}/api/plays`,
+    ),
+    false,
+  );
+  assert.equal(
+    isApprovedBrowserRequest(
+      RENDER_PERFORMANCE_TARGET,
+      "GET",
+      "https://example.com/analytics.js",
+    ),
+    false,
+  );
+  assert.equal(
+    isApprovedBrowserRequest(RENDER_PERFORMANCE_TARGET, "GET", "not-a-url"),
+    false,
+  );
+});
 
 test("accepts only the dedicated local port and exact Render Free origin", () => {
   assert.equal(
