@@ -15,10 +15,15 @@ import {
   verifyGoogleOAuthStart,
 } from "./owner-auth-live-fixture";
 import honestSelfManifest from "../../content/packs/honest-self-v1.json" with { type: "json" };
+import { deriveNetworkKey } from "../../lib/security/network-key.mjs";
 
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
 const proxyKey = Buffer.alloc(32, 8).toString("base64url");
+const ownerRateLimitSecret = Buffer.alloc(32, 9);
+const ownerForwardedIp = "198.51.100.218";
+const rateLimitWindowMilliseconds = 600_000;
+const rateLimitBoundaryGuardMilliseconds = 10_000;
 const visitorManagementSecret = Buffer.alloc(32, 6).toString("base64url");
 const e2eBaseUrl = `http://127.0.0.1:${process.env.GYEOP_E2E_PORT ?? "3000"}`;
 const visitorHeaders = {
@@ -272,6 +277,48 @@ function seedResponseActionLimit(
         where key_hash = v_key and action = '${action}';
         for v_index in 1..${count} loop
           perform public.consume_rate_limit(v_key, '${action}', 600, ${limit});
+        end loop;
+      end
+      $block$;`,
+    ],
+    { stdio: "ignore" },
+  );
+}
+
+async function seedOwnerAccessLimit(count: number) {
+  const remainingMilliseconds =
+    rateLimitWindowMilliseconds - (Date.now() % rateLimitWindowMilliseconds);
+  if (remainingMilliseconds < rateLimitBoundaryGuardMilliseconds) {
+    await new Promise((resolve) =>
+      setTimeout(resolve, remainingMilliseconds + 100),
+    );
+  }
+  const keyHash = deriveNetworkKey({
+    ip: ownerForwardedIp,
+    secret: ownerRateLimitSecret,
+  });
+  execFileSync(
+    "docker",
+    [
+      "exec",
+      databaseContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      `do $block$
+      declare
+        v_index integer;
+        v_key bytea := decode('${Buffer.from(keyHash).toString("hex")}', 'hex');
+      begin
+        delete from public.rate_limit_buckets
+        where key_hash = v_key and action = 'owner_play_access';
+        for v_index in 1..${count} loop
+          perform public.consume_rate_limit(v_key, 'owner_play_access', 600, 120);
         end loop;
       end
       $block$;`,
@@ -1739,23 +1786,22 @@ test.describe("live owner flow", () => {
       4,
     );
 
-    let limited:
-      | {
-          status: number;
-          cacheControl: string | null;
-          retryAfter: string | null;
-        }
-      | undefined;
-    for (let request = 0; request < 121 && !limited; request += 1) {
-      const response = await postShareAction(
+    await seedOwnerAccessLimit(119);
+    expect(
+      await postShareAction(
         page,
         ownerCookie!.value.split(".")[1],
         disabledPublic!,
-      );
-      if (response.status === 429) limited = response;
-    }
-    expect(limited?.status).toBe(429);
-    expect(Number(limited?.retryAfter)).toBeGreaterThan(0);
+      ),
+    ).toMatchObject({ status: 404, cacheControl: "private, no-store" });
+    const limited = await postShareAction(
+      page,
+      ownerCookie!.value.split(".")[1],
+      disabledPublic!,
+    );
+    expect(limited.status).toBe(429);
+    expect(limited.cacheControl).toBe("private, no-store");
+    expect(Number(limited.retryAfter)).toBeGreaterThan(0);
     expect(readShareActionEventsSince(initialShareActionEvents)).toHaveLength(
       4,
     );

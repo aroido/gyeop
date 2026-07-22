@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ATTEMPTS="${GYEOP_SUPABASE_READY_ATTEMPTS:-30}"
+INTERVAL_SECONDS="${GYEOP_SUPABASE_READY_INTERVAL_SECONDS:-1}"
+
+if ! [[ "$ATTEMPTS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "GYEOP_SUPABASE_READY_ATTEMPTS must be a positive integer." >&2
+  exit 2
+fi
+if ! [[ "$INTERVAL_SECONDS" =~ ^[0-9]+$ ]]; then
+  echo "GYEOP_SUPABASE_READY_INTERVAL_SECONDS must be a non-negative integer." >&2
+  exit 2
+fi
+
+PROJECT_IDS=()
+while IFS= read -r project_id; do
+  PROJECT_IDS+=("$project_id")
+done < <(
+  sed -nE 's/^[[:space:]]*project_id[[:space:]]*=[[:space:]]*"([A-Za-z0-9_-]+)"[[:space:]]*$/\1/p' \
+    "$ROOT/supabase/config.toml"
+)
+
+if [[ "${#PROJECT_IDS[@]}" -ne 1 ]]; then
+  echo "supabase/config.toml must contain exactly one quoted project_id." >&2
+  exit 2
+fi
+
+DB_CONTAINER="supabase_db_${PROJECT_IDS[0]}"
+for ((attempt = 1; attempt <= ATTEMPTS; attempt += 1)); do
+  if docker exec "$DB_CONTAINER" pg_isready -U postgres -d postgres >/dev/null 2>&1; then
+    exit 0
+  fi
+  if [[ "$attempt" -lt "$ATTEMPTS" ]]; then
+    sleep "$INTERVAL_SECONDS"
+  fi
+done
+
+echo "Supabase Postgres did not become ready: container=$DB_CONTAINER attempts=$ATTEMPTS" >&2
+exit 1
