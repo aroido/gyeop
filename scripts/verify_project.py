@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import sys
+import tomllib
 from pathlib import Path
 
 
@@ -25,6 +26,11 @@ EXPECTED_SKILLS = {
     "gyeop-product",
     "gyeop-question-pack-design",
     "gyeop-task",
+}
+EXPECTED_AGENTS = {
+    "critic": ("gpt-5.6-sol", "xhigh"),
+    "gyeop-core": ("gpt-5.6-sol", "xhigh"),
+    "verifier": ("gpt-5.6-sol", "xhigh"),
 }
 EXPECTED_MOCKUPS = 6
 LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
@@ -66,6 +72,36 @@ def verify_skills() -> None:
             fail(f"unresolved TODO in {skill_file.relative_to(ROOT)}")
 
 
+def read_toml(path: Path) -> dict[str, object]:
+    try:
+        return tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        fail(f"invalid TOML in {path.relative_to(ROOT)}: {error}")
+
+
+def verify_model_routing() -> None:
+    config = read_toml(ROOT / ".codex" / "config.toml")
+    if (config.get("model"), config.get("model_reasoning_effort")) != (
+        "gpt-5.6-terra",
+        "low",
+    ):
+        fail("root Codex model must be gpt-5.6-terra with low reasoning effort")
+
+    agents_root = ROOT / ".codex" / "agents"
+    actual = {path.stem for path in agents_root.glob("*.toml")}
+    if actual != set(EXPECTED_AGENTS):
+        fail(f"agent files differ: expected={sorted(EXPECTED_AGENTS)} actual={sorted(actual)}")
+    for name, expected in EXPECTED_AGENTS.items():
+        agent = read_toml(agents_root / f"{name}.toml")
+        if agent.get("name") != name:
+            fail(f"agent name differs from filename: {name}")
+        if (agent.get("model"), agent.get("model_reasoning_effort")) != expected:
+            fail(f"agent model routing differs: {name}")
+        for field in ("description", "developer_instructions"):
+            if not isinstance(agent.get(field), str) or not agent[field].strip():
+                fail(f"missing {field}: {name}")
+
+
 def verify_mockups() -> None:
     mockups = sorted((ROOT / "docs" / "assets" / "mockups").glob("*.png"))
     if len(mockups) != EXPECTED_MOCKUPS:
@@ -93,9 +129,10 @@ def verify_markdown_links() -> None:
 def main() -> None:
     verify_required_files()
     verify_skills()
+    verify_model_routing()
     verify_mockups()
     verify_markdown_links()
-    print("Project structure, SSOT documents, mockups, and local links are valid.")
+    print("Project structure, model routing, SSOT documents, mockups, and local links are valid.")
 
 
 if __name__ == "__main__":

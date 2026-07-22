@@ -2,7 +2,7 @@
 
 ## Spec reviewer gate
 
-Use an independent `critic` or `architect` context when available.
+Use an independent `critic` context.
 
 The review must include:
 
@@ -23,7 +23,7 @@ Each field must begin at the start of a line, appear exactly once, and contain t
 
 ## QA gate
 
-Use an independent `verifier` or `test-engineer` context when available.
+Use an independent `verifier` context.
 
 QA must include:
 
