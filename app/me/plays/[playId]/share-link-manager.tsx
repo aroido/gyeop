@@ -401,9 +401,14 @@ export default function ShareLinkManager({
   return (
     <main className={styles.shell}>
       <section className={styles.panel} aria-labelledby="share-title">
-        <Link className={styles.back} href={`/play/${playId}`}>
-          ← 내 답변
-        </Link>
+        <nav className={styles.ownerNav} aria-label="내 질문팩 이동">
+          <Link className={styles.back} href="/me">
+            내 질문팩
+          </Link>
+          <Link className={styles.back} href={`/play/${playId}`}>
+            ← 내 답변
+          </Link>
+        </nav>
         <p className={styles.brand}>겹 · {state.packTitle}</p>
         <h1 id="share-title" ref={headingRef} tabIndex={-1}>
           공유 링크

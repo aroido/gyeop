@@ -620,6 +620,10 @@ test("holds all later choices behind a failed save and completes after retry", a
   await expect(
     page.getByRole("button", { name: "내 질문팩 저장하고 공유하기" }),
   ).toBeVisible();
+  await expect(page.getByRole("link", { name: "내 질문팩" })).toHaveAttribute(
+    "href",
+    "/me",
+  );
   await page.keyboard.press("Tab");
   const saveButton = page.getByRole("button", {
     name: "내 질문팩 저장하고 공유하기",

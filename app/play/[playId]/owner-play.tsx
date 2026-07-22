@@ -537,6 +537,9 @@ export default function OwnerPlay({ playId }: { playId: string | null }) {
           >
             내 질문팩 저장하고 공유하기
           </button>
+          <Link className={styles.profileButton} href="/me">
+            내 질문팩
+          </Link>
         </section>
       </main>
     );

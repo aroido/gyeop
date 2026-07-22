@@ -257,6 +257,10 @@ test("creates the recommended public link and loses the raw URL on reload", asyn
   await page.goto(`/me/plays/${playId}`);
 
   await expect(page.getByRole("heading", { name: "공유 링크" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "내 질문팩" })).toHaveAttribute(
+    "href",
+    "/me",
+  );
   await expect(
     page.getByRole("link", { name: "내 시선 프로필" }),
   ).toHaveAttribute("href", `/me/profile/${playId}`);

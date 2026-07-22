@@ -47,6 +47,21 @@
   letter-spacing: 0.18em;
 }
 
+.ownerEntry {
+  display: inline-grid;
+  min-height: 2.75rem;
+  padding-inline: 0.5rem;
+  place-items: center;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+
+.ownerEntry:focus-visible {
+  outline: 3px solid #315cff;
+  outline-offset: 2px;
+}
+
 .hero {
   position: relative;
   min-height: 12.5rem;
