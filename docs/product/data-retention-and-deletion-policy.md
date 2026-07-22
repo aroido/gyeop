@@ -158,7 +158,7 @@ cleanup 로그·metric은 category, 처리 건수, `remaining_count`, `oldest_du
 5. 격리 restore→ledger 재적용→erased subject 0건 drill.
 6. 공개 privacy 연락 채널과 이름이 지정된 Privacy/Operations Owner.
 
-비공개 MVP에는 익명 owner capability, 공유 직전 Supabase Auth 이메일 claim, 연결된 play의 인증 조회를 활성화한다. 이메일 알림·계정 삭제·미귀속 Auth cleanup과 public signup 운영은 위 release gate와 별도 production 재승인 전까지 비활성이다. 자동 cleanup #32가 배포되기 전 수집 데이터는 Operations Owner가 이 정책 상한 안에서 수동 정리하거나 테스트 DB를 폐기해야 하며 production traffic을 받지 않는다.
+비공개 MVP에는 익명 owner capability, 공유 직전 Supabase Auth Google OAuth claim, 연결된 play의 인증 조회를 활성화한다. 이메일 알림, standalone public signup, self-service 계정 삭제, 미귀속/provider Auth deletion과 hosted cleanup/Cron은 위 release gate와 별도 production 재승인 전까지 비활성이다. 이 비활성 상태는 이 정책의 보관 상한을 완화하지 않는다. 수집 데이터를 상한 안에서 정리할 승인된 경로가 없으면 신규 수집과 private MVP 모집을 중단하고 local/test DB를 폐기하며 production traffic을 받지 않는다.
 
 ## 11. 변경 통제
 
