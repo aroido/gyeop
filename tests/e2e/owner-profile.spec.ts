@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-import manifest from "../../content/packs/old-friend-v1.json" with { type: "json" };
+import manifest from "../../content/packs/old-friend-v2.json" with { type: "json" };
 
 import { playId } from "./owner-flow-fixture";
 

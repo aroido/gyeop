@@ -490,7 +490,7 @@ test.describe("core MVP live gate", () => {
     await page.setViewportSize({ width: 430, height: 932 });
     await page.goto(`/me/profile/${ownerPlayId}`);
     const signatureHeading = page.getByRole("heading", {
-      name: "서운한 일이 생기면 나는?",
+      name: "오랜만에 친구를 만나면 나는?",
     });
     const signatureCard = page.locator("article").filter({
       has: signatureHeading,
@@ -498,11 +498,11 @@ test.describe("core MVP live gate", () => {
     const signatureAggregate = signatureCard.getByLabel("친구 시선 3개");
     await expect(signatureAggregate).toHaveCount(1);
     await expect(
-      signatureAggregate.getByText("A · 바로 이야기한다"),
+      signatureAggregate.getByText("A · 어제 본 듯 바로 편해진다"),
     ).toBeVisible();
     await expect(signatureAggregate.getByText("0명")).toBeVisible();
     await expect(
-      signatureAggregate.getByText("B · 생각을 정리한 뒤 말한다"),
+      signatureAggregate.getByText("B · 근황부터 천천히 맞춰 간다"),
     ).toBeVisible();
     await expect(signatureAggregate.getByText("3명")).toBeVisible();
     const lockedCards = page.locator("article").filter({

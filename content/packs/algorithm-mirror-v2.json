@@ -1,0 +1,107 @@
+{
+  "slug": "algorithm-mirror",
+  "version": "algorithm-mirror-v2",
+  "title": "알고리즘이 들킨 날",
+  "targetRelationship": "new_connection",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "피드 취향 추리",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "algorithm-mirror-card-v1",
+    "coverTone": "violet"
+  },
+  "cards": [
+    {
+      "id": "feed-clue",
+      "position": 1,
+      "ownerPrompt": "내 피드가 나를 너무 잘 안다고 느끼면 나는?",
+      "visitorPrompt": "추천 피드가 취향을 너무 잘 안다고 느껴지면 이 사람은?",
+      "optionA": "추천을 더 깊게 따라간다",
+      "optionB": "일부러 다른 걸 찾아본다",
+      "isSignature": true
+    },
+    {
+      "id": "save-first",
+      "position": 2,
+      "ownerPrompt": "누가 콘텐츠를 추천해 주면 나는?",
+      "visitorPrompt": "누가 콘텐츠를 추천해 주면 이 사람은?",
+      "optionA": "바로 열어 본다",
+      "optionB": "저장해 두고 나중에 본다",
+      "isSignature": false
+    },
+    {
+      "id": "rabbit-hole",
+      "position": 3,
+      "ownerPrompt": "하나를 보다가 다른 주제로 새면 나는?",
+      "visitorPrompt": "하나를 보다가 다른 주제로 새면 이 사람은?",
+      "optionA": "끝까지 새 길을 탐험한다",
+      "optionB": "원래 보려던 곳으로 돌아온다",
+      "isSignature": false
+    },
+    {
+      "id": "share-find",
+      "position": 4,
+      "ownerPrompt": "내 취향 저격 콘텐츠를 보면 나는?",
+      "visitorPrompt": "취향에 딱 맞는 콘텐츠를 보면 이 사람은?",
+      "optionA": "누군가에게 바로 보낸다",
+      "optionB": "혼자 여러 번 다시 본다",
+      "isSignature": false
+    },
+    {
+      "id": "trend-check",
+      "position": 5,
+      "ownerPrompt": "다들 하는 유행을 보면 나는?",
+      "visitorPrompt": "다들 하는 유행을 보면 이 사람은?",
+      "optionA": "왜 뜨는지 한 번 해본다",
+      "optionB": "나한테 맞는지부터 본다",
+      "isSignature": false
+    },
+    {
+      "id": "recommendation",
+      "position": 6,
+      "ownerPrompt": "추천을 받을 때 나는?",
+      "visitorPrompt": "추천을 받을 때 이 사람은?",
+      "optionA": "비슷한 걸 더 찾아본다",
+      "optionB": "정반대도 같이 비교한다",
+      "isSignature": false
+    },
+    {
+      "id": "comment-dive",
+      "position": 7,
+      "ownerPrompt": "흥미로운 영상 아래에서 나는?",
+      "visitorPrompt": "흥미로운 영상 아래에서 이 사람은?",
+      "optionA": "댓글 반응까지 읽는다",
+      "optionB": "영상만 보고 다음으로 간다",
+      "isSignature": false
+    },
+    {
+      "id": "old-favorite",
+      "position": 8,
+      "ownerPrompt": "예전에 좋아한 걸 다시 발견하면 나는?",
+      "visitorPrompt": "예전에 좋아한 걸 다시 발견하면 이 사람은?",
+      "optionA": "그때 기록을 다시 찾아본다",
+      "optionB": "지금의 취향과 비교한다",
+      "isSignature": false
+    },
+    {
+      "id": "search-style",
+      "position": 9,
+      "ownerPrompt": "궁금한 게 생기면 나는?",
+      "visitorPrompt": "궁금한 게 생기면 이 사람은?",
+      "optionA": "검색어를 구체적으로 만든다",
+      "optionB": "대충 넣고 흐름을 따라간다",
+      "isSignature": false
+    },
+    {
+      "id": "recommend-to-me",
+      "position": 10,
+      "ownerPrompt": "누가 취향을 추천해 달라 하면 나는?",
+      "visitorPrompt": "누가 취향을 추천해 달라 하면 이 사람은?",
+      "optionA": "내 최애 하나를 강하게 민다",
+      "optionB": "상대 취향부터 물어본다",
+      "isSignature": false
+    }
+  ]
+}

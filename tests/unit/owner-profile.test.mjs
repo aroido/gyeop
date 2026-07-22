@@ -18,7 +18,7 @@ const root = path.resolve(
   "../..",
 );
 const manifest = JSON.parse(
-  readFileSync(path.join(root, "content/packs/old-friend-v1.json"), "utf8"),
+  readFileSync(path.join(root, "content/packs/old-friend-v2.json"), "utf8"),
 );
 const deadlineModeManifest = JSON.parse(
   readFileSync(path.join(root, "content/packs/deadline-mode-v1.json"), "utf8"),
@@ -27,9 +27,9 @@ const deadlineModeManifest = JSON.parse(
 function profile(overrides = {}) {
   return {
     playId: "27000000-0000-4000-8000-000000000001",
-    packSlug: "old-friend",
-    packVersion: "old-friend-v1",
-    packTitle: "우리는 아직도 통하는 편",
+    packSlug: manifest.slug,
+    packVersion: manifest.version,
+    packTitle: manifest.title,
     sightCount: 0,
     sightStatus: "empty",
     cards: manifest.cards.map((card, index) => ({

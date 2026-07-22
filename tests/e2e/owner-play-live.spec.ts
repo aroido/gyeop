@@ -618,7 +618,7 @@ function expectExactAssignmentResponse(body: string) {
   ]);
   expect(parsed).toMatchObject({
     packSlug: "old-friend",
-    packVersion: "old-friend-v1",
+    packVersion: "old-friend-v2",
     packTitle: "우리는 아직도 통하는 편",
   });
   const assignments = parsed.assignments as Record<string, unknown>[];
@@ -668,7 +668,7 @@ function expectExactSubmittedResponse(body: string) {
   ]);
   expect(parsed).toMatchObject({
     packSlug: "old-friend",
-    packVersion: "old-friend-v1",
+    packVersion: "old-friend-v2",
     packTitle: "우리는 아직도 통하는 편",
   });
   expect(parsed.status).toBe("submitted");
@@ -971,14 +971,14 @@ test.describe("live owner flow", () => {
         {
           event: "share_handoff_succeeded",
           properties: {
-            packVersion: "old-friend-v1",
+            packVersion: "old-friend-v2",
             linkKind: "public",
           },
         },
         {
           event: "share_link_copied",
           properties: {
-            packVersion: "old-friend-v1",
+            packVersion: "old-friend-v2",
             linkKind: "one_to_one",
           },
         },
@@ -1186,7 +1186,7 @@ test.describe("live owner flow", () => {
         await visitor.getByRole("button", { name: "3장 답하러 가기" }).click();
         await expect(
           visitor.getByRole("heading", {
-            name: "서운한 일이 생기면 이 사람은?",
+            name: "오랜만에 친구를 만나면 이 사람은?",
           }),
         ).toBeFocused();
         if (complete) {
@@ -1306,7 +1306,7 @@ test.describe("live owner flow", () => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       submittedAnswerResults.push(
         await rawVisitorAction(request, {
-          path: `/api/responses/${submittedResponseId}/answers/conflict`,
+          path: `/api/responses/${submittedResponseId}/answers/reunion`,
           method: "PUT",
           cookieValue: visitors[0].cookieValue,
           body: { choice: "a" },
@@ -1391,7 +1391,7 @@ test.describe("live owner flow", () => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       draftAnswerResults.push(
         await rawVisitorAction(request, {
-          path: `/api/responses/${incompleteResponseId}/answers/conflict`,
+          path: `/api/responses/${incompleteResponseId}/answers/reunion`,
           method: "PUT",
           cookieValue: visitors[1].cookieValue,
           body: { choice: "a" },
@@ -1587,7 +1587,7 @@ test.describe("live owner flow", () => {
       .poll(() => readProfileReshareClickEvents())
       .toEqual([
         ...initialProfileReshareEvents,
-        { packVersion: "old-friend-v1", entrySource: "profile_reshare" },
+        { packVersion: "old-friend-v2", entrySource: "profile_reshare" },
       ]);
     await expect(page.getByLabel("공유 링크 직접 복사")).toHaveCount(0);
     await expect(page.getByText("사용 중")).toHaveCount(2);
@@ -1613,14 +1613,14 @@ test.describe("live owner flow", () => {
         {
           event: "share_handoff_succeeded",
           properties: {
-            packVersion: "old-friend-v1",
+            packVersion: "old-friend-v2",
             linkKind: "public",
           },
         },
         {
           event: "share_handoff_succeeded",
           properties: {
-            packVersion: "old-friend-v1",
+            packVersion: "old-friend-v2",
             linkKind: "public",
             entrySource: "profile_reshare",
           },
@@ -1628,7 +1628,7 @@ test.describe("live owner flow", () => {
         {
           event: "share_link_copied",
           properties: {
-            packVersion: "old-friend-v1",
+            packVersion: "old-friend-v2",
             linkKind: "one_to_one",
           },
         },
@@ -1659,7 +1659,7 @@ test.describe("live owner flow", () => {
       .click();
     await expect(
       visitors[0].visitor.getByRole("heading", {
-        name: "서운한 일이 생기면 이 사람은?",
+        name: "오랜만에 친구를 만나면 이 사람은?",
       }),
     ).toBeFocused();
     const crossLinkCookie = (await visitors[0].visitorContext.cookies()).find(
@@ -1741,14 +1741,14 @@ test.describe("live owner flow", () => {
       {
         event: "share_link_copied",
         properties: {
-          packVersion: "old-friend-v1",
+          packVersion: "old-friend-v2",
           linkKind: "one_to_one",
         },
       },
       {
         event: "share_link_copied",
         properties: {
-          packVersion: "old-friend-v1",
+          packVersion: "old-friend-v2",
           linkKind: "one_to_one",
         },
       },

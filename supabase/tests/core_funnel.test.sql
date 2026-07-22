@@ -58,7 +58,7 @@ select is(
     'owner', '31000000-0000-4000-8000-000000000001'::uuid,
     'response', null,
     'properties', jsonb_build_object(
-      'packVersion', 'old-friend-v1', 'entrySource', 'home'
+      'packVersion', 'old-friend-v2', 'entrySource', 'home'
     )
   ),
   'home pack-open records only the owner subject and safe properties'
@@ -70,7 +70,7 @@ insert into public.pack_plays (
   last_active_at, status, current_position, completed_at
 ) select
   '31000000-0000-4000-8000-000000000002',
-  '15151515-1515-4515-8515-151515151515',
+  'e05e6366-2a00-4798-8273-0af5f16aad10',
   decode(repeat('02', 32), 'hex'), value + interval '7 days', value,
   'completed', 10, value
 from fixed_time;
@@ -92,7 +92,7 @@ insert into public.visitor_responses (
 ) select
   '31200000-0000-4000-8000-000000000001',
   '31100000-0000-4000-8000-000000000001',
-  '15151515-1515-4515-8515-151515151515',
+  'e05e6366-2a00-4798-8273-0af5f16aad10',
   'old_friend', 'ten_years_or_more', 'submitted',
   decode(repeat('04', 32), 'hex'), value + interval '24 hours',
   decode(repeat('05', 32), 'hex'), value, value
@@ -156,9 +156,9 @@ insert into public.self_answers (
 )
 select
   '31000000-0000-4000-8000-000000000001',
-  '15151515-1515-4515-8515-151515151515', card.id, 'a'
+  'e05e6366-2a00-4798-8273-0af5f16aad10', card.id, 'a'
 from public.pack_cards as card
-where card.pack_version_id = '15151515-1515-4515-8515-151515151515';
+where card.pack_version_id = 'e05e6366-2a00-4798-8273-0af5f16aad10';
 
 set local role service_role;
 
@@ -230,7 +230,7 @@ insert into public.analytics_events (
   'relationship_selected',
   '31200000-0000-4000-8000-000000000001',
   jsonb_build_object(
-    'packVersion', 'old-friend-v1', 'linkKind', 'public',
+    'packVersion', 'old-friend-v2', 'linkKind', 'public',
     'relationshipCode', 'old_friend', 'knownSinceCode', 'ten_years_or_more'
   )
 );
@@ -242,7 +242,7 @@ select is(
     where event_name = 'relationship_selected'
       and visitor_response_id = '31200000-0000-4000-8000-000000000001'
   ),
-  jsonb_build_object('packVersion', 'old-friend-v1', 'linkKind', 'public'),
+  jsonb_build_object('packVersion', 'old-friend-v2', 'linkKind', 'public'),
   'legacy relationship metadata is normalized out before storage'
 );
 
@@ -252,7 +252,7 @@ select throws_ok(
     values (
       'invite_opened',
       jsonb_build_object(
-        'packVersion', 'old-friend-v1', 'linkKind', 'public',
+        'packVersion', 'old-friend-v2', 'linkKind', 'public',
         'email', 'private@example.com'
       )
     )
@@ -316,7 +316,7 @@ insert into public.visitor_responses (
 ) select
   '31200000-0000-4000-8000-000000000002',
   '31100000-0000-4000-8000-000000000001',
-  '15151515-1515-4515-8515-151515151515',
+  'e05e6366-2a00-4798-8273-0af5f16aad10',
   'old_friend', 'not_sure', 'draft', decode(repeat('09', 32), 'hex'),
   value + interval '24 hours', value
 from fixed_time;
@@ -326,7 +326,7 @@ insert into public.analytics_events (
 ) values (
   'comparison_viewed',
   '31200000-0000-4000-8000-000000000002',
-  jsonb_build_object('packVersion', 'old-friend-v1', 'linkKind', 'public')
+  jsonb_build_object('packVersion', 'old-friend-v2', 'linkKind', 'public')
 );
 delete from public.visitor_responses
 where id = '31200000-0000-4000-8000-000000000002';
@@ -352,7 +352,7 @@ insert into public.pack_plays (
   id, pack_version_id, management_secret_hash, management_expires_at,
   last_active_at, status, current_position, completed_at
 ) select
-  fixture.id, '15151515-1515-4515-8515-151515151515', fixture.secret,
+  fixture.id, 'e05e6366-2a00-4798-8273-0af5f16aad10', fixture.secret,
   value + interval '7 days', value, fixture.status, 10,
   case when fixture.status = 'completed' then value else null end
 from fixed_time
@@ -375,7 +375,7 @@ insert into public.visitor_responses (
   created_at, submitted_at
 ) select
   fixture.id, '31100000-0000-4000-8000-000000000002',
-  '15151515-1515-4515-8515-151515151515', 'old_friend', 'not_sure',
+  'e05e6366-2a00-4798-8273-0af5f16aad10', 'old_friend', 'not_sure',
   'submitted', decode(repeat(fixture.token, 32), 'hex'),
   value + interval '24 hours', decode(repeat(fixture.management, 32), 'hex'),
   value, value + fixture.submitted_offset
@@ -386,54 +386,54 @@ insert into public.analytics_events (
   properties, occurred_at
 ) values
   ('self_pack_completed', '31000000-0000-4000-8000-000000000001', null, null,
-    '{"packVersion":"old-friend-v1"}', clock_timestamp() - interval '50 seconds'),
+    '{"packVersion":"old-friend-v2"}', clock_timestamp() - interval '50 seconds'),
   ('share_link_created', '31000000-0000-4000-8000-000000000001',
     '31100000-0000-4000-8000-000000000002', null,
-    '{"packVersion":"old-friend-v1","linkKind":"public"}',
+    '{"packVersion":"old-friend-v2","linkKind":"public"}',
     clock_timestamp() - interval '45 seconds'),
   ('share_handoff_succeeded', '31000000-0000-4000-8000-000000000001',
     '31100000-0000-4000-8000-000000000002', null,
-    '{"packVersion":"old-friend-v1","linkKind":"public"}',
+    '{"packVersion":"old-friend-v2","linkKind":"public"}',
     clock_timestamp() - interval '40 seconds'),
   ('visitor_required_submitted', null, null,
     '31200000-0000-4000-8000-000000000003',
-    '{"packVersion":"old-friend-v1","linkKind":"public"}',
+    '{"packVersion":"old-friend-v2","linkKind":"public"}',
     clock_timestamp() - interval '40 seconds'),
   ('comparison_viewed', null, null, '31200000-0000-4000-8000-000000000003',
-    '{"packVersion":"old-friend-v1","linkKind":"public"}',
+    '{"packVersion":"old-friend-v2","linkKind":"public"}',
     clock_timestamp() - interval '35 seconds'),
   ('same_pack_start_clicked', null, null, '31200000-0000-4000-8000-000000000003',
-    '{"packVersion":"old-friend-v1","linkKind":"public"}',
+    '{"packVersion":"old-friend-v2","linkKind":"public"}',
     clock_timestamp() - interval '25 seconds'),
   ('pack_opened', '31000000-0000-4000-8000-000000000003', null,
     '31200000-0000-4000-8000-000000000003',
-    '{"packVersion":"old-friend-v1","entrySource":"same_pack_cta"}',
+    '{"packVersion":"old-friend-v2","entrySource":"same_pack_cta"}',
     clock_timestamp() - interval '30 seconds'),
   ('visitor_required_submitted', null, null,
     '31200000-0000-4000-8000-000000000004',
-    '{"packVersion":"old-friend-v1","linkKind":"public"}',
+    '{"packVersion":"old-friend-v2","linkKind":"public"}',
     clock_timestamp() - interval '35 seconds'),
   ('comparison_viewed', null, null, '31200000-0000-4000-8000-000000000004',
-    '{"packVersion":"old-friend-v1","linkKind":"public"}',
+    '{"packVersion":"old-friend-v2","linkKind":"public"}',
     clock_timestamp() - interval '40 seconds'),
   ('same_pack_start_clicked', null, null, '31200000-0000-4000-8000-000000000004',
-    '{"packVersion":"old-friend-v1","linkKind":"public"}',
+    '{"packVersion":"old-friend-v2","linkKind":"public"}',
     clock_timestamp() - interval '30 seconds'),
   ('pack_opened', '31000000-0000-4000-8000-000000000005', null,
     '31200000-0000-4000-8000-000000000004',
-    '{"packVersion":"old-friend-v1","entrySource":"same_pack_cta"}',
+    '{"packVersion":"old-friend-v2","entrySource":"same_pack_cta"}',
     clock_timestamp() - interval '25 seconds'),
   ('profile_viewed', '31000000-0000-4000-8000-000000000001', null, null,
-    '{"packVersion":"old-friend-v1"}', clock_timestamp() - interval '20 seconds'),
+    '{"packVersion":"old-friend-v2"}', clock_timestamp() - interval '20 seconds'),
   ('profile_reshare_clicked', '31000000-0000-4000-8000-000000000001', null, null,
-    '{"packVersion":"old-friend-v1","entrySource":"profile_reshare"}',
+    '{"packVersion":"old-friend-v2","entrySource":"profile_reshare"}',
     clock_timestamp() - interval '15 seconds'),
   ('share_link_copied', '31000000-0000-4000-8000-000000000001',
     '31100000-0000-4000-8000-000000000002', null,
-    '{"packVersion":"old-friend-v1","linkKind":"public","entrySource":"profile_reshare"}',
+    '{"packVersion":"old-friend-v2","linkKind":"public","entrySource":"profile_reshare"}',
     clock_timestamp() - interval '10 seconds'),
   ('self_pack_completed', '31000000-0000-4000-8000-000000000006', null, null,
-    '{"packVersion":"old-friend-v1"}', clock_timestamp() - interval '2 hours');
+    '{"packVersion":"old-friend-v2"}', clock_timestamp() - interval '2 hours');
 
 select is(
   (select subjects from private.core_funnel_stage_counts

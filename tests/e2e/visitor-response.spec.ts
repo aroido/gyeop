@@ -18,7 +18,7 @@ type Assignment = {
 type DraftResponse = {
   id: string;
   packSlug: "old-friend";
-  packVersion: "old-friend-v1";
+  packVersion: "old-friend-v2";
   packTitle: "우리는 아직도 통하는 편";
   status: "draft";
   relationshipCode: string;
@@ -46,12 +46,12 @@ type ResponseState = DraftResponse | SubmittedResponse;
 
 const assignments: Assignment[] = [
   {
-    cardId: "conflict",
+    cardId: "reunion",
     stage: "required",
     position: 1,
-    visitorPrompt: "서운한 일이 생기면 이 사람은?",
-    optionA: "바로 이야기한다",
-    optionB: "생각을 정리한 뒤 말한다",
+    visitorPrompt: "오랜만에 친구를 만나면 이 사람은?",
+    optionA: "어제 본 듯 바로 편해진다",
+    optionB: "근황부터 천천히 맞춰 간다",
     isSignature: true,
     visitorChoice: null,
   },
@@ -81,9 +81,9 @@ const optionalAssignments: Assignment[] = [
     cardId: "comfort",
     stage: "optional",
     position: 1,
-    visitorPrompt: "위로가 필요할 때 이 사람은?",
-    optionA: "곁에 있어 달라고 한다",
-    optionB: "혼자 정리할 시간을 갖는다",
+    visitorPrompt: "친구가 고민을 털어놓으면 이 사람은?",
+    optionA: "먼저 끝까지 들어준다",
+    optionB: "해결 방법부터 같이 찾는다",
     isSignature: false,
     visitorChoice: null,
   },
@@ -91,19 +91,19 @@ const optionalAssignments: Assignment[] = [
     cardId: "reconnect",
     stage: "optional",
     position: 2,
-    visitorPrompt: "오랜만에 연락할 때 이 사람은?",
-    optionA: "먼저 안부를 묻는다",
-    optionB: "계기가 생길 때까지 기다린다",
+    visitorPrompt: "연락이 뜸해졌을 때 이 사람은?",
+    optionA: "짧게 안부부터 보낸다",
+    optionB: "만날 약속부터 잡는다",
     isSignature: false,
     visitorChoice: null,
   },
 ];
 const packPositions = new Map([
-  ["conflict", 1],
+  ["reunion", 2],
   ["hard-day", 10],
   ["plans", 3],
-  ["comfort", 2],
-  ["reconnect", 4],
+  ["comfort", 4],
+  ["reconnect", 6],
 ]);
 
 function json(route: Route, status: number, body: unknown, extra = {}) {
@@ -166,7 +166,7 @@ async function installVisitorApi(
       }
       return json(route, 200, {
         packSlug: "old-friend",
-        packVersion: "old-friend-v1",
+        packVersion: "old-friend-v2",
         packTitle: "우리는 아직도 통하는 편",
         kind:
           options.kind ??
@@ -195,7 +195,7 @@ async function installVisitorApi(
     saved = {
       id: responseId,
       packSlug: "old-friend",
-      packVersion: "old-friend-v1",
+      packVersion: "old-friend-v2",
       packTitle: "우리는 아직도 통하는 편",
       status: "draft",
       relationshipCode: body.relationshipCode!,

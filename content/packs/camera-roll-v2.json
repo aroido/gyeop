@@ -1,0 +1,107 @@
+{
+  "slug": "camera-roll",
+  "version": "camera-roll-v2",
+  "title": "최근 사진 20장",
+  "targetRelationship": "old_friend",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "카메라 롤 추리",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "camera-roll-card-v1",
+    "coverTone": "violet"
+  },
+  "cards": [
+    {
+      "id": "first-photo",
+      "position": 1,
+      "ownerPrompt": "재밌는 순간이 오면 나는?",
+      "visitorPrompt": "재밌는 순간이 오면 이 사람은?",
+      "optionA": "바로 사진부터 남긴다",
+      "optionB": "먼저 그 순간을 즐긴다",
+      "isSignature": true
+    },
+    {
+      "id": "food-photo",
+      "position": 2,
+      "ownerPrompt": "맛있는 음식 앞에서 나는?",
+      "visitorPrompt": "맛있는 음식 앞에서 이 사람은?",
+      "optionA": "예쁘게 찍고 먹는다",
+      "optionB": "따뜻할 때 먼저 먹는다",
+      "isSignature": false
+    },
+    {
+      "id": "selfie",
+      "position": 3,
+      "ownerPrompt": "내 사진을 찍을 때 나는?",
+      "visitorPrompt": "자기 사진을 찍을 때 이 사람은?",
+      "optionA": "여러 장 중 마음에 드는 걸 고른다",
+      "optionB": "한 장의 자연스러운 컷을 남긴다",
+      "isSignature": false
+    },
+    {
+      "id": "friend-photo",
+      "position": 4,
+      "ownerPrompt": "친구 사진을 찍어 줄 때 나는?",
+      "visitorPrompt": "친구 사진을 찍어 줄 때 이 사람은?",
+      "optionA": "각도와 구도를 신경 쓴다",
+      "optionB": "재밌는 표정을 먼저 끌어낸다",
+      "isSignature": false
+    },
+    {
+      "id": "cleanup",
+      "position": 5,
+      "ownerPrompt": "사진이 쌓이면 나는?",
+      "visitorPrompt": "사진이 쌓이면 이 사람은?",
+      "optionA": "틈틈이 정리한다",
+      "optionB": "필요할 때 찾아본다",
+      "isSignature": false
+    },
+    {
+      "id": "old-album",
+      "position": 6,
+      "ownerPrompt": "예전 사진을 보면 나는?",
+      "visitorPrompt": "예전 사진을 보면 이 사람은?",
+      "optionA": "그날 이야기를 떠올린다",
+      "optionB": "그때의 분위기를 다시 느낀다",
+      "isSignature": false
+    },
+    {
+      "id": "share-photo",
+      "position": 7,
+      "ownerPrompt": "함께 찍은 사진을 고를 때 나는?",
+      "visitorPrompt": "함께 찍은 사진을 고를 때 이 사람은?",
+      "optionA": "바로 보내서 같이 본다",
+      "optionB": "마음에 드는 걸 골라 보낸다",
+      "isSignature": false
+    },
+    {
+      "id": "screenshot",
+      "position": 8,
+      "ownerPrompt": "스크린샷을 찍는 이유는 주로?",
+      "visitorPrompt": "이 사람이 스크린샷을 찍는 이유는 주로?",
+      "optionA": "나중에 다시 보려고",
+      "optionB": "누군가에게 보여 주려고",
+      "isSignature": false
+    },
+    {
+      "id": "landscape",
+      "position": 9,
+      "ownerPrompt": "풍경 앞에서 나는?",
+      "visitorPrompt": "풍경 앞에서 이 사람은?",
+      "optionA": "멋진 화면을 만들고 싶다",
+      "optionB": "눈으로 오래 기억하고 싶다",
+      "isSignature": false
+    },
+    {
+      "id": "favorite",
+      "position": 10,
+      "ownerPrompt": "좋아하는 사진 한 장을 고를 때 나는?",
+      "visitorPrompt": "좋아하는 사진 한 장을 고를 때 이 사람은?",
+      "optionA": "표정이 선명한 사진을 고른다",
+      "optionB": "장면이 넓게 담긴 사진을 고른다",
+      "isSignature": false
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
-import manifest from "../../content/packs/old-friend-v1.json" with { type: "json" };
+import manifest from "../../content/packs/old-friend-v2.json" with { type: "json" };
 
 import { installOwnerFlowApi, playId } from "./owner-flow-fixture";
 
@@ -16,6 +16,7 @@ const submitted = {
   submittedAt: "2030-01-02T00:00:00Z",
   withdrawnAt: null,
 };
+const requiredCards = [manifest.cards[1], manifest.cards[0], manifest.cards[2]];
 const comparison = {
   id: responseId,
   packTitle: manifest.title,
@@ -25,20 +26,20 @@ const comparison = {
   allMatched: false,
   assignments: [
     {
-      cardId: manifest.cards[0].id,
+      cardId: requiredCards[0].id,
       stage: "required",
       position: 1,
-      packPosition: manifest.cards[0].position,
-      visitorPrompt: manifest.cards[0].visitorPrompt,
-      optionA: manifest.cards[0].optionA,
-      optionB: manifest.cards[0].optionB,
-      isSignature: manifest.cards[0].isSignature,
+      packPosition: requiredCards[0].position,
+      visitorPrompt: requiredCards[0].visitorPrompt,
+      optionA: requiredCards[0].optionA,
+      optionB: requiredCards[0].optionB,
+      isSignature: requiredCards[0].isSignature,
       visitorChoice: "b",
       ownerChoice: "a",
       matches: false,
       isHighlight: true,
     },
-    ...manifest.cards.slice(1, 3).map((card, index) => ({
+    ...requiredCards.slice(1).map((card, index) => ({
       cardId: card.id,
       stage: "required",
       position: index + 2,

@@ -12,7 +12,7 @@ import {
 
 const root = path.resolve(new URL("../../", import.meta.url).pathname);
 const manifest = JSON.parse(
-  readFileSync(path.join(root, "content/packs/old-friend-v1.json"), "utf8"),
+  readFileSync(path.join(root, "content/packs/old-friend-v2.json"), "utf8"),
 );
 const pack = {
   slug: manifest.slug,
@@ -58,10 +58,10 @@ test("strictly initializes owner state against the published pack", () => {
   assert.equal(ownerSaveStatus(flow), "saved");
 
   assert.throws(() =>
-    decodeOwnerFlow(play({ packVersion: "old-friend-v2" }), pack),
+    decodeOwnerFlow(play({ packVersion: "old-friend-v1" }), pack),
   );
   assert.throws(() =>
-    decodeOwnerFlow(play(), { ...pack, version: "old-friend-v2" }),
+    decodeOwnerFlow(play(), { ...pack, version: "old-friend-v1" }),
   );
 });
 

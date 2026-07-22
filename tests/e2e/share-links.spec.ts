@@ -148,7 +148,7 @@ async function installShareApi(
     if (method === "POST" && url.pathname.startsWith("/api/invites/")) {
       return json(route, 200, {
         packSlug: "old-friend",
-        packVersion: "old-friend-v1",
+        packVersion: "old-friend-v2",
         packTitle: "우리는 아직도 통하는 편",
         kind: "public",
       });

@@ -4,7 +4,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { readPackManifests, renderPackSeed } from "./render-pack-seed.mjs";
+import {
+  readPackManifests,
+  readPackSeedManifests,
+  renderPackSeed,
+} from "./render-pack-seed.mjs";
 import { OFFICIAL_PACKS } from "../lib/packs/official-pack-registry.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -43,7 +47,7 @@ function boundedString(value, maximum, pattern) {
 export function validatePackManifest(pack) {
   assert.ok(boundedString(pack.slug, 64, LOWER_KEBAB));
   assert.ok(boundedString(pack.version, 80, LOWER_KEBAB));
-  assert.equal(pack.version, `${pack.slug}-v1`);
+  assert.match(pack.version, new RegExp(`^${pack.slug}-v[1-9]\\d*$`));
   assert.ok(boundedString(pack.title, 80));
   assert.ok(TARGET_RELATIONSHIPS.has(pack.targetRelationship));
   assert.ok(["low", "medium", "high"].includes(pack.sensitivity));
@@ -63,6 +67,11 @@ export function validatePackManifest(pack) {
     assert.equal(card.position, index + 1);
     assert.ok(boundedString(card.ownerPrompt, 200));
     assert.ok(boundedString(card.visitorPrompt, 200));
+    assert.ok((card.visitorPrompt.match(/이 사람/g) ?? []).length <= 1);
+    assert.doesNotMatch(
+      card.visitorPrompt,
+      /(^|\s)(?:나는|내가|나를|나에게|내)(?=$|\s|\?)/,
+    );
     assert.ok(boundedString(card.optionA, 120));
     assert.ok(boundedString(card.optionB, 120));
     assert.notEqual(card.optionA, card.optionB);
@@ -108,14 +117,31 @@ export function validateCoverSources(homeSource, cssSource) {
 
 export async function verifyPackCatalog(root = ROOT) {
   const manifests = readPackManifests(root);
-  assert.ok(
-    manifests.length >= 24,
-    "at least 24 active official packs are required",
+  assert.equal(
+    manifests.length,
+    24,
+    "exactly 24 active official packs are required",
   );
   for (const slug of REQUIRED_PACK_SLUGS) {
     assert.ok(manifests.some((pack) => pack.slug === slug));
   }
   for (const manifest of manifests) validatePackManifest(manifest);
+  assert.equal(
+    new Set(manifests.map(({ title }) => title)).size,
+    manifests.length,
+  );
+  const ownerPrompts = new Map();
+  for (const manifest of manifests) {
+    for (const card of manifest.cards) {
+      const existing = ownerPrompts.get(card.ownerPrompt);
+      assert.equal(
+        existing,
+        undefined,
+        `${manifest.slug}/${card.id} duplicates ${existing}`,
+      );
+      ownerPrompts.set(card.ownerPrompt, `${manifest.slug}/${card.id}`);
+    }
+  }
   const registryByVersion = new Map(
     OFFICIAL_PACKS.map((pack) => [`${pack.slug}\0${pack.version}`, pack]),
   );
@@ -140,6 +166,9 @@ export async function verifyPackCatalog(root = ROOT) {
   }
   const oldFriend = manifests.find((pack) => pack.slug === "old-friend");
   assert.ok(oldFriend);
+  const frozenOldFriend = JSON.parse(
+    readFileSync(path.join(root, "content/packs/old-friend-v1.json"), "utf8"),
+  );
   const manifestBytes = readFileSync(
     path.join(root, "content/packs/old-friend-v1.json"),
   );
@@ -152,8 +181,8 @@ export async function verifyPackCatalog(root = ROOT) {
   ].map((file) => readFileSync(path.join(root, file), "utf8"));
   const hash = createHash("sha256").update(manifestBytes).digest("hex");
   assert.ok(docs.includes(`manifest SHA-256: \`${hash}\``));
-  assert.deepEqual(parseFrozenPackTable(docs), oldFriend.cards);
-  assert.equal(seed, renderPackSeed(manifests));
+  assert.deepEqual(parseFrozenPackTable(docs), frozenOldFriend.cards);
+  assert.equal(seed, renderPackSeed(readPackSeedManifests(root)));
   validateCoverSources(homeSource, cssSource);
 
   for (const manifest of manifests) {

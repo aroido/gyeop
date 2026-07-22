@@ -12,7 +12,7 @@ import {
 } from "../../lib/owner-play/owner-play-session-core.mjs";
 
 const root = new URL("../../", import.meta.url).pathname;
-const versionId = "15151515-1515-4515-8515-151515151515";
+const versionId = "e05e6366-2a00-4798-8273-0af5f16aad10";
 const proxySecret = Buffer.alloc(32, 27).toString("base64url");
 const rateSecret = randomBytes(32).toString("base64url");
 const accountDeleteKey = Buffer.alloc(32, 26).toString("base64url");
@@ -184,8 +184,8 @@ function insertSubmittedResponse(linkId, choice) {
     insert into public.visitor_assignments (
       response_id, pack_version_id, card_id, stage, position
     ) values
-      ('${responseId}', '${versionId}', 'conflict', 'required', 1),
-      ('${responseId}', '${versionId}', 'reunion', 'required', 2),
+      ('${responseId}', '${versionId}', 'reunion', 'required', 1),
+      ('${responseId}', '${versionId}', 'conflict', 'required', 2),
       ('${responseId}', '${versionId}', 'plans', 'required', 3);
     insert into public.visitor_answers (
       response_id, pack_version_id, card_id, choice
@@ -374,7 +374,7 @@ test("profile access requires Auth and stays scoped to the requested owned play"
   assert.equal(event.status, 204, serverLog);
   assert.equal(
     sql(
-      "select count(*) from public.analytics_events where event_name = 'profile_viewed' and visitor_response_id is null and properties = jsonb_build_object('packVersion', 'old-friend-v1')",
+      "select count(*) from public.analytics_events where event_name = 'profile_viewed' and visitor_response_id is null and properties = jsonb_build_object('packVersion', 'old-friend-v2')",
       true,
     ),
     String(initialProfileViewCount + 1),
@@ -437,7 +437,7 @@ test("submitted public sights refresh live and reveal only at three samples", as
   assert.equal(eligibleReshare.status, 204, serverLog);
   assert.equal(
     sql(
-      "select count(*) from public.analytics_events where event_name = 'profile_reshare_clicked' and visitor_response_id is null and properties = jsonb_build_object('packVersion', 'old-friend-v1', 'entrySource', 'profile_reshare')",
+      "select count(*) from public.analytics_events where event_name = 'profile_reshare_clicked' and visitor_response_id is null and properties = jsonb_build_object('packVersion', 'old-friend-v2', 'entrySource', 'profile_reshare')",
       true,
     ),
     String(initialProfileReshareCount + 1),

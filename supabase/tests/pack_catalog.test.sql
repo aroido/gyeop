@@ -46,9 +46,20 @@ select is(
 );
 
 select is(
-  (select count(*) from public.pack_cards),
-  240::bigint,
-  'the twenty-four published packs contain exactly two hundred forty cards'
+  (
+    select jsonb_build_object(
+      'activeCards', (
+        select count(*)
+        from public.pack_templates template
+        join public.pack_cards card
+          on card.pack_version_id = template.published_version_id
+        where template.is_active
+      ),
+      'historyCards', (select count(*) from public.pack_cards)
+    )
+  ),
+  '{"activeCards":240,"historyCards":450}'::jsonb,
+  'the active catalog has two hundred forty cards and preserves version history'
 );
 
 select is(
@@ -69,14 +80,14 @@ select is(
 select ok(
   (
     select published_at is not null
-      and published_version_id = '15151515-1515-4515-8515-151515151515'
+      and published_version_id = 'e05e6366-2a00-4798-8273-0af5f16aad10'
     from public.pack_templates template
     join public.pack_versions version
       on version.template_id = template.id
      and version.id = template.published_version_id
     where template.id = '11111111-1111-4111-8111-111111111111'
   ),
-  'seed publishes v1 and sets the composite current pointer'
+  'seed publishes v2 and sets the composite current pointer'
 );
 
 select is(
@@ -124,7 +135,7 @@ select is(
     )
     from (select public.get_published_pack('old-friend') pack) published
   ),
-  '{"slug":"old-friend","version":"old-friend-v1","cardCount":10}'::jsonb,
+  '{"slug":"old-friend","version":"old-friend-v2","cardCount":10}'::jsonb,
   'active private-MVP seed exposes the reviewed published pack'
 );
 
