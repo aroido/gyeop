@@ -89,6 +89,25 @@ Render Free cold start와 Supabase Free pause는 production SLA가 아니다. fr
 
 이 기록은 당시 상태를 확인한 non-secret evidence일 뿐 상시 가용성이나 응답 시간 SLA가 아니다. 약 28.1초 cold start를 허용하는 best-effort private 검증으로만 사용한다.
 
+### 5.2 무료 성능 smoke
+
+별도 staging·부하 SaaS·RUM 없이 기존 Node와 Playwright만 사용한다. 측정 CLI는 전용 local production origin과 기존 Render Free origin만 받으며 `/`와 공개 질문팩을 `HEAD`/`GET`으로만 읽는다.
+
+```bash
+pnpm test:performance
+
+# local Supabase와 production build가 준비된 터미널
+pnpm start --port 3120
+node scripts/verify-private-mvp-performance.mjs --base-url http://127.0.0.1:3120
+
+# 이미 존재하는 무료 Render를 읽기 전용으로 확인
+node scripts/verify-private-mvp-performance.mjs --base-url https://gyeop-private-mvp.onrender.com
+```
+
+순서는 cold HEAD 1회, 빈 browser context의 Fast 4G·4× CPU 홈 LCP 3회, warm 홈 GET 3회, 공개 pack GET 20회다. stdout JSON top-level은 `schemaVersion`, `target`, `profile`, `budgets`, `coldStart`, `homeLcp`, `warmHome`, `packRead`, `outcome`으로 고정한다. body·cookie·token·header value는 기록하지 않는다.
+
+Render Free의 cold start는 35초까지 별도 허용하고 warm 표본과 합치지 않는다. 홈 LCP 중앙값 2.5초와 pack GET p95 1초는 private MVP 회귀 smoke 예산이며 production SLA가 아니다. 원격 변동 결과는 required CI에 넣지 않고 실패 시 유료 전환이나 provider 설정 변경을 자동 수행하지 않는다.
+
 ## 6. Downstream 이슈 해석
 
 | 이슈 | `$0` private MVP 해석                                                                                                                                                                       |
