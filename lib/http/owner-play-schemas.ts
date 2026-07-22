@@ -44,6 +44,10 @@ export const ownerProfileEventSchema = strictJsonObject({
   playId: canonicalUuidV4,
 });
 
+export const ownerPublicProfileSchema = strictJsonObject({
+  nickname: z.string().max(128),
+});
+
 export const inviteMetadataSchema = strictJsonObject({
   secret: z.string().regex(/^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/),
 });

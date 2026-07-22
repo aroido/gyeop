@@ -9,6 +9,7 @@ import {
 import { hashShareSecret } from "../../lib/share-links/share-link-session-core.mjs";
 import {
   decodeInviteMetadataOutcome,
+  decodeInvitePreviewOutcome,
   decodeRecordShareActionOutcome,
   decodeShareLinkList,
   isSharePublicId,
@@ -85,6 +86,31 @@ test("strictly decodes only public invite metadata", () => {
       ...value,
       metadata: { ...value.metadata, ownerName: "hidden" },
     }),
+  );
+});
+
+test("strictly decodes the nickname-only invite preview boundary", () => {
+  const preview = {
+    outcome: "available",
+    previewNickname: "가힣AZaz09",
+    kind: "public",
+    packSlug: "old-friend",
+    packVersion: "old-friend-v2",
+    packTitle: "우리는 아직도 통하는 편",
+    sensitivity: "low",
+  };
+  assert.deepEqual(decodeInvitePreviewOutcome(preview), preview);
+  assert.deepEqual(decodeInvitePreviewOutcome({ outcome: "unavailable" }), {
+    outcome: "unavailable",
+  });
+  assert.throws(() =>
+    decodeInvitePreviewOutcome({
+      ...preview,
+      ownerEmail: "hidden@example.com",
+    }),
+  );
+  assert.throws(() =>
+    decodeInvitePreviewOutcome({ ...preview, previewNickname: "겹_친구" }),
   );
 });
 

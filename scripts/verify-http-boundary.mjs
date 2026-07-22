@@ -57,6 +57,7 @@ const REVIEWED_INTERNAL_ADAPTERS = new Set([
   "lib/http/auth-owner.ts",
   "lib/http/rate-limit.ts",
   "lib/http/owner-play.ts",
+  "lib/http/owner-public-profile.ts",
   "lib/http/owner-profile.ts",
   "lib/http/private-one-to-one.ts",
   "lib/http/published-pack.ts",

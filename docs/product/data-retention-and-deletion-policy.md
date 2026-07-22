@@ -58,6 +58,8 @@ submit은 `last_active_at = submitted_at`, `session_expires_at = submitted_at + 
 
 - public link 기본 만료는 발급 후 30일이다. 여러 visitor가 사용할 수 있지만 만료를 연장하지 않는다.
 - 1:1 link 기본 만료는 발급 후 7일이며 첫 유효 제출과 같은 transaction에서 소비·비활성화한다.
+- 새 authenticated link는 위 만료 시각을 실제 `expires_at`으로 저장한다. 기존 `expires_at IS NULL` 링크는 `created_at + 30일(public)` 또는 `created_at + 7일(1:1)`을 미리보기 만료 시각으로 계산하며 기존 row를 일괄 backfill하지 않는다.
+- owner nickname snapshot은 링크가 active인 동안만 public lookup material로 사용한다. disable·expire·rotate·1:1 consume transaction에서 즉시 `NULL` 처리하고, 만료 시각부터 늦어도 24시간 안에 bounded cleanup으로 제거한다.
 - 완료·철회된 1:1 응답의 link는 다시 열지 않는다.
 - disable·rotate는 기존 링크를 즉시 닫는다. rotate와 재발급은 새 public ID와 secret을 가진 새 row를 만들며 기존 권한을 되살리지 않는다.
 - 만료·비활성 링크의 public lookup material과 secret hash는 24시간 안에 제거한다. submitted 응답 FK와 1:1 소비 불변식에 필요한 최소 tombstone만 종속 응답 보유 종료까지 유지한다.

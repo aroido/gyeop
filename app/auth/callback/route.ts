@@ -61,6 +61,10 @@ export function GET(request: Request) {
     if (result.outcome === "claim_failed") {
       return redirect("/auth/sign-in?error=claim");
     }
+    if (!result.profileComplete) {
+      const query = new URLSearchParams({ returnTo: result.returnTo });
+      return redirect(`/auth/complete-profile?${query.toString()}`);
+    }
     return redirect(result.returnTo);
   });
 }

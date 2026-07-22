@@ -257,11 +257,88 @@ select is(
     'public',
     null
   )->>'outcome',
+  'profile_incomplete',
+  'an authenticated owner must complete the public nickname first'
+);
+select is(
+  public.get_authenticated_owner_public_profile(
+    '32000000-0000-4000-8000-000000000001'
+  )->>'outcome',
+  'incomplete',
+  'the owner profile gate distinguishes a confirmed missing profile'
+);
+select is(
+  public.set_authenticated_owner_nickname(
+    '32000000-0000-4000-8000-000000000001',
+    'GYEOP 09'
+  )->>'nickname',
+  'GYEOP 09',
+  'the saved nickname uses the canonical application-boundary value'
+);
+select is(
+  public.get_authenticated_owner_public_profile(
+    '32000000-0000-4000-8000-000000000001'
+  )->>'outcome',
+  'complete',
+  'the profile gate becomes complete after nickname save'
+);
+select is(
+  public.create_authenticated_share_link(
+    '32000000-0000-4000-8000-000000000100',
+    '32000000-0000-4000-8000-000000000001',
+    '32000000-0000-4000-8000-000000000201',
+    'BBBBBBBBBBBBBBBBBBBBBA',
+    decode(repeat('46', 32), 'hex'),
+    'public',
+    null
+  )->>'outcome',
   'created',
   'the fresh Auth actor can create a share link without a browser capability'
 );
 
 reset role;
+
+select is(
+  (
+    select link.preview_nickname
+    from public.share_links as link
+    where link.id = '32000000-0000-4000-8000-000000000201'
+  ),
+  'GYEOP 09',
+  'authenticated link creation snapshots the current nickname'
+);
+select ok(
+  (
+    select link.expires_at between
+      clock_timestamp() + interval '29 days 23 hours'
+      and clock_timestamp() + interval '30 days 1 minute'
+    from public.share_links as link
+    where link.id = '32000000-0000-4000-8000-000000000201'
+  ),
+  'a new authenticated public link stores a real 30-day expiry'
+);
+select is(
+  public.get_invite_preview('BBBBBBBBBBBBBBBBBBBBBA')->>'previewNickname',
+  'GYEOP 09',
+  'the read-only preview returns only the snapshotted nickname context'
+);
+update public.share_links as link
+set status = 'disabled'
+where link.id = '32000000-0000-4000-8000-000000000201';
+select is(
+  (
+    select link.preview_nickname
+    from public.share_links as link
+    where link.id = '32000000-0000-4000-8000-000000000201'
+  ),
+  null,
+  'active-to-inactive state changes clear nickname material in the same update'
+);
+select is(
+  public.get_invite_preview('BBBBBBBBBBBBBBBBBBBBBA')->>'outcome',
+  'unavailable',
+  'an inactive link has no public preview'
+);
 
 update public.anonymous_owners as owner
 set management_secret_hash = null,

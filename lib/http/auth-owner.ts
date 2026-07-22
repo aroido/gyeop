@@ -8,6 +8,7 @@ import {
 import {
   claimAnonymousOwner,
   getAuthenticatedOwnerPlay,
+  getAuthenticatedOwnerPublicProfile,
   getOwnerPlay,
   listAuthenticatedOwnerPlays,
 } from "../db/internal-rpc.ts";
@@ -160,8 +161,11 @@ export async function completeOwnerAuthentication(input: {
     }
   }
 
+  const profile = await getAuthenticatedOwnerPublicProfile();
+
   return Object.freeze({
     outcome: "signed_in",
+    profileComplete: profile.outcome === "complete",
     returnTo: input.context.returnTo,
   });
 }

@@ -1,0 +1,89 @@
+.shell {
+  display: grid;
+  min-height: 100svh;
+  padding: 1rem;
+  place-items: center;
+  background: #050505;
+  color: #fff;
+}
+
+.card {
+  width: min(100%, 30rem);
+  padding: 1rem;
+  border: 1px solid #454545;
+  border-top: 0.6rem solid #dfff00;
+  border-radius: 1rem;
+}
+
+.brand,
+.lead,
+.help,
+.alert {
+  margin: 0;
+}
+
+.brand,
+.form label {
+  font-weight: 900;
+}
+
+.card h1 {
+  margin: 0.85rem 0;
+  font-size: clamp(2rem, 10vw, 3rem);
+  line-height: 1.03;
+  letter-spacing: -0.065em;
+  word-break: keep-all;
+}
+
+.lead,
+.help {
+  color: #bdbdbd;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.form {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1.5rem;
+}
+
+.form input {
+  min-height: 3.25rem;
+  padding: 0 0.8rem;
+  border: 1px solid #dedede;
+  border-radius: 0.7rem;
+  background: #fff;
+  color: #171717;
+  font: inherit;
+  font-size: 1rem;
+}
+
+.form button {
+  min-height: 3.25rem;
+  margin-top: 0.5rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: #dfff00;
+  color: #050505;
+  font: inherit;
+  font-weight: 950;
+}
+
+.form button:disabled {
+  opacity: 0.6;
+}
+
+.alert {
+  padding: 0.8rem;
+  border-radius: 0.7rem;
+  background: #3d1717;
+  color: #ffd3cf;
+  font-weight: 750;
+}
+
+.form input:focus-visible,
+.form button:focus-visible {
+  outline: 3px solid #315cff;
+  outline-offset: 3px;
+}

@@ -20,6 +20,11 @@ const ALLOWED_RPC_EXPORTS = new Map([
   ["completeAuthenticatedOwnerPlay", "complete_authenticated_owner_play"],
   ["getAuthenticatedOwnerProfile", "get_authenticated_owner_profile"],
   [
+    "getAuthenticatedOwnerPublicProfile",
+    "get_authenticated_owner_public_profile",
+  ],
+  ["setAuthenticatedOwnerNickname", "set_authenticated_owner_nickname"],
+  [
     "recordAuthenticatedOwnerProfileEvent",
     "record_authenticated_owner_profile_event",
   ],
@@ -43,6 +48,7 @@ const ALLOWED_RPC_EXPORTS = new Map([
   ["completeOwnerPlay", "complete_owner_play"],
   ["revokeOwnerPlaySession", "revoke_owner_play_session"],
   ["getInviteMetadata", "get_invite_metadata"],
+  ["getInvitePreview", "get_invite_preview"],
   ["recordOwnerShareAction", "record_owner_share_action_with_source"],
   ["startResponse", "start_required_response"],
   ["getVisitorResponse", "get_visitor_response"],
