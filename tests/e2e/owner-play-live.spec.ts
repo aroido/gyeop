@@ -22,6 +22,8 @@ const databaseContainer = "supabase_db_gyeop";
 const proxyKey = Buffer.alloc(32, 8).toString("base64url");
 const ownerRateLimitSecret = Buffer.alloc(32, 9);
 const ownerForwardedIp = "198.51.100.218";
+const rateLimitWindowMilliseconds = 600_000;
+const rateLimitBoundaryGuardMilliseconds = 10_000;
 const visitorManagementSecret = Buffer.alloc(32, 6).toString("base64url");
 const e2eBaseUrl = `http://127.0.0.1:${process.env.GYEOP_E2E_PORT ?? "3000"}`;
 const visitorHeaders = {
@@ -283,7 +285,14 @@ function seedResponseActionLimit(
   );
 }
 
-function seedOwnerAccessLimit(count: number) {
+async function seedOwnerAccessLimit(count: number) {
+  const remainingMilliseconds =
+    rateLimitWindowMilliseconds - (Date.now() % rateLimitWindowMilliseconds);
+  if (remainingMilliseconds < rateLimitBoundaryGuardMilliseconds) {
+    await new Promise((resolve) =>
+      setTimeout(resolve, remainingMilliseconds + 100),
+    );
+  }
   const keyHash = deriveNetworkKey({
     ip: ownerForwardedIp,
     secret: ownerRateLimitSecret,
@@ -1777,7 +1786,7 @@ test.describe("live owner flow", () => {
       4,
     );
 
-    seedOwnerAccessLimit(119);
+    await seedOwnerAccessLimit(119);
     expect(
       await postShareAction(
         page,

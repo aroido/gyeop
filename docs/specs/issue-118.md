@@ -16,7 +16,7 @@ PR #117 이후 가장 긴 `ci-data` 검증을 서로 독립적인 두 러너로 
 - [ ] 개발자가 직접 실행하는 `test:e2e:mvp`, `test:e2e:owner`, `test:e2e:live`는 기존처럼 reset을 포함하는 독립 실행 계약을 유지한다.
 - [ ] GitHub Actions base matrix를 `ci-static`, `ci-data-core`, `ci-data-app`, `ci-mock` 네 lane으로 구성한다.
 - [ ] Supabase CLI가 start/reset 성공 직후에도 DB 연결 준비가 늦는 경우를 위해, Postgres readiness를 짧게 재확인한 뒤 DB 의존 검증을 시작한다.
-- [ ] owner live E2E의 `owner_play_access` 제한 검증은 121개 HTTP 요청을 순차 실행하지 않고, 동일 네트워크 키의 현재 10분 버킷을 제한 직전까지 준비한 뒤 마지막 허용 요청과 다음 `429` 응답만 실제 HTTP로 검증한다.
+- [ ] owner live E2E의 `owner_play_access` 제한 검증은 121개 HTTP 요청을 순차 실행하지 않고, 고정 10분 윈도 종료까지 10초 이상 남은 시점에 동일 네트워크 키의 현재 버킷을 제한 직전까지 준비한 뒤 마지막 허용 요청과 다음 `429` 응답만 실제 HTTP로 검증한다.
 - [ ] 변경 전·후 실제 GitHub Actions 실행 시간을 기록하고 flaky 재실행 없이 통과했는지 확인한다.
 
 ## 제외 범위
@@ -66,7 +66,7 @@ PR #117 이후 가장 긴 `ci-data` 검증을 서로 독립적인 두 러너로 
 - [ ] `ci-live-mvp`와 `ci-live-owner`는 `start_supabase` 직후 reset 없는 내부 스크립트를 실행한다.
 - [ ] `full` live 구간은 Supabase 재시작 후 MVP 내부 실행, reset을 포함한 owner 직접 실행 순서로 구성해 두 시나리오 사이의 격리를 유지한다.
 - [ ] `.github/workflows/ci.yml` base matrix의 단일 `ci-data`를 두 data 모드로 나눈다. Chromium 설치 조건과 최종 `verify` 집계 계약은 유지한다.
-- [ ] `tests/e2e/owner-play-live.spec.ts`는 실제 앱과 같은 테스트 전용 `RATE_LIMIT_SECRET`, 주인 브라우저의 고정 forwarded IP, `deriveNetworkKey`를 사용해 `owner_play_access` 현재 버킷을 119회로 준비한다. 이후 비활성 링크에 대한 실제 HTTP 요청이 마지막 허용 응답 `404`와 다음 제한 응답 `429`를 순서대로 반환하는지 검증한다.
+- [ ] `tests/e2e/owner-play-live.spec.ts`는 UTC epoch 기준 고정 10분 윈도의 남은 시간이 10초 미만이면 다음 윈도 시작 직후까지 기다린다. 이후 실제 앱과 같은 테스트 전용 `RATE_LIMIT_SECRET`, 주인 브라우저의 고정 forwarded IP, `deriveNetworkKey`를 사용해 `owner_play_access` 현재 버킷을 119회로 준비하고, 비활성 링크에 대한 실제 HTTP 요청이 마지막 허용 응답 `404`와 다음 제한 응답 `429`를 순서대로 반환하는지 검증한다.
 
 ## 완료 기준
 
@@ -79,7 +79,7 @@ PR #117 이후 가장 긴 `ci-data` 검증을 서로 독립적인 두 러너로 
 - [ ] PR의 `ci-static`, `ci-data-core`, `ci-data-app`, `ci-mock`, `ci-live-mvp`, `ci-live-owner`, 최종 named `verify`가 동일한 정확한 HEAD에서 재실행 없이 모두 통과한다.
 - [ ] 기준 실행 PR #117의 6분 38초보다 짧은 경과 시간을 목표로 하며, 달성 여부와 실제 lane 시간을 PR 및 이슈에 기록한다. 목표를 못 미쳐도 측정값과 원인을 숨기지 않는다.
 - [ ] 테스트 삭제·skip·assertion 완화가 없다.
-- [ ] owner live E2E는 10분 고정 윈도 경계를 지나도 121회 반복 요청 분산으로 실패하지 않으며, 허용 경계와 `429`, 양수 `Retry-After`, 이벤트 미기록을 그대로 확인한다.
+- [ ] owner live E2E는 seed와 실제 요청이 10분 고정 윈도 및 UTC day rollover에 갈리지 않으며, 허용 경계와 `429`, 양수 `Retry-After`, 이벤트 미기록을 그대로 확인한다.
 
 ## 테스트 계획
 
@@ -116,5 +116,5 @@ P0/P1 Findings: 0
 
 - [x] 병렬화로 경과 시간은 줄지만 GitHub Actions 러너 총 사용 시간은 늘 수 있다. 전체 시간 단축을 우선하되 결과에 이 비용을 명시한다.
 - [x] `ci-data-app`의 별도 Supabase 초기화가 약 20초를 추가하지만 기존 약 6분 data 직렬 병목을 두 lane으로 줄이는 이득이 더 클 것으로 예상한다. 실제 CI로 검증한다.
-- [x] 기존 121회 순차 HTTP 검증은 고정 10분 윈도 경계를 넘으면 요청이 두 버킷으로 분산되어 제한에 도달하지 않을 수 있다. DB 준비와 두 실제 HTTP 요청 사이에 경계가 정확히 끼는 극소 구간은 남지만, 장시간 반복보다 노출 시간이 매우 짧고 exact-head CI 무재실행 통과로 확인한다.
+- [x] 기존 121회 순차 HTTP 검증은 고정 10분 윈도 경계를 넘으면 요청이 두 버킷으로 분산되어 제한에 도달하지 않을 수 있다. 마지막 10초에는 seed를 시작하지 않아 두 실제 요청이 같은 윈도와 UTC 날짜 키를 쓰도록 하고, 드물게 대기하더라도 기존 반복 요청보다 최대 실행 시간이 짧다.
 - [x] 구현 전 미결정 블로커는 없다.
