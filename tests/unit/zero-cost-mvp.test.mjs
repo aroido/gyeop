@@ -114,6 +114,7 @@ test("rejects known and pattern-matched server secrets in Docker ARG and ENV", (
     "ARG ACCOUNT_DELETE_REAUTH_KEYRING",
     "ENV CRON_SECRET=placeholder",
     "ENV RESEND_API_KEY=placeholder",
+    "ENV FUTURE_API_KEY=placeholder",
     "ENV NOTIFICATION_FINGERPRINT_KEYRING=placeholder",
     "ENV GITHUB_TOKEN=$GITHUB_TOKEN",
     "ENV DATABASE_PASSWORD=placeholder",

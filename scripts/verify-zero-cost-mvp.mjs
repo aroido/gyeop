@@ -31,7 +31,7 @@ const SERVER_SECRET_NAMES = new Set([
 ]);
 const SAFE_DOCKER_IDENTIFIERS = new Set([...PUBLIC_BUILD_ARGS, "NODE_ENV"]);
 const SERVER_SECRET_PATTERN =
-  /(?:^|_)(?:SECRET|TOKEN|KEYRING|PASSWORD|PRIVATE_KEY|SERVICE_ROLE)(?:_|$)|^RESEND_API_KEY$/;
+  /(?:^|_)(?:SECRET|TOKEN|KEYRING|PASSWORD|PRIVATE_KEY|SERVICE_ROLE|API_KEY)(?:_|$)/;
 const SAFE_SCALAR = /^[A-Za-z0-9_./-]+$/;
 
 function invariant(condition, message) {
