@@ -1,0 +1,107 @@
+{
+  "slug": "social-battery",
+  "version": "social-battery-v2",
+  "title": "사람들 사이 배터리",
+  "targetRelationship": "close_relationship",
+  "sensitivity": "medium",
+  "active": true,
+  "presentation": {
+    "moodLabel": "MBTI풍 상황 선택",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "one_to_one",
+    "coverRecipe": "social-battery-card-v1",
+    "coverTone": "ink"
+  },
+  "cards": [
+    {
+      "id": "recharge",
+      "position": 1,
+      "ownerPrompt": "사람들과 오래 보낸 뒤 나는?",
+      "visitorPrompt": "사람들과 오래 보낸 뒤 이 사람은?",
+      "optionA": "누군가와 더 이야기하며 마무리한다",
+      "optionB": "혼자 조용히 있어야 회복된다",
+      "isSignature": true
+    },
+    {
+      "id": "party-entry",
+      "position": 2,
+      "ownerPrompt": "모임에 도착하면 나는?",
+      "visitorPrompt": "모임에 도착하면 이 사람은?",
+      "optionA": "여러 사람에게 먼저 인사한다",
+      "optionB": "익숙한 사람부터 찾는다",
+      "isSignature": false
+    },
+    {
+      "id": "new-person",
+      "position": 3,
+      "ownerPrompt": "처음 보는 사람이 있으면 나는?",
+      "visitorPrompt": "처음 보는 사람이 있으면 이 사람은?",
+      "optionA": "궁금한 걸 먼저 묻는다",
+      "optionB": "대화 흐름을 보며 합류한다",
+      "isSignature": false
+    },
+    {
+      "id": "small-talk",
+      "position": 4,
+      "ownerPrompt": "아는 사람이 적은 모임에서 나는?",
+      "visitorPrompt": "아는 사람이 적은 모임에서 이 사람은?",
+      "optionA": "소개받으며 자리를 넓힌다",
+      "optionB": "한 사람과 대화를 오래 잇는다",
+      "isSignature": false
+    },
+    {
+      "id": "week-plan",
+      "position": 5,
+      "ownerPrompt": "약속이 연달아 잡히면 나는?",
+      "visitorPrompt": "약속이 연달아 잡히면 이 사람은?",
+      "optionA": "재밌을 것 같아 기대한다",
+      "optionB": "중간에 비는 시간을 만든다",
+      "isSignature": false
+    },
+    {
+      "id": "one-on-one",
+      "position": 6,
+      "ownerPrompt": "사람 많은 자리에서 더 지치는 순간은?",
+      "visitorPrompt": "사람 많은 자리에서 이 사람은 언제 더 지칠까?",
+      "optionA": "새 화제를 계속 찾아야 할 때",
+      "optionB": "여러 대화를 동시에 따라갈 때",
+      "isSignature": false
+    },
+    {
+      "id": "after-cancel",
+      "position": 7,
+      "ownerPrompt": "모임에서 맡기 편한 역할은?",
+      "visitorPrompt": "모임에서 이 사람에게 편한 역할은?",
+      "optionA": "사람들을 자연스럽게 이어 주기",
+      "optionB": "필요한 걸 조용히 챙기기",
+      "isSignature": false
+    },
+    {
+      "id": "hosting",
+      "position": 8,
+      "ownerPrompt": "사람들을 초대하는 날 나는?",
+      "visitorPrompt": "사람들을 초대하는 날 이 사람은?",
+      "optionA": "각자 편하게 놀게 만든다",
+      "optionB": "함께할 흐름을 준비한다",
+      "isSignature": false
+    },
+    {
+      "id": "leave-time",
+      "position": 9,
+      "ownerPrompt": "모임을 마칠 때 나는?",
+      "visitorPrompt": "모임을 마칠 때 이 사람은?",
+      "optionA": "마지막까지 남아 이야기한다",
+      "optionB": "좋았을 때 먼저 인사한다",
+      "isSignature": false
+    },
+    {
+      "id": "reset",
+      "position": 10,
+      "ownerPrompt": "사람 많은 날 집에 돌아오면 나는?",
+      "visitorPrompt": "사람 많은 날 집에 돌아오면 이 사람은?",
+      "optionA": "가볍게 움직이며 기분을 바꾼다",
+      "optionB": "불빛과 소리를 줄여 쉰다",
+      "isSignature": false
+    }
+  ]
+}

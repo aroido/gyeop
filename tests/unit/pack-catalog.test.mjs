@@ -9,6 +9,10 @@ import {
   validatePackManifest,
   verifyPackCatalog,
 } from "../../scripts/verify-pack-catalog.mjs";
+import {
+  readPackManifests,
+  readPackSeedManifests,
+} from "../../scripts/render-pack-seed.mjs";
 import { decodePublishedPack } from "../../lib/packs/published-pack-core.mjs";
 
 const root = path.resolve(new URL("../../", import.meta.url).pathname);
@@ -18,6 +22,27 @@ const manifest = JSON.parse(
 
 test("repository pack catalog trace passes", async () => {
   await verifyPackCatalog(root);
+});
+
+test("catalog selects the latest manifest without discarding frozen v1 files", () => {
+  const manifests = readPackManifests(root);
+  const seedManifests = readPackSeedManifests(root);
+  assert.equal(manifests.length, 24);
+  assert.equal(
+    manifests.find(({ slug }) => slug === "old-friend")?.version,
+    "old-friend-v2",
+  );
+  assert.equal(
+    manifests.find(({ slug }) => slug === "coworker")?.version,
+    "coworker-v1",
+  );
+  assert.equal(seedManifests.length, 45);
+  assert.deepEqual(
+    seedManifests
+      .filter(({ slug }) => slug === "old-friend")
+      .map(({ version }) => version),
+    ["old-friend-v1", "old-friend-v2"],
+  );
 });
 
 test("manifest rejects malformed publication content", () => {

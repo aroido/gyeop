@@ -1,0 +1,107 @@
+{
+  "slug": "after-work",
+  "version": "after-work-v2",
+  "title": "퇴근 후 본캐",
+  "targetRelationship": "coworker",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "퇴근 모드 전환",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "after-work-card-v1",
+    "coverTone": "coral"
+  },
+  "cards": [
+    {
+      "id": "clock-out",
+      "position": 1,
+      "ownerPrompt": "할 일을 마친 직후 나는?",
+      "visitorPrompt": "할 일을 마친 직후 이 사람은?",
+      "optionA": "바로 다음 즐거움으로 전환한다",
+      "optionB": "잠깐 멍하니 속도를 늦춘다",
+      "isSignature": true
+    },
+    {
+      "id": "route-home",
+      "position": 2,
+      "ownerPrompt": "집에 가는 길 나는?",
+      "visitorPrompt": "집에 가는 길 이 사람은?",
+      "optionA": "지름길로 빨리 간다",
+      "optionB": "기분 전환할 길을 고른다",
+      "isSignature": false
+    },
+    {
+      "id": "dinner",
+      "position": 3,
+      "ownerPrompt": "저녁을 고를 때 나는?",
+      "visitorPrompt": "저녁을 고를 때 이 사람은?",
+      "optionA": "간단하게 바로 해결한다",
+      "optionB": "먹고 싶은 걸 찾아 챙긴다",
+      "isSignature": false
+    },
+    {
+      "id": "decompress",
+      "position": 4,
+      "ownerPrompt": "하루를 정리하는 방식은?",
+      "visitorPrompt": "이 사람이 하루를 정리하는 방식은?",
+      "optionA": "누군가와 이야기하며 푼다",
+      "optionB": "혼자 좋아하는 걸 하며 푼다",
+      "isSignature": false
+    },
+    {
+      "id": "message-after",
+      "position": 5,
+      "ownerPrompt": "퇴근 후 연락이 오면 나는?",
+      "visitorPrompt": "퇴근 후 연락이 오면 이 사람은?",
+      "optionA": "가볍게 바로 답한다",
+      "optionB": "내 시간 뒤에 답한다",
+      "isSignature": false
+    },
+    {
+      "id": "energy",
+      "position": 6,
+      "ownerPrompt": "저녁 에너지가 남아 있으면 나는?",
+      "visitorPrompt": "저녁 에너지가 남아 있으면 이 사람은?",
+      "optionA": "밖에서 한 가지 더 한다",
+      "optionB": "내일을 위해 아껴 둔다",
+      "isSignature": false
+    },
+    {
+      "id": "weeknight",
+      "position": 7,
+      "ownerPrompt": "평일 저녁 약속이 생기면 나는?",
+      "visitorPrompt": "평일 저녁 약속이 생기면 이 사람은?",
+      "optionA": "퇴근길에 바로 합류한다",
+      "optionB": "다른 날로 천천히 잡는다",
+      "isSignature": false
+    },
+    {
+      "id": "hobby",
+      "position": 8,
+      "ownerPrompt": "퇴근 후 취미를 할 때 나는?",
+      "visitorPrompt": "퇴근 후 취미를 할 때 이 사람은?",
+      "optionA": "정해 둔 루틴을 따른다",
+      "optionB": "그날 끌리는 걸 고른다",
+      "isSignature": false
+    },
+    {
+      "id": "tomorrow",
+      "position": 9,
+      "ownerPrompt": "집에 들어온 직후 나는?",
+      "visitorPrompt": "집에 들어온 직후 이 사람은?",
+      "optionA": "씻고 완전히 전환한다",
+      "optionB": "잠깐 쉬며 천천히 전환한다",
+      "isSignature": false
+    },
+    {
+      "id": "weekend-countdown",
+      "position": 10,
+      "ownerPrompt": "주말을 기다리는 방식은?",
+      "visitorPrompt": "이 사람이 주말을 기다리는 방식은?",
+      "optionA": "하고 싶은 계획을 세운다",
+      "optionB": "그날까지 지금에 집중한다",
+      "isSignature": false
+    }
+  ]
+}

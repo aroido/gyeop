@@ -1,0 +1,107 @@
+{
+  "slug": "decision-spiral",
+  "version": "decision-spiral-v2",
+  "title": "결정은 내일의 나에게",
+  "targetRelationship": "close_relationship",
+  "sensitivity": "medium",
+  "active": true,
+  "presentation": {
+    "moodLabel": "선택지 과부하",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "one_to_one",
+    "coverRecipe": "decision-spiral-card-v1",
+    "coverTone": "ink"
+  },
+  "cards": [
+    {
+      "id": "menu",
+      "position": 1,
+      "ownerPrompt": "고를 게 너무 많을 때 나는?",
+      "visitorPrompt": "고를 게 너무 많을 때 이 사람은?",
+      "optionA": "기준을 하나 정해 빠르게 고른다",
+      "optionB": "후회 없게 끝까지 비교한다",
+      "isSignature": true
+    },
+    {
+      "id": "recommendation",
+      "position": 2,
+      "ownerPrompt": "사소한 선택도 귀찮은 날 나는?",
+      "visitorPrompt": "사소한 선택도 귀찮은 날 이 사람은?",
+      "optionA": "익숙한 답을 바로 고른다",
+      "optionB": "결정을 다음으로 미룬다",
+      "isSignature": false
+    },
+    {
+      "id": "big-choice",
+      "position": 3,
+      "ownerPrompt": "결정할 시간이 넉넉하면 나는?",
+      "visitorPrompt": "결정할 시간이 넉넉하면 이 사람은?",
+      "optionA": "일찍 정해 마음을 비운다",
+      "optionB": "마지막까지 가능성을 열어 둔다",
+      "isSignature": false
+    },
+    {
+      "id": "coin-flip",
+      "position": 4,
+      "ownerPrompt": "둘 중 하나를 못 고르면 나는?",
+      "visitorPrompt": "둘 중 하나를 못 고르면 이 사람은?",
+      "optionA": "마감 시간을 정해 고른다",
+      "optionB": "하루 더 두고 본다",
+      "isSignature": false
+    },
+    {
+      "id": "risk",
+      "position": 5,
+      "ownerPrompt": "새로운 선택 앞에서 나는?",
+      "visitorPrompt": "새로운 선택 앞에서 이 사람은?",
+      "optionA": "해보면서 배우는 쪽을 고른다",
+      "optionB": "안전한 기준점을 먼저 찾는다",
+      "isSignature": false
+    },
+    {
+      "id": "purchase",
+      "position": 6,
+      "ownerPrompt": "사고 싶은 게 생기면 나는?",
+      "visitorPrompt": "사고 싶은 게 생기면 이 사람은?",
+      "optionA": "필요한 이유를 적어 본다",
+      "optionB": "며칠 뒤에도 생각나는지 본다",
+      "isSignature": false
+    },
+    {
+      "id": "plan-change",
+      "position": 7,
+      "ownerPrompt": "정한 계획을 바꿀 때 나는?",
+      "visitorPrompt": "정한 계획을 바꿀 때 이 사람은?",
+      "optionA": "더 나은 이유가 있으면 바꾼다",
+      "optionB": "처음 정한 약속을 지킨다",
+      "isSignature": false
+    },
+    {
+      "id": "advice",
+      "position": 8,
+      "ownerPrompt": "누가 선택을 물어보면 나는?",
+      "visitorPrompt": "누가 선택을 물어보면 이 사람은?",
+      "optionA": "내가 고를 답을 말해 준다",
+      "optionB": "상대 기준을 같이 정리한다",
+      "isSignature": false
+    },
+    {
+      "id": "regret",
+      "position": 9,
+      "ownerPrompt": "선택 뒤 아쉬움이 남으면 나는?",
+      "visitorPrompt": "선택 뒤 아쉬움이 남으면 이 사람은?",
+      "optionA": "다음 선택의 기준으로 쓴다",
+      "optionB": "좋았던 점을 먼저 찾는다",
+      "isSignature": false
+    },
+    {
+      "id": "easy-day",
+      "position": 10,
+      "ownerPrompt": "결정 피로가 쌓인 날 나는?",
+      "visitorPrompt": "결정 피로가 쌓인 날 이 사람은?",
+      "optionA": "누군가가 정해 주면 편하다",
+      "optionB": "아무것도 정하지 않고 싶다",
+      "isSignature": false
+    }
+  ]
+}

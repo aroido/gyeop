@@ -1,7 +1,7 @@
 import type { Page, Route } from "@playwright/test";
 
 import deadlineModeManifest from "../../content/packs/deadline-mode-v1.json" with { type: "json" };
-import manifest from "../../content/packs/old-friend-v1.json" with { type: "json" };
+import manifest from "../../content/packs/old-friend-v2.json" with { type: "json" };
 
 export const playId = "18181818-1818-4181-8181-181818181818";
 

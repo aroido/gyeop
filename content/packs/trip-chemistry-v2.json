@@ -1,0 +1,107 @@
+{
+  "slug": "trip-chemistry",
+  "version": "trip-chemistry-v2",
+  "title": "여행 가방의 철학",
+  "targetRelationship": "old_friend",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "여행 메이트 테스트",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "trip-chemistry-card-v1",
+    "coverTone": "blue"
+  },
+  "cards": [
+    {
+      "id": "packing",
+      "position": 1,
+      "ownerPrompt": "여행 짐을 쌀 때 나는?",
+      "visitorPrompt": "여행 짐을 쌀 때 이 사람은?",
+      "optionA": "필요한 걸 목록으로 챙긴다",
+      "optionB": "가방 공간을 보며 감으로 챙긴다",
+      "isSignature": true
+    },
+    {
+      "id": "arrival",
+      "position": 2,
+      "ownerPrompt": "도착하자마자 나는?",
+      "visitorPrompt": "도착하자마자 이 사람은?",
+      "optionA": "짐부터 풀고 동선을 본다",
+      "optionB": "일단 주변부터 구경한다",
+      "isSignature": false
+    },
+    {
+      "id": "map",
+      "position": 3,
+      "ownerPrompt": "길을 찾을 때 나는?",
+      "visitorPrompt": "길을 찾을 때 이 사람은?",
+      "optionA": "지도와 후기를 미리 본다",
+      "optionB": "발길 가는 쪽을 따라간다",
+      "isSignature": false
+    },
+    {
+      "id": "food",
+      "position": 4,
+      "ownerPrompt": "여행지 식당을 고를 때 나는?",
+      "visitorPrompt": "여행지 식당을 고를 때 이 사람은?",
+      "optionA": "대표 메뉴부터 먹어 본다",
+      "optionB": "현지에서 눈에 띈 곳에 들어간다",
+      "isSignature": false
+    },
+    {
+      "id": "open-hour",
+      "position": 5,
+      "ownerPrompt": "여행지에서 잠깐 시간이 비면 나는?",
+      "visitorPrompt": "여행지에서 잠깐 시간이 비면 이 사람은?",
+      "optionA": "가까운 곳을 하나 더 본다",
+      "optionB": "앉아서 그곳 분위기를 즐긴다",
+      "isSignature": false
+    },
+    {
+      "id": "change",
+      "position": 6,
+      "ownerPrompt": "일정이 어그러지면 나는?",
+      "visitorPrompt": "일정이 어그러지면 이 사람은?",
+      "optionA": "대안을 빠르게 찾는다",
+      "optionB": "뜻밖의 시간으로 받아들인다",
+      "isSignature": false
+    },
+    {
+      "id": "souvenir",
+      "position": 7,
+      "ownerPrompt": "기념품을 고를 때 나는?",
+      "visitorPrompt": "기념품을 고를 때 이 사람은?",
+      "optionA": "쓸 수 있는 걸 고른다",
+      "optionB": "그 장소다운 걸 고른다",
+      "isSignature": false
+    },
+    {
+      "id": "morning",
+      "position": 8,
+      "ownerPrompt": "여행 중 아침 나는?",
+      "visitorPrompt": "여행 중 아침 이 사람은?",
+      "optionA": "일찍 시작해 하루를 길게 쓴다",
+      "optionB": "천천히 일어나 여유를 챙긴다",
+      "isSignature": false
+    },
+    {
+      "id": "detour",
+      "position": 9,
+      "ownerPrompt": "가고 싶던 곳이 멀어 보이면 나는?",
+      "visitorPrompt": "가고 싶던 곳이 멀어 보이면 이 사람은?",
+      "optionA": "그래도 루트를 맞춰 간다",
+      "optionB": "가까운 즐길 거리를 찾는다",
+      "isSignature": false
+    },
+    {
+      "id": "last-night",
+      "position": 10,
+      "ownerPrompt": "여행 마지막 밤 나는?",
+      "visitorPrompt": "여행 마지막 밤 이 사람은?",
+      "optionA": "다음 날을 위해 정리한다",
+      "optionB": "마지막까지 밖에서 논다",
+      "isSignature": false
+    }
+  ]
+}

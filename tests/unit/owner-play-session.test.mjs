@@ -23,7 +23,7 @@ const root = path.resolve(
   "../..",
 );
 const manifest = JSON.parse(
-  readFileSync(path.join(root, "content/packs/old-friend-v1.json"), "utf8"),
+  readFileSync(path.join(root, "content/packs/old-friend-v2.json"), "utf8"),
 );
 const orderedAnswers = manifest.cards.map((card, index) => ({
   cardId: card.id,
@@ -33,8 +33,8 @@ const orderedAnswers = manifest.cards.map((card, index) => ({
 function state(overrides = {}) {
   return {
     id: "17000000-0000-4000-8000-000000000001",
-    packSlug: "old-friend",
-    packVersion: "old-friend-v1",
+    packSlug: manifest.slug,
+    packVersion: manifest.version,
     status: "draft",
     currentPosition: 1,
     answers: [{ cardId: "conflict", choice: "a" }],
