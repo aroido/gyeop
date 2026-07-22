@@ -54,10 +54,11 @@ function noContent(route: Route) {
 
 async function installShareApi(
   page: Page,
-  options: { shareEventStatus?: 204 | 500 } = {},
+  options: { shareEventStatus?: 204 | 500; inviteFailures?: number } = {},
 ) {
   const links: LinkState[] = [];
   const calls: { method: string; pathname: string; body?: unknown }[] = [];
+  let inviteFailures = options.inviteFailures ?? 0;
   await page.route("**/api/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -146,6 +147,13 @@ async function installShareApi(
       return noContent(route);
     }
     if (method === "POST" && url.pathname.startsWith("/api/invites/")) {
+      if (inviteFailures > 0) {
+        inviteFailures -= 1;
+        return json(route, 500, {
+          code: "INTERNAL_ERROR",
+          message: "요청을 처리하지 못했습니다.",
+        });
+      }
       return json(route, 200, {
         packSlug: "old-friend",
         packVersion: "old-friend-v2",
@@ -155,7 +163,13 @@ async function installShareApi(
     }
     return route.fallback();
   });
-  return { links, calls };
+  return {
+    links,
+    calls,
+    failNextInvite(count = 1) {
+      inviteFailures = count;
+    },
+  };
 }
 
 async function installBrowserHandoff(
@@ -590,6 +604,36 @@ test("reads only an exact fragment and renders generic invite states", async ({
   expect(inviteCalls()).toHaveLength(2);
 });
 
+test("keeps retry primary and offers the pack catalog after an invite error", async ({
+  page,
+}) => {
+  await completedOwner(page);
+  const share = await installShareApi(page, { inviteFailures: 2 });
+  await page.goto(`/i/${publicIds[0]}#k=${secret}`);
+  await expect(
+    page.getByRole("heading", { name: "초대를 확인하지 못했어요" }),
+  ).toBeFocused();
+  const retry = page.getByRole("button", { name: "다시 시도" });
+  const browse = page.getByRole("link", { name: "겹 둘러보기" });
+  await expect(browse).toHaveAttribute("href", "/");
+
+  const inviteMetadataCalls = () =>
+    share.calls.filter(
+      (call) =>
+        call.method === "POST" &&
+        call.pathname.startsWith("/api/invites/") &&
+        !call.pathname.endsWith("/responses"),
+    );
+  expect(inviteMetadataCalls()).toHaveLength(1);
+  await retry.click();
+  await expect(
+    page.getByRole("heading", { name: "초대를 확인하지 못했어요" }),
+  ).toBeFocused();
+  expect(inviteMetadataCalls()).toHaveLength(2);
+  await browse.click();
+  await expect(page).toHaveURL("/");
+});
+
 for (const viewport of [
   { width: 320, height: 800 },
   { width: 390, height: 844 },
@@ -605,7 +649,7 @@ for (const viewport of [
       clipboard: "resolve",
     });
     await completedOwner(page);
-    await installShareApi(page);
+    const share = await installShareApi(page);
 
     await page.goto(`/me/plays/${playId}`);
     const shareHeading = page.getByRole("heading", { name: "공유 링크" });
@@ -673,6 +717,25 @@ for (const viewport of [
       (await page.getByRole("link", { name: "겹 둘러보기" }).boundingBox())
         ?.height,
     ).toBeGreaterThanOrEqual(44);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth,
+      ),
+    ).toBe(true);
+
+    share.failNextInvite();
+    await page.goto(`/i/${publicIds[0]}#k=${secret}`);
+    await expect(
+      page.getByRole("heading", { name: "초대를 확인하지 못했어요" }),
+    ).toBeFocused();
+    const retry = page.getByRole("button", { name: "다시 시도" });
+    const browse = page.getByRole("link", { name: "겹 둘러보기" });
+    expect((await retry.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    expect((await browse.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    await page.keyboard.press("Tab");
+    await expect(retry).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(browse).toBeFocused();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth,
