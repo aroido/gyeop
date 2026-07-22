@@ -213,6 +213,9 @@ export default function InviteEntry({ publicId }: { publicId: string | null }) {
           >
             다시 시도
           </button>
+          <Link className={styles.secondary} href="/">
+            겹 둘러보기
+          </Link>
         </section>
       </main>
     );

@@ -167,6 +167,11 @@
   color: #a8a8a8;
   cursor: not-allowed;
 }
+.card .secondary {
+  border: 1px solid #666;
+  background: transparent;
+  color: #fff;
+}
 .card a:focus-visible,
 .card button:focus-visible {
   outline: 3px solid var(--blue);
