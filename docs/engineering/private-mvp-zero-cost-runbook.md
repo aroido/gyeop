@@ -108,6 +108,22 @@ node scripts/verify-private-mvp-performance.mjs --base-url https://gyeop-private
 
 Render Free의 cold start는 35초까지 별도 허용하고 warm 표본과 합치지 않는다. 홈 LCP 중앙값 2.5초와 pack GET p95 1초는 private MVP 회귀 smoke 예산이며 production SLA가 아니다. 원격 변동 결과는 required CI에 넣지 않고 실패 시 유료 전환이나 provider 설정 변경을 자동 수행하지 않는다.
 
+### 5.3 무료 보안 경계 gate
+
+원격 요청 없이 활성 Route, data access, HTTP boundary, repository secret, zero-cost 선언과 비활성 email/Cron/account-delete 경계를 한 번에 확인한다.
+
+```bash
+pnpm test:security
+```
+
+기존 Render Free에는 정확히 `HEAD /`와 `GET /api/packs/old-friend`만 보내 status와 security header를 확인한다.
+
+```bash
+pnpm test:security:render
+```
+
+원격 표본은 공개 proxy/header 경계만 확인한다. owner와 visitor 권한은 local data-access/HTTP-boundary 테스트와 full verify로 검증하며, 이 명령은 인증하거나 response body를 기록하거나 hosted data를 변경하지 않는다.
+
 ## 6. Downstream 이슈 해석
 
 | 이슈 | `$0` private MVP 해석                                                                                                                                                                       |
