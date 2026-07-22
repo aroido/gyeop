@@ -7,13 +7,13 @@ Status: Active
 
 현재 목표는 public production 운영이 아니라 주인 → 방문자 → 새 주인 → 재공유 루프의 비공개 재미 검증이다. 월 인프라 비용 hard cap은 정확히 `$0`다.
 
-| 자원 | 허용 상태 | 월 비용 |
-|---|---|---:|
-| 기존 Render Free Web Service 1개 | active | `$0` |
-| 기존 Supabase Free project 1개 | active | `$0` |
-| public repository GitHub Actions | active | `$0` |
-| 개발자 Mac의 local Supabase | active | `$0` |
-| 합계 |  | `$0` |
+| 자원                             | 허용 상태 | 월 비용 |
+| -------------------------------- | --------- | ------: |
+| 기존 Render Free Web Service 1개 | active    |    `$0` |
+| 기존 Supabase Free project 1개   | active    |    `$0` |
+| public repository GitHub Actions | active    |    `$0` |
+| 개발자 Mac의 local Supabase      | active    |    `$0` |
+| 합계                             |           |    `$0` |
 
 Render가 제공하는 HTTPS URL을 그대로 사용한다. 유료 server, domain/TLS, paid plan, 별도 service/project와 새 provider는 만들지 않는다.
 
@@ -78,17 +78,15 @@ Render Free cold start와 Supabase Free pause는 production SLA가 아니다. fr
 
 ## 6. Downstream 이슈 해석
 
-| 이슈 | `$0` private MVP 해석 |
-|---|---|
-| #29 | 별도 staging·개인 서버·custom SMTP·매직 링크를 구축하지 않는다. local Supabase, GitHub Actions와 기존 Render smoke로 다시 정의하거나 시작 전 body를 정합화하며 Google OAuth만 유지한다. |
-| #30 | Resend outbox·5분 worker·email delivery는 비활성·연기한다. |
-| #32 | 보관 정책 DB 로직과 local/CI 검증은 별도 재검토할 수 있지만 hosted scheduler와 hosted-data mutation은 자동 승인되지 않는다. production Cron 전제는 연기한다. |
-| #33 | self-service account deletion, 미귀속/provider Auth deletion과 retry worker는 비활성·연기한다. |
-| #35 | local/CI와 기존 Render Free에서 best-effort 성능을 검증한다. paid load environment와 production SLA는 요구하지 않는다. |
-| #36 | 활성 Google OAuth·Render HTTP 경계와 inactive endpoint의 fail-closed 상태만 무료 환경에서 검증한다. email/Cron/deletion 경로를 켜지 않는다. |
-| #37 | production release·secret·rollback runbook은 public production 재승인과 별도 예산 결정 전까지 연기한다. #8을 production 승인으로 사용하지 않는다. |
-
-현재 GitHub #29 본문에는 personal server와 draft-claim magic link 전제가 남아 있다. 이 문서는 GitHub body·label을 바꾸지 않으며 #29 시작 전 `gyeop-issue-writer`와 task-harness 절차로 현재 SSOT에 맞춘다.
+| 이슈 | `$0` private MVP 해석                                                                                                                                                                       |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #29  | 본문과 reviewed spec을 local Supabase, public GitHub Actions, 기존 Render GET/HEAD smoke와 Google OAuth 단일 경로에 맞췄다. 별도 staging·개인 서버·custom SMTP·매직 링크는 구축하지 않는다. |
+| #30  | Resend outbox·5분 worker·email delivery는 비활성·연기한다.                                                                                                                                  |
+| #32  | 보관 정책 DB 로직과 local/CI 검증은 별도 재검토할 수 있지만 hosted scheduler와 hosted-data mutation은 자동 승인되지 않는다. production Cron 전제는 연기한다.                                |
+| #33  | self-service account deletion, 미귀속/provider Auth deletion과 retry worker는 비활성·연기한다.                                                                                              |
+| #35  | local/CI와 기존 Render Free에서 best-effort 성능을 검증한다. paid load environment와 production SLA는 요구하지 않는다.                                                                      |
+| #36  | 활성 Google OAuth·Render HTTP 경계와 inactive endpoint의 fail-closed 상태만 무료 환경에서 검증한다. email/Cron/deletion 경로를 켜지 않는다.                                                 |
+| #37  | production release·secret·rollback runbook은 public production 재승인과 별도 예산 결정 전까지 연기한다. #8을 production 승인으로 사용하지 않는다.                                           |
 
 ## 7. 중단 기준
 
@@ -96,7 +94,7 @@ Render Free cold start와 Supabase Free pause는 production SLA가 아니다. fr
 
 - 월 예상 인프라 비용이 `$0`을 넘음
 - free plan 유지가 불가능하거나 billing 정보가 필요함
-- Google OAuth chooser/callback → `/me`가 동작하지 않음
+- 별도 승인된 live 확인에서 Google OAuth chooser/callback → `/me`가 동작하지 않음
 - Render/Supabase/GitHub 상태를 read-only로 확인할 수 없음
 - secret 노출, 핵심 HTTP 경계 실패 또는 public production 기능의 우발적 활성화가 의심됨
 

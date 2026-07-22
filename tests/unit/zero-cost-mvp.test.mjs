@@ -70,6 +70,19 @@ test("rejects malformed and unsupported Render YAML", () => {
     () => verifyRenderYaml(renderYaml.replace("envVars:", "envVars: {}")),
     /unsupported scalar syntax/,
   );
+  for (const field of [
+    "numInstances: 2",
+    "pullRequestPreviewsEnabled: true",
+    "region: oregon",
+  ]) {
+    assert.throws(
+      () =>
+        verifyRenderYaml(
+          renderYaml.replace("    envVars:", `    ${field}\n    envVars:`),
+        ),
+      /unsupported service field/,
+    );
+  }
 });
 
 test("requires the exact public Docker build arguments", () => {
@@ -90,12 +103,23 @@ test("requires the exact public Docker build arguments", () => {
   );
 });
 
-test("rejects known server secrets in Docker ARG and ENV", () => {
+test("rejects known and pattern-matched server secrets in Docker ARG and ENV", () => {
   for (const declaration of [
     "ARG SUPABASE_SECRET_KEY",
+    "ARG SUPABASE_SERVICE_ROLE_KEY",
     "ENV ORIGIN_PROXY_SECRET=placeholder",
+    "ENV ORIGIN_PROXY_WRITER_SECRET=placeholder",
+    "ENV ORIGIN_PROXY_SECONDARY_SECRET=placeholder",
     "ENV RATE_LIMIT_SECRET=$RATE_LIMIT_SECRET",
     "ARG ACCOUNT_DELETE_REAUTH_KEYRING",
+    "ENV CRON_SECRET=placeholder",
+    "ENV RESEND_API_KEY=placeholder",
+    "ENV NOTIFICATION_FINGERPRINT_KEYRING=placeholder",
+    "ENV GITHUB_TOKEN=$GITHUB_TOKEN",
+    "ENV DATABASE_PASSWORD=placeholder",
+    "ENV SIGNING_PRIVATE_KEY=placeholder",
+    "ENV SERVICE_ROLE=placeholder",
+    "ENV SAFE_NAME=$FUTURE_SECRET",
   ]) {
     assert.throws(
       () => verifyDockerfile(`${dockerfile}\n${declaration}\n`),
@@ -115,17 +139,19 @@ test("requires .env and .env.* Docker context exclusions", () => {
   );
 });
 
-test("rejects Docker ignore negations that reinclude environment files", () => {
+test("rejects every active Docker ignore negation", () => {
   for (const negation of [
     "!.env",
     "!.env.local",
     "!.env.production",
+    "!.e??.production",
+    "!README.md",
     "!*",
     "!**/*",
   ]) {
     assert.throws(
       () => verifyDockerignore(`${dockerignore}\n${negation}\n`),
-      /environment file negation|must remain excluded/,
+      /negation rules are unsupported/,
     );
   }
 });

@@ -7,13 +7,31 @@ const PUBLIC_BUILD_ARGS = new Set([
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "NEXT_PUBLIC_SUPABASE_URL",
 ]);
+const RENDER_SERVICE_KEYS = new Set([
+  "type",
+  "name",
+  "runtime",
+  "plan",
+  "healthCheckPath",
+  "autoDeployTrigger",
+  "envVars",
+]);
 const SERVER_SECRET_NAMES = new Set([
   "ACCOUNT_DELETE_REAUTH_ACTIVE_VERSION",
   "ACCOUNT_DELETE_REAUTH_KEYRING",
+  "CRON_SECRET",
+  "NOTIFICATION_FINGERPRINT_KEYRING",
+  "ORIGIN_PROXY_SECONDARY_SECRET",
   "ORIGIN_PROXY_SECRET",
+  "ORIGIN_PROXY_WRITER_SECRET",
   "RATE_LIMIT_SECRET",
+  "RESEND_API_KEY",
   "SUPABASE_SECRET_KEY",
+  "SUPABASE_SERVICE_ROLE_KEY",
 ]);
+const SAFE_DOCKER_IDENTIFIERS = new Set([...PUBLIC_BUILD_ARGS, "NODE_ENV"]);
+const SERVER_SECRET_PATTERN =
+  /(?:^|_)(?:SECRET|TOKEN|KEYRING|PASSWORD|PRIVATE_KEY|SERVICE_ROLE)(?:_|$)|^RESEND_API_KEY$/;
 const SAFE_SCALAR = /^[A-Za-z0-9_./-]+$/;
 
 function invariant(condition, message) {
@@ -114,6 +132,10 @@ export function verifyRenderYaml(renderYaml) {
 
     if (indent === 4) {
       const entry = mapping(text, lineNumber);
+      invariant(
+        RENDER_SERVICE_KEYS.has(entry.key),
+        `render.yaml:${lineNumber}: unsupported service field ${entry.key}`,
+      );
       setUnique(service, entry.key, entry.value, lineNumber);
       if (entry.key === "envVars") {
         invariant(
@@ -199,10 +221,14 @@ export function verifyDockerfile(dockerfile) {
       !text.endsWith("\\"),
       `Dockerfile:${lineNumber}: multiline ${instruction} is unsupported`,
     );
-    for (const secret of SERVER_SECRET_NAMES) {
+    const identifiers = text.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? [];
+    for (const identifier of identifiers) {
+      const normalized = identifier.toUpperCase();
+      if (SAFE_DOCKER_IDENTIFIERS.has(normalized)) continue;
       invariant(
-        !new RegExp(`\\b${secret}\\b`).test(text),
-        `Dockerfile:${lineNumber}: ${secret} is forbidden in ${instruction}`,
+        !SERVER_SECRET_NAMES.has(normalized) &&
+          !SERVER_SECRET_PATTERN.test(normalized),
+        `Dockerfile:${lineNumber}: ${identifier} is forbidden in ${instruction}`,
       );
     }
     if (instruction !== "ARG") continue;
@@ -224,41 +250,17 @@ export function verifyDockerfile(dockerfile) {
   return actual;
 }
 
-function globRegex(pattern) {
-  let source = "^";
-  for (let index = 0; index < pattern.length; index += 1) {
-    const character = pattern[index];
-    if (character === "*") {
-      if (pattern[index + 1] === "*") {
-        if (pattern[index + 2] === "/") {
-          source += "(?:.*/)?";
-          index += 2;
-        } else {
-          source += ".*";
-          index += 1;
-        }
-      } else {
-        source += "[^/]*";
-      }
-    } else if (character === "?") {
-      source += "[^/]";
-    } else {
-      source += character.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
-    }
-  }
-  return new RegExp(`${source}$`);
-}
-
-function matchesIgnorePattern(pattern, file) {
-  const normalized = pattern.replace(/^\//, "");
-  return globRegex(normalized).test(file);
-}
-
 export function verifyDockerignore(dockerignore) {
   const rules = dockerignore
     .split("\n")
     .map((raw, index) => ({ text: raw.trim(), lineNumber: index + 1 }))
     .filter(({ text }) => text !== "" && !text.startsWith("#"));
+  for (const { text, lineNumber } of rules) {
+    invariant(
+      !text.startsWith("!"),
+      `.dockerignore:${lineNumber}: negation rules are unsupported`,
+    );
+  }
   for (const required of [".env", ".env.*"]) {
     invariant(
       rules.some(({ text }) => text === required),
@@ -266,35 +268,6 @@ export function verifyDockerignore(dockerignore) {
     );
   }
 
-  const protectedFiles = [".env", ".env.local"];
-  for (const file of protectedFiles) {
-    let ignored = false;
-    for (const { text } of rules) {
-      const negated = text.startsWith("!");
-      const pattern = negated ? text.slice(1) : text;
-      if (matchesIgnorePattern(pattern, file)) ignored = !negated;
-    }
-    invariant(ignored, `.dockerignore: ${file} must remain excluded`);
-  }
-
-  const lastRequired = Math.max(
-    ...rules
-      .map(({ text }, index) =>
-        [".env", ".env.*"].includes(text) ? index : -1,
-      )
-      .filter((index) => index >= 0),
-  );
-  for (const [index, { text, lineNumber }] of rules.entries()) {
-    if (!text.startsWith("!") || index <= lastRequired) continue;
-    const pattern = text.slice(1);
-    const canReincludeEnvironment =
-      pattern.includes(".env") ||
-      protectedFiles.some((file) => matchesIgnorePattern(pattern, file));
-    invariant(
-      !canReincludeEnvironment,
-      `.dockerignore:${lineNumber}: environment file negation is forbidden`,
-    );
-  }
   return [".env", ".env.*"];
 }
 
