@@ -55,6 +55,12 @@ flowchart LR
 | P2 성장            | 좋은 팩이 스스로 퍼지는지 검증                     | 공개 팩 탐색, 리믹스, 제작자 프로필, 랭킹, 신고·검수                       | 브랜드 팩과 수익 배분의 복잡한 정산      |
 | P3 수익화          | 지불 의사 검증                                     | 프리미엄 팩, 깊은 인사이트, 브랜드·크리에이터 팩                           | 친구의 신원이나 개별 답변을 돈으로 해금  |
 
+### 4.1 현재 private MVP 운영 경계
+
+월 인프라 예산 hard cap은 `$0`다. 이미 연결된 Render Free Web Service 하나, Supabase Free project 하나, public repository GitHub Actions와 local Supabase만 사용하고 Render가 제공하는 HTTPS URL을 그대로 쓴다. owner 저장은 Google OAuth만 사용하며 standalone public signup은 열지 않는다.
+
+별도 staging/production, 개인 Linux server, 유료 domain/TLS·plan, custom SMTP, Resend delivery와 hosted Cron은 만들지 않는다. 이메일 알림, self-service/provider Auth deletion과 public production은 비활성·연기한다. 무료 한도가 사라지거나 부족하면 유료로 전환하지 않고 해당 기능 또는 private MVP 모집을 중단한다. 세부 운영 경계와 후속 이슈 해석은 `docs/engineering/private-mvp-zero-cost-runbook.md`가 담당한다.
+
 ## 5. P0 — 루프 프로토타입
 
 ### 5.1 시작과 로그인

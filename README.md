@@ -72,6 +72,8 @@ pnpm dev
 
 `render.yaml`은 도메인 없이 `https://<service>.onrender.com`에서 동작하는 Render Free Web Service용 설정이다. 앱과 HAProxy를 한 컨테이너에 두어 public Route가 기존 proxy 신뢰 경계를 계속 통과한다. Render가 전달하는 Cloudflare client IP를 우선 사용하고, 없을 때는 Render 연결 IP로 안전하게 축소한다.
 
+현재 `$0` private MVP는 이미 연결된 Render Free service와 Supabase Free project만 재사용한다. 아래 1~3은 최초 bootstrap 참고이며 새 service/project 생성, plan 변경, secret 수정이나 재배포 권한을 뜻하지 않는다. 현재 운영 경계는 `docs/engineering/private-mvp-zero-cost-runbook.md`를 따른다.
+
 1. Supabase에서 Free project를 만들고 아래 명령으로 migration과 공식 pack seed를 올린다.
 
    ```bash
@@ -96,7 +98,7 @@ pnpm dev
 
    `ORIGIN_PROXY_SECRET`와 `RATE_LIMIT_SECRET`은 각각 `node -e 'console.log(require("node:crypto").randomBytes(32).toString("base64url"))'`로 만들고, account-delete 값은 로컬 개발 안내의 keyring 형식을 사용한다. `.env.local` 전체를 업로드하거나 commit하지 않는다.
 
-4. 첫 배포 뒤 Supabase Auth URL Configuration의 Site URL과 Redirect URL에 `https://<service>.onrender.com` 및 `https://<service>.onrender.com/auth/callback`을 넣고, 홈·팩 시작·방문자 제출·공유 직전 이메일 claim 흐름을 실제 URL에서 확인한다. Render Free service는 15분 유휴 뒤 잠들 수 있고, Supabase Free project는 7일 저활동 뒤 일시 정지될 수 있으므로 지금 단계의 소규모 재미 검증에만 쓴다.
+4. 첫 배포 뒤 Supabase Auth URL Configuration의 Site URL과 Redirect URL에 `https://<service>.onrender.com` 및 `https://<service>.onrender.com/auth/callback`을 넣고, 홈·팩 시작·방문자 제출과 공유 직전 Google OAuth 계정 선택/동의 → `/auth/callback` → `/me` 복귀를 실제 URL에서 확인한다. Google provider나 callback이 준비되지 않았으면 이메일 claim으로 우회하지 말고 공유를 중단한다. Render Free service는 15분 유휴 뒤 잠들 수 있고, Supabase Free project는 7일 저활동 뒤 일시 정지될 수 있으므로 지금 단계의 소규모 재미 검증에만 쓴다.
 
 배포 artifact 자체는 아래로 Docker build, HAProxy header injection, 홈과 cookie 없는 logout API까지 점검한다.
 

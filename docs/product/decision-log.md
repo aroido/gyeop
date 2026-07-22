@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-22 — private MVP 인프라 월 예산을 0달러로 고정
+
+- 결정: 현재 private MVP는 이미 연결된 Render Free Web Service 하나, Supabase Free project 하나, public repository GitHub Actions와 local Supabase만 사용하고 월 인프라 비용 hard cap을 `$0`로 고정한다. owner 연결은 기존 Google OAuth만 유지한다.
+- 이유: 지금 검증할 것은 주인 → 방문자 → 새 주인 → 재공유의 재미이며, 별도 staging/production·개인 서버·이메일·background worker 운영비는 이 가설보다 크다.
+- 결과: provider HTTPS URL을 그대로 사용하고 유료 domain/TLS, paid plan, 별도 service/project, Render/host Cron, custom SMTP, Resend delivery를 만들지 않는다. 이메일 알림, standalone public signup, self-service/provider Auth deletion과 public production은 비활성·연기한다. 무료 한도가 사라지거나 부족하면 자동 upgrade하지 않고 해당 기능 또는 private MVP 모집을 중단한다. 이 결정은 이슈 #8·#29의 개인 Linux server, custom SMTP와 draft-claim 매직 링크 전제를 현재 private MVP에 한해 대체하며, future production은 새 예산·외부 변경 권한·release gate를 별도로 승인해야 한다.
+
 ## 2026-07-22 — 선택한 질문팩의 시각 정체성을 개봉까지 유지
 
 - 결정: 홈의 공식 팩 manifest가 가진 `presentation.coverTone`, `coverRecipe`, 제목을 `/play/new` 개봉 overlay까지 전달한다. 개봉은 기존 Lottie 한 벌의 정적 fill만 여섯 tone 팔레트로 복제·치환하고, 닫힌 포장에 recipe 기반 mark와 pattern을 표시한다. 새 identity와 겹치는 기존 generic pill/bars는 themed clone에서만 제외한다.
