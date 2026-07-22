@@ -19,7 +19,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$MODE" in
-  full | ci-static | ci-data-core | ci-data-app | ci-mock | ci-live-mvp | ci-live-owner) ;;
+  full | ci-static | ci-data-core | ci-data-app-catalog | ci-data-app-sessions | ci-mock | ci-live-mvp | ci-live-owner | nightly-live-mvp) ;;
   *)
     echo "Unsupported verification mode: $MODE" >&2
     exit 2
@@ -89,6 +89,12 @@ restart_supabase() {
   start_supabase
 }
 
+reset_supabase_for_app() {
+  pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
+  "$ROOT/scripts/wait-for-supabase-db"
+  node "$ROOT/scripts/wait-for-supabase-data-api.mjs"
+}
+
 VERIFY_BASE_REF="${GYEOP_VERIFY_BASE_REF:-origin/main}"
 
 run_static_verification() {
@@ -118,6 +124,7 @@ run_static_verification() {
   sh -n "$ROOT/tests/integration/visitor-assignment-upgrade.test.sh"
   sh -n "$ROOT/tests/integration/eligibility-cutover-upgrade.test.sh"
   bash -n "$ROOT/scripts/wait-for-supabase-db"
+  node --check "$ROOT/scripts/wait-for-supabase-data-api.mjs"
   bash -n "$ROOT/tests/integration/supabase-readiness.test.sh"
   "$ROOT/tests/integration/supabase-readiness.test.sh"
 
@@ -187,16 +194,22 @@ run_data_core_verification() {
   node scripts/verify-supabase-types.mjs
 }
 
-run_data_app_verification() {
+run_data_app_catalog_integrations() {
   node --test tests/integration/data-access.test.mjs
   node --test tests/integration/pack-catalog.test.mjs
   node --test tests/integration/pack-publication-concurrency.test.mjs
+}
+
+run_data_app_session_integrations() {
   node --test tests/integration/owner-play-session.test.mjs
   node --test tests/integration/owner-profile-session.test.mjs
   node --test tests/integration/owner-play-concurrency.test.mjs
   node --test tests/integration/share-link-concurrency.test.mjs
   node --test tests/integration/visitor-response-concurrency.test.mjs
   node --test tests/integration/visitor-withdrawal-concurrency.test.mjs
+}
+
+run_data_app_runtime_verification() {
   env -u NEXT_PUBLIC_SUPABASE_URL -u SUPABASE_SECRET_KEY pnpm build
   node --test tests/integration/pack-runtime.test.mjs
 }
@@ -208,8 +221,14 @@ run_mock_verification() {
 case "$MODE" in
   ci-live-mvp)
     start_supabase
-    pnpm test:e2e:mvp:run
+    pnpm test:e2e:mvp:pr:run
     echo "GYEOP CI live MVP verification passed."
+    exit 0
+    ;;
+  nightly-live-mvp)
+    start_supabase
+    pnpm test:e2e:mvp:nightly:run
+    echo "GYEOP nightly live MVP verification passed."
     exit 0
     ;;
   ci-live-owner)
@@ -228,12 +247,19 @@ case "$MODE" in
     echo "GYEOP CI data core verification passed."
     exit 0
     ;;
-  ci-data-app)
+  ci-data-app-catalog)
     start_supabase
-    pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
-    "$ROOT/scripts/wait-for-supabase-db"
-    run_data_app_verification
-    echo "GYEOP CI data app verification passed."
+    reset_supabase_for_app
+    run_data_app_catalog_integrations
+    run_data_app_runtime_verification
+    echo "GYEOP CI data app catalog verification passed."
+    exit 0
+    ;;
+  ci-data-app-sessions)
+    start_supabase
+    reset_supabase_for_app
+    run_data_app_session_integrations
+    echo "GYEOP CI data app sessions verification passed."
     exit 0
     ;;
   ci-mock)
@@ -244,7 +270,9 @@ case "$MODE" in
   full)
     run_static_verification
     run_data_core_verification
-    run_data_app_verification
+    run_data_app_catalog_integrations
+    run_data_app_session_integrations
+    run_data_app_runtime_verification
     restart_supabase
     pnpm test:e2e:mvp:run
     pnpm test:e2e:owner
