@@ -65,6 +65,7 @@ Status: Reviewed
 - [ ] submitted cleanup은 `session_token_hash`만 `NULL` 처리한다. `management_token_hash`, `submitted_at`, answer, assignment는 유지한다.
 - [ ] `visitor_answers`의 실제 insert 또는 choice 변경을 감지하는 DB trigger가 draft parent의 cutoff를 24시간 연장한다. 동일 값 conflict update는 연장하지 않고, submitted/withdrawn parent도 연장하지 않는다.
 - [ ] 제출 write path에 DB trigger 또는 동등한 DB 강제 계약을 추가해 `submitted_at`과 같은 시각을 기준으로 `session_expires_at = submitted_at + 24시간`을 기록한다. `visitor_responses_state_check`를 갱신해 submitted row만 `session_token_hash`의 non-null/NULL을 모두 허용하고 draft·withdrawn invariant는 유지한다.
+- [ ] 별도 DB guard는 submitted row의 `session_expires_at`이 아직 미래일 때 `session_token_hash IS NULL` insert/update를 거부하고, cleanup cutoff가 지난 뒤의 NULL 전이만 허용한다.
 - [ ] 익명 owner cleanup은 due owner root를 삭제해 기존 FK cascade를 사용한다. 단, 그 owner의 play 중 `owner_id IS NOT NULL`이 하나라도 있으면 건드리지 않는다.
 - [ ] 함수 실행 권한은 internal role만 가진다. `anon`, `authenticated`에는 grant하지 않는다.
 
@@ -99,6 +100,7 @@ Status: Reviewed
 - [ ] pgTAP: draft answer insert/choice change는 session cutoff를 mutation 시각+24시간으로 연장하고 동일 choice retry는 cutoff를 바꾸지 않음.
 - [ ] pgTAP: submit 시 `submitted_at + 24시간`으로 session expiry가 갱신되고, expiry 전에는 hash 유지, expiry 뒤에는 submitted content를 보존한 채 `session_token_hash`만 `NULL`.
 - [ ] pgTAP: state constraint가 draft NULL hash는 거부하고 submitted expired NULL hash와 withdrawn invariant는 허용함.
+- [ ] pgTAP: 만료 전 submitted NULL hash 직접 저장은 거부하고 cleanup 시각 이후 hash nulling은 허용함.
 - [ ] pgTAP: `rate_limit_buckets.expires_at + 24시간`, `analytics_events.occurred_at + 30일` 경계 검증.
 - [ ] pgTAP: 동일 fixture에서 cleanup 2회 실행 시 두 번째 mutation count가 0.
 - [ ] focused DB lint/test 명령으로 새 migration과 pgTAP만 검증한다.

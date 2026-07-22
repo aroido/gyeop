@@ -692,44 +692,40 @@ select throws_ok(
   'draft rows still require a non-null session token hash'
 );
 
-with fixed_time as (select clock_timestamp() as value)
-insert into public.visitor_responses (
-  id,
-  share_link_id,
-  pack_version_id,
-  relationship_code,
-  known_since_code,
-  status,
-  session_token_hash,
-  session_expires_at,
-  management_token_hash,
-  created_at,
-  submitted_at,
-  withdrawn_at
-) select
-  '32000000-0000-4000-8000-000000000061',
-  '32000000-0000-4000-8000-000000000030',
-  '15151515-1515-4515-8515-151515151515',
-  'family',
-  'one_to_three_years',
-  'submitted',
-  null,
-  value + interval '24 hours',
-  decode(repeat('0d', 32), 'hex'),
-  value,
-  value,
-  null
-from fixed_time;
-
-select ok(
-  exists (
-    select 1
-    from public.visitor_responses
-    where id = '32000000-0000-4000-8000-000000000061'
-      and status = 'submitted'
-      and session_token_hash is null
-  ),
-  'submitted rows allow a null session token hash'
+select throws_ok(
+  $$
+    with fixed_time as (select clock_timestamp() as value)
+    insert into public.visitor_responses (
+      id,
+      share_link_id,
+      pack_version_id,
+      relationship_code,
+      known_since_code,
+      status,
+      session_token_hash,
+      session_expires_at,
+      management_token_hash,
+      created_at,
+      submitted_at,
+      withdrawn_at
+    ) select
+      '32000000-0000-4000-8000-000000000061',
+      '32000000-0000-4000-8000-000000000030',
+      '15151515-1515-4515-8515-151515151515',
+      'family',
+      'one_to_three_years',
+      'submitted',
+      null,
+      value + interval '24 hours',
+      decode(repeat('0d', 32), 'hex'),
+      value,
+      value,
+      null
+    from fixed_time
+  $$,
+  '23514',
+  'submitted session hash lifecycle denied',
+  'submitted rows reject a null session hash before expiry'
 );
 
 select ok(

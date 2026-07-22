@@ -154,6 +154,36 @@ create trigger visitor_response_submit_session_expiry
 before update of status on public.visitor_responses
 for each row execute function private.set_submitted_visitor_session_expiry();
 
+create or replace function private.enforce_submitted_session_hash_lifecycle()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $function$
+begin
+  if new.status = 'submitted'
+    and new.session_token_hash is null
+    and new.session_expires_at > clock_timestamp()
+  then
+    raise exception using
+      errcode = '23514',
+      message = 'submitted session hash lifecycle denied';
+  end if;
+
+  return new;
+end
+$function$;
+
+revoke execute on function private.enforce_submitted_session_hash_lifecycle()
+  from public, anon, authenticated, service_role;
+alter function private.enforce_submitted_session_hash_lifecycle()
+  owner to gyeop_internal_rpc;
+
+create trigger visitor_response_submitted_hash_guard
+before insert or update of status, session_token_hash, session_expires_at
+on public.visitor_responses
+for each row execute function private.enforce_submitted_session_hash_lifecycle();
+
 create or replace function private.run_local_retention_cleanup(p_now timestamptz)
 returns jsonb
 language plpgsql
