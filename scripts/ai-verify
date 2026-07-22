@@ -125,6 +125,7 @@ run_static_verification() {
   sh -n "$ROOT/tests/integration/eligibility-cutover-upgrade.test.sh"
   bash -n "$ROOT/scripts/wait-for-supabase-db"
   node --check "$ROOT/scripts/wait-for-supabase-data-api.mjs"
+  node --check "$ROOT/scripts/verify-zero-cost-mvp.mjs"
   bash -n "$ROOT/tests/integration/supabase-readiness.test.sh"
   "$ROOT/tests/integration/supabase-readiness.test.sh"
 
@@ -156,6 +157,7 @@ run_static_verification() {
   pnpm typecheck
   pnpm test
   pnpm test:secrets
+  node scripts/verify-zero-cost-mvp.mjs
   node scripts/verify-data-access.mjs
   node scripts/verify-http-boundary.mjs
   node scripts/verify-pack-catalog.mjs
