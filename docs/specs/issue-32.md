@@ -1,6 +1,7 @@
 # Issue 32 구현 스펙: [데이터] 무료 MVP 보관 cleanup DB 로직·local/CI 검증
 
 Status: Reviewed
+
 > 이 스펙은 `$0` private MVP의 local/CI DB cleanup 경계만 다룬다.
 
 ## 목표

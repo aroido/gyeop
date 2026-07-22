@@ -65,7 +65,7 @@ select ok(
   and has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'INSERT')
   and not has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'SELECT')
   and not has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'UPDATE')
-  and not has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'DELETE'),
+  and has_table_privilege('gyeop_internal_rpc', 'public.analytics_events', 'DELETE'),
   'internal share and analytics privileges are the exact allowlist'
 );
 
