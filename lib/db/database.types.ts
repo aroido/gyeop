@@ -818,6 +818,7 @@ export type Database = {
         };
         Returns: Json;
       };
+      run_local_retention_cleanup: { Args: never; Returns: Json };
       save_authenticated_owner_answer: {
         Args: {
           p_actor_id: string;
