@@ -44,7 +44,6 @@ alter table public.visitor_responses
       and management_token_hash is not null
       and octet_length(management_token_hash) = 32
       and submitted_at is not null
-      and session_expires_at = submitted_at + interval '24 hours'
       and withdrawn_at is null
     )
     or (
