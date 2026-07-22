@@ -1,0 +1,82 @@
+.shell {
+  --lime: #dfff00;
+  --blue: #315cff;
+
+  display: grid;
+  min-height: 100svh;
+  padding: 1rem;
+  place-items: center;
+  overflow-x: clip;
+  background: #050505;
+  color: #fff;
+}
+
+.card {
+  width: min(100%, 28rem);
+  padding: 1.1rem;
+  border: 1px solid #555;
+  border-top: 0.65rem solid var(--lime);
+  border-radius: 1rem;
+  background: #0d0d0d;
+}
+
+.brand {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.card h1 {
+  margin: 0.65rem 0 0;
+  font-size: clamp(2rem, 10vw, 3rem);
+  line-height: 1.06;
+  letter-spacing: -0.07em;
+  word-break: keep-all;
+}
+
+.card h1:focus {
+  outline: none;
+}
+
+.card > p:not(.brand) {
+  margin: 0.85rem 0;
+  color: #c5c5c5;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.actions {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1rem;
+}
+
+.primary,
+.secondary {
+  display: grid;
+  min-height: 3rem;
+  place-items: center;
+  border-radius: 0.65rem;
+  font: inherit;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.primary {
+  border: 0;
+  background: var(--lime);
+  color: #050505;
+  cursor: pointer;
+}
+
+.secondary {
+  border: 1px solid #666;
+  background: transparent;
+  color: #fff;
+}
+
+.primary:focus-visible,
+.secondary:focus-visible {
+  outline: 3px solid var(--blue);
+  outline-offset: 3px;
+}
