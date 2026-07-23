@@ -31,7 +31,7 @@ export default function HomeClient({
           <strong>겹</strong>
           <small>GYEOP</small>
           <Link className={styles.ownerEntry} href="/me">
-            내 질문팩
+            내 프로필
           </Link>
         </header>
 
