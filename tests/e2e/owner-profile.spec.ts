@@ -255,6 +255,47 @@ test("selects the first available relationship and keeps collecting counts hidde
   );
 });
 
+test("uses the exact non-romantic share selection even when romantic is first", async ({
+  page,
+}) => {
+  const cardId = manifest.cards[0].id;
+  const api = await installProfileApi(
+    page,
+    profile([
+      layer("romantic", 3, {
+        [cardId]: { a: 1, b: 2 },
+      }),
+      layer("family", 3, {
+        [cardId]: { a: 2, b: 1 },
+      }),
+    ]),
+  );
+  await page.goto(
+    `/me/profile/${playId}?share_relationship=family&share_card=${cardId}#shareable-insight`,
+  );
+
+  await expect(
+    page.getByRole("button", { name: "가족, 3명, 공개 가능" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "썸·연인, 3명, 공개 가능" }),
+  ).toHaveAttribute("aria-pressed", "false");
+  const share = page.getByRole("link", {
+    name: "이 시선 카드 공유하기",
+  });
+  await expect(share).toHaveAttribute(
+    "href",
+    `/me/plays/${playId}?entry_source=profile_reshare&share_relationship=family&share_card=${cardId}`,
+  );
+  await share.click();
+  await expect
+    .poll(() => api.eventBodies)
+    .toEqual([
+      { event: "profile_viewed", playId },
+      { event: "profile_reshare_clicked", playId },
+    ]);
+});
+
 test("refreshes relationship layers deterministically", async ({ page }) => {
   const api = await installProfileApi(page, profile([layer("old_friend", 2)]));
   await page.goto(`/me/profile/${playId}`);
@@ -395,6 +436,13 @@ for (const viewport of [
     expect(
       (await page.getByRole("link", { name: "시선 더 모으기" }).boundingBox())
         ?.height,
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      (
+        await page
+          .getByRole("link", { name: "이 시선 카드 공유하기" })
+          .boundingBox()
+      )?.height,
     ).toBeGreaterThanOrEqual(44);
   });
 }

@@ -9,6 +9,7 @@ import type {
   AccountOwnerProfile,
   AccountOwnerSelfLayer,
 } from "@/lib/owner-profile/account-profile";
+import { firstAccountProfileShareSelection } from "@/lib/owner-profile/profile-share-card-core.mjs";
 import { relationshipLabel } from "@/lib/visitor-response/visitor-context-core.mjs";
 
 import LogoutButton from "./logout-button";
@@ -133,6 +134,18 @@ export default function AccountProfileView({
     ...relationshipChoices,
     ...profile.selfLayers,
   ].slice(0, 4);
+  const shareSelection = firstAccountProfileShareSelection(
+    profile.availableLayers,
+  );
+  const primaryHref = shareSelection
+    ? `/me/profile/${shareSelection.playId}?share_relationship=${encodeURIComponent(
+        shareSelection.relationshipCode,
+      )}&share_card=${encodeURIComponent(
+        shareSelection.cardId,
+      )}#shareable-insight`
+    : profile.ctaPlayId
+      ? `/me/plays/${profile.ctaPlayId}`
+      : "/";
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -146,15 +159,18 @@ export default function AccountProfileView({
             {profile.nickname}의 겹
           </h1>
           <p className={styles.profileLead}>
-            {profile.ctaPlayId
-              ? "관계마다 다른 나를 모아보세요."
-              : "질문팩에 답하고, 내가 보는 나부터 쌓아보세요."}
+            {shareSelection
+              ? "친구가 본 내 모습을 한 장으로 나눠보세요."
+              : profile.ctaPlayId
+                ? "친구의 답이 더 모이면 내 겹을 공유할 수 있어요."
+                : "질문팩에 답하고, 내가 보는 나부터 쌓아보세요."}
           </p>
-          <Link
-            className={styles.primary}
-            href={profile.ctaPlayId ? `/me/plays/${profile.ctaPlayId}` : "/"}
-          >
-            {profile.ctaPlayId ? "질문팩 공유하기" : "질문팩 시작하기"}
+          <Link className={styles.primary} href={primaryHref}>
+            {shareSelection
+              ? "내 겹 공유하기"
+              : profile.ctaPlayId
+                ? "시선 더 모으기"
+                : "질문팩 시작하기"}
           </Link>
           <div className={styles.metrics} aria-label="계정 프로필 요약">
             <p>시선 {profile.sightCount}</p>

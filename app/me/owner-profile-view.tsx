@@ -11,6 +11,10 @@ import {
   serializeOwnerProfileWatermark,
 } from "@/lib/owner-profile/owner-profile-core.mjs";
 import {
+  buildProfileShareCardModel,
+  isProfileShareRelationship,
+} from "@/lib/owner-profile/profile-share-card-core.mjs";
+import {
   loadOwnerProfile,
   OwnerProfileHttpError,
   recordOwnerProfileReshareClicked,
@@ -19,6 +23,7 @@ import {
 import type {
   OwnerProfile,
   OwnerProfileCard,
+  ProfileShareSelection,
   OwnerProfileRelationshipCard,
   OwnerProfileRelationshipLayer,
 } from "@/lib/owner-profile/owner-profile";
@@ -75,17 +80,33 @@ function Choice({
 function AvailableQuestion({
   card,
   relationshipCard,
+  relationshipCode,
   label,
+  onShare,
+  playId,
+  shareDisabled,
 }: {
   card: OwnerProfileCard;
   relationshipCard: Extract<
     OwnerProfileRelationshipCard,
     { status: "available" }
   >;
+  relationshipCode: string;
   label: string;
+  onShare: () => void;
+  playId: string;
+  shareDisabled: boolean;
 }) {
+  const shareable =
+    !shareDisabled && isProfileShareRelationship(relationshipCode);
+  const shareHref = `/me/plays/${playId}?entry_source=profile_reshare&share_relationship=${encodeURIComponent(
+    relationshipCode,
+  )}&share_card=${encodeURIComponent(card.cardId)}`;
   return (
-    <article className={styles.insightCard}>
+    <article
+      className={styles.insightCard}
+      id={shareable ? "shareable-insight" : undefined}
+    >
       <div className={styles.cardEyebrow}>
         <span>{label} 시선</span>
         <strong>첫 시선 공개</strong>
@@ -118,6 +139,15 @@ function AvailableQuestion({
           <strong>{relationshipCard.counts.b}명</strong>
         </div>
       </div>
+      {shareable ? (
+        <Link
+          className={styles.shareInsight}
+          href={shareHref}
+          onClick={onShare}
+        >
+          이 시선 카드 공유하기
+        </Link>
+      ) : null}
     </article>
   );
 }
@@ -146,10 +176,18 @@ function CollectingQuestion({
 
 function LayerContent({
   layer,
+  onShare,
+  playId,
+  preferredCardId,
   profile,
+  shareDisabled,
 }: {
   layer: OwnerProfileRelationshipLayer;
+  onShare: () => void;
+  playId: string;
+  preferredCardId: string | null;
   profile: OwnerProfile;
+  shareDisabled: boolean;
 }) {
   const label = relationshipLabel(layer.relationshipCode) as string;
   if (layer.status === "collecting") {
@@ -162,7 +200,13 @@ function LayerContent({
     );
   }
 
-  const available = layer.cards.find((card) => card.status === "available");
+  const available = layer.cards.find(
+    (
+      card,
+    ): card is Extract<OwnerProfileRelationshipCard, { status: "available" }> =>
+      card.status === "available" &&
+      (preferredCardId === null || card.cardId === preferredCardId),
+  );
   const collecting = layer.cards.find((card) => card.status === "collecting");
   const availableOwnerCard = available
     ? profile.cards.find((card) => card.cardId === available.cardId)
@@ -176,7 +220,11 @@ function LayerContent({
         <AvailableQuestion
           card={availableOwnerCard}
           relationshipCard={available}
+          relationshipCode={layer.relationshipCode}
           label={label}
+          onShare={onShare}
+          playId={playId}
+          shareDisabled={shareDisabled}
         />
       ) : null}
       {collecting && collectingOwnerCard ? (
@@ -189,9 +237,28 @@ function LayerContent({
   );
 }
 
-function RelationshipProfile({ profile }: { profile: OwnerProfile }) {
+function RelationshipProfile({
+  initialShareSelection,
+  onShare,
+  profile,
+}: {
+  initialShareSelection: ProfileShareSelection | null | undefined;
+  onShare: () => void;
+  profile: OwnerProfile;
+}) {
+  const initialShareModel = initialShareSelection
+    ? buildProfileShareCardModel(profile, initialShareSelection)
+    : null;
+  const shareDisabled =
+    initialShareSelection === null ||
+    (initialShareSelection !== undefined && initialShareModel === null);
   const [selectedCode, setSelectedCode] = useState(() =>
-    initialOwnerProfileRelationshipCode(profile.relationshipLayers),
+    initialShareModel
+      ? initialShareSelection!.relationshipCode
+      : initialOwnerProfileRelationshipCode(profile.relationshipLayers),
+  );
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(() =>
+    initialShareModel ? initialShareSelection!.cardId : null,
   );
   const fallbackCode = initialOwnerProfileRelationshipCode(
     profile.relationshipLayers,
@@ -230,7 +297,10 @@ function RelationshipProfile({ profile }: { profile: OwnerProfile }) {
                   ? `${layer.sightCount}명, 공개 가능`
                   : `${layer.sightCount}/3, 시선을 모으는 중`
               }`}
-              onClick={() => setSelectedCode(layer.relationshipCode)}
+              onClick={() => {
+                setSelectedCode(layer.relationshipCode);
+                setSelectedCardId(null);
+              }}
             >
               <span>{label}</span>
               <strong>
@@ -250,15 +320,24 @@ function RelationshipProfile({ profile }: { profile: OwnerProfile }) {
             : `${selectedLayer.sightCount}/3 · 수집 중`}
         </span>
       </div>
-      <LayerContent layer={selectedLayer} profile={profile} />
+      <LayerContent
+        layer={selectedLayer}
+        onShare={onShare}
+        playId={profile.playId}
+        preferredCardId={selectedCardId}
+        profile={profile}
+        shareDisabled={shareDisabled}
+      />
       <p className={styles.privacyNote}>이름과 개별 답변은 공개되지 않아요.</p>
     </section>
   );
 }
 
 export default function OwnerProfileView({
+  initialShareSelection,
   playId,
 }: {
+  initialShareSelection?: ProfileShareSelection | null;
   playId: string | null;
 }) {
   const [state, setState] = useState<State>(
@@ -425,7 +504,17 @@ export default function OwnerProfileView({
             <p>공개 링크로 시선이 도착하면 관계별 상태가 여기에 쌓여요.</p>
           </section>
         ) : (
-          <RelationshipProfile profile={profile} />
+          <RelationshipProfile
+            initialShareSelection={initialShareSelection}
+            onShare={() => {
+              if (reshareClickRef.current) return;
+              reshareClickRef.current = true;
+              void recordOwnerProfileReshareClicked(profile.playId).catch(
+                () => undefined,
+              );
+            }}
+            profile={profile}
+          />
         )}
       </section>
     </main>
