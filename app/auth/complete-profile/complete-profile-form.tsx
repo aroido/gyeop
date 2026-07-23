@@ -54,6 +54,7 @@ export default function CompleteProfileForm({
         name="nickname"
         autoComplete="nickname"
         autoFocus
+        minLength={2}
         maxLength={12}
         value={nickname}
         onChange={(event) => setNickname(event.target.value)}

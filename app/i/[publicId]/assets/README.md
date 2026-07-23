@@ -8,8 +8,9 @@
 - Subsetter: fonttools `4.59.0`
 - Source SHA-256: `194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252`
 - Static instance: weight `900`
+- Subset size: `2,449,048` bytes
 - Subset SHA-256: `686b8c75de265ca1d0a487851dd802419319d06ff808a0e6684cce2b7df8c380`
-- License SHA-256: `1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9`
+- License SHA-256: `babcfe66c8a098b2fa279bc724a3a342f8124f77ce18941fbcc1bbb39823cded`
 
 The subset retains printable ASCII (`U+0020-007E`) and every modern Hangul
 syllable (`U+AC00-D7A3`). This includes the boundary test string

@@ -33,8 +33,8 @@ export default async function CompleteProfilePage({
         <p className={styles.brand}>겹 · 프로필 설정</p>
         <h1 id="profile-title">초대장에 쓸 이름을 알려 주세요</h1>
         <p className={styles.lead}>
-          친구가 링크를 열기 전에 닉네임을 볼 수 있어요. Google 계정 이름은
-          공개하지 않아요.
+          친구가 링크를 열기 전에 닉네임을 볼 수 있어요. Google 계정의 이름,
+          이메일, 사진은 공개하지 않아요.
         </p>
         <CompleteProfileForm returnTo={returnTo} />
       </section>

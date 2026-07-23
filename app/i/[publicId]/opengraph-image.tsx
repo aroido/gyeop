@@ -128,8 +128,8 @@ export default async function OpenGraphImage({
         headers: { "Content-Type": "image/png" },
       }),
     );
-  } catch (error) {
-    console.error("Failed to render invite Open Graph image", error);
+  } catch {
+    console.error("preview_render_failed");
     return inviteOgFallbackResponse();
   }
 }

@@ -5,12 +5,14 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 IMAGE="gyeop-render-deploy-check-$$"
 CONTAINER="${IMAGE}-run"
+INVITE_HEADERS=$(mktemp)
 
 secret() {
   node -e 'console.log(require("node:crypto").randomBytes(32).toString("base64url"))'
 }
 
 cleanup() {
+  rm -f "$INVITE_HEADERS"
   docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
   docker image rm -f "$IMAGE" >/dev/null 2>&1 || true
 }
@@ -57,6 +59,15 @@ animation_content_type=${animation_result#* }
 [[ "$animation_status" == 200 ]]
 [[ "$animation_content_type" == application/json* ]]
 
+invite_status=$(curl --silent --dump-header "$INVITE_HEADERS" --output /dev/null --write-out '%{http_code}' --max-time 5 \
+  "http://127.0.0.1:${port}/i/not-valid")
+invite_cache_control=$(awk 'tolower($1) == "cache-control:" { $1 = ""; sub(/^ /, ""); print }' "$INVITE_HEADERS" | tr -d '\r')
+
+if [[ "$invite_status" != 200 || "$invite_cache_control" != *no-store* ]]; then
+  echo "Invite cache contract failed: status=${invite_status} cache=${invite_cache_control}" >&2
+  exit 1
+fi
+
 api_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-time 5 \
   -X DELETE "http://127.0.0.1:${port}/api/me/session" \
   -H 'Origin: https://gyeop.example' \
@@ -64,4 +75,4 @@ api_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --max-t
   --data '{}')
 
 [[ "$api_status" == 204 ]]
-echo "Render deploy check passed: home=${home_status} animation=${animation_status} animation_type=${animation_content_type} api=${api_status}"
+echo "Render deploy check passed: home=${home_status} animation=${animation_status} animation_type=${animation_content_type} invite=${invite_status} invite_cache=${invite_cache_control} api=${api_status}"

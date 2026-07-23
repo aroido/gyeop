@@ -24,7 +24,7 @@ test("static fallback is an independently valid 1200x630 PNG", async () => {
   const png = await readFile(fallbackPath);
   assert.equal(
     sha256(png),
-    "6ed835d2f8a27b976896d248be9e14df1dc7436d2cc5b84d56827b7ea103ad20",
+    "33ba2cc71417af29252a4a0af1bc28e7fa5300ddbd55f8cebe74a62bc37ac475",
   );
   assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
   assert.equal(png.toString("ascii", 12, 16), "IHDR");
@@ -41,15 +41,21 @@ test("fallback response returns the exact static bytes without caching", async (
   assert.deepEqual(Buffer.from(await response.arrayBuffer()), expected);
 });
 
-test("pinned local TTF subset and provenance stay reproducible", async () => {
-  const [font, provenance] = await Promise.all([
+test("pinned local TTF subset, license, and provenance stay reproducible", async () => {
+  const [font, license, provenance] = await Promise.all([
     readFile(fontPath),
+    readFile(path.join(root, "app/i/[publicId]/assets/OFL.txt")),
     readFile(path.join(root, "app/i/[publicId]/assets/README.md"), "utf8"),
   ]);
   assert.equal(font.readUInt32BE(0), 0x00010000);
+  assert.equal(font.byteLength, 2_449_048);
   assert.equal(
     sha256(font),
     "686b8c75de265ca1d0a487851dd802419319d06ff808a0e6684cce2b7df8c380",
+  );
+  assert.equal(
+    sha256(license),
+    "babcfe66c8a098b2fa279bc724a3a342f8124f77ce18941fbcc1bbb39823cded",
   );
   assert.match(provenance, /U\+0020-007E,U\+AC00-D7A3/);
   assert.match(provenance, /가힣AZaz09/);
