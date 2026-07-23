@@ -811,10 +811,12 @@ test.describe("live owner flow", () => {
       }),
     ).toBeFocused();
     await expect(
-      page.getByText("관계마다 다른 나를 모아보세요.", { exact: true }),
+      page.getByText("친구의 답이 더 모이면 내 겹을 공유할 수 있어요.", {
+        exact: true,
+      }),
     ).toBeVisible();
     const shareEntry = page.getByRole("link", {
-      name: "질문팩 공유하기",
+      name: "시선 더 모으기",
     });
     await expect(shareEntry).toHaveAttribute(
       "href",

@@ -398,6 +398,20 @@
   color: var(--lime);
 }
 
+.shareInsight {
+  display: grid;
+  min-height: 3rem;
+  margin-top: 0.85rem;
+  place-items: center;
+  border: 1px solid #050505;
+  border-radius: 0.7rem;
+  background: var(--lime);
+  color: #050505;
+  font-weight: 950;
+  text-align: center;
+  text-decoration: none;
+}
+
 .collectingCard > p,
 .lockedLayer p {
   margin: 0.65rem 0 0;
@@ -437,6 +451,7 @@
 
 .back:focus-visible,
 .primary:focus-visible,
+.shareInsight:focus-visible,
 .relationshipPicker button:focus-visible {
   outline: 3px solid var(--blue);
   outline-offset: 3px;

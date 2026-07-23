@@ -7,6 +7,15 @@ import {
   loadOwnerFlow,
   OwnerFlowHttpError,
 } from "@/lib/owner-flow/owner-flow-client";
+import type {
+  ProfileShareCardModel,
+  ProfileShareSelection,
+} from "@/lib/owner-profile/owner-profile";
+import { buildProfileShareCardModel } from "@/lib/owner-profile/profile-share-card-core.mjs";
+import {
+  loadOwnerProfile,
+  OwnerProfileHttpError,
+} from "@/lib/owner-profile/owner-profile-client";
 import { defaultShareKind, type ShareKind } from "@/lib/packs/presentation";
 import {
   buildShareData,
@@ -25,16 +34,23 @@ import {
 
 import styles from "./share-links.module.css";
 import PrivateOneToOnePanel from "./private-one-to-one-panel";
+import {
+  downloadProfileShareCard,
+  ProfileShareCardPreview,
+  renderProfileShareCard,
+} from "./profile-share-card";
 
 type State =
   | { kind: "loading" }
   | { kind: "auth" }
   | { kind: "terminal" }
+  | { kind: "share_unavailable" }
   | {
       kind: "ready";
       packTitle: string;
       defaultShareKind: ShareKind;
       links: readonly ShareLink[];
+      shareCard: ProfileShareCardModel | null;
     };
 type ReadyLink = Readonly<{
   linkId: string;
@@ -45,10 +61,18 @@ type Feedback = Readonly<{
   tone: "status" | "alert";
   message: string;
 }>;
+type CardFileState =
+  | Readonly<{ kind: "idle" | "error" }>
+  | Readonly<{
+      kind: "ready";
+      file: File;
+      model: ProfileShareCardModel;
+    }>;
 
 function isAuthenticationRequired(error: unknown) {
   return (
     (error instanceof OwnerFlowHttpError ||
+      error instanceof OwnerProfileHttpError ||
       error instanceof ShareLinkHttpError) &&
     error.status === 401
   );
@@ -56,8 +80,19 @@ function isAuthenticationRequired(error: unknown) {
 
 async function readManagerState(
   playId: string,
-): Promise<Extract<State, { kind: "ready" }>> {
-  const { play, pack } = await loadOwnerFlow(playId);
+  shareSelection: ProfileShareSelection | null | undefined,
+): Promise<
+  | Extract<State, { kind: "ready" }>
+  | Extract<State, { kind: "share_unavailable" }>
+> {
+  if (shareSelection === null) return { kind: "share_unavailable" };
+  const [{ play, pack }, links, profile] = await Promise.all([
+    loadOwnerFlow(playId),
+    shareSelection === undefined ? listShareLinks(playId) : Promise.resolve([]),
+    shareSelection === undefined
+      ? Promise.resolve(null)
+      : loadOwnerProfile(playId),
+  ]);
   if (
     play.status !== "completed" ||
     pack.slug !== play.packSlug ||
@@ -65,12 +100,17 @@ async function readManagerState(
   ) {
     throw new Error("terminal");
   }
-  const links = await listShareLinks(playId);
+  const shareCard =
+    profile && shareSelection
+      ? buildProfileShareCardModel(profile, shareSelection)
+      : null;
+  if (shareSelection && !shareCard) return { kind: "share_unavailable" };
   return {
     kind: "ready",
     packTitle: pack.title,
     defaultShareKind: defaultShareKind(pack.sensitivity),
     links,
+    shareCard,
   };
 }
 
@@ -88,12 +128,25 @@ function readShareSupport() {
   );
 }
 
+function canShareFile(file: File) {
+  try {
+    return (
+      typeof navigator.canShare === "function" &&
+      navigator.canShare({ files: [file] })
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default function ShareLinkManager({
   playId,
   entrySource,
+  shareSelection,
 }: {
   playId: string | null;
   entrySource: ShareEntrySource;
+  shareSelection?: ProfileShareSelection | null;
 }) {
   const [state, setState] = useState<State>(
     playId ? { kind: "loading" } : { kind: "terminal" },
@@ -102,11 +155,15 @@ export default function ShareLinkManager({
   const [readyLink, setReadyLink] = useState<ReadyLink | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [cardFile, setCardFile] = useState<CardFileState>({ kind: "idle" });
+  const [forceCardFallback, setForceCardFallback] = useState(false);
+  const [manualCopyRequired, setManualCopyRequired] = useState(false);
   const canShare = useSyncExternalStore(
     subscribeShareSupport,
     readShareSupport,
     () => false,
   );
+  const shareCard = state.kind === "ready" ? state.shareCard : null;
   const actionLatchRef = useRef(false);
   const focusAfterActionRef = useRef<"share" | "copy" | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -132,6 +189,7 @@ export default function ShareLinkManager({
       if (!event.persisted) return;
       setState({ kind: "loading" });
       setReadyLink(null);
+      setCardFile({ kind: "idle" });
       window.location.reload();
     };
     window.addEventListener("pageshow", refreshRestoredPage);
@@ -142,9 +200,14 @@ export default function ShareLinkManager({
     if (!playId) return;
     setState({ kind: "loading" });
     setReadyLink(null);
+    setCardFile({ kind: "idle" });
+    setForceCardFallback(false);
+    setManualCopyRequired(false);
     try {
-      const next = await readManagerState(playId);
-      setSelectedKind(next.defaultShareKind);
+      const next = await readManagerState(playId, shareSelection);
+      if (next.kind === "ready") {
+        setSelectedKind(next.shareCard ? "public" : next.defaultShareKind);
+      }
       setState(next);
     } catch (error) {
       setState({ kind: isAuthenticationRequired(error) ? "auth" : "terminal" });
@@ -154,10 +217,12 @@ export default function ShareLinkManager({
   useEffect(() => {
     if (!playId) return;
     let active = true;
-    void readManagerState(playId)
+    void readManagerState(playId, shareSelection)
       .then((next) => {
         if (active) {
-          setSelectedKind(next.defaultShareKind);
+          if (next.kind === "ready") {
+            setSelectedKind(next.shareCard ? "public" : next.defaultShareKind);
+          }
           setState(next);
         }
       })
@@ -171,7 +236,31 @@ export default function ShareLinkManager({
     return () => {
       active = false;
     };
-  }, [playId]);
+  }, [playId, shareSelection]);
+
+  useEffect(() => {
+    if (!shareCard) return;
+    let active = true;
+    void renderProfileShareCard(shareCard).then(
+      (file) => {
+        if (active) setCardFile({ kind: "ready", file, model: shareCard });
+      },
+      () => {
+        if (active) {
+          setCardFile({ kind: "error" });
+          setForceCardFallback(true);
+          setFeedback({
+            tone: "alert",
+            message:
+              "이미지를 만들지 못했어요. 링크를 복사해 먼저 보내 주세요.",
+          });
+        }
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [shareCard]);
 
   useEffect(() => {
     if (state.kind !== "loading") headingRef.current?.focus();
@@ -180,6 +269,12 @@ export default function ShareLinkManager({
   useEffect(() => {
     if (readyLink) readyHeadingRef.current?.focus();
   }, [readyLink]);
+
+  useEffect(() => {
+    if (!manualCopyRequired) return;
+    manualUrlRef.current?.focus();
+    manualUrlRef.current?.select();
+  }, [manualCopyRequired]);
 
   useEffect(() => {
     if (busy !== null || focusAfterActionRef.current === null) return;
@@ -193,7 +288,10 @@ export default function ShareLinkManager({
     if (!playId || state.kind !== "ready" || !beginAction("create")) return;
     setFeedback(null);
     try {
-      const result = await createShareLink(playId, selectedKind);
+      const result = await createShareLink(
+        playId,
+        state.shareCard ? "public" : selectedKind,
+      );
       setReadyLink({
         linkId: result.link.id,
         kind: result.link.kind,
@@ -207,7 +305,9 @@ export default function ShareLinkManager({
     } catch {
       setFeedback({
         tone: "alert",
-        message: "링크를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+        message: state.shareCard
+          ? "카드 공유를 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+          : "링크를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.",
       });
     } finally {
       endAction();
@@ -300,12 +400,29 @@ export default function ShareLinkManager({
       return;
     setFeedback(null);
     try {
-      await navigator.share(
-        buildShareData(readyLink.inviteUrl, state.packTitle),
-      );
+      const shareData = buildShareData(readyLink.inviteUrl, state.packTitle);
+      if (state.shareCard) {
+        if (
+          cardFile.kind !== "ready" ||
+          cardFile.model !== state.shareCard ||
+          !canShareFile(cardFile.file)
+        ) {
+          setForceCardFallback(true);
+          setFeedback({
+            tone: "alert",
+            message: "이 브라우저에서는 카드와 링크를 함께 보낼 수 없어요.",
+          });
+          return;
+        }
+        await navigator.share({ ...shareData, files: [cardFile.file] });
+      } else {
+        await navigator.share(shareData);
+      }
       setFeedback({
         tone: "status",
-        message: "공유 메뉴로 링크를 전달했어요.",
+        message: state.shareCard
+          ? "공유 메뉴로 카드와 링크를 전달했어요."
+          : "공유 메뉴로 링크를 전달했어요.",
       });
       void recordShareAction(
         playId,
@@ -314,15 +431,19 @@ export default function ShareLinkManager({
         entrySource,
       ).catch(() => undefined);
     } catch (caught) {
+      const cancelled = isShareCancellation(caught);
+      if (state.shareCard && !cancelled) setForceCardFallback(true);
       setFeedback(
-        isShareCancellation(caught)
+        cancelled
           ? {
               tone: "status",
               message: "공유를 취소했어요. 링크는 그대로 있어요.",
             }
           : {
               tone: "alert",
-              message: "공유 메뉴를 열지 못했어요. 링크 복사를 사용해 주세요.",
+              message: state.shareCard
+                ? "공유 메뉴를 열지 못했어요. 이미지 저장과 링크 복사를 사용해 주세요."
+                : "공유 메뉴를 열지 못했어요. 링크 복사를 사용해 주세요.",
             },
       );
     } finally {
@@ -338,6 +459,7 @@ export default function ShareLinkManager({
     try {
       if (!navigator.clipboard?.writeText) throw new Error("unavailable");
       await navigator.clipboard.writeText(readyLink.inviteUrl);
+      setManualCopyRequired(false);
       setFeedback({
         tone: "status",
         message:
@@ -351,19 +473,33 @@ export default function ShareLinkManager({
       ).catch(() => undefined);
     } catch {
       manualFallback = true;
+      setManualCopyRequired(true);
       setFeedback({
         tone: "alert",
         message:
           "자동 복사가 안 됐어요. 아래 링크를 길게 눌러 직접 복사해 주세요.",
       });
-      manualUrlRef.current?.focus();
-      manualUrlRef.current?.select();
     } finally {
       if (!manualFallback) {
         focusAfterActionRef.current = "copy";
       }
       endAction();
     }
+  }
+
+  function downloadCard() {
+    if (
+      state.kind !== "ready" ||
+      !state.shareCard ||
+      cardFile.kind !== "ready" ||
+      cardFile.model !== state.shareCard
+    )
+      return;
+    downloadProfileShareCard(cardFile.file);
+    setFeedback({
+      tone: "status",
+      message: "이미지를 저장했어요. 링크도 함께 보내 주세요.",
+    });
   }
 
   if (state.kind === "loading") {
@@ -404,6 +540,132 @@ export default function ShareLinkManager({
           <Link className={styles.primaryLink} href="/">
             홈으로
           </Link>
+        </section>
+      </main>
+    );
+  }
+  if (state.kind === "share_unavailable") {
+    return (
+      <main className={styles.shell}>
+        <section className={styles.panel}>
+          <p className={styles.brand}>겹 · 내 프로필</p>
+          <h1 ref={headingRef} tabIndex={-1}>
+            이 시선은 지금 공유할 수 없어요
+          </h1>
+          <Link
+            className={styles.primaryLink}
+            href={playId ? `/me/profile/${playId}` : "/me"}
+          >
+            프로필로 돌아가기
+          </Link>
+        </section>
+      </main>
+    );
+  }
+
+  if (state.shareCard) {
+    const cardFileReady =
+      cardFile.kind === "ready" && cardFile.model === state.shareCard;
+    const fileShareSupported =
+      canShare &&
+      cardFileReady &&
+      canShareFile(cardFile.file) &&
+      !forceCardFallback;
+    const showFallback =
+      readyLink &&
+      (forceCardFallback ||
+        (cardFileReady && !fileShareSupported) ||
+        cardFile.kind === "error");
+    return (
+      <main className={styles.shell}>
+        <section className={styles.panel} aria-labelledby="share-title">
+          <nav className={styles.cardNav} aria-label="내 프로필 이동">
+            <Link className={styles.back} href={`/me/profile/${playId}`}>
+              ← 프로필로
+            </Link>
+          </nav>
+          <p className={styles.brand}>겹 · {state.packTitle}</p>
+          <h1 id="share-title" ref={headingRef} tabIndex={-1}>
+            내 겹 공유하기
+          </h1>
+          <ProfileShareCardPreview model={state.shareCard} />
+
+          {!readyLink ? (
+            <button
+              className={styles.primary}
+              type="button"
+              disabled={busy !== null}
+              onClick={create}
+            >
+              {busy === "create" ? "준비하는 중…" : "카드 공유 준비하기"}
+            </button>
+          ) : cardFile.kind === "idle" || !cardFileReady ? (
+            <p className={styles.feedback} role="status">
+              공유 이미지를 준비하는 중…
+            </p>
+          ) : fileShareSupported ? (
+            <button
+              ref={shareButtonRef}
+              className={styles.primary}
+              disabled={busy !== null}
+              type="button"
+              onClick={shareReadyLink}
+            >
+              {busy === "share" ? "공유 메뉴 여는 중…" : "카드와 링크 공유하기"}
+            </button>
+          ) : null}
+
+          {showFallback ? (
+            <div className={styles.cardFallback} aria-label="카드 공유 대안">
+              {cardFileReady ? (
+                <button
+                  className={styles.secondary}
+                  disabled={busy !== null}
+                  type="button"
+                  onClick={downloadCard}
+                >
+                  이미지 저장
+                </button>
+              ) : null}
+              <button
+                ref={copyButtonRef}
+                className={styles.secondary}
+                disabled={busy !== null}
+                type="button"
+                onClick={copyReadyLink}
+              >
+                {busy === "copy" ? "복사하는 중…" : "링크 복사"}
+              </button>
+            </div>
+          ) : null}
+
+          {feedback ? (
+            <p
+              className={
+                feedback.tone === "alert" ? styles.error : styles.feedback
+              }
+              role={feedback.tone}
+              aria-live={feedback.tone === "status" ? "polite" : undefined}
+            >
+              {feedback.message}
+            </p>
+          ) : null}
+
+          {readyLink && manualCopyRequired ? (
+            <>
+              <label className={styles.manualLabel} htmlFor="manual-share-url">
+                공유 링크 직접 복사
+              </label>
+              <input
+                id="manual-share-url"
+                ref={manualUrlRef}
+                className={styles.manualUrl}
+                readOnly
+                value={readyLink.inviteUrl}
+                onFocus={(event) => event.currentTarget.select()}
+              />
+            </>
+          ) : null}
         </section>
       </main>
     );

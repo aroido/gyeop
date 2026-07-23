@@ -1,5 +1,20 @@
 export type OwnerProfileCounts = Readonly<{ a: number; b: number }>;
 
+export type ProfileShareSelection = Readonly<{
+  relationshipCode: string;
+  cardId: string;
+}>;
+
+export type ProfileShareCardModel = Readonly<{
+  packTitle: string;
+  relationshipLabel: string;
+  prompt: string;
+  optionA: string;
+  optionB: string;
+  selfChoice: "a" | "b";
+  counts: OwnerProfileCounts;
+}>;
+
 export type OwnerProfileRelationshipCard =
   | Readonly<{
       cardId: string;

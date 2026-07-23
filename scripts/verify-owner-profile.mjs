@@ -230,11 +230,19 @@ export function verifyOwnerProfile() {
   const accountPage = source("app/me/page.tsx");
   assert.match(accountPage, /loadAuthenticatedOwnerAccountProfile/);
   assert.match(accountPage, /프로필을 불러오지 못했어요/);
+  const profileShareCore = source(
+    "lib/owner-profile/profile-share-card-core.mjs",
+  );
+  assert.match(profileShareCore, /value !== "romantic"/);
+  assert.match(profileShareCore, /firstAccountProfileShareSelection/);
   const accountView = source("app/me/account-profile-view.tsx");
   for (const contract of [
-    "관계마다 다른 나를 모아보세요.",
+    "firstAccountProfileShareSelection",
+    "친구가 본 내 모습을 한 장으로 나눠보세요.",
+    "친구의 답이 더 모이면 내 겹을 공유할 수 있어요.",
     "질문팩에 답하고, 내가 보는 나부터 쌓아보세요.",
-    "질문팩 공유하기",
+    "내 겹 공유하기",
+    "시선 더 모으기",
     "질문팩 시작하기",
     "완료한 겹",
     "관계별로 보는 나",
@@ -247,7 +255,15 @@ export function verifyOwnerProfile() {
   }
   assert.match(
     accountView,
-    /href=\{profile\.ctaPlayId \? `\/me\/plays\/\$\{profile\.ctaPlayId\}` : "\/"\}/,
+    /`\/me\/profile\/\$\{shareSelection\.playId\}\?share_relationship=\$\{encodeURIComponent\(\s*shareSelection\.relationshipCode,?\s*\)\}/,
+  );
+  assert.match(
+    accountView,
+    /share_card=\$\{encodeURIComponent\(\s*shareSelection\.cardId,?\s*\)\}#shareable-insight/,
+  );
+  assert.match(
+    accountView,
+    /profile\.ctaPlayId\s*\?\s*`\/me\/plays\/\$\{profile\.ctaPlayId\}`\s*:\s*"\/"/,
   );
   assert.doesNotMatch(
     accountView,
@@ -267,6 +283,8 @@ export function verifyOwnerProfile() {
     "새 시선 도착",
     "시선이 쌓여 있어요",
     "시선 더 모으기",
+    "이 시선 카드 공유하기",
+    "isProfileShareRelationship",
     "recordOwnerProfileViewed",
     "recordOwnerProfileReshareClicked",
     "entry_source=profile_reshare",
@@ -274,7 +292,6 @@ export function verifyOwnerProfile() {
     assert.ok(view.includes(contract), `missing profile UI: ${contract}`);
   }
   assert.doesNotMatch(view, /팔로워|팔로잉|친밀도|순위|AI 요약/);
-  assert.doesNotMatch(view, /이 시선 카드 공유하기/);
   assert.doesNotMatch(view, /console\s*\./);
 
   const mockup = readFileSync(

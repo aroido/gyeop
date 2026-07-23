@@ -1,0 +1,99 @@
+.preview {
+  position: relative;
+  display: grid;
+  width: min(100%, 20rem);
+  aspect-ratio: 9 / 16;
+  min-width: 0;
+  margin: 1rem auto 0;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  gap: 0.7rem;
+  padding: 1rem;
+  overflow: hidden;
+  border: 1px solid #555;
+  border-radius: 1rem;
+  background: #f5f1e9;
+  box-shadow:
+    0.35rem 0.35rem 0 #315cff,
+    0.65rem 0.65rem 0 #dfff00,
+    0.95rem 0.95rem 0 #ff4d42;
+  color: #050505;
+}
+
+.preview header {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: #315cff;
+  color: #fff;
+}
+
+.preview header p,
+.preview h2,
+.preview p {
+  margin: 0;
+}
+
+.preview header p {
+  font-size: 0.68rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.preview header span {
+  width: fit-content;
+  padding: 0.25rem 0.45rem;
+  border-radius: 999px;
+  background: #dfff00;
+  color: #050505;
+  font-size: 0.66rem;
+  font-weight: 950;
+}
+
+.preview h2 {
+  align-self: center;
+  font-size: clamp(1.4rem, 7vw, 2rem);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+.selfChoice {
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.choices {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.choices p {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  padding: 0.65rem;
+  border-radius: 0.65rem;
+  background: #050505;
+  color: #fff;
+  font-size: 0.72rem;
+}
+
+.choices p[data-selected="true"] {
+  background: #dfff00;
+  color: #050505;
+}
+
+.choices span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.choices strong {
+  white-space: nowrap;
+}
+
+.brand {
+  font-size: 1.15rem;
+}
