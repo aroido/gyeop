@@ -19,6 +19,7 @@ const ALLOWED_RPC_EXPORTS = new Map([
   ["saveAuthenticatedOwnerAnswer", "save_authenticated_owner_answer"],
   ["completeAuthenticatedOwnerPlay", "complete_authenticated_owner_play"],
   ["getAuthenticatedOwnerProfile", "get_authenticated_owner_profile"],
+  ["getAuthenticatedOwnerAccountProfiles", "get_authenticated_owner_profile"],
   [
     "getAuthenticatedOwnerPublicProfile",
     "get_authenticated_owner_public_profile",

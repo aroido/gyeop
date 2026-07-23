@@ -844,7 +844,7 @@ test.describe("live owner flow", () => {
     ).toBeFocused();
     await signInOwnerAccount(page, account.email);
     await expect(
-      page.getByRole("link", { name: "프로필·공유 관리" }),
+      page.getByRole("link", { name: "공유·상세 관리" }),
     ).toHaveCount(1);
 
     const recoveredContext = await browser.newContext({
@@ -926,6 +926,26 @@ test.describe("live owner flow", () => {
         name: "내 답변 10개가 저장됐어요",
       }),
     ).toBeVisible({ timeout: 15_000 });
+    await recoveredPage.goto("/me");
+    await expect(
+      recoveredPage.getByRole("heading", {
+        name: `${account.nickname}의 겹`,
+        level: 1,
+      }),
+    ).toBeFocused();
+    await expect(recoveredPage.getByText("완료한 겹 2개")).toBeVisible();
+    await expect(
+      recoveredPage.getByRole("heading", {
+        name: "말 안 해도 알까?",
+        level: 3,
+      }),
+    ).toBeVisible();
+    await expect(
+      recoveredPage.getByRole("heading", {
+        name: "우리는 아직도 통하는 편",
+        level: 3,
+      }),
+    ).toBeVisible();
     await recoveredContext.close();
   });
 

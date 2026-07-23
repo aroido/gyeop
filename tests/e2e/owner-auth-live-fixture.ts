@@ -226,7 +226,8 @@ export async function signInOwnerAccount(
   }
   await expect(page).toHaveURL(/\/me$/);
   const ownerListHeading = page.getByRole("heading", {
-    name: "저장한 질문팩",
+    name: /의 겹$/,
+    level: 1,
   });
   if (options.profile === "new") {
     await expect(ownerListHeading).toBeVisible();
@@ -245,6 +246,6 @@ export async function verifyIncompleteOwnerProfileGate(page: Page) {
   await expectIncompleteProfile(page, { email, returnTo: "/me" });
   await completeOwnerProfile(page, { email, returnTo: "/me" });
   await expect(
-    page.getByRole("heading", { name: "저장한 질문팩" }),
+    page.getByRole("heading", { name: `${defaultOwnerNickname}의 겹` }),
   ).toBeVisible();
 }

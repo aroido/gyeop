@@ -502,6 +502,8 @@ P0에는 별도 aggregate table을 만들지 않는다.
 
 owner profile SQL 함수는 공개 링크의 raw 방문자 row나 개별 선택을 반환하지 않는다. owner 전용 `get_private_1to1_comparison`은 해당 play owner에게만 지정 response의 카드 비교를 반환하고 response session을 권한으로 받지 않는다. 방문자는 만료 전 동일 response session의 `get_visitor_response`로 자신이 답한 카드 비교만 받는다. P0 방문자는 자신의 비교 외 어떤 관계 집계도 볼 수 없다. 집계 query p95가 300ms를 넘거나 한 play의 유효 응답이 10,000건을 넘을 때 materialized aggregate를 별도 이슈로 검토한다.
 
+인증 owner의 `/me` 계정 프로필은 새 aggregate SQL을 만들지 않는다. `list_authenticated_owner_plays`의 완료 play를 최신 활동순으로 유지하고, fresh Auth actor 한 번과 30초 전체 deadline 아래 `get_authenticated_owner_profile`을 최대 4개 동시 실행한다. completed play를 임의 절단하지 않으며 개별 profile에는 8초 deadline을 둔다. 한 결과라도 timeout·권한·decode·metadata 교차 검증에 실패하면 partial RSC를 만들지 않고 generic retry 화면으로 수렴한다. 계정 모델은 play별 strict profile의 첫 셀프 카드, collecting 관계의 play-bound `1/3|2/3`, 이미 available인 관계 질문만 직렬화한다. 서로 다른 play의 소표본은 합산하지 않는다.
+
 owner profile 화면은 시선 0건에서 재공유 CTA를 표시하지 않는다. 시선 1건 이상에서는 기존 질문팩 `시선 더 모으기`, `profile_viewed`, `profile_reshare_clicked` 조건을 유지한다. 관계 카드 PNG·다운로드·외부 공유는 #147이 소유한다.
 
 ## 13. 알림과 분석

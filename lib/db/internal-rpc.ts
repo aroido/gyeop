@@ -13,6 +13,7 @@ import {
   decodeOwnerProfileEventOutcome,
   decodeOwnerProfileOutcome,
 } from "../owner-profile/owner-profile-core.mjs";
+import { readOwnerProfilesBounded } from "../owner-profile/account-profile-core.mjs";
 import type {
   OwnerProfileEventResult,
   OwnerProfileResult,
@@ -571,6 +572,40 @@ export async function getAuthenticatedOwnerProfile(input: {
       throw new Error("Internal authenticated owner profile RPC failed");
     return decodeOwnerProfileOutcome(data) as OwnerProfileResult;
   });
+}
+
+export async function getAuthenticatedOwnerAccountProfiles(
+  playIds: readonly string[],
+): Promise<readonly OwnerProfileResult[]> {
+  return withOwnerMutationActor(({ actor, signal }) =>
+    readOwnerProfilesBounded({
+      actor,
+      playIds: [...playIds],
+      signal,
+      concurrency: 4,
+      perProfileDeadlineMs: 8_000,
+      readProfile: async ({
+        actor: profileActor,
+        playId,
+        signal: profileSignal,
+      }: {
+        actor: Readonly<{ uid: string }>;
+        playId: string;
+        signal: AbortSignal;
+      }) => {
+        const { data, error } = await getInternalClient()
+          .rpc("get_authenticated_owner_profile", {
+            p_play_id: playId,
+            p_actor_id: profileActor.uid,
+          })
+          .abortSignal(profileSignal);
+        if (error) {
+          throw new Error("Internal authenticated owner profile RPC failed");
+        }
+        return decodeOwnerProfileOutcome(data) as OwnerProfileResult;
+      },
+    }),
+  ) as Promise<readonly OwnerProfileResult[]>;
 }
 
 export async function getAuthenticatedOwnerPublicProfile(): Promise<OwnerPublicProfileResult> {

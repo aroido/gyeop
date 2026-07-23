@@ -7,11 +7,14 @@ import {
 } from "../auth/owner-claim-context-core.mjs";
 import {
   claimAnonymousOwner,
+  getAuthenticatedOwnerAccountProfiles,
   getAuthenticatedOwnerPlay,
   getAuthenticatedOwnerPublicProfile,
   getOwnerPlay,
   listAuthenticatedOwnerPlays,
 } from "../db/internal-rpc.ts";
+import { buildAccountOwnerProfile } from "../owner-profile/account-profile-core.mjs";
+import type { AccountOwnerProfile } from "../owner-profile/account-profile.ts";
 import type { ParsedOwnerCookie } from "../owner-play/owner-play-session.ts";
 import { parseRateLimitSecret } from "../security/network-key.mjs";
 import { validateAppUrl } from "./http-boundary-core.mjs";
@@ -172,6 +175,23 @@ export async function completeOwnerAuthentication(input: {
 
 export async function loadAuthenticatedOwnerPlays() {
   return listAuthenticatedOwnerPlays();
+}
+
+export async function loadAuthenticatedOwnerAccountProfile(
+  nickname: string,
+): Promise<AccountOwnerProfile> {
+  const plays = await listAuthenticatedOwnerPlays();
+  const completed = plays.filter(({ status }) => status === "completed");
+  const outcomes = await getAuthenticatedOwnerAccountProfiles(
+    completed.map(({ id }) => id),
+  );
+  const profiles = outcomes.map((result) => {
+    if (result.outcome !== "authorized") {
+      throw new Error("Authenticated account profile load failed");
+    }
+    return result.profile;
+  });
+  return buildAccountOwnerProfile({ nickname, plays, profiles });
 }
 
 export async function signOutOwnerAccountResponse() {

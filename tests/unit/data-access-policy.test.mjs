@@ -21,6 +21,25 @@ test("accepts the repository server-only RPC boundary", async () => {
   assert.deepEqual(verifyDataAccessFiles(await fixtureFiles()), []);
 });
 
+test("keeps account profile reads behind one fresh actor and bounded shared context", async () => {
+  const source = (await fixtureFiles())[internalPath];
+  const start = source.indexOf(
+    "export async function getAuthenticatedOwnerAccountProfiles",
+  );
+  const end = source.indexOf(
+    "export async function getAuthenticatedOwnerPublicProfile",
+    start,
+  );
+  const wrapper = source.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.equal(wrapper.match(/withOwnerMutationActor/g)?.length, 1);
+  assert.match(wrapper, /readOwnerProfilesBounded/);
+  assert.match(wrapper, /concurrency:\s*4/);
+  assert.match(wrapper, /perProfileDeadlineMs:\s*8_000/);
+  assert.match(wrapper, /p_actor_id:\s*profileActor\.uid/);
+  assert.match(wrapper, /\.abortSignal\(profileSignal\)/);
+});
+
 test("rejects secret use, direct tables, actor imports, and raw client exports", async () => {
   const files = await fixtureFiles();
   files["lib/leaked-secret.ts"] =

@@ -210,6 +210,40 @@ export function verifyOwnerProfile() {
   assert.match(core, /OWNER_PROFILE_WATERMARK_KEY/);
   assert.doesNotMatch(core, /console\s*\./);
 
+  const accountCore = source("lib/owner-profile/account-profile-core.mjs");
+  for (const contract of [
+    "buildAccountOwnerProfile",
+    "decodeAccountOwnerProfile",
+    "readOwnerProfilesBounded",
+    "concurrency = 4",
+    "AbortSignal.timeout(perProfileDeadlineMs)",
+    'relationship.status === "collecting"',
+    'card.status !== "available"',
+  ]) {
+    assert.ok(
+      accountCore.includes(contract),
+      `missing account profile contract: ${contract}`,
+    );
+  }
+  assert.doesNotMatch(accountCore, /console\s*\./);
+
+  const accountPage = source("app/me/page.tsx");
+  assert.match(accountPage, /loadAuthenticatedOwnerAccountProfile/);
+  assert.match(accountPage, /프로필을 불러오지 못했어요/);
+  const accountView = source("app/me/account-profile-view.tsx");
+  for (const contract of [
+    "겹 · 내 프로필",
+    "완료한 겹",
+    "관계별로 보는 나",
+    "내 질문팩 관리",
+    "시선 더 모으기",
+  ]) {
+    assert.ok(
+      accountView.includes(contract),
+      `missing account UI: ${contract}`,
+    );
+  }
+
   const view = source("app/me/owner-profile-view.tsx");
   for (const contract of [
     "공개 링크로 도착한 시선",
