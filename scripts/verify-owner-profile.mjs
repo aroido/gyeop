@@ -125,10 +125,7 @@ export function verifyOwnerProfile() {
 
   const relationshipProjection = migration.slice(
     migration.indexOf("select coalesce(", profileRead),
-    migration.indexOf(
-      "if jsonb_array_length(coalesce(v_cards",
-      profileRead,
-    ),
+    migration.indexOf("if jsonb_array_length(coalesce(v_cards", profileRead),
   );
   for (const contract of [
     "link.pack_play_id = p_play_id",
