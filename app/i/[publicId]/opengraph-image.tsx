@@ -129,7 +129,6 @@ export default async function OpenGraphImage({
       }),
     );
   } catch {
-    console.error("preview_render_failed");
     return inviteOgFallbackResponse();
   }
 }
