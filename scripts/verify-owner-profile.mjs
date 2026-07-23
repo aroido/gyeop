@@ -232,17 +232,31 @@ export function verifyOwnerProfile() {
   assert.match(accountPage, /프로필을 불러오지 못했어요/);
   const accountView = source("app/me/account-profile-view.tsx");
   for (const contract of [
-    "겹 · 내 프로필",
+    "관계마다 다른 나를 모아보세요.",
+    "질문팩에 답하고, 내가 보는 나부터 쌓아보세요.",
+    "질문팩 공유하기",
+    "질문팩 시작하기",
     "완료한 겹",
     "관계별로 보는 나",
     "내 질문팩 관리",
-    "시선 더 모으기",
   ]) {
     assert.ok(
       accountView.includes(contract),
       `missing account UI: ${contract}`,
     );
   }
+  assert.match(
+    accountView,
+    /href=\{profile\.ctaPlayId \? `\/me\/plays\/\$\{profile\.ctaPlayId\}` : "\/"\}/,
+  );
+  assert.doesNotMatch(
+    accountView,
+    /완료 응답 기준|완료 질문팩|도착한 관계 종류|아직 완성한 겹이 없어요/,
+  );
+  assert.doesNotMatch(
+    accountView,
+    /entry_source=profile_reshare|recordOwnerProfileReshareClicked/,
+  );
 
   const view = source("app/me/owner-profile-view.tsx");
   for (const contract of [

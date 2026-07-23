@@ -387,17 +387,18 @@ Primary는 error가 comparison 내용만 가리는 동안에도 새 owner 전환
 
 ### 7.7 비공개 최소 프로필 `/me`
 
-| 상태                    | 화면                                        | 행동·복구                                     | 접근성·privacy                        |
-| ----------------------- | ------------------------------------------- | --------------------------------------------- | ------------------------------------- |
-| loading                 | pack heading·summary skeleton               | 대기                                          | 이전 사용자 profile 잔상 금지         |
-| empty                   | 셀프 10장 + `아직 도착한 시선이 없어요`     | `시선 모으기`는 완료 play의 share 관리로 연결 | 새 play를 만들지 않음                 |
-| first sight success     | 전체 시선 `1`, `새 시선이 도착했어요`       | 같은 play `시선 더 모으기` 한 번              | animation 없이도 live status 제공     |
-| under threshold         | 각 card에 `시선을 모으는 중 · n/3`          | 선택 수 숨김                                  | `n`은 공개 링크 submitted 필수 응답만 |
-| threshold met           | 셀프 선택 + 공개 가능한 A/B count           | card별 실제 count                             | AI 요약, 점수, 고정 성격 label 없음   |
-| mixed                   | threshold 충족·미달 card가 한 목록에 공존   | card 상태별 표시                              | 미달 card의 count 추정 불가           |
-| empty account profile   | `<닉네임>의 겹` + `아직 완성한 겹이 없어요` | `질문팩 시작하기`, draft는 아래 관리 영역     | profile이 삭제됐다고 표현하지 않음    |
-| error                   | `프로필을 불러오지 못했어요`                | 현재 `/me`를 `다시 시도`                      | stale count·부분 play·login 오인 금지 |
-| session expired/revoked | same-browser 관리 종료 generic 안내         | 홈에서 새 시작                                | 기존 play·시선 존재 미노출            |
+| 상태                      | 화면                                                           | 행동·복구                                           | 접근성·privacy                        |
+| ------------------------- | -------------------------------------------------------------- | --------------------------------------------------- | ------------------------------------- |
+| loading                   | pack heading·summary skeleton                                  | 대기                                                | 이전 사용자 profile 잔상 금지         |
+| empty                     | 셀프 10장 + `아직 도착한 시선이 없어요`                        | `시선 모으기`는 완료 play의 share 관리로 연결       | 새 play를 만들지 않음                 |
+| first sight success       | 전체 시선 `1`, `새 시선이 도착했어요`                          | 같은 play `시선 더 모으기` 한 번                    | animation 없이도 live status 제공     |
+| under threshold           | 각 card에 `시선을 모으는 중 · n/3`                             | 선택 수 숨김                                        | `n`은 공개 링크 submitted 필수 응답만 |
+| threshold met             | 셀프 선택 + 공개 가능한 A/B count                              | card별 실제 count                                   | AI 요약, 점수, 고정 성격 label 없음   |
+| mixed                     | threshold 충족·미달 card가 한 목록에 공존                      | card 상태별 표시                                    | 미달 card의 count 추정 불가           |
+| empty account profile     | `<닉네임>의 겹` + 한 줄 + compact 지표                         | `질문팩 시작하기` → `/`, draft는 아래 관리          | 별도 empty 설명 박스를 만들지 않음    |
+| completed account profile | 제목 + `관계마다 다른 나를 모아보세요.` + compact 지표 + stack | `질문팩 공유하기` → query 없는 `/me/plays/[playId]` | 시선 0건에도 초기 공유 진입 표시      |
+| error                     | `프로필을 불러오지 못했어요`                                   | 현재 `/me`를 `다시 시도`                            | stale count·부분 play·login 오인 금지 |
+| session expired/revoked   | same-browser 관리 종료 generic 안내                            | 홈에서 새 시작                                      | 기존 play·시선 존재 미노출            |
 
 현재 private MVP의 layer 정의:
 
@@ -405,6 +406,8 @@ Primary는 error가 comparison 내용만 가리는 동안에도 새 owner 전환
 2. pending edge: 공개 링크 card 표본 `0/3`, `1/3`, `2/3`
 3. revealed layer: 같은 card가 공개 기준을 충족했을 때 실제 A/B count
 4. account stack: 인증 owner의 `/me`는 완료 play별 첫 셀프 카드와 각 play에서 이미 공개 가능한 관계 질문을 최대 4개 layer로 보여 준다. 전체 시선만 play별 `sightCount`를 합하고, 관계·질문 threshold는 play 경계를 넘어 다시 계산하지 않는다.
+
+account `/me` 상단은 `<닉네임>의 겹` → 상태별 한 줄 → 단일 CTA → `시선 N`·`완료한 겹 N`·`관계 N` → stack 순서만 사용한다. 완료 play가 없을 때 한 줄은 `질문팩에 답하고, 내가 보는 나부터 쌓아보세요.`다. 지표의 `계정 프로필 요약` 접근성 이름은 유지하되 `완료 응답 기준` 같은 보조 설명, 아이콘, 다중 action은 추가하지 않는다. 완료 play의 `질문팩 공유하기`는 실제 공유가 아니라 관리 화면 navigation이며, per-play 시선 0건 재공유 숨김 규칙은 그대로다.
 
 `/me`의 시각 기준은 검정 canvas의 목업 01·03·04다. 흰 canvas의 `owner-profile-relationship-layers-v1`은 원본 질문·셀프 선택·관계 threshold 구조만 참고한다. 목업의 `오래된 친구 7명`, avatar row, 여러 관계별 성격 단어는 현재 화면에 사용하지 않는다. submitted 1:1 응답과 민감 관계도 `/me` 누적에서 제외한다.
 

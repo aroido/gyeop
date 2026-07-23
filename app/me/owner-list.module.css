@@ -36,10 +36,18 @@
   font-weight: 900;
 }
 
+.profileHeader {
+  padding: 1rem;
+  border: 1px solid #444;
+  border-top: 0.45rem solid var(--blue);
+  border-radius: 1rem;
+  background: #111;
+  box-shadow: 0.35rem 0.35rem 0 var(--lime);
+}
+
 .card h1,
-.profile > h1,
+.profileHeader h1,
 .loading h1 {
-  margin: 0.75rem 0 0;
   font-size: clamp(2.25rem, 12vw, 4.5rem);
   font-weight: 950;
   line-height: 0.98;
@@ -47,8 +55,17 @@
   overflow-wrap: anywhere;
 }
 
+.card h1,
+.loading h1 {
+  margin: 0.75rem 0 0;
+}
+
+.profileHeader h1 {
+  margin: 0;
+}
+
 .card h1:focus,
-.profile > h1:focus,
+.profileHeader h1:focus,
 .loading h1:focus {
   outline: none;
 }
@@ -59,31 +76,28 @@
   line-height: 1.55;
 }
 
+.profileLead {
+  margin: 0.7rem 0 0;
+  font-weight: 800;
+  line-height: 1.4;
+  word-break: keep-all;
+}
+
 .metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.45rem;
-  margin-top: 1rem;
+  margin-top: 0.75rem;
 }
 
 .metrics p {
-  display: grid;
-  align-content: space-between;
-  min-height: 4.4rem;
   margin: 0;
-  padding: 0.65rem 0;
+  padding-top: 0.55rem;
   border-top: 1px solid #3a3a3a;
-}
-
-.metrics strong {
-  font-size: clamp(0.88rem, 3.8vw, 1.05rem);
+  font-size: clamp(0.72rem, 3.3vw, 0.9rem);
+  font-weight: 900;
   line-height: 1.2;
-}
-
-.metrics span {
-  color: #999;
-  font-size: 0.68rem;
-  font-weight: 800;
+  white-space: nowrap;
 }
 
 .stack {
@@ -162,7 +176,6 @@
   color: #fff;
 }
 
-.emptyProfile,
 .seedDetail,
 .collectingDetail,
 .relationshipDetail,
@@ -174,8 +187,6 @@
   background: #111;
 }
 
-.emptyProfile h2,
-.emptyProfile p,
 .seedDetail h2,
 .seedDetail p,
 .collectingDetail h3,
@@ -185,7 +196,6 @@
   margin: 0;
 }
 
-.emptyProfile p,
 .collectingDetail > p:last-child,
 .management > p {
   margin-top: 0.6rem;
