@@ -660,3 +660,45 @@ test("keeps unsafe-eval out of production while allowing the Next development ru
   assert.doesNotMatch(production["Content-Security-Policy"], /unsafe-eval/);
   assert.match(development["Content-Security-Policy"], /unsafe-eval/);
 });
+
+test("adds only exact GA hosts for a valid measurement ID", () => {
+  const valid = Object.fromEntries(
+    securityHeaders({
+      NODE_ENV: "production",
+      NEXT_PUBLIC_GA_MEASUREMENT_ID: "G-TEST123",
+    }).map(({ key, value }) => [key, value]),
+  )["Content-Security-Policy"];
+
+  assert.match(
+    valid,
+    /script-src [^;]* https:\/\/www\.googletagmanager\.com(?:;|$)/,
+  );
+  assert.match(
+    valid,
+    /connect-src [^;]* https:\/\/www\.google-analytics\.com https:\/\/region1\.google-analytics\.com(?:;|$)/,
+  );
+  assert.doesNotMatch(
+    valid,
+    /doubleclick|googleads|googletagmanager\.com\/gtm|\*/i,
+  );
+  assert.match(valid, /img-src 'self' data:/);
+  assert.doesNotMatch(valid, /img-src [^;]*google/i);
+});
+
+test("keeps Google out of CSP for missing or invalid measurement IDs", () => {
+  for (const measurementId of [
+    undefined,
+    "",
+    "g-TEST123",
+    "G-test123",
+    " G-TEST123",
+  ]) {
+    const csp = Object.fromEntries(
+      securityHeaders({
+        NODE_ENV: "production",
+        NEXT_PUBLIC_GA_MEASUREMENT_ID: measurementId,
+      }).map(({ key, value }) => [key, value]),
+    )["Content-Security-Policy"];
+    assert.doesNotMatch(csp, /google/i);
+  }
+});

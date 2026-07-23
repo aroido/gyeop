@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-23 — GA4는 명시 동의한 route-class 방문 관측에만 사용
+
+- 결정: GYEOP 전용 GA4 property와 Render web stream은 현재 브라우저에서 분석을 명시적으로 허용한 경우에만 동적 식별자를 제거한 route-class `page_view`와 tag health를 관측한다. Enhanced measurement, Google signals, user-provided data, 광고 개인화와 제품 연결은 끄며 Google user/event 보관은 2개월·새 활동 시 만료 재설정 OFF로 고정한다.
+- 이유: 운영 경로별 유입과 태그 작동 여부는 확인해야 하지만 닉네임·이메일·답변·관계·실제 play/public ID 또는 세부 제품 전환을 외부 분석 provider에 복제할 이유가 없다. pending과 denied에서는 Google code 자체를 실행하지 않는다.
+- 결과: 제품 전환과 ordered funnel의 canonical SSOT는 계속 `public.analytics_events`와 `private.core_funnel_stage_counts`다. 브라우저 GA 쿠키의 최초 생성부터 60일 non-renewing 상한, localStorage의 브라우저별 동의 선택, provider user/event 2개월 보관은 서로 다른 lifecycle로 다루며 표준 집계 보고서에는 provider 보관 설정이 적용되지 않을 수 있음을 공개한다.
+
 ## 2026-07-23 — private MVP 초대에 owner가 입력한 닉네임을 snapshot으로 공개
 
 - 결정: Google 로그인 직후 owner가 한글 완성형·영문·숫자 2~12자의 공개 닉네임을 완료해야 `/me`와 공유 생성을 사용할 수 있다. 새 링크는 생성 당시 닉네임을 snapshot으로 보관하고, fragment secret 없이 읽는 server HTML·SNS metadata·OG 이미지에 `닉네임님` 맥락을 표시한다. 공개·low 팩만 정확한 발행 version의 제목·커버 정체성을 쓰며 1:1·medium/high는 중립 카드로 제한한다.

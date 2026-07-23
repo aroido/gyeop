@@ -44,6 +44,52 @@
   word-break: keep-all;
 }
 
+.card .detail {
+  margin-top: 0.7rem;
+}
+
+.preference {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid #3a3a3a;
+  border-radius: 0.8rem;
+  background: #151515;
+}
+
+.preference h2 {
+  margin-top: 0;
+}
+
+.preferenceActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+
+.preferenceActions button {
+  min-height: 2.75rem;
+  padding: 0.65rem;
+  border: 1px solid #dfff00;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.preferenceActions button:disabled {
+  border-color: #565656;
+  color: #8d8d8d;
+  cursor: default;
+}
+
+.preferenceActions button:focus-visible {
+  outline: 3px solid #315cff;
+  outline-offset: 3px;
+}
+
 .card a {
   display: grid;
   min-height: 3rem;

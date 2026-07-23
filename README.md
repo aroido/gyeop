@@ -84,17 +84,27 @@ pnpm dev
 
 2. Render Dashboard에서 GitHub repository를 연결해 Blueprint `render.yaml`을 적용한다. Free plan을 유지하고, 생성된 `https://<service>.onrender.com` 주소만 비공개 테스트 참가자에게 전달한다.
 
-3. Render Environment에 `.env.example`의 다음 값을 설정한다. `NEXT_PUBLIC_SUPABASE_*` 두 값은 build 시에도 필요하며 나머지는 runtime secret이다. `APP_URL`은 비워두면 Render가 제공한 URL을 사용하고, 나중에 커스텀 도메인을 붙일 때만 HTTPS origin으로 명시한다.
+3. Render Environment에 `.env.example`의 다음 값을 설정한다. `NEXT_PUBLIC_SUPABASE_*`와 선택형 `NEXT_PUBLIC_GA_MEASUREMENT_ID`는 build 시에도 필요하며 나머지는 runtime secret이다. `APP_URL`은 비워두면 Render가 제공한 URL을 사용하고, 나중에 커스텀 도메인을 붙일 때만 HTTPS origin으로 명시한다.
 
    ```text
    NEXT_PUBLIC_SUPABASE_URL
    NEXT_PUBLIC_SUPABASE_ANON_KEY
+   NEXT_PUBLIC_GA_MEASUREMENT_ID
    SUPABASE_SECRET_KEY
    ORIGIN_PROXY_SECRET
    RATE_LIMIT_SECRET
    ACCOUNT_DELETE_REAUTH_KEYRING
    ACCOUNT_DELETE_REAUTH_ACTIVE_VERSION
    ```
+
+   GA4는 GYEOP 전용 web stream의 `G-...` measurement ID를 설정한 build에서만
+   활성화된다. 실제 ID는 저장소에 기록하지 않는다. ID가 없거나 exact
+   `G-[A-Z0-9]+` 형식이 아니면 동의 UI·Google script·수집 요청·Google CSP
+   source가 모두 비활성화된다. 운영에서는 Enhanced measurement, Google
+   signals, user-provided data, 광고 개인화와 제품 연결을 끄고 user/event 보관을
+   2개월·새 활동 시 만료 재설정 OFF로 고정한다. 사용자가 화면 하단에서 분석을
+   허용한 뒤에만 coarse route-class `page_view`를 보내며 `/privacy`에서 언제든
+   중단할 수 있다.
 
    `ORIGIN_PROXY_SECRET`와 `RATE_LIMIT_SECRET`은 각각 `node -e 'console.log(require("node:crypto").randomBytes(32).toString("base64url"))'`로 만들고, account-delete 값은 로컬 개발 안내의 keyring 형식을 사용한다. `.env.local` 전체를 업로드하거나 commit하지 않는다.
 

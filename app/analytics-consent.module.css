@@ -1,0 +1,77 @@
+.banner {
+  position: fixed;
+  z-index: 1000;
+  right: max(0.75rem, env(safe-area-inset-right));
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  left: max(0.75rem, env(safe-area-inset-left));
+  width: min(35rem, calc(100% - 1.5rem));
+  max-height: calc(100svh - 1.5rem);
+  margin-inline: auto;
+  padding: 1rem;
+  overflow-y: auto;
+  border: 1px solid var(--line, #ded8e5);
+  border-radius: 1rem;
+  background: var(--surface, #fffdf9);
+  box-shadow: var(--shadow, 0 24px 60px rgb(53 43 73 / 18%));
+  color: var(--ink, #25222b);
+}
+
+.banner h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.banner p {
+  margin: 0.55rem 0 0;
+  color: var(--ink-muted, #6b6672);
+  font-size: 0.82rem;
+  line-height: 1.55;
+  word-break: keep-all;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.85rem;
+}
+
+.actions button {
+  min-height: 2.75rem;
+  padding: 0.6rem;
+  border: 1px solid var(--accent, #5f4bb6);
+  border-radius: 0.7rem;
+  background: var(--surface, #fffdf9);
+  color: var(--accent-strong, #483690);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.actions button:focus-visible,
+.banner a:focus-visible {
+  outline: 3px solid #315cff;
+  outline-offset: 3px;
+}
+
+.banner a {
+  display: inline-block;
+  min-height: 2.75rem;
+  margin-top: 0.35rem;
+  padding-block: 0.75rem;
+  color: var(--ink-muted, #6b6672);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-underline-offset: 0.18em;
+}
+
+:global(body[data-analytics-consent="pending"]) {
+  padding-bottom: calc(14rem + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 359px) {
+  .actions {
+    grid-template-columns: 1fr;
+  }
+}
