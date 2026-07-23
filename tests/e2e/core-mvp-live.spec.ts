@@ -441,8 +441,23 @@ test.describe("core MVP live gate", () => {
     await expect(
       page.getByRole("heading", { name: "내 시선 프로필" }),
     ).toBeFocused();
-    await expect(page.getByLabel("친구 시선 3개")).toHaveCount(0);
-    await expect(page.getByText(/시선을 모으는 중 · [0-2]\/3/)).toHaveCount(10);
+    const relationshipGroup = page.getByRole("group", {
+      name: "관계 선택",
+    });
+    const oldFriendButton = relationshipGroup.getByRole("button", {
+      name: "오래된 친구, 1/3, 시선을 모으는 중",
+    });
+    await expect(relationshipGroup.getByRole("button")).toHaveCount(2);
+    await expect(oldFriendButton).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      relationshipGroup.getByRole("button", {
+        name: "가족, 1/3, 시선을 모으는 중",
+      }),
+    ).toHaveAttribute("aria-pressed", "false");
+    await expect(
+      page.getByText("시선을 모으는 중 · 1/3", { exact: true }),
+    ).toHaveCount(1);
+    await expect(page.locator("article")).toHaveCount(0);
     const collectMore = page.getByRole("link", { name: "시선 더 모으기" });
     await expectMobileContract(page, collectMore);
     await expectNoHighImpactA11yViolations(page);
@@ -489,30 +504,30 @@ test.describe("core MVP live gate", () => {
 
     await page.setViewportSize({ width: 430, height: 932 });
     await page.goto(`/me/profile/${ownerPlayId}`);
-    const signatureHeading = page.getByRole("heading", {
-      name: "오랜만에 친구를 만나면 나는?",
+    const threeRelationshipGroup = page.getByRole("group", {
+      name: "관계 선택",
     });
-    const signatureCard = page.locator("article").filter({
-      has: signatureHeading,
+    const schoolFriendButton = threeRelationshipGroup.getByRole("button", {
+      name: "학교 친구, 1/3, 시선을 모으는 중",
     });
-    const signatureAggregate = signatureCard.getByLabel("친구 시선 3개");
-    await expect(signatureAggregate).toHaveCount(1);
+    await expect(threeRelationshipGroup.getByRole("button")).toHaveCount(3);
     await expect(
-      signatureAggregate.getByText("A · 어제 본 듯 바로 편해진다"),
-    ).toBeVisible();
-    await expect(signatureAggregate.getByText("0명")).toBeVisible();
+      threeRelationshipGroup.getByRole("button", {
+        name: "오래된 친구, 1/3, 시선을 모으는 중",
+      }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(schoolFriendButton).toHaveAttribute("aria-pressed", "false");
     await expect(
-      signatureAggregate.getByText("B · 근황부터 천천히 맞춰 간다"),
-    ).toBeVisible();
-    await expect(signatureAggregate.getByText("3명")).toBeVisible();
-    const lockedCards = page.locator("article").filter({
-      hasNot: signatureHeading,
-    });
-    await expect(lockedCards).toHaveCount(9);
-    await expect(
-      lockedCards.getByText(/시선을 모으는 중 · [0-2]\/3/),
-    ).toHaveCount(9);
-    await expect(lockedCards.getByLabel("친구 시선 3개")).toHaveCount(0);
+      threeRelationshipGroup.getByRole("button", {
+        name: "가족, 1/3, 시선을 모으는 중",
+      }),
+    ).toHaveAttribute("aria-pressed", "false");
+    await schoolFriendButton.click();
+    await expect(schoolFriendButton).toHaveAttribute("aria-pressed", "true");
+    const selectedLockedLayer = page.locator('section[aria-live="polite"]');
+    await expect(selectedLockedLayer).toContainText("학교 친구");
+    await expect(selectedLockedLayer).toContainText("시선을 모으는 중 · 1/3");
+    await expect(page.locator("article")).toHaveCount(0);
     await expectMobileContract(page, collectMore);
     await expectNoHighImpactA11yViolations(page);
 
@@ -654,7 +669,18 @@ test.describe("core MVP live gate", () => {
       page.getByRole("heading", { name: "첫 장면, 네 버전", level: 2 }),
     ).toBeVisible();
     await page.goto(`/me/profile/${ownerPlayId}`);
-    await expect(page.locator("article")).toHaveCount(10);
+    const relationshipGroup = page.getByRole("group", {
+      name: "관계 선택",
+    });
+    const oldFriendButton = relationshipGroup.getByRole("button", {
+      name: "오래된 친구, 1/3, 시선을 모으는 중",
+    });
+    await expect(relationshipGroup.getByRole("button")).toHaveCount(1);
+    await expect(oldFriendButton).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('section[aria-live="polite"]')).toContainText(
+      "시선을 모으는 중 · 1/3",
+    );
+    await expect(page.locator("article")).toHaveCount(0);
     await visitor.context.close();
   });
 
@@ -703,7 +729,18 @@ test.describe("core MVP live gate", () => {
     expect(managementUrl).toMatch(/\/responses\/manage#token=/);
 
     await page.goto(`/me/profile/${ownerPlayId}`);
-    await expect(page.getByText("시선을 모으는 중 · 1/3")).toHaveCount(3);
+    const relationshipGroup = page.getByRole("group", {
+      name: "관계 선택",
+    });
+    const familyButton = relationshipGroup.getByRole("button", {
+      name: "가족, 1/3, 시선을 모으는 중",
+    });
+    await expect(relationshipGroup.getByRole("button")).toHaveCount(1);
+    await expect(familyButton).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      page.getByText("시선을 모으는 중 · 1/3", { exact: true }),
+    ).toHaveCount(1);
+    await expect(page.locator("article")).toHaveCount(0);
 
     await visitor.page.goto(managementUrl);
     await expect(
@@ -718,7 +755,11 @@ test.describe("core MVP live gate", () => {
     ).toBeVisible();
 
     await page.reload();
-    await expect(page.getByText("시선을 모으는 중 · 0/3")).toHaveCount(10);
+    await expect(page.getByRole("group", { name: "관계 선택" })).toHaveCount(0);
+    await expect(page.getByText("아직 도착한 시선이 없어요")).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "시선 더 모으기" }),
+    ).toHaveCount(0);
 
     const oldSession = await visitor.context.request.get(
       `/api/responses/${responseId}`,
