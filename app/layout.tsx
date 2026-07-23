@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { AnalyticsConsent } from "./analytics-consent";
 import "./globals.css";
 
 const title = "겹 · 나를 보는 시선이 쌓이는 프로필";
@@ -45,7 +46,12 @@ export default function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>
+        {children}
+        <AnalyticsConsent
+          measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}
+        />
+      </body>
     </html>
   );
 }

@@ -38,6 +38,7 @@ GYEOP은 제품 목적에 필요한 최소 기간만 데이터를 보관하고, 
 | withdrawn response tombstone | `withdrawn_at + 30일` | 24시간 | hard-delete + 30일 |
 | raw analytics event | `occurred_at + 30일`; source 삭제·철회 시 subject와 연관 property는 즉시 제거 | 24시간 | hard-delete + 30일 |
 | 비식별 집계 지표 | `aggregated_at + 1년` | 24시간 | hard-delete + 30일 |
+| GA4 외부 provider user/event 데이터 | 명시 동의 뒤 수집; Google property 보관 2개월, 새 활동 시 만료 재설정 OFF | GYEOP 운영 DB에 저장하지 않음; 필요 시 provider data deletion/property deletion 별도 수행 | Google 표준 집계 보고서에는 user/event 보관 설정이 적용되지 않을 수 있음 |
 | rate-limit bucket | `expires_at + 24시간` | 24시간 | hard-delete + 30일 |
 | 미귀속 Auth registration | `auth user created_at + 7일` adoption grace 종료 | 앱 DB state·job UID와 Auth provider 계정 모두 `eligible_at + 24시간` | 각 hard-delete + 30일 |
 | Auth deletion call permit | `max(acquired_at + 5분, lease_until)` | 24시간 | hard-delete + 30일 |
@@ -53,6 +54,8 @@ visitor draft의 활동은 관계·시점 확정이나 draft answer save처럼 c
 submit은 `last_active_at = submitted_at`, `session_expires_at = submitted_at + 24시간`을 마지막으로 기록한다. submitted 응답 본문은 1년 상한까지 유지할 수 있지만 만료된 `session_token_hash`는 `session_expires_at`부터 24시간 안에 `NULL` 처리한다. 비교·선택 2장 read/write는 session expiry를 연장하지 않는다.
 
 로그인 owner 활동은 인증된 owner의 account/play/profile 성공 read 또는 owner save/complete/link create·rotate·disable만 갱신한다. visitor·notification·cron은 갱신하지 않는다.
+
+GA4가 생성하는 현재 브라우저의 `_ga`, `_ga_*` 쿠키는 최초 생성부터 최대 60일이며 새 page view로 만료를 연장하지 않는다. 분석 중단 시 현재 origin에서 즉시 제거한다. 이 cookie 상한, `gyeop:analytics-consent:v1` localStorage에 남는 브라우저별 선택, Google provider의 user/event 데이터 2개월 보관은 서로 다른 lifecycle이다. cookie 삭제나 동의 철회만으로 이미 수집된 provider 데이터 또는 표준 집계 보고서가 즉시 삭제된다고 간주하지 않는다. 제품 전환 SSOT인 내부 raw analytics 30일·비식별 집계 1년 정책은 그대로 유지한다.
 
 ## 4. 공유 링크
 

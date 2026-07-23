@@ -101,6 +101,26 @@ test("requires the exact public Docker build arguments", () => {
     () => verifyDockerfile(`${dockerfile}\nARG NEXT_PUBLIC_SUPABASE_URL\n`),
     /duplicate ARG/,
   );
+  assert.throws(
+    () =>
+      verifyDockerfile(
+        dockerfile.replace("ARG NEXT_PUBLIC_GA_MEASUREMENT_ID\n", ""),
+      ),
+    /build ARGs must be exactly/,
+  );
+});
+
+test("requires every public build value in the Render environment", () => {
+  assert.throws(
+    () =>
+      verifyRenderYaml(
+        renderYaml.replace(
+          "      - key: NEXT_PUBLIC_GA_MEASUREMENT_ID\n        sync: false\n",
+          "",
+        ),
+      ),
+    /NEXT_PUBLIC_GA_MEASUREMENT_ID build environment is required/,
+  );
 });
 
 test("rejects known and pattern-matched server secrets in Docker ARG and ENV", () => {

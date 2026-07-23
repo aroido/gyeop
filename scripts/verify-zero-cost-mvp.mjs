@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUBLIC_BUILD_ARGS = new Set([
+  "NEXT_PUBLIC_GA_MEASUREMENT_ID",
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "NEXT_PUBLIC_SUPABASE_URL",
 ]);
@@ -66,6 +67,7 @@ function setUnique(fields, key, value, lineNumber) {
 export function verifyRenderYaml(renderYaml) {
   let servicesDeclarations = 0;
   const services = [];
+  const environmentKeys = new Set();
   let service = null;
   let envVars = false;
   let envVar = null;
@@ -168,6 +170,11 @@ export function verifyRenderYaml(renderYaml) {
         `render.yaml:${lineNumber}: envVars item must start with a literal key`,
       );
       envVar = new Map([[entry.key, entry.value]]);
+      invariant(
+        !environmentKeys.has(entry.value),
+        `render.yaml:${lineNumber}: duplicate env var ${entry.value}`,
+      );
+      environmentKeys.add(entry.value);
       continue;
     }
 
@@ -204,6 +211,12 @@ export function verifyRenderYaml(renderYaml) {
     invariant(
       fields.get(key) === value,
       `render.yaml: ${key} must be ${value}`,
+    );
+  }
+  for (const name of PUBLIC_BUILD_ARGS) {
+    invariant(
+      environmentKeys.has(name),
+      `render.yaml: ${name} build environment is required`,
     );
   }
   return required;
