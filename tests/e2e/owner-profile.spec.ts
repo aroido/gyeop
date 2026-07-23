@@ -399,6 +399,32 @@ test("renders terminal and sign-in states without recording a view", async ({
   expect(auth.eventCalls).toBe(0);
 });
 
+test("keeps the exact share card entry usable at 320x568", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await installProfileApi(
+    page,
+    profile([
+      layer("old_friend", 3, {
+        [manifest.cards[0].id]: { a: 2, b: 1 },
+      }),
+    ]),
+  );
+  await page.goto(
+    `/me/profile/${playId}?share_relationship=old_friend&share_card=${manifest.cards[0].id}#shareable-insight`,
+  );
+
+  const share = page.getByRole("link", {
+    name: "이 시선 카드 공유하기",
+  });
+  await expect(share).toHaveCount(1);
+  expect((await share.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    ),
+  ).toBe(0);
+});
+
 for (const viewport of [
   { width: 320, height: 800 },
   { width: 390, height: 844 },

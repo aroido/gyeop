@@ -256,16 +256,28 @@ async function completedOwner(page: Page) {
 async function installInsightProfileApi(
   page: Page,
   relationshipCode = "old_friend",
+  overrides: {
+    ownerPrompt?: string;
+    optionA?: string;
+    optionB?: string;
+    counts?: { a: number; b: number };
+  } = {},
 ) {
-  const counts = { a: 2, b: 1 };
+  const counts = overrides.counts ?? { a: 2, b: 1 };
+  const sampleCount = counts.a + counts.b;
   const cards = manifest.cards.map((card, index) => ({
     cardId: card.id,
     position: card.position,
-    ownerPrompt: card.ownerPrompt,
-    optionA: card.optionA,
-    optionB: card.optionB,
+    ownerPrompt:
+      index === 0 && overrides.ownerPrompt
+        ? overrides.ownerPrompt
+        : card.ownerPrompt,
+    optionA:
+      index === 0 && overrides.optionA ? overrides.optionA : card.optionA,
+    optionB:
+      index === 0 && overrides.optionB ? overrides.optionB : card.optionB,
     selfChoice: index === 0 ? ("a" as const) : ("b" as const),
-    sampleCount: index === 0 ? 3 : 0,
+    sampleCount: index === 0 ? sampleCount : 0,
     counts: index === 0 ? counts : null,
   }));
   await page.route("**/api/me/profile**", async (route) => {
@@ -276,19 +288,19 @@ async function installInsightProfileApi(
       packSlug: manifest.slug,
       packVersion: manifest.version,
       packTitle: manifest.title,
-      sightCount: 3,
+      sightCount: sampleCount,
       sightStatus: "has_sight",
       cards,
       relationshipLayers: [
         {
           relationshipCode,
-          sightCount: 3,
+          sightCount: sampleCount,
           status: "available",
           cards: manifest.cards.map((card, index) =>
             index === 0
               ? {
                   cardId: card.id,
-                  sampleCount: 3,
+                  sampleCount,
                   status: "available",
                   counts,
                 }
@@ -532,6 +544,11 @@ test("treats native share cancellation and failure as zero success events", asyn
     "공유 메뉴를 열지 못했어요. 링크 복사를 사용해 주세요.",
   );
   await expect(button).toBeFocused();
+  await expect(button).toBeEnabled();
+  await expect(page.getByRole("button", { name: "링크 복사" })).toBeEnabled();
+  await expect(page.getByLabel("공유 링크 직접 복사")).toHaveValue(
+    new RegExp(`#k=${secret}$`),
+  );
   expect(
     share.calls.filter((call) => call.pathname.endsWith("/share-events")),
   ).toHaveLength(0);
@@ -738,6 +755,91 @@ test("shares one threshold-safe 9:16 profile card with the public invite", async
     ]);
 });
 
+test("renders legal maximum Korean card copy into a 1080x1920 PNG", async ({
+  page,
+}) => {
+  const ownerPrompt = `${"긴질문".repeat(66)}끝끝`;
+  const optionA = "가".repeat(120);
+  const optionB = "나".repeat(120);
+  expect(ownerPrompt).toHaveLength(200);
+  await installBrowserHandoff(page, {
+    share: "resolve",
+    clipboard: "resolve",
+    fileShare: true,
+  });
+  await completedOwner(page);
+  await installShareApi(page);
+  await installInsightProfileApi(page, "old_friend", {
+    ownerPrompt,
+    optionA,
+    optionB,
+    counts: { a: 123, b: 456 },
+  });
+  await page.goto(
+    `/me/plays/${playId}?entry_source=profile_reshare&share_relationship=old_friend&share_card=${manifest.cards[0].id}`,
+  );
+
+  const preview = page.getByLabel("오래된 친구 시선 공유 카드 미리보기");
+  await expect(preview).toContainText(ownerPrompt);
+  await expect(preview).toContainText("123명");
+  await expect(preview).toContainText("456명");
+  await page.getByRole("button", { name: "카드 공유 준비하기" }).click();
+  await page.getByRole("button", { name: "카드와 링크 공유하기" }).click();
+
+  const png = await page.evaluate(async () => {
+    const data = (
+      window as typeof window & {
+        __gyeopHandoff: { shareCalls: ShareData[] };
+      }
+    ).__gyeopHandoff.shareCalls[0];
+    const file = data.files?.[0];
+    if (!file) return null;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const view = new DataView(bytes.buffer);
+    return {
+      signature: Array.from(bytes.slice(0, 8)),
+      width: view.getUint32(16),
+      height: view.getUint32(20),
+    };
+  });
+  expect(png).toEqual({
+    signature: [137, 80, 78, 71, 13, 10, 26, 10],
+    width: 1080,
+    height: 1920,
+  });
+});
+
+test("keeps card recovery available after AbortError without recording success", async ({
+  page,
+}) => {
+  await installBrowserHandoff(page, {
+    share: "cancel",
+    clipboard: "resolve",
+    fileShare: true,
+  });
+  await completedOwner(page);
+  const share = await installShareApi(page);
+  await installInsightProfileApi(page);
+  await page.goto(
+    `/me/plays/${playId}?entry_source=profile_reshare&share_relationship=old_friend&share_card=${manifest.cards[0].id}`,
+  );
+  await page.getByRole("button", { name: "카드 공유 준비하기" }).click();
+  const shareButton = page.getByRole("button", {
+    name: "카드와 링크 공유하기",
+  });
+  await shareButton.click();
+
+  await expect(page.getByRole("status")).toHaveText(
+    "공유를 취소했어요. 링크는 그대로 있어요.",
+  );
+  await expect(shareButton).toBeFocused();
+  await expect(shareButton).toBeEnabled();
+  await expect(page.getByRole("link", { name: "프로필로" })).toBeVisible();
+  expect(
+    share.calls.filter((call) => call.pathname.endsWith("/share-events")),
+  ).toHaveLength(0);
+});
+
 test("keeps card mode isolated and falls back to image plus manual link copy", async ({
   page,
 }) => {
@@ -767,6 +869,43 @@ test("keeps card mode isolated and falls back to image plus manual link copy", a
   expect(
     share.calls.filter((call) => call.pathname.endsWith("/share-events")),
   ).toHaveLength(0);
+});
+
+test("keeps one card action usable without horizontal overflow at 320x568", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await installBrowserHandoff(page, {
+    share: "resolve",
+    clipboard: "resolve",
+    fileShare: true,
+  });
+  await completedOwner(page);
+  await installShareApi(page);
+  await installInsightProfileApi(page);
+  await page.goto(
+    `/me/plays/${playId}?entry_source=profile_reshare&share_relationship=old_friend&share_card=${manifest.cards[0].id}`,
+  );
+
+  const main = page.locator("main");
+  const prepare = main.getByRole("button", { name: "카드 공유 준비하기" });
+  await expect(main.getByRole("button")).toHaveCount(1);
+  expect((await prepare.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    ),
+  ).toBe(0);
+
+  await prepare.click();
+  const share = main.getByRole("button", { name: "카드와 링크 공유하기" });
+  await expect(main.getByRole("button")).toHaveCount(1);
+  expect((await share.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth,
+    ),
+  ).toBe(0);
 });
 
 test("fails closed when a requested profile card is stale", async ({

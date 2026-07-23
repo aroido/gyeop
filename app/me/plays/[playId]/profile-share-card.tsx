@@ -99,7 +99,7 @@ function drawChoice(
   const label = choice === "a" ? "A" : "B";
   const option = choice === "a" ? model.optionA : model.optionB;
   const count = model.counts[choice];
-  roundedRect(context, 130, y, 820, 250, 36);
+  roundedRect(context, 130, y, 820, 300, 36);
   context.fillStyle = selected ? "#dfff00" : "#050505";
   context.fill();
   context.fillStyle = selected ? "#050505" : "#ffffff";
@@ -114,8 +114,8 @@ function drawChoice(
     180,
     y + 100,
     720,
-    118,
-    50,
+    168,
+    46,
     24,
     selected ? "#050505" : "#ffffff",
   );
@@ -215,14 +215,14 @@ export async function renderProfileShareCard(
     "#050505",
     950,
   );
-  drawChoice(context, model, "a", 1010);
-  drawChoice(context, model, "b", 1290);
+  drawChoice(context, model, "a", 970);
+  drawChoice(context, model, "b", 1300);
 
   context.fillStyle = "#050505";
   context.font = '900 34px Pretendard, "Apple SD Gothic Neo", sans-serif';
-  context.fillText("관계마다 다르게 보이는 나", 130, 1630);
+  context.fillText("관계마다 다르게 보이는 나", 130, 1650);
   context.font = '950 72px Pretendard, "Apple SD Gothic Neo", sans-serif';
-  context.fillText("겹", 130, 1700);
+  context.fillText("겹", 130, 1720);
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
