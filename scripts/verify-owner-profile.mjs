@@ -28,10 +28,6 @@ export function verifyOwnerProfile() {
     "private.authorize_owner_play_capability",
     "link.kind = 'public'",
     "response.status = 'submitted'",
-    "valid_responses as materialized",
-    "safe_samples as",
-    "sight.sight_count >= 3",
-    "sample.sample_count >= 3",
     "'relationshipLayers'",
     "'relationshipCode'",
     "'status', 'collecting'",
@@ -65,6 +61,99 @@ export function verifyOwnerProfile() {
     1,
     "profile RPC must call the capability helper exactly once",
   );
+  const sightCountQuery = migration.slice(
+    migration.indexOf("select count(*)::bigint", profileRead),
+    migration.indexOf("select jsonb_agg(", profileRead),
+  );
+  for (const contract of [
+    "link.pack_play_id = p_play_id",
+    "link.kind = 'public'",
+    "response.pack_version_id = v_pack_version_id",
+    "response.status = 'submitted'",
+  ]) {
+    assert.ok(
+      sightCountQuery.includes(contract),
+      `owner profile sight count must stay scoped: ${contract}`,
+    );
+  }
+
+  const topLevelProjection = migration.slice(
+    migration.indexOf("select jsonb_agg(", profileRead),
+    migration.indexOf("select coalesce(", profileRead),
+  );
+  for (const contract of [
+    "link.pack_play_id = p_play_id",
+    "link.kind = 'public'",
+    "response.pack_version_id = v_pack_version_id",
+    "response.status = 'submitted'",
+    "where relation_sample.sample_count >= 3",
+    "as relation_sight",
+    "on relation_sight.relationship_code = relation_sample.relationship_code",
+    "and relation_sight.sight_count >= 3",
+    "'sampleCount', coalesce(sample.sample_count, 0)",
+    "when sample.sample_count is null then null",
+  ]) {
+    assert.ok(
+      topLevelProjection.includes(contract),
+      `owner profile safe projection must preserve: ${contract}`,
+    );
+  }
+  const relationSampleEnd = topLevelProjection.indexOf(") as relation_sample");
+  const relationSightEnd = topLevelProjection.indexOf(") as relation_sight");
+  assert.ok(
+    relationSampleEnd >= 0 && relationSightEnd > relationSampleEnd,
+    "top-level projection must join one relationship sight aggregate",
+  );
+  const relationshipSightAggregate = topLevelProjection.slice(
+    topLevelProjection.indexOf("join (", relationSampleEnd),
+    relationSightEnd,
+  );
+  for (const contract of [
+    "from public.visitor_responses as response",
+    "join public.share_links as link",
+    "link.pack_play_id = p_play_id",
+    "link.kind = 'public'",
+    "response.pack_version_id = v_pack_version_id",
+    "response.status = 'submitted'",
+    "group by response.relationship_code",
+  ]) {
+    assert.ok(
+      relationshipSightAggregate.includes(contract),
+      `relationship sight aggregate must stay scoped: ${contract}`,
+    );
+  }
+
+  const relationshipProjection = migration.slice(
+    migration.indexOf("select coalesce(", profileRead),
+    migration.indexOf(
+      "if jsonb_array_length(coalesce(v_cards",
+      profileRead,
+    ),
+  );
+  for (const contract of [
+    "link.pack_play_id = p_play_id",
+    "link.kind = 'public'",
+    "response.pack_version_id = v_pack_version_id",
+    "response.status = 'submitted'",
+    "when sight.sight_count < 3 then 'collecting'",
+    "when sight.sight_count < 3 then '[]'::jsonb",
+    "when coalesce(sample.sample_count, 0) < 3",
+    "'status', 'available'",
+    "order by array_position(",
+    "'old_friend'",
+    "'school_friend'",
+    "'coworker'",
+    "'romantic'",
+    "'family'",
+    "'online_friend'",
+    "'social_follower'",
+    "'other'",
+  ]) {
+    assert.ok(
+      relationshipProjection.includes(contract),
+      `owner profile relationship projection must preserve: ${contract}`,
+    );
+  }
   assert.doesNotMatch(
     migration,
     /assignment\.stage\s*=/,
