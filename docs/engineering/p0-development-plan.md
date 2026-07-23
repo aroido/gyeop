@@ -36,6 +36,7 @@ Reviewer Agent: development_plan_review, issue_backlog_review, issue17_spec_revi
 - `docs/assets/mockups/04-profile-evolution.png`
 - `docs/assets/mockups/05-share-card-system.png`
 - `docs/assets/mockups/06-friend-contribution-flow.png`
+- `docs/assets/mockups/owner-profile-relationship-layers-v1.png`
 
 P0에는 사람이 검수한 공식 팩 4개를 포함한다. 사용자 팩 제작, 공개 프로필 링크, 결제, 광고, 자유 텍스트, 댓글, DM, 점수·순위, AI 생성·요약은 구현하지 않는다.
 
@@ -492,11 +493,16 @@ P0에는 별도 aggregate table을 만들지 않는다.
 - 관계 레이어: 공개 링크에서 같은 `relationship_code`의 유효 응답 3건 이상
 - 질문 선택 수: 공개 링크의 공개 가능한 관계에서 같은 카드 응답 3건 이상
 - 부족 상태: 값을 반환하지 않고 현재 `n/3`만 반환
+- 배포 호환 top-level 카드: self-card 10장의 문구·선택은 유지하고, 공개 가능한 관계에서 공개 가능한 카드만 관계별로 먼저 threshold 처리한 뒤 합산. 숨은 2+1·2+2 관계 또는 공개 관계의 숨은 카드 2+1을 합쳐 공개하지 않으며 결과는 `0/null` 또는 3 이상 합계
+- 관계 순서와 label: `lib/visitor-response/visitor-context-core.mjs`의 `RELATIONSHIP_OPTIONS`를 사용. 최초 선택은 공개 가능한 관계 우선, registry 순서이며 없으면 첫 수집 중 관계
+- `known_since_code`: 응답 저장은 유지하지만 owner profile에서 관계와 교차 집계하거나 필터로 쓰지 않음
 - 1:1 응답: 방문자 본인의 즉시 비교에만 사용하고 비공개 `/me` 전체 시선·관계·질문 집계에서 제외. production beta에서 private 전체 시선 포함 여부는 owner 1:1 비교 정책과 함께 재승인
 - 민감 관계: 공개 집계에서 제외
 - 최근 변화: `새 시선`, `새 관계`, `집계 공개 가능` 같은 파생 상태만 반환
 
 owner profile SQL 함수는 공개 링크의 raw 방문자 row나 개별 선택을 반환하지 않는다. owner 전용 `get_private_1to1_comparison`은 해당 play owner에게만 지정 response의 카드 비교를 반환하고 response session을 권한으로 받지 않는다. 방문자는 만료 전 동일 response session의 `get_visitor_response`로 자신이 답한 카드 비교만 받는다. P0 방문자는 자신의 비교 외 어떤 관계 집계도 볼 수 없다. 집계 query p95가 300ms를 넘거나 한 play의 유효 응답이 10,000건을 넘을 때 materialized aggregate를 별도 이슈로 검토한다.
+
+owner profile 화면은 시선 0건에서 재공유 CTA를 표시하지 않는다. 시선 1건 이상에서는 기존 질문팩 `시선 더 모으기`, `profile_viewed`, `profile_reshare_clicked` 조건을 유지한다. 관계 카드 PNG·다운로드·외부 공유는 #147이 소유한다.
 
 ## 13. 알림과 분석
 

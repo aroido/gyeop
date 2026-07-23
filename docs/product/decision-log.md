@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-23 — owner 전용 관계 레이어를 private MVP P0에 포함
+
+- 결정: `/me/profile/[playId]`는 submitted 공개 링크 시선을 방문자가 고른 관계별로 나누고, 같은 관계 완료 응답 3건 이상에서만 관계를 열며 같은 관계·질문 실제 답변 3건 이상에서만 A/B 수치를 보여준다. 1:1과 `known_since_code` 교차 집계는 제외하고 관계 순서는 shared registry를 따른다.
+- 이유: 전체 A/B 합계만 반복하는 프로필보다 `관계마다 다르게 보이는 나`가 누적 프로필의 핵심 보상이다. 관계 1~2건 또는 질문 1~2건을 다른 소표본과 합쳐 공개하면 방문자 선택을 유추할 수 있으므로 관계와 질문에 각각 독립 threshold가 필요하다.
+- 결과: 기존 top-level self-card 10장 계약은 배포 호환을 위해 유지하되 합계는 공개 가능한 관계의 공개 가능한 카드만 더한 safe projection으로 바꾼다. 숨은 관계·카드는 top-level에 기여하지 않아 값이 `0/null` 또는 3 이상 합계만 된다. 시선 0건에서는 재공유 CTA를 숨기고, 1건 이상에서는 기존 질문팩 `시선 더 모으기`와 analytics 계약을 유지한다. 이는 2026-07-18의 total-only 범위 축소 중 owner 관계 레이어 제외를 대체하지만 공개 프로필 URL과 관계 인사이트 PNG(#147)는 계속 분리한다.
+
 ## 2026-07-23 — GA4는 명시 동의한 route-class 방문 관측에만 사용
 
 - 결정: GYEOP 전용 GA4 property와 Render web stream은 현재 브라우저에서 분석을 명시적으로 허용한 경우에만 동적 식별자를 제거한 route-class `page_view`와 tag health를 관측한다. Enhanced measurement, Google signals, user-provided data, 광고 개인화와 제품 연결은 끄며 Google user/event 보관은 2개월·새 활동 시 만료 재설정 OFF로 고정한다.

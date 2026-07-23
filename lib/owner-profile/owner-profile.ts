@@ -1,5 +1,32 @@
 export type OwnerProfileCounts = Readonly<{ a: number; b: number }>;
 
+export type OwnerProfileRelationshipCard =
+  | Readonly<{
+      cardId: string;
+      sampleCount: number;
+      status: "collecting";
+    }>
+  | Readonly<{
+      cardId: string;
+      sampleCount: number;
+      status: "available";
+      counts: OwnerProfileCounts;
+    }>;
+
+export type OwnerProfileRelationshipLayer =
+  | Readonly<{
+      relationshipCode: string;
+      sightCount: 1 | 2;
+      status: "collecting";
+      cards: readonly [];
+    }>
+  | Readonly<{
+      relationshipCode: string;
+      sightCount: number;
+      status: "available";
+      cards: readonly OwnerProfileRelationshipCard[];
+    }>;
+
 export type OwnerProfileCard = Readonly<{
   cardId: string;
   position: number;
@@ -19,6 +46,7 @@ export type OwnerProfile = Readonly<{
   sightCount: number;
   sightStatus: "empty" | "has_sight";
   cards: readonly OwnerProfileCard[];
+  relationshipLayers: readonly OwnerProfileRelationshipLayer[];
 }>;
 
 export type OwnerProfileResult =

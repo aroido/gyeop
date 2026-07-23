@@ -349,6 +349,7 @@ test("profile access requires Auth and stays scoped to the requested owned play"
   assert.equal(profileA.playId, ownerA.playId);
   assert.equal(profileA.cards.length, 10);
   assert.equal(profileA.sightCount, 0);
+  assert.deepEqual(profileA.relationshipLayers, []);
 
   const responseB = await ownerRequest(
     `/api/me/profile?playId=${ownerB.playId}`,
@@ -425,8 +426,16 @@ test("submitted public sights refresh live and reveal only at three samples", as
   });
   const beforeProfile = await before.json();
   assert.equal(beforeProfile.sightCount, 2);
-  assert.equal(beforeProfile.cards[0].sampleCount, 2);
+  assert.equal(beforeProfile.cards[0].sampleCount, 0);
   assert.equal(beforeProfile.cards[0].counts, null);
+  assert.deepEqual(beforeProfile.relationshipLayers, [
+    {
+      relationshipCode: "old_friend",
+      sightCount: 2,
+      status: "collecting",
+      cards: [],
+    },
+  ]);
 
   const eligibleReshare = await ownerRequest("/api/me/profile/events", {
     method: "POST",
@@ -473,6 +482,19 @@ test("submitted public sights refresh live and reveal only at three samples", as
   assert.equal(afterProfile.sightStatus, "has_sight");
   assert.equal(afterProfile.cards[0].sampleCount, 3);
   assert.deepEqual(afterProfile.cards[0].counts, { a: 2, b: 1 });
+  assert.equal(afterProfile.relationshipLayers.length, 1);
+  assert.equal(
+    afterProfile.relationshipLayers[0].relationshipCode,
+    "old_friend",
+  );
+  assert.equal(afterProfile.relationshipLayers[0].status, "available");
+  assert.equal(afterProfile.relationshipLayers[0].cards.length, 10);
+  assert.deepEqual(afterProfile.relationshipLayers[0].cards[0], {
+    cardId: "conflict",
+    sampleCount: 3,
+    status: "available",
+    counts: { a: 2, b: 1 },
+  });
   assert.equal("relationshipCode" in afterProfile, false);
   assert.equal("responseId" in afterProfile.cards[0], false);
 });

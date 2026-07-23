@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,21 +12,31 @@ function source(relative) {
 
 export function verifyOwnerProfile() {
   const migration = source(
-    "supabase/migrations/20260718000900_owner_profile.sql",
+    "supabase/migrations/20260723000200_owner_profile_relationship_layers.sql",
+  );
+  const optionalAnswersMigration = source(
+    "supabase/migrations/20260719000200_visitor_optional_answers.sql",
+  );
+  const authenticatedOwnerMigration = source(
+    "supabase/migrations/20260720000100_anonymous_owner_claim.sql",
   );
   const reshareMigration = source(
     "supabase/migrations/20260718001000_profile_reshare.sql",
   );
   for (const contract of [
     "create or replace function public.get_owner_profile",
-    "create or replace function public.record_owner_profile_event",
     "private.authorize_owner_play_capability",
     "link.kind = 'public'",
     "response.status = 'submitted'",
-    "when coalesce(sample.sample_count, 0) < 3 then null",
+    "valid_responses as materialized",
+    "safe_samples as",
+    "sight.sight_count >= 3",
+    "sample.sample_count >= 3",
+    "'relationshipLayers'",
+    "'relationshipCode'",
+    "'status', 'collecting'",
+    "'status', 'available'",
     "'sightStatus'",
-    "'profile_viewed'",
-    "properties - array['packVersion']::text[] = '{}'::jsonb",
   ]) {
     assert.ok(
       migration.includes(contract),
@@ -49,17 +60,26 @@ export function verifyOwnerProfile() {
   );
   assert.equal(
     migration
-      .slice(
-        profileFunction,
-        migration.indexOf(
-          "create or replace function public.record_owner_profile_event",
-        ),
-      )
+      .slice(profileFunction)
       .match(/private\.authorize_owner_play_capability/g)?.length,
     1,
     "profile RPC must call the capability helper exactly once",
   );
+  assert.doesNotMatch(
+    migration,
+    /assignment\.stage\s*=/,
+    "profile aggregation must include actual required and optional answers",
+  );
+  assert.match(
+    optionalAnswersMigration,
+    /create or replace function public\.get_owner_profile/,
+  );
+  assert.match(
+    authenticatedOwnerMigration,
+    /return public\.get_owner_profile\(p_play_id, v_hash\)/,
+  );
   for (const contract of [
+    "create or replace function public.record_owner_profile_event",
     "'profile_reshare_clicked'",
     "'entrySource', 'profile_reshare'",
     "response.status = 'submitted'",
@@ -96,16 +116,20 @@ export function verifyOwnerProfile() {
   assert.match(eventRoute, /recordOwnerProfileEventResponse/);
 
   const core = source("lib/owner-profile/owner-profile-core.mjs");
-  assert.match(core, /sampleCount < 3/);
-  assert.match(core, /card\.counts !== null/);
-  assert.match(core, /card\.counts\.a \+ card\.counts\.b/);
+  assert.match(core, /RELATIONSHIP_OPTIONS/);
+  assert.match(core, /relationshipSightCount !== value\.sightCount/);
+  assert.match(core, /relationshipCard\.status !== "available"/);
+  assert.match(core, /card\.sampleCount !== sampleCount/);
+  assert.match(core, /card\.counts\.a !== a/);
   assert.match(core, /OWNER_PROFILE_WATERMARK_KEY/);
   assert.doesNotMatch(core, /console\s*\./);
 
   const view = source("app/me/owner-profile-view.tsx");
   for (const contract of [
     "공개 링크로 도착한 시선",
+    "관계별로 보는 나",
     "시선을 모으는 중",
+    "이름과 개별 답변은 공개되지 않아요",
     "새 시선 도착",
     "시선이 쌓여 있어요",
     "시선 더 모으기",
@@ -116,7 +140,20 @@ export function verifyOwnerProfile() {
     assert.ok(view.includes(contract), `missing profile UI: ${contract}`);
   }
   assert.doesNotMatch(view, /팔로워|팔로잉|친밀도|순위|AI 요약/);
+  assert.doesNotMatch(view, /이 시선 카드 공유하기/);
   assert.doesNotMatch(view, /console\s*\./);
+
+  const mockup = readFileSync(
+    path.join(
+      ROOT,
+      "docs/assets/mockups/owner-profile-relationship-layers-v1.png",
+    ),
+  );
+  assert.equal(
+    createHash("sha256").update(mockup).digest("hex"),
+    "6521916f8b5c40fbf81b82374ffb326ece1c89b69abed7d804605c882c35264c",
+    "approved owner profile mockup must stay byte-identical",
+  );
 
   const ownerPlay = source("app/play/[playId]/owner-play.tsx");
   assert.match(ownerPlay, /내 질문팩 저장하고 공유하기/);

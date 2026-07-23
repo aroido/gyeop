@@ -225,6 +225,14 @@ select is(
   'the private profile returns exactly ten self cards'
 );
 select is(
+  public.get_owner_profile(
+    '27000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex')
+  )->'profile'->'relationshipLayers',
+  '[]'::jsonb,
+  'a zero-sight profile has no relationship layers'
+);
+select is(
   (
     select array_agg(key order by key)
     from jsonb_object_keys(
@@ -240,6 +248,7 @@ select is(
     'packTitle',
     'packVersion',
     'playId',
+    'relationshipLayers',
     'sightCount',
     'sightStatus'
   ]::text[],
@@ -358,8 +367,21 @@ select is(
       decode(repeat('11', 32), 'hex')
     )->'profile'->'cards'->0->>'sampleCount'
   )::integer,
-  1,
-  'one sample exposes only n of the threshold'
+  0,
+  'one collecting relationship contributes nothing to the top-level projection'
+);
+select is(
+  public.get_owner_profile(
+    '27000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex')
+  )->'profile'->'relationshipLayers'->0,
+  jsonb_build_object(
+    'relationshipCode', 'old_friend',
+    'sightCount', 1,
+    'status', 'collecting',
+    'cards', '[]'::jsonb
+  ),
+  'one relationship sight exposes only its collecting n of three state'
 );
 
 reset role;
@@ -396,7 +418,17 @@ select is(
     decode(repeat('11', 32), 'hex')
   )->'profile'->'cards'->0->'counts',
   'null'::jsonb,
-  'two samples still hide both A and B counts'
+  'two one-sight relationships cannot combine their card counts'
+);
+select is(
+  (
+    public.get_owner_profile(
+      '27000000-0000-4000-8000-000000000001',
+      decode(repeat('11', 32), 'hex')
+    )->'profile'->'cards'->0->>'sampleCount'
+  )::integer,
+  0,
+  'top-level sample stays zero while every relationship is collecting'
 );
 
 reset role;
@@ -409,7 +441,7 @@ insert into public.visitor_responses (
   '27200000-0000-4000-8000-000000000003',
   '27100000-0000-4000-8000-000000000001',
   '15151515-1515-4515-8515-151515151515',
-  'online_friend', 'three_to_five_years', 'submitted',
+  'old_friend', 'three_to_five_years', 'submitted',
   decode(repeat('53', 32), 'hex'), transaction_timestamp() + interval '24 hours',
   decode(repeat('63', 32), 'hex'), transaction_timestamp(), transaction_timestamp()
 );
@@ -425,7 +457,8 @@ insert into public.visitor_answers (
 from public.visitor_assignments
 where response_id = '27200000-0000-4000-8000-000000000003';
 
--- These rows must not affect owner A: one-to-one, another owner, and public draft.
+-- These rows must not affect owner A: one-to-one, another owner, public draft,
+-- another pack version, and a withdrawn tombstone.
 insert into public.visitor_responses (
   id, share_link_id, pack_version_id, relationship_code, known_since_code,
   status, session_token_hash, session_expires_at, management_token_hash,
@@ -454,7 +487,22 @@ insert into public.visitor_responses (
     'old_friend', 'ten_years_or_more', 'draft',
     decode(repeat('56', 32), 'hex'), transaction_timestamp() + interval '24 hours',
     null, transaction_timestamp(), null
+  ),
+  (
+    '27200000-0000-4000-8000-000000000010',
+    '27100000-0000-4000-8000-000000000001',
+    'e05e6366-2a00-4798-8273-0af5f16aad10',
+    'old_friend', 'ten_years_or_more', 'submitted',
+    decode(repeat('5a', 32), 'hex'), transaction_timestamp() + interval '24 hours',
+    decode(repeat('6a', 32), 'hex'), transaction_timestamp(), transaction_timestamp()
   );
+insert into public.visitor_responses (
+  id, share_link_id, status, created_at, submitted_at, withdrawn_at
+) values (
+  '27200000-0000-4000-8000-000000000011',
+  '27100000-0000-4000-8000-000000000001',
+  'withdrawn', null, transaction_timestamp(), transaction_timestamp()
+);
 
 set local role service_role;
 
@@ -463,8 +511,34 @@ select is(
     '27000000-0000-4000-8000-000000000001',
     decode(repeat('11', 32), 'hex')
   )->'profile'->'cards'->0->'counts',
-  jsonb_build_object('a', 2, 'b', 1),
-  'the third public sample reveals the exact A and B counts'
+  'null'::jsonb,
+  'collecting relationships with two plus one samples do not reveal top-level counts'
+);
+select is(
+  (
+    public.get_owner_profile(
+      '27000000-0000-4000-8000-000000000001',
+      decode(repeat('11', 32), 'hex')
+    )->'profile'->'cards'->0->>'sampleCount'
+  )::integer,
+  0,
+  'collecting relationships with two plus one samples project top-level zero'
+);
+select is(
+  (
+    select array_agg(
+      (layer->>'relationshipCode') || ':' || (layer->>'sightCount')
+      order by ordinal
+    )
+    from jsonb_array_elements(
+      public.get_owner_profile(
+        '27000000-0000-4000-8000-000000000001',
+        decode(repeat('11', 32), 'hex')
+      )->'profile'->'relationshipLayers'
+    ) with ordinality as layers(layer, ordinal)
+  ),
+  array['old_friend:2', 'school_friend:1']::text[],
+  'relationship layers follow the shared registry order'
 );
 select is(
   (
@@ -474,7 +548,7 @@ select is(
     )->'profile'->>'sightCount'
   )::integer,
   3,
-  'total sight count excludes one-to-one, other-owner, and draft responses'
+  'total sight count excludes one-to-one, other-owner, draft, other-version, and withdrawn responses'
 );
 select is(
   public.get_owner_profile(
@@ -483,6 +557,170 @@ select is(
   )->'profile'->>'sightStatus',
   'has_sight',
   'submitted public responses return the honest current sight state'
+);
+
+reset role;
+
+insert into public.visitor_responses (
+  id, share_link_id, pack_version_id, relationship_code, known_since_code,
+  status, session_token_hash, session_expires_at, management_token_hash,
+  created_at, submitted_at
+) values
+  (
+    '27200000-0000-4000-8000-000000000007',
+    '27100000-0000-4000-8000-000000000001',
+    '15151515-1515-4515-8515-151515151515',
+    'school_friend', 'not_sure', 'submitted',
+    decode(repeat('57', 32), 'hex'), transaction_timestamp() + interval '24 hours',
+    decode(repeat('67', 32), 'hex'), transaction_timestamp(), transaction_timestamp()
+  );
+insert into public.visitor_assignments (
+  response_id, pack_version_id, card_id, stage, position
+) values
+  ('27200000-0000-4000-8000-000000000007', '15151515-1515-4515-8515-151515151515', 'conflict', 'required', 1),
+  ('27200000-0000-4000-8000-000000000007', '15151515-1515-4515-8515-151515151515', 'reunion', 'required', 2),
+  ('27200000-0000-4000-8000-000000000007', '15151515-1515-4515-8515-151515151515', 'plans', 'required', 3);
+insert into public.visitor_answers (
+  response_id, pack_version_id, card_id, choice
+) select response_id, pack_version_id, card_id, 'b'
+from public.visitor_assignments
+where response_id = '27200000-0000-4000-8000-000000000007';
+
+set local role service_role;
+
+select is(
+  (
+    public.get_owner_profile(
+      '27000000-0000-4000-8000-000000000001',
+      decode(repeat('11', 32), 'hex')
+    )->'profile'->'cards'->0->>'sampleCount'
+  )::integer,
+  0,
+  'collecting relationships with two plus two samples still project zero'
+);
+
+reset role;
+
+insert into public.visitor_responses (
+  id, share_link_id, pack_version_id, relationship_code, known_since_code,
+  status, session_token_hash, session_expires_at, management_token_hash,
+  created_at, submitted_at
+) values
+  (
+    '27200000-0000-4000-8000-000000000008',
+    '27100000-0000-4000-8000-000000000001',
+    '15151515-1515-4515-8515-151515151515',
+    'old_friend', 'under_one_year', 'submitted',
+    decode(repeat('58', 32), 'hex'), transaction_timestamp() + interval '24 hours',
+    decode(repeat('68', 32), 'hex'), transaction_timestamp(), transaction_timestamp()
+  ),
+  (
+    '27200000-0000-4000-8000-000000000009',
+    '27100000-0000-4000-8000-000000000001',
+    '15151515-1515-4515-8515-151515151515',
+    'school_friend', 'one_to_three_years', 'submitted',
+    decode(repeat('59', 32), 'hex'), transaction_timestamp() + interval '24 hours',
+    decode(repeat('69', 32), 'hex'), transaction_timestamp(), transaction_timestamp()
+  );
+insert into public.visitor_assignments (
+  response_id, pack_version_id, card_id, stage, position
+) values
+  ('27200000-0000-4000-8000-000000000008', '15151515-1515-4515-8515-151515151515', 'conflict', 'required', 1),
+  ('27200000-0000-4000-8000-000000000008', '15151515-1515-4515-8515-151515151515', 'reunion', 'required', 2),
+  ('27200000-0000-4000-8000-000000000008', '15151515-1515-4515-8515-151515151515', 'plans', 'required', 3),
+  ('27200000-0000-4000-8000-000000000009', '15151515-1515-4515-8515-151515151515', 'conflict', 'required', 1),
+  ('27200000-0000-4000-8000-000000000009', '15151515-1515-4515-8515-151515151515', 'reunion', 'required', 2),
+  ('27200000-0000-4000-8000-000000000009', '15151515-1515-4515-8515-151515151515', 'plans', 'required', 3),
+  ('27200000-0000-4000-8000-000000000001', '15151515-1515-4515-8515-151515151515', 'comfort', 'optional', 1),
+  ('27200000-0000-4000-8000-000000000003', '15151515-1515-4515-8515-151515151515', 'comfort', 'optional', 1),
+  ('27200000-0000-4000-8000-000000000002', '15151515-1515-4515-8515-151515151515', 'comfort', 'optional', 1);
+insert into public.visitor_answers (
+  response_id, pack_version_id, card_id, choice
+) select
+  assignment.response_id,
+  assignment.pack_version_id,
+  assignment.card_id,
+  case
+    when assignment.response_id in (
+      '27200000-0000-4000-8000-000000000001',
+      '27200000-0000-4000-8000-000000000009'
+    ) then 'a'
+    else 'b'
+  end
+from public.visitor_assignments as assignment
+where assignment.response_id in (
+  '27200000-0000-4000-8000-000000000008',
+  '27200000-0000-4000-8000-000000000009'
+)
+or (
+  assignment.card_id = 'comfort'
+  and assignment.response_id in (
+    '27200000-0000-4000-8000-000000000001',
+    '27200000-0000-4000-8000-000000000002',
+    '27200000-0000-4000-8000-000000000003'
+  )
+);
+
+set local role service_role;
+
+select is(
+  (
+    public.get_owner_profile(
+      '27000000-0000-4000-8000-000000000001',
+      decode(repeat('11', 32), 'hex')
+    )->'profile'->'cards'->0->>'sampleCount'
+  )::integer,
+  6,
+  'available relationship cards contribute their safe samples'
+);
+select is(
+  public.get_owner_profile(
+    '27000000-0000-4000-8000-000000000001',
+    decode(repeat('11', 32), 'hex')
+  )->'profile'->'cards'->0->'counts',
+  jsonb_build_object('a', 3, 'b', 3),
+  'safe top-level counts equal the available relationship card sum'
+);
+select is(
+  (
+    select card
+    from jsonb_array_elements(
+      public.get_owner_profile(
+        '27000000-0000-4000-8000-000000000001',
+        decode(repeat('11', 32), 'hex')
+      )->'profile'->'cards'
+    ) as card
+    where card->>'cardId' = 'comfort'
+  ),
+  jsonb_build_object(
+    'cardId', 'comfort',
+    'position', 4,
+    'ownerPrompt', '친구가 고민을 털어놓으면 나는?',
+    'optionA', '먼저 끝까지 들어준다',
+    'optionB', '해결 방법부터 같이 찾는다',
+    'selfChoice', 'b',
+    'sampleCount', 0,
+    'counts', null
+  ),
+  'available relationships with hidden card samples two plus one still project zero'
+);
+select is(
+  (
+    select array_agg(
+      (card->>'sampleCount')::integer
+      order by ordinal
+    )
+    from jsonb_array_elements(
+      public.get_owner_profile(
+        '27000000-0000-4000-8000-000000000001',
+        decode(repeat('11', 32), 'hex')
+      )->'profile'->'relationshipLayers'
+    ) with ordinality as layers(layer, ordinal)
+    cross join lateral jsonb_array_elements(layer->'cards') as card
+    where card->>'cardId' = 'comfort'
+  ),
+  array[2, 1]::integer[],
+  'required and optional actual answers stay separated inside their available relationships'
 );
 
 select is(
