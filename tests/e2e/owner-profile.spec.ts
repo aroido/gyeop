@@ -177,12 +177,32 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
+test("loading profile has one main landmark", async ({ page }) => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/me/profile**", async (route) => {
+    await held;
+    await noStoreJson(route, 200, profile());
+  });
+  await page.goto(`/me/profile/${playId}`);
+
+  await expect(page.locator("main")).toHaveCount(1);
+  await expect(page.getByRole("status")).toHaveText("내 시선을 불러오는 중…");
+  release();
+  await expect(
+    page.getByRole("heading", { name: "내 시선 프로필", level: 1 }),
+  ).toBeVisible();
+});
+
 test("zero profile hides relationship controls and the reshare CTA", async ({
   page,
 }) => {
   const api = await installProfileApi(page, profile());
   await page.goto(`/me/profile/${playId}`);
 
+  await expect(page.locator("main")).toHaveCount(1);
   await expect(
     page.getByRole("heading", { name: "내 시선 프로필", level: 1 }),
   ).toBeFocused();
@@ -319,6 +339,7 @@ test("renders terminal and sign-in states without recording a view", async ({
 }) => {
   const terminal = await installProfileApi(page, profile(), { status: 404 });
   await page.goto(`/me/profile/${playId}`);
+  await expect(page.locator("main")).toHaveCount(1);
   await expect(
     page.getByRole("heading", { name: "이 프로필을 열 수 없어요" }),
   ).toBeFocused();
@@ -327,6 +348,7 @@ test("renders terminal and sign-in states without recording a view", async ({
   await page.unrouteAll({ behavior: "wait" });
   const auth = await installProfileApi(page, profile(), { status: 401 });
   await page.goto(`/me/profile/${playId}`);
+  await expect(page.locator("main")).toHaveCount(1);
   await expect(
     page.getByRole("heading", { name: "다시 로그인해 주세요" }),
   ).toBeFocused();

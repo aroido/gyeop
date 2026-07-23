@@ -328,15 +328,15 @@ export default function OwnerProfileView({
 
   if (state.kind === "loading") {
     return (
-      <section className={styles.shell}>
+      <main className={styles.shell}>
         <p role="status">내 시선을 불러오는 중…</p>
-      </section>
+      </main>
     );
   }
 
   if (state.kind === "terminal") {
     return (
-      <section className={styles.shell}>
+      <main className={styles.shell}>
         <section className={styles.terminal}>
           <p className={styles.brand}>겹</p>
           <h1 ref={headingRef} tabIndex={-1}>
@@ -347,13 +347,13 @@ export default function OwnerProfileView({
             홈으로
           </Link>
         </section>
-      </section>
+      </main>
     );
   }
 
   if (state.kind === "auth") {
     return (
-      <section className={styles.shell}>
+      <main className={styles.shell}>
         <section className={styles.terminal}>
           <p className={styles.brand}>겹</p>
           <h1 ref={headingRef} tabIndex={-1}>
@@ -364,13 +364,13 @@ export default function OwnerProfileView({
             Google로 로그인
           </Link>
         </section>
-      </section>
+      </main>
     );
   }
 
   const { profile, notice } = state;
   return (
-    <section className={styles.shell}>
+    <main className={styles.shell}>
       <section className={styles.profile} aria-labelledby="profile-title">
         <nav className={styles.ownerNav} aria-label="내 질문팩 이동">
           <Link className={styles.back} href="/me">
@@ -428,6 +428,6 @@ export default function OwnerProfileView({
           <RelationshipProfile profile={profile} />
         )}
       </section>
-    </section>
+    </main>
   );
 }

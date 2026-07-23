@@ -325,7 +325,7 @@
   padding: 0.65rem;
   border: 1px solid rgb(255 255 255 / 55%);
   border-radius: 0.65rem;
-  color: #dce4ff;
+  color: #fff;
 }
 
 .choice[data-selected="true"] {
