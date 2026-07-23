@@ -804,6 +804,66 @@ test.describe("live owner flow", () => {
 
     await page.goto("/me");
     await expect(page.getByRole("button", { name: "로그아웃" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: `${account.nickname}의 겹`,
+        level: 1,
+      }),
+    ).toBeFocused();
+    await expect(
+      page.getByText("관계마다 다른 나를 모아보세요.", { exact: true }),
+    ).toBeVisible();
+    const shareEntry = page.getByRole("link", {
+      name: "질문팩 공유하기",
+    });
+    await expect(shareEntry).toHaveAttribute(
+      "href",
+      `/me/plays/${account.playId}`,
+    );
+    const metrics = page.getByLabel("계정 프로필 요약");
+    await expect(metrics.getByText("시선 0", { exact: true })).toBeVisible();
+    await expect(
+      metrics.getByText("완료한 겹 1", { exact: true }),
+    ).toBeVisible();
+    await expect(metrics.getByText("관계 0", { exact: true })).toBeVisible();
+    for (const copy of [
+      "완료 응답 기준",
+      "완료 질문팩",
+      "도착한 관계 종류",
+      "아직 완성한 겹이 없어요",
+    ]) {
+      await expect(page.getByText(copy, { exact: true })).toHaveCount(0);
+    }
+    await page.keyboard.press("Tab");
+    await expect(shareEntry).toBeFocused();
+    expect(
+      await shareEntry.evaluate(
+        (element) => getComputedStyle(element).outlineStyle,
+      ),
+    ).toBe("solid");
+    expect((await shareEntry.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+    ]) {
+      await page.setViewportSize(viewport);
+      const card = await page
+        .locator("[data-layer-count] > article")
+        .first()
+        .boundingBox();
+      expect(card).not.toBeNull();
+      expect(
+        Math.min(card!.y + card!.height, viewport.height) -
+          Math.max(card!.y, 0),
+      ).toBeGreaterThanOrEqual(24);
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= window.innerWidth,
+        ),
+      ).toBe(true);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
     const getLogout = await page.evaluate(async () => {
       const response = await fetch("/api/auth/logout");
       return {
@@ -933,7 +993,9 @@ test.describe("live owner flow", () => {
         level: 1,
       }),
     ).toBeFocused();
-    await expect(recoveredPage.getByText("완료한 겹 2개")).toBeVisible();
+    await expect(
+      recoveredPage.getByText("완료한 겹 2", { exact: true }),
+    ).toBeVisible();
     await expect(
       recoveredPage.getByRole("heading", {
         name: "말 안 해도 알까?",

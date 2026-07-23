@@ -141,31 +141,29 @@ export default function AccountProfileView({
   return (
     <main className={styles.shell}>
       <section className={styles.profile} aria-labelledby="account-title">
-        <p className={styles.brand}>겹 · 내 프로필</p>
-        <h1 id="account-title" ref={headingRef} tabIndex={-1}>
-          {profile.nickname}의 겹
-        </h1>
-        <div className={styles.metrics} aria-label="계정 프로필 요약">
-          <p>
-            <strong>시선 {profile.sightCount}개</strong>
-            <span>완료 응답 기준</span>
+        <header className={styles.profileHeader}>
+          <h1 id="account-title" ref={headingRef} tabIndex={-1}>
+            {profile.nickname}의 겹
+          </h1>
+          <p className={styles.profileLead}>
+            {profile.ctaPlayId
+              ? "관계마다 다른 나를 모아보세요."
+              : "질문팩에 답하고, 내가 보는 나부터 쌓아보세요."}
           </p>
-          <p>
-            <strong>완료한 겹 {profile.completedPlayCount}개</strong>
-            <span>완료 질문팩</span>
-          </p>
-          <p>
-            <strong>관계 {profile.relationshipCount}개</strong>
-            <span>도착한 관계 종류</span>
-          </p>
-        </div>
-
-        {stackLayers.length === 0 ? (
-          <div className={styles.emptyProfile}>
-            <h2>아직 완성한 겹이 없어요</h2>
-            <p>질문팩 10장에 답하면 내가 보는 나부터 쌓이기 시작해요.</p>
+          <Link
+            className={styles.primary}
+            href={profile.ctaPlayId ? `/me/plays/${profile.ctaPlayId}` : "/"}
+          >
+            {profile.ctaPlayId ? "질문팩 공유하기" : "질문팩 시작하기"}
+          </Link>
+          <div className={styles.metrics} aria-label="계정 프로필 요약">
+            <p>시선 {profile.sightCount}</p>
+            <p>완료한 겹 {profile.completedPlayCount}</p>
+            <p>관계 {profile.relationshipCount}</p>
           </div>
-        ) : (
+        </header>
+
+        {stackLayers.length > 0 ? (
           <div
             className={styles.stack}
             data-layer-count={stackLayers.length}
@@ -181,7 +179,7 @@ export default function AccountProfileView({
               />
             ))}
           </div>
-        )}
+        ) : null}
 
         {relationshipChoices.length > 0 ? (
           <section
@@ -226,13 +224,6 @@ export default function AccountProfileView({
             <p>내 선택 · {selectedOption(profile.selfLayers[0])}</p>
           </article>
         ) : null}
-
-        <Link
-          className={styles.primary}
-          href={profile.ctaPlayId ? `/me/plays/${profile.ctaPlayId}` : "/"}
-        >
-          {profile.ctaPlayId ? "시선 더 모으기" : "질문팩 시작하기"}
-        </Link>
 
         <section className={styles.management} aria-labelledby="manage-title">
           <h2 id="manage-title">내 질문팩 관리</h2>
