@@ -32,7 +32,7 @@ EXPECTED_AGENTS = {
     "gyeop-core": ("gpt-5.6-sol", "xhigh"),
     "verifier": ("gpt-5.6-sol", "xhigh"),
 }
-EXPECTED_MOCKUPS = 6
+EXPECTED_MOCKUPS = 7
 LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 IGNORED_DIRS = {".git", ".next", "coverage", "dist", "node_modules", "playwright-report", "test-results"}
 

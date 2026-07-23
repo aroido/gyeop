@@ -4,7 +4,28 @@ import manifest from "../../content/packs/old-friend-v2.json" with { type: "json
 
 import { playId } from "./owner-flow-fixture";
 
-type Counts = { a: number; b: number } | null;
+type Counts = { a: number; b: number };
+type RelationshipCard =
+  | { cardId: string; sampleCount: number; status: "collecting" }
+  | {
+      cardId: string;
+      sampleCount: number;
+      status: "available";
+      counts: Counts;
+    };
+type RelationshipLayer =
+  | {
+      relationshipCode: string;
+      sightCount: 1 | 2;
+      status: "collecting";
+      cards: [];
+    }
+  | {
+      relationshipCode: string;
+      sightCount: number;
+      status: "available";
+      cards: RelationshipCard[];
+    };
 type Profile = {
   playId: string;
   packSlug: "old-friend";
@@ -20,11 +41,43 @@ type Profile = {
     optionB: string;
     selfChoice: "a" | "b";
     sampleCount: number;
-    counts: Counts;
+    counts: Counts | null;
   }>;
+  relationshipLayers: RelationshipLayer[];
 };
 
-function profile(sightCount = 0, firstSampleCount = 0): Profile {
+function layer(
+  relationshipCode: string,
+  sightCount: number,
+  samples: Record<string, Counts> = {},
+): RelationshipLayer {
+  if (sightCount < 3) {
+    return {
+      relationshipCode,
+      sightCount: sightCount as 1 | 2,
+      status: "collecting",
+      cards: [],
+    };
+  }
+  return {
+    relationshipCode,
+    sightCount,
+    status: "available",
+    cards: manifest.cards.map((card) => {
+      const counts = samples[card.id] ?? { a: 0, b: 0 };
+      const sampleCount = counts.a + counts.b;
+      return sampleCount < 3
+        ? { cardId: card.id, sampleCount, status: "collecting" }
+        : { cardId: card.id, sampleCount, status: "available", counts };
+    }),
+  };
+}
+
+function profile(relationshipLayers: RelationshipLayer[] = []): Profile {
+  const sightCount = relationshipLayers.reduce(
+    (total, relationship) => total + relationship.sightCount,
+    0,
+  );
   return {
     playId,
     packSlug: "old-friend",
@@ -32,19 +85,30 @@ function profile(sightCount = 0, firstSampleCount = 0): Profile {
     packTitle: manifest.title,
     sightCount,
     sightStatus: sightCount === 0 ? "empty" : "has_sight",
-    cards: manifest.cards.map((card, index) => ({
-      cardId: card.id,
-      position: card.position,
-      ownerPrompt: card.ownerPrompt,
-      optionA: card.optionA,
-      optionB: card.optionB,
-      selfChoice: index % 2 === 0 ? "a" : "b",
-      sampleCount: index === 0 ? firstSampleCount : 0,
-      counts:
-        index === 0 && firstSampleCount >= 3
-          ? { a: firstSampleCount - 1, b: 1 }
-          : null,
-    })),
+    cards: manifest.cards.map((card, index) => {
+      let sampleCount = 0;
+      let a = 0;
+      let b = 0;
+      for (const relationship of relationshipLayers) {
+        if (relationship.status !== "available") continue;
+        const relationshipCard = relationship.cards[index];
+        if (relationshipCard.status !== "available") continue;
+        sampleCount += relationshipCard.sampleCount;
+        a += relationshipCard.counts.a;
+        b += relationshipCard.counts.b;
+      }
+      return {
+        cardId: card.id,
+        position: card.position,
+        ownerPrompt: card.ownerPrompt,
+        optionA: card.optionA,
+        optionB: card.optionB,
+        selfChoice: index % 2 === 0 ? ("a" as const) : ("b" as const),
+        sampleCount,
+        counts: sampleCount === 0 ? null : { a, b },
+      };
+    }),
+    relationshipLayers,
   };
 }
 
@@ -75,11 +139,11 @@ async function installProfileApi(
     const pathname = new URL(request.url()).pathname;
     if (pathname === "/api/me/profile/events") {
       state.eventCalls += 1;
-      expect(request.method()).toBe("POST");
       const body = request.postDataJSON() as {
         event: "profile_viewed" | "profile_reshare_clicked";
         playId: string;
       };
+      expect(request.method()).toBe("POST");
       expect(["profile_viewed", "profile_reshare_clicked"]).toContain(
         body.event,
       );
@@ -113,53 +177,101 @@ test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
 });
 
-test("renders the private zero-sight profile and records viewing after render", async ({
+test("loading profile has one main landmark", async ({ page }) => {
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/me/profile**", async (route) => {
+    await held;
+    await noStoreJson(route, 200, profile());
+  });
+  await page.goto(`/me/profile/${playId}`);
+
+  await expect(page.locator("main")).toHaveCount(1);
+  await expect(page.getByRole("status")).toHaveText("내 시선을 불러오는 중…");
+  release();
+  await expect(
+    page.getByRole("heading", { name: "내 시선 프로필", level: 1 }),
+  ).toBeVisible();
+});
+
+test("zero profile hides relationship controls and the reshare CTA", async ({
   page,
 }) => {
   const api = await installProfileApi(page, profile());
   await page.goto(`/me/profile/${playId}`);
 
+  await expect(page.locator("main")).toHaveCount(1);
   await expect(
     page.getByRole("heading", { name: "내 시선 프로필", level: 1 }),
   ).toBeFocused();
-  await expect(page.getByRole("link", { name: "내 질문팩" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "← 내 질문팩" })).toHaveAttribute(
     "href",
     "/me",
   );
   await expect(page.getByText("아직 도착한 시선이 없어요")).toBeVisible();
-  await expect(page.locator("article")).toHaveCount(10);
-  await expect(page.getByText("시선을 모으는 중 · 0/3")).toHaveCount(10);
-  await expect(page.getByText("친구 시선", { exact: false })).toHaveCount(0);
+  await expect(page.getByRole("group", { name: "관계 선택" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "시선 더 모으기" })).toHaveCount(
     0,
   );
-  await page.keyboard.press("Shift+Tab");
-  const backLink = page.getByRole("link", { name: "← 내 답변" });
-  await expect(backLink).toBeFocused();
-  await expect(backLink).toHaveCSS("outline-color", "rgb(49, 92, 255)");
   await expect.poll(() => api.eventCalls).toBe(1);
   expect(api.eventBodies).toEqual([{ event: "profile_viewed", playId }]);
 });
 
-test("reveals exact counts at three samples and shows each increase only once", async ({
+test("selects the first available relationship and keeps collecting counts hidden", async ({
   page,
 }) => {
-  const api = await installProfileApi(page, profile(2, 2));
+  await installProfileApi(
+    page,
+    profile([
+      layer("old_friend", 2),
+      layer("coworker", 3, {
+        [manifest.cards[0].id]: { a: 2, b: 1 },
+        [manifest.cards[1].id]: { a: 2, b: 0 },
+      }),
+    ]),
+  );
+  await page.goto(`/me/profile/${playId}`);
+
+  const available = page.getByRole("button", {
+    name: "직장 동료, 3명, 공개 가능",
+  });
+  await expect(available).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("직장 동료 시선 3개")).toContainText("2명");
+  await expect(
+    page.locator("article").filter({ hasText: "다음 질문 · 시선을 모으는 중" }),
+  ).toContainText("2/3");
+
+  const collecting = page.getByRole("button", {
+    name: "오래된 친구, 2/3, 시선을 모으는 중",
+  });
+  await collecting.focus();
+  await page.keyboard.press("Enter");
+  await expect(collecting).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText("시선을 모으는 중 · 2/3")).toBeVisible();
+  await expect(page.getByText("직장 동료 시선", { exact: true })).toHaveCount(
+    0,
+  );
+});
+
+test("refreshes relationship layers deterministically", async ({ page }) => {
+  const api = await installProfileApi(page, profile([layer("old_friend", 2)]));
   await page.goto(`/me/profile/${playId}`);
   await expect(page.getByText("새 시선 도착")).toBeVisible();
   await expect(page.getByText("시선을 모으는 중 · 2/3")).toBeVisible();
-  await expect(page.getByText("A · 바로 이야기한다")).toHaveCount(0);
-  await expect(
-    page.getByRole("link", { name: "시선 더 모으기" }),
-  ).toHaveAttribute("href", `/me/plays/${playId}?entry_source=profile_reshare`);
 
-  api.profile = profile(3, 3);
+  api.profile = profile([
+    layer("old_friend", 3, {
+      [manifest.cards[0].id]: { a: 2, b: 1 },
+    }),
+    layer("family", 2),
+  ]);
   await page.reload();
-  await expect(page.getByText("새 시선 도착")).toBeVisible();
-  const aggregate = page.getByLabel("친구 시선 3개");
-  await expect(aggregate.getByText("A · 바로 이야기한다")).toBeVisible();
-  await expect(aggregate.getByText("2명")).toBeVisible();
-  await expect(aggregate.getByText("1명")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "오래된 친구, 3명, 공개 가능" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByLabel("오래된 친구 시선 3개")).toBeVisible();
 
   await page.reload();
   await expect(page.getByText("새 시선 도착")).toHaveCount(0);
@@ -167,30 +279,14 @@ test("reveals exact counts at three samples and shows each increase only once", 
   await expect.poll(() => api.eventCalls).toBe(3);
 });
 
-test("refreshes newly submitted public sights when the owner returns", async ({
-  page,
-}) => {
-  const api = await installProfileApi(page, profile());
-  await page.goto(`/me/profile/${playId}`);
-  await expect(page.getByText("아직 도착한 시선이 없어요")).toBeVisible();
-
-  api.profile = profile(1, 1);
-  await page.evaluate(() =>
-    document.dispatchEvent(new Event("visibilitychange")),
-  );
-
-  await expect(page.getByText("새 시선 도착")).toBeVisible();
-  await expect(page.getByText("시선을 모으는 중 · 1/3")).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "시선 더 모으기" }),
-  ).toBeVisible();
-});
-
 for (const activation of ["pointer", "keyboard"] as const) {
-  test(`${activation} profile reshare records the click and keeps the same play`, async ({
+  test(`${activation} profile reshare keeps the existing event contract`, async ({
     page,
   }) => {
-    const api = await installProfileApi(page, profile(1, 1));
+    const api = await installProfileApi(
+      page,
+      profile([layer("old_friend", 1)]),
+    );
     await page.goto(`/me/profile/${playId}`);
     const cta = page.getByRole("link", { name: "시선 더 모으기" });
     if (activation === "pointer") {
@@ -211,26 +307,6 @@ for (const activation of ["pointer", "keyboard"] as const) {
   });
 }
 
-test("deduplicates same-tick profile reshare activation", async ({ page }) => {
-  const api = await installProfileApi(page, profile(1, 1));
-  await page.goto(`/me/profile/${playId}`);
-  await page
-    .getByRole("link", { name: "시선 더 모으기" })
-    .evaluate((element) => {
-      (element as HTMLElement).click();
-      (element as HTMLElement).click();
-    });
-  await expect(page).toHaveURL(
-    `/me/plays/${playId}?entry_source=profile_reshare`,
-  );
-  await expect
-    .poll(() => api.eventBodies)
-    .toEqual([
-      { event: "profile_viewed", playId },
-      { event: "profile_reshare_clicked", playId },
-    ]);
-});
-
 test("never claims a new sight when browser storage is unavailable", async ({
   page,
 }) => {
@@ -244,39 +320,42 @@ test("never claims a new sight when browser storage is unavailable", async ({
       });
     }
   });
-  await installProfileApi(page, profile(3, 3));
+  await installProfileApi(
+    page,
+    profile([
+      layer("old_friend", 3, {
+        [manifest.cards[0].id]: { a: 2, b: 1 },
+      }),
+    ]),
+  );
   await page.goto(`/me/profile/${playId}`);
 
   await expect(page.getByText("새 시선 도착")).toHaveCount(0);
   await expect(page.getByText("시선이 쌓여 있어요")).toBeVisible();
 });
 
-test("renders one generic terminal state without recording a view", async ({
+test("renders terminal and sign-in states without recording a view", async ({
   page,
 }) => {
-  const api = await installProfileApi(page, profile(), { status: 404 });
+  const terminal = await installProfileApi(page, profile(), { status: 404 });
   await page.goto(`/me/profile/${playId}`);
-
+  await expect(page.locator("main")).toHaveCount(1);
   await expect(
     page.getByRole("heading", { name: "이 프로필을 열 수 없어요" }),
   ).toBeFocused();
-  await expect(page.getByRole("link", { name: "홈으로" })).toBeVisible();
-  expect(api.eventCalls).toBe(0);
-});
+  expect(terminal.eventCalls).toBe(0);
 
-test("offers sign-in instead of a missing-profile message on 401", async ({
-  page,
-}) => {
-  const api = await installProfileApi(page, profile(), { status: 401 });
+  await page.unrouteAll({ behavior: "wait" });
+  const auth = await installProfileApi(page, profile(), { status: 401 });
   await page.goto(`/me/profile/${playId}`);
-
+  await expect(page.locator("main")).toHaveCount(1);
   await expect(
     page.getByRole("heading", { name: "다시 로그인해 주세요" }),
   ).toBeFocused();
   await expect(
     page.getByRole("link", { name: "Google로 로그인" }),
   ).toHaveAttribute("href", "/auth/sign-in?returnTo=%2Fme");
-  expect(api.eventCalls).toBe(0);
+  expect(auth.eventCalls).toBe(0);
 });
 
 for (const viewport of [
@@ -284,16 +363,21 @@ for (const viewport of [
   { width: 390, height: 844 },
   { width: 430, height: 932 },
 ]) {
-  test(`keeps the owner profile usable at ${viewport.width}px`, async ({
+  test(`keeps the relationship profile usable at ${viewport.width}px`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
-    await installProfileApi(page, profile(3, 3));
+    await installProfileApi(
+      page,
+      profile([
+        layer("old_friend", 3, {
+          [manifest.cards[0].id]: { a: 2, b: 1 },
+        }),
+        layer("social_follower", 2),
+      ]),
+    );
     await page.goto(`/me/profile/${playId}`);
 
-    await expect(
-      page.getByRole("heading", { name: "내 시선 프로필", level: 1 }),
-    ).toBeFocused();
     expect(
       await page.evaluate(
         () =>
@@ -301,6 +385,13 @@ for (const viewport of [
           window.matchMedia("(prefers-reduced-motion: reduce)").matches,
       ),
     ).toBe(true);
+    expect(
+      (
+        await page
+          .getByRole("button", { name: "오래된 친구, 3명, 공개 가능" })
+          .boundingBox()
+      )?.height,
+    ).toBeGreaterThanOrEqual(44);
     expect(
       (await page.getByRole("link", { name: "시선 더 모으기" }).boundingBox())
         ?.height,

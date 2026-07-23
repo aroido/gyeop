@@ -440,16 +440,33 @@ select is(
 
 select is(
   (
-    select sum((card->>'sampleCount')::integer)
-    from jsonb_array_elements(
-      public.get_owner_profile(
+    select jsonb_build_object(
+      'topLevelSampleSum',
+      (
+        select sum((card->>'sampleCount')::integer)
+        from jsonb_array_elements(profile.value->'cards') as card_state(card)
+      ),
+      'layerSightCount',
+      (profile.value->'relationshipLayers'->0->>'sightCount')::integer,
+      'layerStatus',
+      profile.value->'relationshipLayers'->0->>'status',
+      'layerCards',
+      profile.value->'relationshipLayers'->0->'cards'
+    )
+    from (
+      select public.get_owner_profile(
         '25000000-0000-4000-8000-000000000001',
         decode(repeat('10', 32), 'hex')
-      )->'profile'->'cards'
-    ) as profile(card)
+      )->'profile' as value
+    ) as profile
   ),
-  5::bigint,
-  'public profile samples include three required and two optional answers'
+  jsonb_build_object(
+    'topLevelSampleSum', 0,
+    'layerSightCount', 1,
+    'layerStatus', 'collecting',
+    'layerCards', '[]'::jsonb
+  ),
+  'one collecting relationship hides required and optional samples from the top-level profile'
 );
 select is(
   public.get_owner_profile(
