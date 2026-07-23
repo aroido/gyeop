@@ -484,10 +484,10 @@ test.describe("core MVP live gate", () => {
     await expect(
       accountPage.getByRole("heading", {
         name: "우리는 아직도 통하는 편",
-        level: 2,
+        level: 3,
       }),
     ).toBeVisible();
-    await accountPage.getByRole("link", { name: "프로필·공유 관리" }).click();
+    await accountPage.getByRole("link", { name: "공유·상세 관리" }).click();
     await expect(accountPage).toHaveURL(`/me/plays/${ownerPlayId}`);
     await expect(
       accountPage.getByRole("heading", { name: "공유 링크" }),
@@ -663,10 +663,10 @@ test.describe("core MVP live gate", () => {
 
     await page.goto("/me");
     await expect(
-      page.getByRole("heading", { name: "저장한 질문팩" }),
+      page.getByRole("heading", { name: /의 겹$/, level: 1 }),
     ).toBeFocused();
     await expect(
-      page.getByRole("heading", { name: "첫 장면, 네 버전", level: 2 }),
+      page.getByRole("heading", { name: "첫 장면, 네 버전", level: 3 }),
     ).toBeVisible();
     await page.goto(`/me/profile/${ownerPlayId}`);
     const relationshipGroup = page.getByRole("group", {

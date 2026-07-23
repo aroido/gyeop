@@ -1,48 +1,310 @@
 .shell {
   --lime: #dfff00;
   --blue: #315cff;
-
+  --coral: #ff4d42;
   min-height: 100svh;
-  padding: 1rem 0.85rem 2rem;
+  overflow-x: clip;
+  padding: 1rem 0.75rem 2.5rem;
   background: #050505;
   color: #fff;
 }
 
 .card,
-.list {
-  width: min(100%, 36rem);
+.profile,
+.loading {
+  width: min(100%, 38rem);
   margin: 0 auto;
 }
 
 .card {
-  margin-top: 22svh;
+  margin-top: 20svh;
   padding: 1rem;
   border: 1px solid #454545;
   border-top: 0.6rem solid var(--lime);
   border-radius: 1rem;
 }
 
-.brand {
+.profile,
+.loading {
+  padding-top: 1rem;
+}
+
+.brand,
+.eyebrow {
   margin: 0;
   font-size: 0.76rem;
   font-weight: 900;
 }
 
 .card h1,
-.list h1 {
-  margin: 0.8rem 0 0;
-  font-size: clamp(2rem, 10vw, 3.2rem);
+.profile > h1,
+.loading h1 {
+  margin: 0.75rem 0 0;
+  font-size: clamp(2.25rem, 12vw, 4.5rem);
   font-weight: 950;
-  line-height: 1.03;
-  letter-spacing: -0.065em;
-  word-break: keep-all;
+  line-height: 0.98;
+  letter-spacing: -0.07em;
+  overflow-wrap: anywhere;
 }
 
-.card > p:not(.brand),
-.lead {
+.card h1:focus,
+.profile > h1:focus,
+.loading h1:focus {
+  outline: none;
+}
+
+.card > p:not(.brand) {
   color: #bdbdbd;
   font-weight: 700;
   line-height: 1.55;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-top: 1rem;
+}
+
+.metrics p {
+  display: grid;
+  align-content: space-between;
+  min-height: 4.4rem;
+  margin: 0;
+  padding: 0.65rem 0;
+  border-top: 1px solid #3a3a3a;
+}
+
+.metrics strong {
+  font-size: clamp(0.88rem, 3.8vw, 1.05rem);
+  line-height: 1.2;
+}
+
+.metrics span {
+  color: #999;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.stack {
+  display: grid;
+  margin: 1rem 0 0.5rem;
+  padding: 0 0.9rem 0.7rem 0;
+}
+
+.stack[data-layer-count="2"] {
+  padding-bottom: 3.2rem;
+}
+
+.stack[data-layer-count="3"] {
+  padding-bottom: 6.2rem;
+}
+
+.stack[data-layer-count="4"] {
+  padding-bottom: 9.2rem;
+}
+
+.stackCard {
+  grid-area: 1 / 1;
+  display: grid;
+  min-height: 12rem;
+  align-content: space-between;
+  padding: 1rem;
+  border: 1px solid currentColor;
+  border-radius: 1rem;
+  color: #050505;
+  box-shadow: 0 0.45rem 0 #050505;
+}
+
+.stackCard p,
+.stackCard strong,
+.stackCard span {
+  margin: 0;
+}
+
+.stackCard p,
+.stackCard span {
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.stackCard strong {
+  max-width: 20ch;
+  font-size: clamp(1.35rem, 6vw, 2rem);
+  line-height: 1.08;
+  word-break: keep-all;
+}
+
+.layer0 {
+  z-index: 4;
+  margin-top: 0.5rem;
+  background: var(--blue);
+  color: #fff;
+}
+
+.layer1 {
+  z-index: 3;
+  transform: translate(0.3rem, 3rem) rotate(0.4deg);
+  background: var(--lime);
+}
+
+.layer2 {
+  z-index: 2;
+  transform: translate(0.6rem, 6rem) rotate(-0.4deg);
+  background: var(--coral);
+}
+
+.layer3 {
+  z-index: 1;
+  transform: translate(0.9rem, 9rem) rotate(0.5deg);
+  border-color: #777;
+  background: #111;
+  color: #fff;
+}
+
+.emptyProfile,
+.seedDetail,
+.collectingDetail,
+.relationshipDetail,
+.management {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #444;
+  border-radius: 1rem;
+  background: #111;
+}
+
+.emptyProfile h2,
+.emptyProfile p,
+.seedDetail h2,
+.seedDetail p,
+.collectingDetail h3,
+.collectingDetail p,
+.relationshipDetail h3,
+.management h2 {
+  margin: 0;
+}
+
+.emptyProfile p,
+.collectingDetail > p:last-child,
+.management > p {
+  margin-top: 0.6rem;
+  color: #bdbdbd;
+  line-height: 1.5;
+}
+
+.relationships {
+  margin-top: 1.5rem;
+}
+
+.relationships > h2 {
+  margin: 0 0 0.65rem;
+  font-size: 1.25rem;
+}
+
+.relationshipPicker {
+  display: flex;
+  gap: 0.5rem;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0.2rem 0.15rem 0.65rem;
+  scroll-snap-type: x mandatory;
+}
+
+.relationshipPicker button {
+  display: grid;
+  flex: 0 0 min(12rem, 72vw);
+  min-height: 4.25rem;
+  padding: 0.7rem;
+  scroll-snap-align: start;
+  border: 1px solid #666;
+  border-radius: 0.8rem;
+  background: #111;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.relationshipPicker button[aria-pressed="true"] {
+  border-color: var(--lime);
+  background: var(--blue);
+}
+
+.relationshipPicker span,
+.relationshipPicker small {
+  overflow-wrap: anywhere;
+  color: #d0d0d0;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.relationshipPicker strong {
+  margin-top: 0.2rem;
+}
+
+.relationshipDetail {
+  border-color: var(--blue);
+  background: var(--blue);
+}
+
+.relationshipDetail h3,
+.collectingDetail h3 {
+  margin-top: 0.7rem;
+  font-size: clamp(1.5rem, 7vw, 2.2rem);
+  line-height: 1.08;
+  word-break: keep-all;
+}
+
+.selfChoice {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  padding: 0.8rem;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #050505;
+}
+
+.selfChoice span {
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.relationshipDetail dl {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+}
+
+.relationshipDetail dl div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  padding: 0.65rem;
+  border-radius: 0.65rem;
+  background: #050505;
+}
+
+.relationshipDetail dt,
+.relationshipDetail dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 800;
+}
+
+.relationshipDetail dd {
+  color: var(--lime);
+}
+
+.seedDetail h2 {
+  margin-top: 0.65rem;
+  font-size: 1.6rem;
+}
+
+.seedDetail > p:last-child {
+  margin-top: 0.8rem;
+  color: var(--lime);
+  font-weight: 900;
 }
 
 .primary,
@@ -51,8 +313,9 @@
   min-height: 3rem;
   margin-top: 1rem;
   place-items: center;
-  border-radius: 0.7rem;
+  border-radius: 0.75rem;
   font-weight: 900;
+  text-align: center;
   text-decoration: none;
 }
 
@@ -64,6 +327,65 @@
 .secondary {
   border: 1px solid #666;
   color: #fff;
+}
+
+.management {
+  margin-top: 2.5rem;
+}
+
+.management > h2 {
+  font-size: 1.35rem;
+}
+
+.plays {
+  display: grid;
+  gap: 0.7rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plays li {
+  display: grid;
+  gap: 0.8rem;
+  padding: 0.9rem;
+  border: 1px solid #444;
+  border-radius: 0.8rem;
+  background: #050505;
+}
+
+.plays p,
+.plays h3 {
+  margin: 0;
+}
+
+.plays p {
+  color: var(--lime);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.plays h3 {
+  margin-top: 0.25rem;
+  font-size: 1.05rem;
+}
+
+.plays span {
+  color: #999;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.plays a {
+  display: grid;
+  min-height: 2.75rem;
+  place-items: center;
+  border-radius: 0.65rem;
+  background: #222;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 900;
+  text-decoration: none;
 }
 
 .logout {
@@ -96,70 +418,39 @@
   font-weight: 800;
 }
 
-.list {
-  padding-top: 2rem;
-}
-
-.plays {
-  display: grid;
-  gap: 0.8rem;
-  margin: 1.5rem 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.plays li,
-.empty {
-  padding: 1rem;
-  border: 1px solid #4c4c4c;
-  border-radius: 0.9rem;
-  background: #111;
-}
-
-.plays li {
-  display: grid;
-  gap: 1rem;
-}
-
-.plays p,
-.plays h2 {
-  margin: 0;
-}
-
-.plays p {
-  color: var(--lime);
-  font-size: 0.72rem;
-  font-weight: 900;
-}
-
-.plays h2 {
-  margin-top: 0.3rem;
-  font-size: 1.25rem;
-}
-
-.plays span {
-  display: inline-block;
-  margin-top: 0.35rem;
-  color: #aaa;
-  font-size: 0.8rem;
-}
-
-.plays a {
-  display: grid;
-  min-height: 2.75rem;
-  place-items: center;
-  border-radius: 0.65rem;
-  background: var(--lime);
-  color: #050505;
-  font-size: 0.82rem;
-  font-weight: 900;
-  text-decoration: none;
+.loading > div {
+  min-height: 14rem;
+  margin-top: 1rem;
+  border-radius: 1rem;
+  background: linear-gradient(100deg, #111 35%, #222 50%, #111 65%);
+  background-size: 200% 100%;
+  animation: pulse 1.2s linear infinite;
 }
 
 .primary:focus-visible,
 .secondary:focus-visible,
 .logout button:focus-visible,
-.plays a:focus-visible {
+.plays a:focus-visible,
+.relationshipPicker button:focus-visible {
   outline: 3px solid var(--blue);
   outline-offset: 3px;
+}
+
+@keyframes pulse {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading > div {
+    animation: none;
+  }
+}
+
+@media (min-width: 36rem) {
+  .plays li {
+    grid-template-columns: minmax(0, 1fr) 10rem;
+    align-items: center;
+  }
 }

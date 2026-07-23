@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-23 — `/me`를 닉네임 기반 계정 통합 프로필로 전환
+
+- 결정: 인증 owner의 `/me`는 질문팩 목록 대신 `<닉네임>의 겹`을 첫 제목으로 하고, 완료 play별 첫 셀프 카드와 이미 공개 가능한 관계 질문을 한 계정 프로필에 쌓는다. 전체는 고유 인원이 아닌 완료 play별 submitted 공개 응답 합계인 `시선`으로만 부르며, 질문팩 이어하기·공유 관리는 프로필 아래 보조 영역에 둔다.
+- 이유: 홈의 `내 프로필` 진입이 팩 선택 허브로 끝나면 여러 팩에서 쌓이는 한 사람의 보상을 먼저 보여 주지 못한다. 반대로 raw 응답을 계정 단위로 다시 집계하면 서로 다른 팩의 소표본이 결합되어 방문자 선택을 유추할 수 있다.
+- 결과: 새 aggregate RPC나 migration 없이 기존 play별 strict-decoded profile을 server-only에서 조합한다. 관계·질문 threshold는 play마다 독립 적용하고 collecting 상태는 해당 play의 `n/3`만 유지한다. `/me/profile/[playId]` 상세, 공유 관리, draft 복구는 유지하며 공개 프로필·avatar·AI 성격 요약·identity stitching은 추가하지 않는다.
+
 ## 2026-07-23 — owner 전용 관계 레이어를 private MVP P0에 포함
 
 - 결정: `/me/profile/[playId]`는 submitted 공개 링크 시선을 방문자가 고른 관계별로 나누고, 같은 관계 완료 응답 3건 이상에서만 관계를 열며 같은 관계·질문 실제 답변 3건 이상에서만 A/B 수치를 보여준다. 1:1과 `known_since_code` 교차 집계는 제외하고 관계 순서는 shared registry를 따른다.
