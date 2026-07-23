@@ -218,6 +218,7 @@ run_data_app_runtime_verification() {
 
 run_mock_verification() {
   GYEOP_E2E_PORT=3110 pnpm test:e2e --project=mobile-chromium
+  pnpm test:e2e:analytics
 }
 
 case "$MODE" in

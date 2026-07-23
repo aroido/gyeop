@@ -39,6 +39,7 @@
     "supabase:lint": "supabase db lint --local --level warning",
     "test:render-deploy": "bash tests/integration/render-deploy.test.sh",
     "test:e2e": "playwright test",
+    "test:e2e:analytics": "GYEOP_NEXT_DIST_DIR=.next/e2e-3113 GYEOP_E2E_PORT=3113 NEXT_PUBLIC_GA_MEASUREMENT_ID=G-TEST123 playwright test tests/e2e/google-analytics.spec.ts --project=mobile-chromium --workers=1",
     "test:e2e:mvp": "pnpm supabase:reset && pnpm test:e2e:mvp:run",
     "test:e2e:mvp:run": "GYEOP_NEXT_DIST_DIR=.next/e2e-3111 GYEOP_E2E_PORT=3111 GYEOP_E2E_LIVE=1 playwright test tests/e2e/core-mvp-live.spec.ts --project=mobile-chromium --workers=1",
     "test:e2e:mvp:pr:run": "GYEOP_NEXT_DIST_DIR=.next/e2e-3111 GYEOP_E2E_PORT=3111 GYEOP_E2E_LIVE=1 playwright test tests/e2e/core-mvp-live.spec.ts --project=mobile-chromium --workers=1 --grep @pr-core",

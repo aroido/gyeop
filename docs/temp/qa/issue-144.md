@@ -9,7 +9,7 @@ Verified HEAD: `f90e8a1e10abf4f5224f69553566ec8f8e26ad9d`
 
 - `node --test tests/unit/google-analytics.test.mjs tests/unit/http-boundary-policy.test.mjs tests/unit/zero-cost-mvp.test.mjs`: 36 passed.
 - `pnpm test`: 202 passed. 새 `tests/unit/google-analytics.test.mjs`가 기본 unit gate에 포함됨을 확인했다.
-- `GYEOP_E2E_PORT=32149 GYEOP_NEXT_DIST_DIR=.next/e2e-32149 NEXT_PUBLIC_GA_MEASUREMENT_ID=G-TEST123 pnpm exec playwright test tests/e2e/google-analytics.spec.ts --project=mobile-chromium --workers=1`: 7 passed.
+- `pnpm test:e2e:analytics`: 7 passed. 일반 mock E2E는 analytics fixture 없이 유지하고 `scripts/ai-verify`의 mock lane이 별도 port/build로 이 명령을 이어서 실행한다.
 - `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `git diff --check`: 통과.
 - GA fixture E2E는 모든 Google endpoint를 intercept해 실제 property로 test event를 보내지 않았다.
 - DB, migration, API, 내부 funnel registry 변경이 없고 `public.analytics_events`와 `private.core_funnel_stage_counts` 계약이 유지됨을 diff로 확인했다.

@@ -13,6 +13,11 @@ const forbidden = [
 
 type CapturedHit = { url: string; body: string | null };
 
+test.skip(
+  process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID !== "G-TEST123",
+  "GA consent E2E runs in the isolated analytics lane",
+);
+
 async function installFakeGoogleTag(page: Page, hits: CapturedHit[]) {
   await page.route(
     /^https:\/\/www\.googletagmanager\.com\/gtag\/js\?.*/,
