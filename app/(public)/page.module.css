@@ -50,11 +50,14 @@
 .ownerEntry {
   display: inline-grid;
   min-height: 2.75rem;
-  padding-inline: 0.5rem;
+  padding-inline: 0.7rem;
   place-items: center;
+  border: 1px solid #fff;
+  border-radius: 999px;
   color: #fff;
   font-size: 0.72rem;
   font-weight: 850;
+  text-decoration: none;
 }
 
 .ownerEntry:focus-visible {
