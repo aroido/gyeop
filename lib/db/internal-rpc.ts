@@ -28,10 +28,12 @@ import type {
 import { decodePublishedPack } from "../packs/published-pack-core.mjs";
 import type { PublishedPack } from "../packs/published-pack.ts";
 import { packManifests } from "../packs/catalog";
+import { decodeOwnerPublicProfileOutcome } from "../auth/owner-public-profile-core.mjs";
 import {
   decodeCreateShareLinkOutcome,
   decodeDisableShareLinkOutcome,
   decodeInviteMetadataOutcome,
+  decodeInvitePreviewOutcome,
   decodeListShareLinksOutcome,
   decodeRecordShareActionOutcome,
   decodeRotateShareLinkOutcome,
@@ -61,7 +63,7 @@ type ShareManagementState = Readonly<{
   managementTtlSeconds: 604800;
 }>;
 type OwnerShareFailure = Readonly<{
-  outcome: "expired" | "not_found" | "not_completed";
+  outcome: "expired" | "not_found" | "not_completed" | "profile_incomplete";
 }>;
 type CreateShareLinkResult =
   | (ShareManagementState &
@@ -95,6 +97,20 @@ type InviteMetadataResult =
       }>;
     }>
   | Readonly<{ outcome: "invalid" | "unavailable" }>;
+export type InvitePreviewResult =
+  | Readonly<{
+      outcome: "available";
+      previewNickname: string;
+      kind: "public" | "one_to_one";
+      packSlug: string;
+      packVersion: string;
+      packTitle: string;
+      sensitivity: "low" | "medium" | "high";
+    }>
+  | Readonly<{ outcome: "unavailable" }>;
+export type OwnerPublicProfileResult =
+  | Readonly<{ outcome: "complete"; nickname: string }>
+  | Readonly<{ outcome: "incomplete" }>;
 type RecordShareActionResult =
   | (ShareManagementState & Readonly<{ outcome: "recorded" }>)
   | OwnerShareFailure
@@ -557,6 +573,36 @@ export async function getAuthenticatedOwnerProfile(input: {
   });
 }
 
+export async function getAuthenticatedOwnerPublicProfile(): Promise<OwnerPublicProfileResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("get_authenticated_owner_public_profile", {
+        p_actor_id: actor.uid,
+      })
+      .abortSignal(signal);
+    if (error) throw new Error("Internal owner public profile RPC failed");
+    return decodeOwnerPublicProfileOutcome(data) as OwnerPublicProfileResult;
+  });
+}
+
+export async function setAuthenticatedOwnerNickname(input: {
+  nickname: string;
+}): Promise<Readonly<{ outcome: "saved"; nickname: string }>> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("set_authenticated_owner_nickname", {
+        p_actor_id: actor.uid,
+        p_nickname: input.nickname,
+      })
+      .abortSignal(signal);
+    if (error) throw new Error("Internal owner public profile RPC failed");
+    return decodeOwnerPublicProfileOutcome(data) as Readonly<{
+      outcome: "saved";
+      nickname: string;
+    }>;
+  });
+}
+
 export async function recordAuthenticatedOwnerProfileEvent(input: {
   playId: string;
   event: "profile_viewed" | "profile_reshare_clicked";
@@ -1003,6 +1049,19 @@ export async function getInviteMetadata(input: {
   const { data, error } = await query;
   if (error) throw new Error("Internal invite metadata RPC failed");
   return decodeInviteMetadataOutcome(data) as InviteMetadataResult;
+}
+
+export async function getInvitePreview(input: {
+  publicId: string;
+  signal?: AbortSignal;
+}): Promise<InvitePreviewResult> {
+  let query = getInternalClient().rpc("get_invite_preview", {
+    p_public_id: input.publicId,
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal invite preview RPC failed");
+  return decodeInvitePreviewOutcome(data) as InvitePreviewResult;
 }
 
 export async function startResponse(input: {

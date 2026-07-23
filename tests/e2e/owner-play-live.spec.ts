@@ -12,6 +12,7 @@ import {
   claimCompletedOwner,
   claimCompletedOwnerAccount,
   signInOwnerAccount,
+  verifyIncompleteOwnerProfileGate,
   verifyGoogleOAuthStart,
 } from "./owner-auth-live-fixture";
 import honestSelfManifest from "../../content/packs/honest-self-v1.json" with { type: "json" };
@@ -745,7 +746,15 @@ test.describe("live owner flow", () => {
   test("keeps the local Auth callback fixture behind the E2E gate", async ({
     page,
   }) => {
-    await signInOwnerAccount(page, `gyeop-oauth-${Date.now()}@example.com`);
+    await signInOwnerAccount(page, `gyeop-oauth-${Date.now()}@example.com`, {
+      profile: "new",
+    });
+  });
+
+  test("gates an authenticated owner until a nickname is completed", async ({
+    page,
+  }) => {
+    await verifyIncompleteOwnerProfileGate(page);
   });
 
   test("keeps multiple packs under one anonymous owner and resumes each pack", async ({

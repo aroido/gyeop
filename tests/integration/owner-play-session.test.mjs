@@ -188,6 +188,7 @@ async function createAuthenticatedAccount() {
     cookie: [...authCookies]
       .map(([name, value]) => `${name}=${value}`)
       .join("; "),
+    email,
     userId: created.data.user.id,
   };
 }
@@ -363,6 +364,27 @@ test("each additional pack completes and exposes profile and sharing after accou
         true,
       );
       assert.equal(claimed, "claimed", `${pack.slug}: ${serverLog}`);
+
+      const savedAccountProfile = await ownerRequest(
+        "/api/me/account-profile",
+        {
+          method: "PATCH",
+          ip,
+          cookie: account.cookie,
+          body: { nickname: "겹친구09" },
+        },
+      );
+      assert.equal(
+        savedAccountProfile.status,
+        200,
+        `${pack.slug}: ${serverLog}`,
+      );
+      const savedAccountProfileBody = await savedAccountProfile.json();
+      assert.deepEqual(savedAccountProfileBody, { nickname: "겹친구09" });
+      assert.equal(
+        JSON.stringify(savedAccountProfileBody).includes(account.email),
+        false,
+      );
 
       const profile = await ownerRequest(`/api/me/profile?playId=${play.id}`, {
         ip,

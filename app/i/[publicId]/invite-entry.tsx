@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
 
 import {
   buildManagementUrl,
@@ -52,7 +53,18 @@ function unavailable(error: unknown) {
   );
 }
 
-export default function InviteEntry({ publicId }: { publicId: string | null }) {
+type PublicPreview = Readonly<{
+  nickname: string;
+  packTitle: string | null;
+}>;
+
+export default function InviteEntry({
+  publicId,
+  preview,
+}: {
+  publicId: string | null;
+  preview: PublicPreview | null;
+}) {
   const [state, setState] = useState<State>(
     publicId ? { kind: "loading" } : { kind: "unavailable" },
   );
@@ -176,6 +188,22 @@ export default function InviteEntry({ publicId }: { publicId: string | null }) {
   }
 
   if (state.kind === "loading") {
+    if (preview) {
+      return (
+        <main className={styles.shell}>
+          <section className={styles.card}>
+            <p className={styles.brand}>
+              겹{preview.packTitle ? ` · ${preview.packTitle}` : ""}
+            </p>
+            <h1>{preview.nickname}님이 먼저 답한 질문팩이에요</h1>
+            <p>3개만 고르면 실제 답과 바로 비교할 수 있어요.</p>
+            <p className={styles.loading} role="status">
+              초대를 확인하는 중…
+            </p>
+          </section>
+        </main>
+      );
+    }
     return (
       <main className={styles.shell}>
         <p className={styles.loading} role="status">
@@ -231,6 +259,11 @@ export default function InviteEntry({ publicId }: { publicId: string | null }) {
     <main className={styles.shell}>
       <section className={styles.card} data-kind={state.metadata.kind}>
         <p className={styles.brand}>겹 · {state.metadata.packTitle}</p>
+        {preview ? (
+          <p className={styles.inviteContext}>
+            {preview.nickname}님이 먼저 답한 질문팩이에요
+          </p>
+        ) : null}
         <h1 ref={headingRef} tabIndex={-1}>
           이 사람과 어떤 사이인가요?
         </h1>

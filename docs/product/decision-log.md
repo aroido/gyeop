@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-23 — private MVP 초대에 owner가 입력한 닉네임을 snapshot으로 공개
+
+- 결정: Google 로그인 직후 owner가 한글 완성형·영문·숫자 2~12자의 공개 닉네임을 완료해야 `/me`와 공유 생성을 사용할 수 있다. 새 링크는 생성 당시 닉네임을 snapshot으로 보관하고, fragment secret 없이 읽는 server HTML·SNS metadata·OG 이미지에 `닉네임님` 맥락을 표시한다. 공개·low 팩만 정확한 발행 version의 제목·커버 정체성을 쓰며 1:1·medium/high는 중립 카드로 제한한다.
+- 이유: 일반적인 `친구가 먼저 답한 질문팩`보다 누가 보낸 초대인지 즉시 알아야 실제 DM·스토리에서 열 동기가 생긴다. Google 계정 프로필을 재사용하지 않고 주인이 직접 공개값을 고르게 하며, 기존 링크·민감 팩·secret 기반 응답 내용은 함께 노출하지 않는다.
+- 결과: 닉네임은 링크를 가진 사람과 crawler가 읽을 수 있는 public lookup material로 분류한다. 링크 disable·expire·rotate·1:1 consume 때 즉시 지우고 만료+24시간 cleanup 상한을 적용한다. 이는 2026-07-15의 `P0 공유 문구에는 표시 이름을 사용하지 않음` 결정을 private MVP 초대 링크에 한해 대체한다. 금칙어·신고·운영 moderation이 없는 현재 상태는 명시적 private-MVP 예외이며 public beta release blocker다.
+
 ## 2026-07-22 — private MVP 인프라 월 예산을 0달러로 고정
 
 - 결정: 현재 private MVP는 이미 연결된 Render Free Web Service 하나, Supabase Free project 하나, public repository GitHub Actions와 local Supabase만 사용하고 월 인프라 비용 hard cap을 `$0`로 고정한다. owner 연결은 기존 Google OAuth만 유지한다.

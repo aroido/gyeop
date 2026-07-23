@@ -22,6 +22,10 @@ const INVITE_UNAVAILABLE = Object.freeze({
   code: "INVITE_UNAVAILABLE",
   message: "이 초대는 지금 참여할 수 없습니다.",
 });
+const PROFILE_INCOMPLETE = Object.freeze({
+  code: "OWNER_PROFILE_INCOMPLETE",
+  message: "초대 링크를 만들기 전에 닉네임을 설정해 주세요.",
+});
 
 export function inviteUnavailableResponse() {
   return privateNoStore(Response.json(INVITE_UNAVAILABLE, { status: 404 }));
@@ -32,6 +36,9 @@ function ownerJson(value: unknown, status = 200) {
 }
 
 function ownerFailure(outcome: string) {
+  if (outcome === "profile_incomplete") {
+    return ownerJson(PROFILE_INCOMPLETE, 409);
+  }
   if (outcome === "expired" || outcome === "not_found")
     return ownerNotFoundResponse();
   return ownerNotFoundResponse();

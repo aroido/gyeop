@@ -178,6 +178,28 @@ insert into public.share_links (
   'active'
 );
 
+insert into public.share_links (
+  id,
+  public_id,
+  pack_play_id,
+  kind,
+  secret_hash,
+  status,
+  preview_nickname,
+  created_at,
+  updated_at
+) values (
+  '32000000-0000-4000-8000-000000000032',
+  'DDDDDDDDDDDDDDDDDDDDDA',
+  '32000000-0000-4000-8000-000000000022',
+  'public',
+  decode(repeat('0f', 32), 'hex'),
+  'active',
+  'GYEOP 09',
+  clock_timestamp() - interval '32 days',
+  clock_timestamp() - interval '32 days'
+);
+
 with fixed_time as (select clock_timestamp() as value)
 insert into public.visitor_responses (
   id,
@@ -503,11 +525,26 @@ select ok(
       'visitor_drafts',
       'submitted_sessions',
       'rate_limit_buckets',
-      'analytics_events'
+      'analytics_events',
+      'invite_previews'
     ]
     from cleanup_result
   ),
   'cleanup returns every category result'
+);
+select is(
+  (select payload#>>'{invite_previews,updated_count}' from cleanup_result),
+  '1',
+  'cleanup clears one nickname snapshot after link due time plus 24 hours'
+);
+select is(
+  (
+    select link.preview_nickname
+    from public.share_links as link
+    where link.id = '32000000-0000-4000-8000-000000000032'
+  ),
+  null,
+  'preview cleanup preserves the link tombstone while removing public nickname material'
 );
 select is(
   (select payload#>>'{anonymous_owner_trees,deleted_count}' from cleanup_result),

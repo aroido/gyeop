@@ -116,6 +116,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      owner_public_profiles: {
+        Row: {
+          created_at: string;
+          nickname: string;
+          owner_id: string;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          nickname: string;
+          owner_id: string;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          nickname?: string;
+          owner_id?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       pack_cards: {
         Row: {
           created_at: string;
@@ -374,6 +395,7 @@ export type Database = {
           id: string;
           kind: string;
           pack_play_id: string;
+          preview_nickname: string | null;
           public_id: string;
           secret_hash: string;
           status: string;
@@ -387,6 +409,7 @@ export type Database = {
           id: string;
           kind: string;
           pack_play_id: string;
+          preview_nickname?: string | null;
           public_id: string;
           secret_hash: string;
           status?: string;
@@ -400,6 +423,7 @@ export type Database = {
           id?: string;
           kind?: string;
           pack_play_id?: string;
+          preview_nickname?: string | null;
           public_id?: string;
           secret_hash?: string;
           status?: string;
@@ -682,6 +706,10 @@ export type Database = {
         Args: { p_actor_id: string; p_play_id: string };
         Returns: Json;
       };
+      get_authenticated_owner_public_profile: {
+        Args: { p_actor_id: string };
+        Returns: Json;
+      };
       get_authenticated_private_1to1_comparison: {
         Args: { p_actor_id: string; p_play_id: string; p_response_id: string };
         Returns: Json;
@@ -690,6 +718,7 @@ export type Database = {
         Args: { p_public_id: string; p_secret_hash: string };
         Returns: Json;
       };
+      get_invite_preview: { Args: { p_public_id: string }; Returns: Json };
       get_owner_claim_state: {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: Json;
@@ -846,6 +875,10 @@ export type Database = {
           p_response_id: string;
           p_session_hash: string;
         };
+        Returns: Json;
+      };
+      set_authenticated_owner_nickname: {
+        Args: { p_actor_id: string; p_nickname: string };
         Returns: Json;
       };
       start_required_response: {
