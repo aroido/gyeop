@@ -1,4 +1,4 @@
-# Issue 152 구현 스펙: [P0] /me 프로필 상단 공유 동기와 행동 강화
+# Issue 152 구현 스펙: /me 프로필 상단 공유 동기와 행동 강화
 
 Status: Reviewed
 Issue: https://github.com/aroido/gyeop/issues/152
