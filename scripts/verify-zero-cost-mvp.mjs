@@ -48,12 +48,14 @@ function mapping(text, lineNumber) {
     suffix.startsWith(" ") && suffix.trim() === suffix.slice(1),
     `render.yaml:${lineNumber}: malformed scalar spacing`,
   );
-  const value = suffix.slice(1);
+  const scalar = suffix.slice(1);
+  const quoted = scalar === '"false"';
+  const value = quoted ? "false" : scalar;
   invariant(
-    SAFE_SCALAR.test(value),
+    quoted || SAFE_SCALAR.test(value),
     `render.yaml:${lineNumber}: unsupported scalar syntax`,
   );
-  return { key: match[1], value };
+  return { key: match[1], value, quoted };
 }
 
 function setUnique(fields, key, value, lineNumber) {
@@ -68,6 +70,7 @@ export function verifyRenderYaml(renderYaml) {
   let servicesDeclarations = 0;
   const services = [];
   const environmentKeys = new Set();
+  const environmentVariables = [];
   let service = null;
   let envVars = false;
   let envVar = null;
@@ -93,7 +96,7 @@ export function verifyRenderYaml(renderYaml) {
     if (indent === 0) {
       const entry = mapping(text, lineNumber);
       invariant(
-        entry.key === "services" && entry.value === null,
+        entry.key === "services" && entry.value === null && !entry.quoted,
         `render.yaml:${lineNumber}: unsupported root declaration`,
       );
       servicesDeclarations += 1;
@@ -119,7 +122,7 @@ export function verifyRenderYaml(renderYaml) {
       );
       const entry = mapping(text.slice(2), lineNumber);
       invariant(
-        entry.key === "type" && entry.value !== null,
+        entry.key === "type" && entry.value !== null && !entry.quoted,
         `render.yaml:${lineNumber}: service item must start with type`,
       );
       service = new Map();
@@ -135,7 +138,7 @@ export function verifyRenderYaml(renderYaml) {
     if (indent === 4) {
       const entry = mapping(text, lineNumber);
       invariant(
-        RENDER_SERVICE_KEYS.has(entry.key),
+        RENDER_SERVICE_KEYS.has(entry.key) && !entry.quoted,
         `render.yaml:${lineNumber}: unsupported service field ${entry.key}`,
       );
       setUnique(service, entry.key, entry.value, lineNumber);
@@ -166,10 +169,12 @@ export function verifyRenderYaml(renderYaml) {
       invariant(
         entry.key === "key" &&
           entry.value !== null &&
+          !entry.quoted &&
           /^[A-Z][A-Z0-9_]*$/.test(entry.value),
         `render.yaml:${lineNumber}: envVars item must start with a literal key`,
       );
       envVar = new Map([[entry.key, entry.value]]);
+      environmentVariables.push(envVar);
       invariant(
         !environmentKeys.has(entry.value),
         `render.yaml:${lineNumber}: duplicate env var ${entry.value}`,
@@ -185,8 +190,15 @@ export function verifyRenderYaml(renderYaml) {
       );
       const entry = mapping(text, lineNumber);
       invariant(
-        entry.key === "sync" && entry.value === "false",
-        `render.yaml:${lineNumber}: only sync: false is supported for envVars`,
+        (entry.key === "sync" &&
+          entry.value === "false" &&
+          !entry.quoted &&
+          envVar.get("key") !== "GYEOP_CONCEPT_PROFILE_ENABLED") ||
+          (entry.key === "value" &&
+            entry.value === "false" &&
+            entry.quoted &&
+            envVar.get("key") === "GYEOP_CONCEPT_PROFILE_ENABLED"),
+        `render.yaml:${lineNumber}: envVars require sync: false or the exact quoted disabled concept gate`,
       );
       setUnique(envVar, entry.key, entry.value, lineNumber);
       continue;
@@ -219,6 +231,13 @@ export function verifyRenderYaml(renderYaml) {
       `render.yaml: ${name} build environment is required`,
     );
   }
+  const conceptGate = environmentVariables.find(
+    (variable) => variable.get("key") === "GYEOP_CONCEPT_PROFILE_ENABLED",
+  );
+  invariant(
+    conceptGate?.get("value") === "false" && conceptGate.size === 2,
+    'render.yaml: GYEOP_CONCEPT_PROFILE_ENABLED must use exact value: "false"',
+  );
   return required;
 }
 

@@ -5,7 +5,9 @@ import {
   completeOwnerPlay,
   createOrResumeOwnerPlay,
   getAuthenticatedOwnerPlay,
+  getAuthenticatedOwnerPlayPack,
   getOwnerPlay,
+  getOwnerPlayPack,
   revokeOwnerPlaySession,
   saveAuthenticatedOwnerAnswer,
   saveOwnerAnswer,
@@ -228,6 +230,31 @@ export async function readOwnerPlayResponse(input: {
     });
     return authenticated.outcome === "authorized"
       ? ownerJson(authenticated.play)
+      : ownerNotFoundResponse(true);
+  } catch (error) {
+    return authenticatedOwnerFailureResponse(error);
+  }
+}
+
+export async function readOwnerPlayPackResponse(input: {
+  cookie: ValidOwnerCookie;
+  playId: string;
+  signal: AbortSignal;
+}) {
+  const result = await getOwnerPlayPack({
+    playId: input.playId,
+    managementSecretHash: input.cookie.managementSecretHash,
+    signal: input.signal,
+  });
+  if (result.outcome === "authorized") {
+    return ownerJson(result.pack);
+  }
+  try {
+    const authenticated = await getAuthenticatedOwnerPlayPack({
+      playId: input.playId,
+    });
+    return authenticated.outcome === "authorized"
+      ? ownerJson(authenticated.pack)
       : ownerNotFoundResponse(true);
   } catch (error) {
     return authenticatedOwnerFailureResponse(error);

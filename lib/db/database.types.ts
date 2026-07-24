@@ -139,6 +139,8 @@ export type Database = {
       };
       pack_cards: {
         Row: {
+          concept_context: string | null;
+          concept_signals: Json | null;
           created_at: string;
           id: string;
           is_signature: boolean;
@@ -150,6 +152,8 @@ export type Database = {
           visitor_prompt: string;
         };
         Insert: {
+          concept_context?: string | null;
+          concept_signals?: Json | null;
           created_at?: string;
           id: string;
           is_signature?: boolean;
@@ -161,6 +165,8 @@ export type Database = {
           visitor_prompt: string;
         };
         Update: {
+          concept_context?: string | null;
+          concept_signals?: Json | null;
           created_at?: string;
           id?: string;
           is_signature?: boolean;
@@ -290,6 +296,7 @@ export type Database = {
       };
       pack_versions: {
         Row: {
+          concept_version: number | null;
           created_at: string;
           id: string;
           published_at: string | null;
@@ -297,6 +304,7 @@ export type Database = {
           version: string;
         };
         Insert: {
+          concept_version?: number | null;
           created_at?: string;
           id?: string;
           published_at?: string | null;
@@ -304,6 +312,7 @@ export type Database = {
           version: string;
         };
         Update: {
+          concept_version?: number | null;
           created_at?: string;
           id?: string;
           published_at?: string | null;
@@ -702,6 +711,10 @@ export type Database = {
         Args: { p_actor_id: string; p_play_id: string };
         Returns: Json;
       };
+      get_authenticated_owner_play_pack: {
+        Args: { p_actor_id: string; p_play_id: string };
+        Returns: Json;
+      };
       get_authenticated_owner_profile: {
         Args: { p_actor_id: string; p_play_id: string };
         Returns: Json;
@@ -724,6 +737,10 @@ export type Database = {
         Returns: Json;
       };
       get_owner_play: {
+        Args: { p_management_secret_hash: string; p_play_id: string };
+        Returns: Json;
+      };
+      get_owner_play_pack: {
         Args: { p_management_secret_hash: string; p_play_id: string };
         Returns: Json;
       };

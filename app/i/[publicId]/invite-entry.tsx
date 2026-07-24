@@ -22,6 +22,10 @@ import {
   RELATIONSHIP_OPTIONS,
 } from "@/lib/visitor-response/visitor-context-core.mjs";
 import {
+  choiceOrder,
+  visitorChoiceOrdinal,
+} from "@/lib/packs/choice-order.mjs";
+import {
   continueVisitorResponse,
   readVisitorResponse,
   recordVisitorEvent,
@@ -529,7 +533,11 @@ function ResponseFlow({
               {assignment.visitorPrompt}
             </h1>
             <div className={styles.answerGrid}>
-              {(["a", "b"] as const).map((choice) => (
+              {choiceOrder(
+                visitorChoiceOrdinal(assignment.stage, assignment.position),
+                assignment.optionA,
+                assignment.optionB,
+              ).map(({ choice, label }) => (
                 <button
                   className={styles.answer}
                   type="button"
@@ -539,9 +547,7 @@ function ResponseFlow({
                   aria-pressed={choices[assignment.cardId] === choice}
                 >
                   <small>{choice.toUpperCase()}</small>
-                  <span>
-                    {choice === "a" ? assignment.optionA : assignment.optionB}
-                  </span>
+                  <span>{label}</span>
                 </button>
               ))}
             </div>
@@ -757,7 +763,11 @@ function OptionalQuestions({
             {assignment.visitorPrompt}
           </h1>
           <div className={styles.answerGrid}>
-            {(["a", "b"] as const).map((choice) => (
+            {choiceOrder(
+              visitorChoiceOrdinal(assignment.stage, assignment.position),
+              assignment.optionA,
+              assignment.optionB,
+            ).map(({ choice, label }) => (
               <button
                 className={styles.answer}
                 type="button"
@@ -767,9 +777,7 @@ function OptionalQuestions({
                 aria-pressed={choices[assignment.cardId] === choice}
               >
                 <small>{choice.toUpperCase()}</small>
-                <span>
-                  {choice === "a" ? assignment.optionA : assignment.optionB}
-                </span>
+                <span>{label}</span>
               </button>
             ))}
           </div>

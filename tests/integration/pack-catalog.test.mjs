@@ -139,7 +139,7 @@ test("active pack returns only the approved published fields", async () => {
       "version",
     ]);
     assert.equal(body.slug, "old-friend");
-    assert.equal(body.version, "old-friend-v2");
+    assert.equal(body.version, "old-friend-v3");
     assert.equal(body.cards.length, 10);
     assert.equal(body.cards[0].ownerPrompt, "서운한 일이 생기면 나는?");
     assert.equal(body.cards[0].isSignature, false);

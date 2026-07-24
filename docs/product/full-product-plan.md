@@ -4,6 +4,12 @@
 > 상태: 활성 SSOT를 종합한 장기 제품 기획
 > 목적: 제품의 문제, 사용자, 핵심 루프, 단계별 범위, 안전 기준, 지표와 실행 순서를 한 문서에서 이해하게 한다.
 
+## 2026-07-24 현재 private MVP 보상
+
+활성 최신 24개 질문팩은 concept v1의 8개 영역·32개 양방향 결에 연결된다. owner가 여러 팩을 완료하면 `/me`는 MBTI형 고정 코드나 점수 대신 실제 장면에서 반복·차이·상황 의존이 생긴 대화 훅 3~5개를 보여 준다. owner는 비연애 공개 관계의 기존 임계값을 통과한 안전한 후보 중 하나를 직접 골라 고정 관찰문·다음 질문·같은 source pack 초대가 담긴 9:16 카드로 공유한다.
+
+신규 play는 slug별 최신 v2/v3에서 시작하고, 과거 45개와 신규 24개를 합친 69 version·690 card history는 불변으로 보존한다. 공개 pack API는 current-only, 과거 owner play와 invite/result는 exact historical version을 사용한다. concept 화면은 server-only gate 기본 false로 배포하며 gate를 꺼도 기존 프로필·공유와 v1/v2/v3 history 읽기는 유지한다.
+
 ## 0. 문서 권한
 
 이 문서는 제품 전체 맥락과 장기 방향을 설명하는 보조 문서다. 구체적인 현재 동작이 충돌하면 아래 순서가 우선한다.

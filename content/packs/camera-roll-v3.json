@@ -1,0 +1,182 @@
+{
+  "slug": "camera-roll",
+  "version": "camera-roll-v3",
+  "title": "최근 사진 20장",
+  "targetRelationship": "old_friend",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "카메라 롤 추리",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "camera-roll-card-v1",
+    "coverTone": "violet"
+  },
+  "cards": [
+    {
+      "id": "first-photo",
+      "position": 1,
+      "ownerPrompt": "재밌는 순간이 오면 나는?",
+      "visitorPrompt": "재밌는 순간이 오면 이 사람은?",
+      "optionA": "바로 사진부터 남긴다",
+      "optionB": "먼저 그 순간을 즐긴다",
+      "isSignature": true,
+      "conceptContext": "경험·기록",
+      "conceptSignals": [
+        {
+          "conceptId": "att.experience",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "food-photo",
+      "position": 2,
+      "ownerPrompt": "맛있는 음식 앞에서 나는?",
+      "visitorPrompt": "맛있는 음식 앞에서 이 사람은?",
+      "optionA": "예쁘게 찍고 먹는다",
+      "optionB": "따뜻할 때 먼저 먹는다",
+      "isSignature": false,
+      "conceptContext": "식사·기록",
+      "conceptSignals": [
+        {
+          "conceptId": "att.experience",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "selfie",
+      "position": 3,
+      "ownerPrompt": "내 사진을 찍을 때 나는?",
+      "visitorPrompt": "자기 사진을 찍을 때 이 사람은?",
+      "optionA": "여러 장 중 마음에 드는 걸 고른다",
+      "optionB": "한 장의 자연스러운 컷을 남긴다",
+      "isSignature": false,
+      "conceptContext": "자기표현·선택",
+      "conceptSignals": [
+        {
+          "conceptId": "dec.convergence",
+          "directionForOptionA": "b"
+        }
+      ]
+    },
+    {
+      "id": "friend-photo",
+      "position": 4,
+      "ownerPrompt": "친구와 사진을 같이 만들 때 우리는?",
+      "visitorPrompt": "친구와 사진을 같이 만들 때 이 사람은?",
+      "optionA": "같은 박자에 맞춰 포즈를 잡는다",
+      "optionB": "한 명은 구도, 한 명은 표정을 맡는다",
+      "isSignature": false,
+      "conceptContext": "친구·사진",
+      "conceptSignals": [
+        {
+          "conceptId": "coop.sync",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "cleanup",
+      "position": 5,
+      "ownerPrompt": "사진이 쌓이면 나는?",
+      "visitorPrompt": "사진이 쌓이면 이 사람은?",
+      "optionA": "틈틈이 정리한다",
+      "optionB": "필요할 때 찾아본다",
+      "isSignature": false,
+      "conceptContext": "정리·일상",
+      "conceptSignals": [
+        {
+          "conceptId": "act.routine",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "old-album",
+      "position": 6,
+      "ownerPrompt": "예전 사진을 보면 나는?",
+      "visitorPrompt": "예전 사진을 보면 이 사람은?",
+      "optionA": "그날 이야기를 떠올린다",
+      "optionB": "그때의 분위기를 다시 느낀다",
+      "isSignature": false,
+      "conceptContext": "기억",
+      "conceptSignals": [
+        {
+          "conceptId": "att.memory",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "share-photo",
+      "position": 7,
+      "ownerPrompt": "함께 찍은 사진을 고를 때 나는?",
+      "visitorPrompt": "함께 찍은 사진을 고를 때 이 사람은?",
+      "optionA": "바로 보내서 같이 본다",
+      "optionB": "마음에 드는 걸 골라 보낸다",
+      "isSignature": false,
+      "conceptContext": "사진·공유",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.reaction",
+          "directionForOptionA": "a"
+        },
+        {
+          "conceptId": "dec.revision",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "screenshot",
+      "position": 8,
+      "ownerPrompt": "재밌는 화면을 발견하면 나는?",
+      "visitorPrompt": "재밌는 화면을 발견하면 이 사람은?",
+      "optionA": "바로 캡처하며 따라간다",
+      "optionB": "먼저 끝까지 본 뒤 필요한 장면을 남긴다",
+      "isSignature": false,
+      "conceptContext": "저장·공유",
+      "conceptSignals": [
+        {
+          "conceptId": "att.experience",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "landscape",
+      "position": 9,
+      "ownerPrompt": "여행 풍경을 나중에 떠올릴 때 나는?",
+      "visitorPrompt": "여행 풍경을 나중에 떠올릴 때 이 사람은?",
+      "optionA": "빛과 장소 같은 구체적인 장면이 먼저 난다",
+      "optionB": "그때의 기분과 분위기가 먼저 난다",
+      "isSignature": false,
+      "conceptContext": "풍경·기억",
+      "conceptSignals": [
+        {
+          "conceptId": "att.memory",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "favorite",
+      "position": 10,
+      "ownerPrompt": "친구에게 사진 한 장을 보여준다면 나는?",
+      "visitorPrompt": "친구에게 사진 한 장을 보여준다면 이 사람은?",
+      "optionA": "전후 맥락이 담긴 장면을 고른다",
+      "optionB": "핵심 표정이 바로 보이는 장면을 고른다",
+      "isSignature": false,
+      "conceptContext": "사진·선택",
+      "conceptSignals": [
+        {
+          "conceptId": "att.story",
+          "directionForOptionA": "a"
+        }
+      ]
+    }
+  ],
+  "conceptVersion": 1
+}

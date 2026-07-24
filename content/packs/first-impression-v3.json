@@ -1,0 +1,182 @@
+{
+  "slug": "first-impression",
+  "version": "first-impression-v3",
+  "title": "첫 장면, 네 버전",
+  "targetRelationship": "new_connection",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "가벼운 첫 만남",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "first-impression-card-v1",
+    "coverTone": "blue"
+  },
+  "cards": [
+    {
+      "id": "first-move",
+      "position": 1,
+      "ownerPrompt": "처음 만난 자리에서 나는?",
+      "visitorPrompt": "처음 만난 자리에서 이 사람은?",
+      "optionA": "먼저 말을 건다",
+      "optionB": "상대가 말을 걸면 자연스럽게 이어 간다",
+      "isSignature": true,
+      "conceptContext": "첫만남",
+      "conceptSignals": [
+        {
+          "conceptId": "rel.entry",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "first-topic",
+      "position": 2,
+      "ownerPrompt": "낯선 모임에서 대화를 이어갈 때 나는?",
+      "visitorPrompt": "낯선 모임에서 대화를 이어갈 때 이 사람은?",
+      "optionA": "여러 사람과 짧게 공통점을 찾는다",
+      "optionB": "한 사람의 이야기를 오래 파고든다",
+      "isSignature": false,
+      "conceptContext": "첫대화",
+      "conceptSignals": [
+        {
+          "conceptId": "rel.range",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "group-entry",
+      "position": 3,
+      "ownerPrompt": "낯선 사람들이 모인 자리에 가면 나는?",
+      "visitorPrompt": "낯선 사람들이 모인 자리에 가면 이 사람은?",
+      "optionA": "여러 사람에게 두루 인사한다",
+      "optionB": "한두 사람과 먼저 친해진다",
+      "isSignature": false,
+      "conceptContext": "낯선모임",
+      "conceptSignals": [
+        {
+          "conceptId": "rel.range",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "silence",
+      "position": 4,
+      "ownerPrompt": "대화가 잠시 끊기면 나는?",
+      "visitorPrompt": "대화가 잠시 끊기면 이 사람은?",
+      "optionA": "새 화제를 꺼낸다",
+      "optionB": "잠깐의 침묵도 편하게 둔다",
+      "isSignature": false,
+      "conceptContext": "대화·진입",
+      "conceptSignals": [
+        {
+          "conceptId": "rel.entry",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "interest",
+      "position": 5,
+      "ownerPrompt": "상대 이야기에 관심을 보일 때 나는 주로?",
+      "visitorPrompt": "상대 이야기에 관심을 보일 때 이 사람은 주로?",
+      "optionA": "표정과 맞장구로 보여 준다",
+      "optionB": "이어지는 질문으로 보여 준다",
+      "isSignature": false,
+      "conceptContext": "관심·표현",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.form",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "humor",
+      "position": 6,
+      "ownerPrompt": "첫 만남에서 웃음이 생기면 나는?",
+      "visitorPrompt": "첫 만남에서 웃음이 생기면 이 사람은?",
+      "optionA": "먼저 농담을 꺼낸다",
+      "optionB": "상대 농담에 크게 반응한다",
+      "isSignature": false,
+      "conceptContext": "첫만남·반응",
+      "conceptSignals": [
+        {
+          "conceptId": "rel.entry",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "warm-up",
+      "position": 7,
+      "ownerPrompt": "새로운 사람과 가까워질 때 나는?",
+      "visitorPrompt": "새로운 사람과 가까워질 때 이 사람은?",
+      "optionA": "짧은 시간에도 금방 편해진다",
+      "optionB": "몇 번 만나며 천천히 편해진다",
+      "isSignature": false,
+      "conceptContext": "관계·거리",
+      "conceptSignals": [
+        {
+          "conceptId": "rel.distance",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "meet-again",
+      "position": 8,
+      "ownerPrompt": "한 번 만난 사람을 다시 보면 나는?",
+      "visitorPrompt": "한 번 만난 사람을 다시 보면 이 사람은?",
+      "optionA": "지난 이야기를 바로 이어 간다",
+      "optionB": "새 근황부터 천천히 다시 맞춘다",
+      "isSignature": false,
+      "conceptContext": "재회·대화",
+      "conceptSignals": [
+        {
+          "conceptId": "rel.distance",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "follow-up",
+      "position": 9,
+      "ownerPrompt": "처음 만난 뒤 연락할 때 나는?",
+      "visitorPrompt": "처음 만난 뒤 연락할 때 이 사람은?",
+      "optionA": "먼저 짧게 안부를 보낸다",
+      "optionB": "다음에 만날 계기가 생기면 연락한다",
+      "isSignature": false,
+      "conceptContext": "첫만남·연락",
+      "conceptSignals": [
+        {
+          "conceptId": "rel.cadence",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "outfit",
+      "position": 10,
+      "ownerPrompt": "처음 만나는 날 옷을 고를 때 나는?",
+      "visitorPrompt": "처음 만나는 날 옷을 고를 때 이 사람은?",
+      "optionA": "익숙한 조합을 전날 미리 정해 둔다",
+      "optionB": "나가기 직전 새로운 포인트를 그날 고른다",
+      "isSignature": false,
+      "conceptContext": "첫인상·준비",
+      "conceptSignals": [
+        {
+          "conceptId": "act.preparation",
+          "directionForOptionA": "a"
+        },
+        {
+          "conceptId": "pref.familiarity",
+          "directionForOptionA": "a"
+        }
+      ]
+    }
+  ],
+  "conceptVersion": 1
+}

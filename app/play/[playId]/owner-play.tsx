@@ -21,6 +21,7 @@ import {
   saveOwnerAnswer,
 } from "@/lib/owner-flow/owner-flow-client";
 import type { OwnerPlayState } from "@/lib/owner-play/owner-play-session";
+import { choiceOrder } from "@/lib/packs/choice-order.mjs";
 
 import { usePlayTransition } from "../play-transition";
 import styles from "./page.module.css";
@@ -632,29 +633,31 @@ export default function OwnerPlay({ playId }: { playId: string | null }) {
             {card.ownerPrompt}
           </h1>
           <div className={styles.choices}>
-            {(["a", "b"] as const).map((choice) => (
-              <button
-                key={choice}
-                type="button"
-                data-choice={choice}
-                aria-pressed={selected === choice}
-                disabled={flow.completion === "in-flight"}
-                onClick={() =>
-                  setFlow((value) =>
-                    value
-                      ? ownerFlowReducer(value, {
-                          type: "choose",
-                          cardId: card.id,
-                          choice,
-                        })
-                      : value,
-                  )
-                }
-              >
-                <span>{choice.toUpperCase()}</span>
-                {choice === "a" ? card.optionA : card.optionB}
-              </button>
-            ))}
+            {choiceOrder(card.position, card.optionA, card.optionB).map(
+              ({ choice, label }) => (
+                <button
+                  key={choice}
+                  type="button"
+                  data-choice={choice}
+                  aria-pressed={selected === choice}
+                  disabled={flow.completion === "in-flight"}
+                  onClick={() =>
+                    setFlow((value) =>
+                      value
+                        ? ownerFlowReducer(value, {
+                            type: "choose",
+                            cardId: card.id,
+                            choice,
+                          })
+                        : value,
+                    )
+                  }
+                >
+                  <span>{choice.toUpperCase()}</span>
+                  {label}
+                </button>
+              ),
+            )}
           </div>
         </div>
 

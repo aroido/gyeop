@@ -58,7 +58,7 @@ select is(
     'owner', '31000000-0000-4000-8000-000000000001'::uuid,
     'response', null,
     'properties', jsonb_build_object(
-      'packVersion', 'old-friend-v2', 'entrySource', 'home'
+      'packVersion', 'old-friend-v3', 'entrySource', 'home'
     )
   ),
   'home pack-open records only the owner subject and safe properties'
@@ -124,6 +124,18 @@ select is(
   'an invalid response capability safely falls back to home'
 );
 
+select is(
+  public.create_or_resume_play_with_source(
+    'first-impression', null, null,
+    '31000000-0000-4000-8000-000000000008',
+    decode(repeat('13', 32), 'hex'), decode(repeat('a4', 32), 'hex'),
+    'same_pack_cta', '31200000-0000-4000-8000-000000000001',
+    decode(repeat('04', 32), 'hex')
+  )->>'outcome',
+  'created',
+  'a valid response from another template creates without same-pack attribution'
+);
+
 reset role;
 
 select is(
@@ -150,15 +162,27 @@ select is(
   1::bigint,
   'invalid same-pack attribution stores no response subject'
 );
+select is(
+  (
+    select count(*)
+    from public.analytics_events
+    where event_name = 'pack_opened'
+      and owner_play_id = '31000000-0000-4000-8000-000000000008'
+      and visitor_response_id is null
+      and properties->>'entrySource' = 'home'
+  ),
+  1::bigint,
+  'cross-template response attribution falls back to home'
+);
 
 insert into public.self_answers (
   pack_play_id, pack_version_id, card_id, choice
 )
 select
   '31000000-0000-4000-8000-000000000001',
-  'e05e6366-2a00-4798-8273-0af5f16aad10', card.id, 'a'
+  'ff63ec5c-11de-456d-a3a2-28ad65758e0f', card.id, 'a'
 from public.pack_cards as card
-where card.pack_version_id = 'e05e6366-2a00-4798-8273-0af5f16aad10';
+where card.pack_version_id = 'ff63ec5c-11de-456d-a3a2-28ad65758e0f';
 
 set local role service_role;
 
@@ -362,6 +386,23 @@ cross join (
     ('31000000-0000-4000-8000-000000000006'::uuid, decode(repeat('0b', 32), 'hex'), 'completed')
 ) as fixture(id, secret, status);
 
+with fixed_time as (select clock_timestamp() as value)
+insert into public.pack_plays (
+  id, pack_version_id, management_secret_hash, management_expires_at,
+  last_active_at, status, current_position
+)
+select
+  '31000000-0000-4000-8000-000000000007',
+  template.published_version_id,
+  decode(repeat('12', 32), 'hex'),
+  value + interval '7 days',
+  value,
+  'draft',
+  1
+from fixed_time
+join public.pack_templates as template
+  on template.slug = 'first-impression';
+
 with fixed_time as (select clock_timestamp() as value),
 fixture(id, submitted_offset, token, management) as (
   values
@@ -408,7 +449,7 @@ insert into public.analytics_events (
     clock_timestamp() - interval '25 seconds'),
   ('pack_opened', '31000000-0000-4000-8000-000000000003', null,
     '31200000-0000-4000-8000-000000000003',
-    '{"packVersion":"old-friend-v2","entrySource":"same_pack_cta"}',
+    '{"packVersion":"old-friend-v3","entrySource":"same_pack_cta"}',
     clock_timestamp() - interval '30 seconds'),
   ('visitor_required_submitted', null, null,
     '31200000-0000-4000-8000-000000000004',
@@ -424,6 +465,20 @@ insert into public.analytics_events (
     '31200000-0000-4000-8000-000000000004',
     '{"packVersion":"old-friend-v2","entrySource":"same_pack_cta"}',
     clock_timestamp() - interval '25 seconds'),
+  ('visitor_required_submitted', null, null,
+    '31200000-0000-4000-8000-000000000005',
+    '{"packVersion":"old-friend-v2","linkKind":"public"}',
+    clock_timestamp() - interval '32 seconds'),
+  ('comparison_viewed', null, null, '31200000-0000-4000-8000-000000000005',
+    '{"packVersion":"old-friend-v2","linkKind":"public"}',
+    clock_timestamp() - interval '28 seconds'),
+  ('same_pack_start_clicked', null, null, '31200000-0000-4000-8000-000000000005',
+    '{"packVersion":"old-friend-v2","linkKind":"public"}',
+    clock_timestamp() - interval '22 seconds'),
+  ('pack_opened', '31000000-0000-4000-8000-000000000007', null,
+    '31200000-0000-4000-8000-000000000005',
+    '{"packVersion":"first-impression-v3","entrySource":"same_pack_cta"}',
+    clock_timestamp() - interval '24 seconds'),
   ('profile_viewed', '31000000-0000-4000-8000-000000000001', null, null,
     '{"packVersion":"old-friend-v2"}', clock_timestamp() - interval '20 seconds'),
   ('profile_reshare_clicked', '31000000-0000-4000-8000-000000000001', null, null,
@@ -457,26 +512,26 @@ select is(
 select is(
   (select subjects from private.core_funnel_stage_counts
    where funnel = 'visitor_same_pack' and stage = 'visitor_required_submitted'),
-  2::bigint,
-  'visitor funnel starts from both submitted responses'
+  3::bigint,
+  'visitor funnel starts from all submitted responses'
 );
 select is(
   (select subjects from private.core_funnel_stage_counts
    where funnel = 'visitor_same_pack' and stage = 'comparison_viewed'),
-  1::bigint,
-  'comparison before submission is excluded'
+  2::bigint,
+  'comparison before submission is excluded while ordered responses remain'
 );
 select is(
   (select subjects from private.core_funnel_stage_counts
    where funnel = 'visitor_same_pack' and stage = 'same_pack_start_clicked'),
-  1::bigint,
+  2::bigint,
   'same-pack click counts only the ordered cohort'
 );
 select is(
   (select subjects from private.core_funnel_stage_counts
    where funnel = 'visitor_same_pack' and stage = 'new_owner_pack_opened'),
   1::bigint,
-  'new owner pack-open tolerates click and navigation arrival order'
+  'new owner pack-open tolerates arrival order and matches canonical template across v2 to v3'
 );
 select is(
   (select subjects from private.core_funnel_stage_counts

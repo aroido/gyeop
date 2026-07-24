@@ -121,6 +121,7 @@ run_static_verification() {
   sh -n "$ROOT/ops/http-boundary/gyeop-loopback-firewall-probe"
   sh -n "$ROOT/tests/integration/http-boundary-host.test.sh"
   sh -n "$ROOT/tests/integration/render-deploy.test.sh"
+  sh -n "$ROOT/tests/integration/concept-graph-upgrade.test.sh"
   sh -n "$ROOT/tests/integration/visitor-assignment-upgrade.test.sh"
   sh -n "$ROOT/tests/integration/eligibility-cutover-upgrade.test.sh"
   bash -n "$ROOT/scripts/wait-for-supabase-db"
@@ -128,6 +129,7 @@ run_static_verification() {
   node --check "$ROOT/scripts/verify-zero-cost-mvp.mjs"
   bash -n "$ROOT/tests/integration/supabase-readiness.test.sh"
   "$ROOT/tests/integration/supabase-readiness.test.sh"
+  bash "$ROOT/tests/integration/render-deploy.test.sh"
 
   VALIDATOR="${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py"
   if [[ -f "$VALIDATOR" ]]; then
@@ -182,6 +184,7 @@ run_data_core_verification() {
     supabase/migrations
     tests/integration/visitor-assignment-upgrade.test.sh
     tests/integration/eligibility-cutover-upgrade.test.sh
+    tests/integration/concept-graph-upgrade.test.sh
   )
   if [[ "$("$ROOT/scripts/verify-path-changes" "$VERIFY_BASE_REF" "${UPGRADE_TEST_PATHS[@]}")" == "skip" ]]; then
     echo "Upgrade regression tests skipped: no migration-path changes."
@@ -189,6 +192,7 @@ run_data_core_verification() {
     tests/integration/visitor-assignment-upgrade.test.sh
     tests/integration/eligibility-cutover-upgrade.test.sh
   fi
+  bash "$ROOT/tests/integration/concept-graph-upgrade.test.sh"
   pnpm supabase:reset || { sleep 5; pnpm supabase:reset; }
   "$ROOT/scripts/wait-for-supabase-db"
   pnpm test:db
@@ -237,6 +241,8 @@ case "$MODE" in
   ci-live-owner)
     start_supabase
     pnpm test:e2e:owner:run
+    reset_supabase_for_app
+    pnpm test:e2e:concept:run
     echo "GYEOP CI live owner verification passed."
     exit 0
     ;;
@@ -279,6 +285,8 @@ case "$MODE" in
     restart_supabase
     pnpm test:e2e:mvp:run
     pnpm test:e2e:owner
+    reset_supabase_for_app
+    pnpm test:e2e:concept:run
     run_mock_verification
     ;;
 esac

@@ -39,10 +39,26 @@ export const recordShareActionSchema = strictJsonObject({
   entrySource: z.literal("profile_reshare").nullable().optional(),
 });
 
-export const ownerProfileEventSchema = strictJsonObject({
-  event: z.enum(["profile_viewed", "profile_reshare_clicked"]),
-  playId: canonicalUuidV4,
-});
+export const ownerProfileEventSchema = strictJsonObject(
+  {
+    event: z.enum([
+      "profile_viewed",
+      "profile_reshare_clicked",
+      "concept_profile_viewed",
+      "concept_detail_opened",
+    ]),
+    playId: canonicalUuidV4,
+    conceptId: z
+      .string()
+      .max(64)
+      .regex(/^(?:rel|exp|act|dec|coop|reg|att|pref)\.[a-z]+$/)
+      .optional(),
+  },
+  (value) =>
+    value.event === "concept_detail_opened"
+      ? value.conceptId !== undefined
+      : value.conceptId === undefined,
+);
 
 export const ownerPublicProfileSchema = strictJsonObject({
   nickname: z.string().max(128),

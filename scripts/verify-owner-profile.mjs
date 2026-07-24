@@ -228,7 +228,8 @@ export function verifyOwnerProfile() {
   assert.doesNotMatch(accountCore, /console\s*\./);
 
   const accountPage = source("app/me/page.tsx");
-  assert.match(accountPage, /loadAuthenticatedOwnerAccountProfile/);
+  assert.match(accountPage, /loadAuthenticatedOwnerPageProfiles/);
+  assert.match(accountPage, /conceptProfile=\{profile\.conceptProfile\}/);
   assert.match(accountPage, /프로필을 불러오지 못했어요/);
   const profileShareCore = source(
     "lib/owner-profile/profile-share-card-core.mjs",
@@ -238,6 +239,12 @@ export function verifyOwnerProfile() {
   const accountView = source("app/me/account-profile-view.tsx");
   for (const contract of [
     "firstAccountProfileShareSelection",
+    "recordConceptProfileViewed",
+    "recordConceptDetailOpened",
+    "장면이 쌓여 보이는 결",
+    "나를 단정하지 않는 대화거리",
+    "한 장으로 나누기",
+    "왜 이렇게 보일까?",
     "친구가 본 내 모습을 한 장으로 나눠보세요.",
     "친구의 답이 더 모이면 내 겹을 공유할 수 있어요.",
     "질문팩에 답하고, 내가 보는 나부터 쌓아보세요.",
@@ -269,9 +276,24 @@ export function verifyOwnerProfile() {
     accountView,
     /완료 응답 기준|완료 질문팩|도착한 관계 종류|아직 완성한 겹이 없어요/,
   );
-  assert.doesNotMatch(
+  assert.match(
     accountView,
-    /entry_source=profile_reshare|recordOwnerProfileReshareClicked/,
+    /await recordOwnerProfileReshareClicked\(selectedConceptShare\.sourcePlayId\)/,
+  );
+  assert.ok(
+    accountView.indexOf(
+      "await recordOwnerProfileReshareClicked(selectedConceptShare.sourcePlayId)",
+    ) < accountView.indexOf("router.push("),
+    "concept share must record the reshare before navigation",
+  );
+  const pickerBody = accountView.slice(
+    accountView.indexOf("const openSharePicker"),
+    accountView.indexOf("const confirmConceptShare"),
+  );
+  assert.doesNotMatch(pickerBody, /recordOwnerProfileReshareClicked/);
+  assert.match(
+    accountView,
+    /entry_source=profile_reshare&share_concept=\$\{encodeURIComponent/,
   );
 
   const view = source("app/me/owner-profile-view.tsx");

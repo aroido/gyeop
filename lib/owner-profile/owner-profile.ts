@@ -5,7 +5,7 @@ export type ProfileShareSelection = Readonly<{
   cardId: string;
 }>;
 
-export type ProfileShareCardModel = Readonly<{
+export type RelationshipProfileShareCardModel = Readonly<{
   packTitle: string;
   relationshipLabel: string;
   prompt: string;
@@ -14,6 +14,18 @@ export type ProfileShareCardModel = Readonly<{
   selfChoice: "a" | "b";
   counts: OwnerProfileCounts;
 }>;
+
+export type ConceptProfileShareCardModel = Readonly<{
+  conceptLabel: string;
+  observation: string;
+  stageText: "윤곽" | "선명";
+  evidenceText: string;
+  question: string;
+  packTitle: string;
+}>;
+
+export type ProfileShareCardModel =
+  RelationshipProfileShareCardModel | ConceptProfileShareCardModel;
 
 export type ProfileShareCardPresentation = Readonly<{
   sampleCount: number;

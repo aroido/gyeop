@@ -1,0 +1,186 @@
+{
+  "slug": "decision-spiral",
+  "version": "decision-spiral-v3",
+  "title": "결정은 내일의 나에게",
+  "targetRelationship": "close_relationship",
+  "sensitivity": "medium",
+  "active": true,
+  "presentation": {
+    "moodLabel": "선택지 과부하",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "one_to_one",
+    "coverRecipe": "decision-spiral-card-v1",
+    "coverTone": "ink"
+  },
+  "cards": [
+    {
+      "id": "menu",
+      "position": 1,
+      "ownerPrompt": "고를 게 너무 많을 때 나는?",
+      "visitorPrompt": "고를 게 너무 많을 때 이 사람은?",
+      "optionA": "기준을 하나 정해 빠르게 고른다",
+      "optionB": "후회 없게 끝까지 비교한다",
+      "isSignature": true,
+      "conceptContext": "선택",
+      "conceptSignals": [
+        {
+          "conceptId": "dec.convergence",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "recommendation",
+      "position": 2,
+      "ownerPrompt": "둘이 메뉴를 고를 때 더 편한 방식은?",
+      "visitorPrompt": "둘이 메뉴를 고를 때 이 사람이 더 편해하는 방식은?",
+      "optionA": "둘 다 비슷하게 원하는 메뉴를 찾는다",
+      "optionB": "한 명은 후보를, 한 명은 결정을 맡는다",
+      "isSignature": false,
+      "conceptContext": "선택·피로",
+      "conceptSignals": [
+        {
+          "conceptId": "coop.sync",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "big-choice",
+      "position": 3,
+      "ownerPrompt": "결정할 시간이 넉넉하면 나는?",
+      "visitorPrompt": "결정할 시간이 넉넉하면 이 사람은?",
+      "optionA": "일찍 정해 마음을 비운다",
+      "optionB": "마지막까지 가능성을 열어 둔다",
+      "isSignature": false,
+      "conceptContext": "중요한선택",
+      "conceptSignals": [
+        {
+          "conceptId": "dec.openness",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "coin-flip",
+      "position": 4,
+      "ownerPrompt": "둘 중 하나를 못 고르면 나는?",
+      "visitorPrompt": "둘 중 하나를 못 고르면 이 사람은?",
+      "optionA": "마감 시간을 정해 고른다",
+      "optionB": "하루 더 두고 본다",
+      "isSignature": false,
+      "conceptContext": "선택·시간",
+      "conceptSignals": [
+        {
+          "conceptId": "dec.convergence",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "risk",
+      "position": 5,
+      "ownerPrompt": "새로운 선택 앞에서 나는?",
+      "visitorPrompt": "새로운 선택 앞에서 이 사람은?",
+      "optionA": "해보면서 배우는 쪽을 고른다",
+      "optionB": "안전한 기준점을 먼저 찾는다",
+      "isSignature": false,
+      "conceptContext": "선택·시도",
+      "conceptSignals": [
+        {
+          "conceptId": "dec.experiment",
+          "directionForOptionA": "b"
+        }
+      ]
+    },
+    {
+      "id": "purchase",
+      "position": 6,
+      "ownerPrompt": "작은 예산으로 사고 싶은 게 여러 개라면?",
+      "visitorPrompt": "작은 예산으로 사고 싶은 게 여러 개라면 이 사람은?",
+      "optionA": "가장 마음에 드는 하나를 고른다",
+      "optionB": "작은 즐거움 여러 개를 고른다",
+      "isSignature": false,
+      "conceptContext": "소비·선택",
+      "conceptSignals": [
+        {
+          "conceptId": "pref.focus",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "plan-change",
+      "position": 7,
+      "ownerPrompt": "정한 계획을 바꿀 때 나는?",
+      "visitorPrompt": "정한 계획을 바꿀 때 이 사람은?",
+      "optionA": "더 나은 이유가 있으면 바꾼다",
+      "optionB": "처음 정한 약속을 지킨다",
+      "isSignature": false,
+      "conceptContext": "계획·변경",
+      "conceptSignals": [
+        {
+          "conceptId": "act.adjustment",
+          "directionForOptionA": "a"
+        },
+        {
+          "conceptId": "dec.revision",
+          "directionForOptionA": "b"
+        }
+      ]
+    },
+    {
+      "id": "advice",
+      "position": 8,
+      "ownerPrompt": "누가 선택을 물어보면 나는?",
+      "visitorPrompt": "누가 선택을 물어보면 이 사람은?",
+      "optionA": "내가 고를 답을 말해 준다",
+      "optionB": "상대 기준을 같이 정리한다",
+      "isSignature": false,
+      "conceptContext": "조언·애매함",
+      "conceptSignals": [
+        {
+          "conceptId": "coop.ambiguity",
+          "directionForOptionA": "b"
+        },
+        {
+          "conceptId": "att.story",
+          "directionForOptionA": "b"
+        }
+      ]
+    },
+    {
+      "id": "regret",
+      "position": 9,
+      "ownerPrompt": "선택 뒤 아쉬움이 남으면 나는?",
+      "visitorPrompt": "선택 뒤 아쉬움이 남으면 이 사람은?",
+      "optionA": "다음 선택의 기준으로 쓴다",
+      "optionB": "좋았던 점을 먼저 찾는다",
+      "isSignature": false,
+      "conceptContext": "선택·회고",
+      "conceptSignals": [
+        {
+          "conceptId": "act.adjustment",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "easy-day",
+      "position": 10,
+      "ownerPrompt": "결정 피로가 쌓인 날 하나를 골랐다면?",
+      "visitorPrompt": "결정 피로가 쌓인 날 하나를 고른 뒤 이 사람은?",
+      "optionA": "더 보지 않고 그 선택으로 끝낸다",
+      "optionB": "혹시 몰라 후보 하나는 남겨 둔다",
+      "isSignature": false,
+      "conceptContext": "선택·피로",
+      "conceptSignals": [
+        {
+          "conceptId": "dec.openness",
+          "directionForOptionA": "a"
+        }
+      ]
+    }
+  ],
+  "conceptVersion": 1
+}

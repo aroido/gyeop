@@ -1,10 +1,12 @@
 # GYEOP · 겹
 
-질문팩에 먼저 답하고 링크를 공유하면, 친구와 온라인 팔로워가 일부 질문에 답해 관계별 시선이 계속 쌓이는 모바일 소셜 프로필.
+질문팩에 먼저 답하고 링크를 공유하면, 친구와 온라인 팔로워가 일부 질문에 답해 여러 장면에서 반복되거나 달라지는 나의 결이 쌓이는 모바일 소셜 프로필.
 
 ## 현재 핵심 루프
 
 `팩 선택 → 주인 10장 응답 → 공개·1:1 링크 → 방문자 관계 선택 → 3장 응답 → 주인의 실제 답과 비교 → 나도 같은 팩 시작 → 새 링크 공유`
+
+현재 private MVP는 활성 최신 공식 팩 24개·240문항과 8개 영역·32개 양방향 결을 사용한다. `/me`는 고정 유형 대신 근거가 있는 대화 훅 3~5개를 만들고, owner가 안전한 결 하나를 골라 같은 질문팩 초대와 공유한다. 과거 45개와 신규 24개를 합친 69 version·690 card history는 불변으로 읽는다.
 
 ## 프로젝트 상태
 
@@ -65,6 +67,8 @@ pnpm exec supabase status -o env \
 node --input-type=module -e 'import { randomBytes } from "node:crypto"; import { appendFileSync } from "node:fs"; const key=randomBytes(32).toString("base64url"); appendFileSync(".env.local", `ACCOUNT_DELETE_REAUTH_KEYRING=${JSON.stringify({local:key})}\nACCOUNT_DELETE_REAUTH_ACTIVE_VERSION=local\n`)'
 pnpm dev
 ```
+
+concept profile은 server-only `GYEOP_CONCEPT_PROFILE_ENABLED`로 제어한다. missing 또는 exact `false`는 기존 `/me`만 렌더하고 concept API를 404로 닫으며, exact `true`만 새 프로필을 활성화한다. 그 밖의 값은 startup validation error다. 기본 배포와 복구 순서는 [private MVP 운영 runbook](docs/engineering/private-mvp-zero-cost-runbook.md)을 따른다.
 
 `.env.local`은 local 전용 값도 포함하므로 출력·커밋·artifact 업로드를 하지 않는다. 작업을 마치면 `pnpm supabase:stop`으로 local stack을 내린다.
 

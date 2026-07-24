@@ -17,6 +17,11 @@ REQUIRED_FILES = [
     ROOT / "docs" / "product" / "question-pack-spec.md",
     ROOT / "docs" / "product" / "decision-log.md",
     ROOT / "docs" / "product" / "full-product-plan.md",
+    ROOT / "docs" / "product" / "concept-graph-design.md",
+    ROOT / "docs" / "design" / "research" / "issue-157-lazyweb.md",
+    ROOT / "docs" / "engineering" / "p0-development-plan.md",
+    ROOT / "docs" / "engineering" / "private-mvp-zero-cost-runbook.md",
+    ROOT / "content" / "concepts-v1.json",
     ROOT / "docs" / "templates" / "implementation-spec.md",
     ROOT / "docs" / "templates" / "qa-verdict.md",
     ROOT / "docs" / "engineering" / "github-task-workflow.md",
@@ -126,12 +131,42 @@ def verify_markdown_links() -> None:
         fail("broken local markdown links:\n" + "\n".join(errors))
 
 
+def verify_concept_profile_ssot() -> None:
+    plan = (ROOT / "docs" / "engineering" / "p0-development-plan.md").read_text(
+        encoding="utf-8"
+    )
+    required_plan_anchors = (
+        "concept 훅 3~5개",
+        "owner 선택형 safe share picker",
+        "69 version·690 card",
+        "GYEOP_CONCEPT_PROFILE_ENABLED",
+        "GET /api/me/concept-profile",
+        "GET /api/plays/[playId]/pack",
+    )
+    missing = [anchor for anchor in required_plan_anchors if anchor not in plan]
+    if missing:
+        fail("P0 concept-profile SSOT anchors missing: " + ", ".join(missing))
+
+    runbook = (
+        ROOT / "docs" / "engineering" / "private-mvp-zero-cost-runbook.md"
+    ).read_text(encoding="utf-8")
+    for anchor in (
+        'GYEOP_CONCEPT_PROFILE_ENABLED: "false"',
+        "24 template·69 version·690 card",
+        "exact `true`",
+        "exact `false`",
+    ):
+        if anchor not in runbook:
+            fail(f"concept-profile runbook anchor missing: {anchor}")
+
+
 def main() -> None:
     verify_required_files()
     verify_skills()
     verify_model_routing()
     verify_mockups()
     verify_markdown_links()
+    verify_concept_profile_ssot()
     print("Project structure, model routing, SSOT documents, mockups, and local links are valid.")
 
 

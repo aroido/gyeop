@@ -2,9 +2,11 @@
 
 import {
   buildProfileShareCardPresentation,
+  decodeConceptProfileShareCardModel,
   PROFILE_SHARE_FILENAME,
 } from "@/lib/owner-profile/profile-share-card-core.mjs";
 import type {
+  ConceptProfileShareCardModel,
   ProfileShareCardModel,
   ProfileShareCardPresentation,
 } from "@/lib/owner-profile/owner-profile";
@@ -95,11 +97,41 @@ function drawTextBlock(
   });
 }
 
+function isConceptShareCard(
+  model: ProfileShareCardModel,
+): model is ConceptProfileShareCardModel {
+  return "conceptLabel" in model;
+}
+
 export function ProfileShareCardPreview({
   model,
 }: {
   model: ProfileShareCardModel;
 }) {
+  if (isConceptShareCard(model)) {
+    return (
+      <article
+        className={styles.preview}
+        aria-label={`${model.conceptLabel} 공유 카드 미리보기`}
+      >
+        <header>
+          <p>겹 · {model.conceptLabel}</p>
+          <span>{model.packTitle}</span>
+        </header>
+        <section className={styles.result}>
+          <p>{model.stageText}</p>
+          <h2>{model.observation}</h2>
+          <strong>{model.evidenceText}</strong>
+        </section>
+        <section className={styles.detail}>
+          <p className={styles.detailLabel}>대화 이어가기</p>
+          <p className={styles.question}>{model.question}</p>
+          <p className={styles.distribution}>같은 팩 답하기</p>
+        </section>
+        <strong className={styles.brand}>겹</strong>
+      </article>
+    );
+  }
   const presentation = buildProfileShareCardPresentation(
     model,
   ) as ProfileShareCardPresentation;
@@ -135,6 +167,11 @@ export function ProfileShareCardPreview({
 export async function renderProfileShareCard(
   model: ProfileShareCardModel,
 ): Promise<File> {
+  if (isConceptShareCard(model)) {
+    return renderConceptShareCard(
+      decodeConceptProfileShareCardModel(model) as ConceptProfileShareCardModel,
+    );
+  }
   const presentation = buildProfileShareCardPresentation(
     model,
   ) as ProfileShareCardPresentation;
@@ -248,6 +285,117 @@ export async function renderProfileShareCard(
   context.fillStyle = "#ffffff";
   context.font = '900 34px Pretendard, "Apple SD Gothic Neo", sans-serif';
   context.fillText(presentation.distributionText, 180, 1490);
+
+  context.fillStyle = "#050505";
+  context.font = '950 72px Pretendard, "Apple SD Gothic Neo", sans-serif';
+  context.fillText("겹", 130, 1680);
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (value) =>
+        value ? resolve(value) : reject(new Error("PNG render failed")),
+      "image/png",
+    );
+  });
+  return new File([blob], PROFILE_SHARE_FILENAME, {
+    type: "image/png",
+    lastModified: 0,
+  });
+}
+
+async function renderConceptShareCard(
+  model: ConceptProfileShareCardModel,
+): Promise<File> {
+  await document.fonts?.ready;
+  const canvas = document.createElement("canvas");
+  canvas.width = 1080;
+  canvas.height = 1920;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas is unavailable");
+
+  context.textBaseline = "top";
+  context.fillStyle = "#050505";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  for (const [offset, color] of [
+    [66, "#ff4d42"],
+    [44, "#dfff00"],
+    [22, "#315cff"],
+  ] as const) {
+    roundedRect(context, 72 + offset, 136 + offset, 936, 1680, 52);
+    context.fillStyle = color;
+    context.fill();
+  }
+  roundedRect(context, 72, 100, 936, 1720, 52);
+  context.fillStyle = "#f5f1e9";
+  context.fill();
+
+  roundedRect(context, 72, 100, 936, 270, 52);
+  context.fillStyle = "#315cff";
+  context.fill();
+  drawTextBlock(
+    context,
+    `겹 · ${model.conceptLabel}`,
+    130,
+    150,
+    820,
+    75,
+    48,
+    28,
+    "#ffffff",
+  );
+  drawTextBlock(context, model.packTitle, 130, 255, 820, 70, 30, 16, "#dfff00");
+
+  context.fillStyle = "#315cff";
+  context.font = '900 34px Pretendard, "Apple SD Gothic Neo", sans-serif';
+  context.fillText(model.stageText, 130, 440);
+  drawTextBlock(
+    context,
+    model.observation,
+    130,
+    500,
+    820,
+    520,
+    74,
+    30,
+    "#050505",
+    950,
+  );
+
+  roundedRect(context, 130, 1040, 820, 160, 38);
+  context.fillStyle = "#dfff00";
+  context.fill();
+  drawTextBlock(
+    context,
+    `${model.stageText} · ${model.evidenceText}`,
+    170,
+    1070,
+    740,
+    100,
+    34,
+    18,
+    "#050505",
+  );
+
+  roundedRect(context, 130, 1210, 820, 350, 40);
+  context.fillStyle = "#050505";
+  context.fill();
+  context.fillStyle = "#dfff00";
+  context.font = '900 30px Pretendard, "Apple SD Gothic Neo", sans-serif';
+  context.fillText("대화 이어가기", 180, 1260);
+  drawTextBlock(
+    context,
+    model.question,
+    180,
+    1320,
+    720,
+    150,
+    42,
+    24,
+    "#ffffff",
+  );
+  context.fillStyle = "#ffffff";
+  context.font = '900 30px Pretendard, "Apple SD Gothic Neo", sans-serif';
+  context.fillText("같은 팩 답하기", 180, 1490);
 
   context.fillStyle = "#050505";
   context.font = '950 72px Pretendard, "Apple SD Gothic Neo", sans-serif';

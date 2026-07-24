@@ -16,7 +16,15 @@ restore_latest() {
 trap restore_latest EXIT
 
 cd "$ROOT"
-pnpm exec supabase db reset --local --version 20260719000400 >/dev/null
+pnpm exec supabase db reset \
+  --local \
+  --version 20260719000400 \
+  --no-seed \
+  >/dev/null
+
+docker exec -i "$DATABASE_CONTAINER" psql \
+  -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null \
+  <"$ROOT/tests/integration/fixtures/legacy-old-friend-v1.sql"
 
 docker exec -i "$DATABASE_CONTAINER" psql \
   -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
@@ -109,18 +117,18 @@ begin
   end if;
 
   if (select count(*) from public.pack_templates where is_active) <> 24
-    or (select count(*) from public.pack_versions where published_at is not null) <> 45
-    or (select count(*) from public.pack_cards) <> 450
+    or (select count(*) from public.pack_versions where published_at is not null) <> 69
+    or (select count(*) from public.pack_cards) <> 690
     or (select count(*)
         from public.pack_templates template
         join public.pack_versions version
           on version.id = template.published_version_id
-        where version.version ~ '-v2$') <> 21
+        where version.version ~ '-v3$') <> 21
     or (select count(*)
         from public.pack_templates template
         join public.pack_versions version
           on version.id = template.published_version_id
-        where version.version ~ '-v1$') <> 3 then
+        where version.version ~ '-v2$') <> 3 then
     raise exception 'published pack catalog did not preserve 24 current packs and version history';
   end if;
 

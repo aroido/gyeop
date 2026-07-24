@@ -123,6 +123,40 @@ test("requires every public build value in the Render environment", () => {
   );
 });
 
+test("requires the one exact quoted disabled concept gate", () => {
+  const exact =
+    '      - key: GYEOP_CONCEPT_PROFILE_ENABLED\n        value: "false"\n';
+  assert.match(
+    renderYaml,
+    new RegExp(exact.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+  );
+  for (const replacement of [
+    "",
+    "      - key: GYEOP_CONCEPT_PROFILE_ENABLED\n        value: false\n",
+    '      - key: GYEOP_CONCEPT_PROFILE_ENABLED\n        value: "true"\n',
+    "      - key: GYEOP_CONCEPT_PROFILE_ENABLED\n        sync: false\n",
+  ]) {
+    assert.throws(
+      () => verifyRenderYaml(renderYaml.replace(exact, replacement)),
+      /GYEOP_CONCEPT_PROFILE_ENABLED|exact quoted disabled concept gate|unsupported scalar/,
+    );
+  }
+  assert.throws(
+    () => verifyRenderYaml(`${renderYaml}${exact}`),
+    /duplicate env var/,
+  );
+  assert.throws(
+    () =>
+      verifyRenderYaml(
+        renderYaml.replace(
+          "      - key: RATE_LIMIT_SECRET\n        sync: false\n",
+          '      - key: RATE_LIMIT_SECRET\n        value: "false"\n',
+        ),
+      ),
+    /exact quoted disabled concept gate/,
+  );
+});
+
 test("rejects known and pattern-matched server secrets in Docker ARG and ENV", () => {
   for (const declaration of [
     "ARG SUPABASE_SECRET_KEY",

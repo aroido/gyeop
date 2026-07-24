@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { Buffer } from "node:buffer";
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import test, { after, before } from "node:test";
@@ -10,10 +10,10 @@ import { createClient } from "@supabase/supabase-js";
 
 const root = path.resolve(new URL("../../", import.meta.url).pathname);
 const manifestFiles = [
-  "old-friend-v2.json",
-  "first-impression-v2.json",
-  "coworker-v1.json",
-  "honest-self-v2.json",
+  "old-friend-v3.json",
+  "first-impression-v3.json",
+  "coworker-v2.json",
+  "honest-self-v3.json",
 ];
 const manifests = manifestFiles.map((file) =>
   JSON.parse(readFileSync(path.join(root, "content/packs", file), "utf8")),
@@ -152,6 +152,59 @@ function cookieFrom(response) {
   const value = header.match(/__Host-gyeop-owner=([^;]*)/)?.[1];
   assert.ok(value, "response must contain a non-empty owner cookie");
   return `__Host-gyeop-owner=${value}`;
+}
+
+function insertHistoricalAccountPlay({
+  playId,
+  anonymousOwnerId,
+  userId,
+  version,
+  status,
+}) {
+  const managementSecret = randomBytes(32).toString("hex");
+  sql(`
+    with fixed_time as (select clock_timestamp() as value)
+    insert into public.anonymous_owners (
+      id, management_secret_hash, management_expires_at, last_active_at,
+      management_revoked_at, created_at, updated_at
+    ) select
+      '${anonymousOwnerId}', decode('${managementSecret}', 'hex'),
+      value + interval '7 days', value, null, value, value
+    from fixed_time;
+
+    with fixed_time as (select clock_timestamp() as value)
+    insert into public.pack_plays (
+      id, pack_version_id, anonymous_owner_id, owner_id,
+      management_secret_hash, management_expires_at, last_active_at,
+      management_revoked_at, status, current_position, completed_at
+    ) select
+      '${playId}', version.id, '${anonymousOwnerId}', '${userId}',
+      null, value + interval '7 days', value, value, 'draft',
+      1,
+      null
+    from public.pack_versions as version
+    cross join fixed_time
+    where version.version = '${version}';
+  `);
+  if (status === "completed") {
+    sql(`
+      insert into public.self_answers (
+        pack_play_id, pack_version_id, card_id, choice
+      )
+      select '${playId}', card.pack_version_id, card.id, 'a'
+      from public.pack_cards as card
+      join public.pack_versions as version
+        on version.id = card.pack_version_id
+      where version.version = '${version}'
+    `);
+    sql(`
+      update public.pack_plays
+      set status = 'completed',
+          current_position = 10,
+          completed_at = clock_timestamp()
+      where id = '${playId}'
+    `);
+  }
 }
 
 async function createAuthenticatedAccount() {
@@ -295,6 +348,128 @@ test("inactive create returns PACK_NOT_FOUND without a cookie or quota row", asy
     ),
     "0",
   );
+});
+
+test("v1 and v2 owner history stays readable while public slug remains on v3", async () => {
+  const owner = await createAuthenticatedAccount();
+  const other = await createAuthenticatedAccount();
+  const v1PlayId = randomUUID();
+  const v1OwnerId = randomUUID();
+  const v2PlayId = randomUUID();
+  const v2OwnerId = randomUUID();
+  const unpublishedPlayId = randomUUID();
+  const unpublishedOwnerId = randomUUID();
+  const unpublishedVersionId = randomUUID();
+  const unpublishedVersion = `old-friend-integration-${unpublishedVersionId}`;
+  try {
+    sql(`
+      insert into public.pack_versions (
+        id, template_id, version, concept_version
+      )
+      select
+        '${unpublishedVersionId}', template.id,
+        '${unpublishedVersion}', null
+      from public.pack_templates as template
+      where template.slug = 'old-friend';
+
+      insert into public.pack_cards (
+        pack_version_id, id, position, owner_prompt, visitor_prompt,
+        option_a, option_b, is_signature
+      )
+      select
+        '${unpublishedVersionId}', 'unpublished-' || value, value,
+        'Owner ' || value, 'Visitor ' || value, 'A ' || value, 'B ' || value,
+        value = 1
+      from generate_series(1, 10) as value
+    `);
+    insertHistoricalAccountPlay({
+      playId: v1PlayId,
+      anonymousOwnerId: v1OwnerId,
+      userId: owner.userId,
+      version: "old-friend-v1",
+      status: "draft",
+    });
+    insertHistoricalAccountPlay({
+      playId: v2PlayId,
+      anonymousOwnerId: v2OwnerId,
+      userId: owner.userId,
+      version: "old-friend-v2",
+      status: "completed",
+    });
+    insertHistoricalAccountPlay({
+      playId: unpublishedPlayId,
+      anonymousOwnerId: unpublishedOwnerId,
+      userId: owner.userId,
+      version: unpublishedVersion,
+      status: "draft",
+    });
+
+    const v1State = await ownerRequest(`/api/plays/${v1PlayId}`, {
+      cookie: owner.cookie,
+      ip: "198.51.100.91",
+    });
+    assert.equal(v1State.status, 200, serverLog);
+    assert.equal((await v1State.json()).packVersion, "old-friend-v1");
+
+    const v1Pack = await ownerRequest(`/api/plays/${v1PlayId}/pack`, {
+      cookie: owner.cookie,
+      ip: "198.51.100.91",
+    });
+    assert.equal(v1Pack.status, 200, serverLog);
+    assert.equal((await v1Pack.json()).version, "old-friend-v1");
+
+    const v2Pack = await ownerRequest(`/api/plays/${v2PlayId}/pack`, {
+      cookie: owner.cookie,
+      ip: "198.51.100.92",
+    });
+    assert.equal(v2Pack.status, 200, serverLog);
+    assert.equal((await v2Pack.json()).version, "old-friend-v2");
+
+    const v2Profile = await ownerRequest(`/api/me/profile?playId=${v2PlayId}`, {
+      cookie: owner.cookie,
+      ip: "198.51.100.92",
+    });
+    assert.equal(v2Profile.status, 200, serverLog);
+    assert.equal((await v2Profile.json()).packVersion, "old-friend-v2");
+
+    for (const [pathname, cookie] of [
+      [`/api/plays/${v1PlayId}/pack`, other.cookie],
+      [`/api/plays/${randomUUID()}/pack`, owner.cookie],
+      [`/api/plays/${unpublishedPlayId}/pack`, owner.cookie],
+    ]) {
+      const hidden = await ownerRequest(pathname, {
+        cookie,
+        ip: "198.51.100.93",
+      });
+      assert.equal(hidden.status, 404, serverLog);
+      assert.deepEqual(await hidden.json(), {
+        code: "OWNER_PLAY_NOT_FOUND",
+        message: "진행 중인 팩을 찾을 수 없습니다.",
+      });
+    }
+
+    sql(
+      "update public.pack_templates set is_active = true where slug = 'old-friend'",
+    );
+    const current = await fetch(`${appUrl}/api/packs/old-friend`, {
+      headers: proxyHeaders("198.51.100.94"),
+    });
+    assert.equal(current.status, 200, serverLog);
+    assert.equal((await current.json()).version, "old-friend-v3");
+  } finally {
+    sql(`
+      update public.pack_templates
+      set is_active = false
+      where slug = 'old-friend';
+      update public.pack_plays
+      set owner_id = null
+      where id in ('${v1PlayId}', '${v2PlayId}', '${unpublishedPlayId}');
+    `);
+    for (const account of [owner, other]) {
+      const deleted = await account.admin.auth.admin.deleteUser(account.userId);
+      assert.ifError(deleted.error);
+    }
+  }
 });
 
 test("each additional pack completes and exposes profile and sharing after account claim", async () => {

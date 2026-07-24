@@ -1,0 +1,190 @@
+{
+  "slug": "comment-section",
+  "version": "comment-section-v3",
+  "title": "내적 댓글창",
+  "targetRelationship": "close_relationship",
+  "sensitivity": "medium",
+  "active": true,
+  "presentation": {
+    "moodLabel": "생각의 반응창",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "one_to_one",
+    "coverRecipe": "comment-section-card-v1",
+    "coverTone": "ink"
+  },
+  "cards": [
+    {
+      "id": "surprise-thought",
+      "position": 1,
+      "ownerPrompt": "뜻밖의 일이 생기면 내 머릿속은?",
+      "visitorPrompt": "뜻밖의 일이 생기면 이 사람 머릿속은?",
+      "optionA": "말로 바로 나오는 편이다",
+      "optionB": "속으로 먼저 여러 번 생각한다",
+      "isSignature": true,
+      "conceptContext": "돌발·생각",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.reaction",
+          "directionForOptionA": "a"
+        },
+        {
+          "conceptId": "exp.processing",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "replay",
+      "position": 2,
+      "ownerPrompt": "대화가 끝난 뒤 머릿속 첫 반응은?",
+      "visitorPrompt": "대화가 끝난 뒤 이 사람 머릿속 첫 반응은?",
+      "optionA": "방금 한 말을 다시 재생한다",
+      "optionB": "다음에 할 말을 미리 붙인다",
+      "isSignature": false,
+      "conceptContext": "대화·전환",
+      "conceptSignals": [
+        {
+          "conceptId": "reg.transition",
+          "directionForOptionA": "b"
+        }
+      ]
+    },
+    {
+      "id": "awkward-moment",
+      "position": 3,
+      "ownerPrompt": "민망한 순간이 오면 나는?",
+      "visitorPrompt": "민망한 순간이 오면 이 사람은?",
+      "optionA": "웃으며 바로 넘긴다",
+      "optionB": "혼자 조금 더 곱씹는다",
+      "isSignature": false,
+      "conceptContext": "민망함·전환",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.reaction",
+          "directionForOptionA": "a"
+        },
+        {
+          "conceptId": "reg.transition",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "idea",
+      "position": 4,
+      "ownerPrompt": "좋은 생각이 떠오르면 나는?",
+      "visitorPrompt": "좋은 생각이 떠오르면 이 사람은?",
+      "optionA": "누군가에게 말하며 키운다",
+      "optionB": "혼자 메모하며 다듬는다",
+      "isSignature": false,
+      "conceptContext": "아이디어",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.processing",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "choice-voice",
+      "position": 5,
+      "ownerPrompt": "결정을 내리기 직전 내적 댓글은?",
+      "visitorPrompt": "결정을 내리기 직전 이 사람의 내적 댓글은?",
+      "optionA": "이유 하나면 충분하다고 한다",
+      "optionB": "놓친 조건이 없나 다시 묻는다",
+      "isSignature": false,
+      "conceptContext": "선택",
+      "conceptSignals": [
+        {
+          "conceptId": "dec.convergence",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "quiet",
+      "position": 6,
+      "ownerPrompt": "생각이 복잡할 때 조용한 시간이 생기면 나는?",
+      "visitorPrompt": "생각이 복잡할 때 조용한 시간이 생기면 이 사람은?",
+      "optionA": "음악이나 산책으로 자극을 바꾼다",
+      "optionB": "소리를 줄이고 가만히 가라앉힌다",
+      "isSignature": false,
+      "conceptContext": "혼자·생각",
+      "conceptSignals": [
+        {
+          "conceptId": "reg.stimulus",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "mistake",
+      "position": 7,
+      "ownerPrompt": "실수를 알아차리면 나는?",
+      "visitorPrompt": "실수를 알아차리면 이 사람은?",
+      "optionA": "가장 작은 수정부터 바로 시작한다",
+      "optionB": "전체 영향을 먼저 파악한 뒤 움직인다",
+      "isSignature": false,
+      "conceptContext": "실수",
+      "conceptSignals": [
+        {
+          "conceptId": "act.start",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "compliment-thought",
+      "position": 8,
+      "ownerPrompt": "오래 남은 칭찬을 다시 떠올릴 때 나는?",
+      "visitorPrompt": "오래 남은 칭찬을 다시 떠올릴 때 이 사람은?",
+      "optionA": "그때의 장면과 맥락까지 펼쳐 본다",
+      "optionB": "핵심 한마디만 선명하게 기억한다",
+      "isSignature": false,
+      "conceptContext": "칭찬·기억",
+      "conceptSignals": [
+        {
+          "conceptId": "att.story",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "plan-thought",
+      "position": 9,
+      "ownerPrompt": "새 계획 앞에서 머릿속 첫 반응은?",
+      "visitorPrompt": "새 계획 앞에서 이 사람 머릿속 첫 반응은?",
+      "optionA": "해볼 장면부터 떠올린다",
+      "optionB": "필요한 준비부터 떠올린다",
+      "isSignature": false,
+      "conceptContext": "계획",
+      "conceptSignals": [
+        {
+          "conceptId": "act.preparation",
+          "directionForOptionA": "b"
+        }
+      ]
+    },
+    {
+      "id": "share-thought",
+      "position": 10,
+      "ownerPrompt": "마음에 걸리는 생각이 있으면 나는?",
+      "visitorPrompt": "마음에 걸리는 생각이 있으면 이 사람은?",
+      "optionA": "믿는 사람에게 말해 본다",
+      "optionB": "시간을 두고 혼자 정리한다",
+      "isSignature": false,
+      "conceptContext": "감정·공유",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.processing",
+          "directionForOptionA": "a"
+        },
+        {
+          "conceptId": "reg.source",
+          "directionForOptionA": "a"
+        }
+      ]
+    }
+  ],
+  "conceptVersion": 1
+}
