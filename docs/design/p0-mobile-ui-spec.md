@@ -341,7 +341,7 @@ owner는 팩 선택 뒤, visitor는 초대 맥락 뒤 관계 선택으로 바로
 | error            | 기존 결과 유지 + 해당 action 옆 오류                     | action-scoped retry        | 전체 화면 error로 성공 링크를 지우지 않음             |
 | empty            | `아직 만든 링크가 없어요`                                | mode 선택이 Primary        | empty와 loading skeleton 구분                         |
 
-`내 겹 공유하기`로 들어온 카드 mode는 위 일반 관리 화면과 분리한다. 공개 기준을 통과한 관계·질문 한 장의 9:16 미리보기와 Primary 하나만 표시하고, 기존 링크 목록·공개/1:1 방식 선택·일반 설명·비활성화 관리는 숨긴다. 링크 생성 전에는 `카드 공유 준비하기`, 생성 뒤에는 `카드와 링크 공유하기`만 Primary로 사용한다. OS 파일 공유가 불가능하거나 실패한 경우에만 `이미지 저장`과 `링크 복사`를 함께 노출하고, 자동 복사 실패 때 선택 가능한 URL field에 focus한다.
+`내 겹 공유하기`로 들어온 카드 mode는 위 일반 관리 화면과 분리한다. 공개 기준을 통과한 관계·질문 한 장의 결과 미리보기와 `이 카드 공유하기` Primary 하나만 표시하고, 기존 링크 목록·공개/1:1 방식 선택·일반 설명·비활성화 관리는 숨긴다. export PNG는 항상 9:16이며 높이 650px 이하 DOM 미리보기만 첫 viewport의 Primary를 보장하기 위해 4:5로 압축한다. 미리보기와 PNG는 `관계+해당 질문 표본 → 친구 시선의 우세 결과 → 셀프 선택과의 일치 여부`를 먼저 보여 주고 원본 질문과 `A n명 · B n명` 분포를 보조로 둔다. A/B 동수는 `시선이 반으로 갈렸어요`로 표시하고 agreement badge를 만들지 않는다. Primary 한 번으로 필요한 public 링크를 만든 뒤 가능한 즉시 이미지+링크 OS 공유를 시도한다. OS 파일 공유 미지원·취소·실패 시 생성된 링크를 보존하고 `이미지 저장`과 `링크 복사`를 함께 노출하며, 자동 복사 실패 때 선택 가능한 URL field에 focus한다.
 
 ### 7.4 방문자 관계·알게 된 시점 `/i/[publicId]#k=…`
 
@@ -500,6 +500,7 @@ account `/me` 상단은 `<닉네임>의 겹` → 상태별 한 줄 → 단일 CT
 - 채택: 결과를 먼저 보상하고 공유/다음 행동을 분명히 하는 구조, 로그인이나 연결을 콘텐츠 경험 뒤에 두는 순서, 하나의 dominant CTA.
 - 미채택: personality score, avatar social proof, 가입으로 결과를 잠그는 방식, generic quiz discovery로 되돌리는 CTA.
 - 현재 화면 기반 Lazyweb improve report: [GYEOP mobile UI improve report](https://www.lazyweb.com/report/lazyweb/fc21cfcf-ca51-449b-b6fd-ae9769fc43f0/?source=create). 생성 결과는 `degraded=false`, mockup failure 0건이다.
+- 내 겹 카드 improve report: [GYEOP share card result screen](https://www.lazyweb.com/report/lazyweb/29e22c98-1f20-4d90-af83-b3cadaf1c22b/?source=create). 중간 준비 단계를 제거하고 결과 카드와 direct Primary를 중심에 두는 진단을 채택하며 테마 picker는 제외한다.
 - 현재 홈 baseline: 검정 canvas와 네온 palette는 식별력이 높지만 pack 선택 rail은 다음 card가 일부 보인다는 것만으로 scroll affordance에 의존한다. metadata 순서, focus 가능한 rail, 한 card 한 Primary를 이 명세로 고정한다.
 
 ### 320/390/430px 현재 baseline 검수

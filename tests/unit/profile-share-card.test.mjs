@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   PROFILE_SHARE_FILENAME,
   buildProfileShareCardModel,
+  buildProfileShareCardPresentation,
   firstAccountProfileShareSelection,
   parseProfileShareSelection,
 } from "../../lib/owner-profile/profile-share-card-core.mjs";
@@ -109,6 +110,44 @@ test("builds one exact public card model without identifiers", () => {
   assert.equal(Object.isFrozen(model), true);
   assert.equal(Object.isFrozen(model.counts), true);
   assert.equal(PROFILE_SHARE_FILENAME, "gyeop-insight.png");
+});
+
+test("derives match, mismatch, and tie presentation from card counts", () => {
+  const model = buildProfileShareCardModel(profile(), {
+    relationshipCode: "old_friend",
+    cardId: "signature",
+  });
+  assert.deepEqual(buildProfileShareCardPresentation(model), {
+    sampleCount: 3,
+    dominantChoice: "a",
+    resultState: "match",
+    relationshipText: "오래된 친구 · 3명의 시선",
+    resultText: "친구들은 나를 “먼저 분위기를 살핀다”로 더 많이 봤어요",
+    agreementText: "내 선택도 같아요",
+    selfText: "내 선택 · 먼저 분위기를 살핀다",
+    questionText: card.ownerPrompt,
+    distributionText: "A 2명 · B 1명",
+  });
+
+  const mismatch = buildProfileShareCardPresentation({
+    ...model,
+    counts: { a: 1, b: 2 },
+  });
+  assert.equal(mismatch.sampleCount, 3);
+  assert.equal(mismatch.dominantChoice, "b");
+  assert.equal(mismatch.resultState, "mismatch");
+  assert.equal(mismatch.agreementText, "내 선택은 달라요");
+
+  const tie = buildProfileShareCardPresentation({
+    ...model,
+    counts: { a: 2, b: 2 },
+  });
+  assert.equal(tie.sampleCount, 4);
+  assert.equal(tie.dominantChoice, null);
+  assert.equal(tie.resultState, "tie");
+  assert.equal(tie.resultText, "시선이 반으로 갈렸어요");
+  assert.equal(tie.agreementText, null);
+  assert.equal(Object.isFrozen(tie), true);
 });
 
 test("fails closed for sensitive, collecting, or stale selections", () => {

@@ -15,6 +15,18 @@ export type ProfileShareCardModel = Readonly<{
   counts: OwnerProfileCounts;
 }>;
 
+export type ProfileShareCardPresentation = Readonly<{
+  sampleCount: number;
+  dominantChoice: "a" | "b" | null;
+  resultState: "match" | "mismatch" | "tie";
+  relationshipText: string;
+  resultText: string;
+  agreementText: string | null;
+  selfText: string;
+  questionText: string;
+  distributionText: string;
+}>;
+
 export type OwnerProfileRelationshipCard =
   | Readonly<{
       cardId: string;
