@@ -44,15 +44,17 @@ function insertCompletedConceptPlay({
   userId,
   packVersion,
   requiredCards,
+  responseCount = 3,
 }: {
   userId: string;
   packVersion: string;
   requiredCards: [string, string, string];
+  responseCount?: 0 | 3;
 }) {
   const playId = randomUUID();
   const anonymousOwnerId = randomUUID();
   const linkId = randomUUID();
-  const responses = Array.from({ length: 3 }, () => ({
+  const responses = Array.from({ length: responseCount }, () => ({
     id: randomUUID(),
     session: bytea(),
     management: bytea(),
@@ -81,6 +83,54 @@ function insertCompletedConceptPlay({
       ),
     )
     .join(",\n");
+  const visitorSql =
+    responses.length === 0
+      ? ""
+      : `
+        with fixed as (select clock_timestamp() as value),
+        version as (
+          select id from public.pack_versions where version = '${packVersion}'
+        )
+        insert into public.visitor_responses (
+          id, share_link_id, pack_version_id, relationship_code,
+          known_since_code, status, session_token_hash, session_expires_at,
+          management_token_hash, submitted_at, created_at
+        )
+        select fixture.*
+        from fixed
+        cross join version
+        cross join lateral (values
+          ${responseValues}
+        ) as fixture(
+          id, share_link_id, pack_version_id, relationship_code,
+          known_since_code, status, session_token_hash, session_expires_at,
+          management_token_hash, submitted_at, created_at
+        );
+
+        with version as (
+          select id from public.pack_versions where version = '${packVersion}'
+        )
+        insert into public.visitor_assignments (
+          response_id, pack_version_id, card_id, stage, position
+        )
+        select fixture.*
+        from version
+        cross join lateral (values
+          ${assignmentValues}
+        ) as fixture(response_id, pack_version_id, card_id, stage, position);
+
+        with version as (
+          select id from public.pack_versions where version = '${packVersion}'
+        )
+        insert into public.visitor_answers (
+          response_id, pack_version_id, card_id, choice
+        )
+        select fixture.*
+        from version
+        cross join lateral (values
+          ${answerValues}
+        ) as fixture(response_id, pack_version_id, card_id, choice);
+      `;
   sql(`
     with fixed as (select clock_timestamp() as value)
     insert into public.anonymous_owners (
@@ -125,52 +175,24 @@ function insertCompletedConceptPlay({
       '${linkId}', '${publicId()}', '${playId}', 'public',
       decode('${bytea()}', 'hex'), 'active'
     );
-
-    with fixed as (select clock_timestamp() as value),
-    version as (
-      select id from public.pack_versions where version = '${packVersion}'
-    )
-    insert into public.visitor_responses (
-      id, share_link_id, pack_version_id, relationship_code,
-      known_since_code, status, session_token_hash, session_expires_at,
-      management_token_hash, submitted_at, created_at
-    )
-    select fixture.*
-    from fixed
-    cross join version
-    cross join lateral (values
-      ${responseValues}
-    ) as fixture(
-      id, share_link_id, pack_version_id, relationship_code,
-      known_since_code, status, session_token_hash, session_expires_at,
-      management_token_hash, submitted_at, created_at
-    );
-
-    with version as (
-      select id from public.pack_versions where version = '${packVersion}'
-    )
-    insert into public.visitor_assignments (
-      response_id, pack_version_id, card_id, stage, position
-    )
-    select fixture.*
-    from version
-    cross join lateral (values
-      ${assignmentValues}
-    ) as fixture(response_id, pack_version_id, card_id, stage, position);
-
-    with version as (
-      select id from public.pack_versions where version = '${packVersion}'
-    )
-    insert into public.visitor_answers (
-      response_id, pack_version_id, card_id, choice
-    )
-    select fixture.*
-    from version
-    cross join lateral (values
-      ${answerValues}
-    ) as fixture(response_id, pack_version_id, card_id, choice);
+    ${visitorSql}
   `);
   return { anonymousOwnerId, playId };
+}
+
+function cleanupOwnerFixtures(
+  userId: string,
+  fixtures: Array<{ playId: string }>,
+) {
+  const playIds =
+    fixtures.map(({ playId }) => `'${playId}'`).join(",") || "null";
+  sql(`
+    update public.pack_plays
+    set owner_id = null
+    where id in (${playIds});
+    delete from public.owner_public_profiles where owner_id = '${userId}';
+    delete from auth.users where id = '${userId}';
+  `);
 }
 
 test.describe("concept owner profile live", () => {
@@ -358,15 +380,73 @@ test.describe("concept owner profile live", () => {
         ),
       ).toBe(before + 1);
     } finally {
-      const playIds =
-        fixtures.map(({ playId }) => `'${playId}'`).join(",") || "null";
-      sql(`
-        update public.pack_plays
-        set owner_id = null
-        where id in (${playIds});
-        delete from public.owner_public_profiles where owner_id = '${userId}';
-        delete from auth.users where id = '${userId}';
-      `);
+      cleanupOwnerFixtures(userId, fixtures);
+    }
+  });
+
+  test("keeps the collecting action below hooks when no concept is shareable", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const email = `concept-collecting-e2e-${randomUUID()}@example.com`;
+    await signInOwnerAccount(page, email, { profile: "new" });
+    const userId = sql(
+      `select id from auth.users where email = '${email}'`,
+      true,
+    );
+    expect(userId).toMatch(/^[0-9a-f-]{36}$/);
+    const fixtures: Array<{ playId: string }> = [];
+    try {
+      fixtures.push(
+        insertCompletedConceptPlay({
+          userId,
+          packVersion: "old-friend-v3",
+          requiredCards: ["conflict", "celebration", "plans"],
+          responseCount: 0,
+        }),
+        insertCompletedConceptPlay({
+          userId,
+          packVersion: "after-work-v3",
+          requiredCards: ["message-after", "decompress", "weeknight"],
+          responseCount: 0,
+        }),
+      );
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/me");
+
+      const lead = page.getByText(
+        "한 장면의 답이 여러 팩에서 어떤 결로 이어졌는지 살펴보세요.",
+        { exact: true },
+      );
+      const hooks = page.locator("article").filter({ hasText: "나:" });
+      const hookCount = await hooks.count();
+      expect(hookCount).toBeGreaterThanOrEqual(3);
+      expect(hookCount).toBeLessThanOrEqual(5);
+      const collectingAction = page.getByRole("link", {
+        name: "시선 더 모으기",
+      });
+      await expect(collectingAction).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "한 장으로 나누기" }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("link", { name: "내 겹 공유하기" }),
+      ).toHaveCount(0);
+      await expect(page.locator("main header").getByRole("link")).toHaveCount(
+        0,
+      );
+      const order = await Promise.all([
+        lead.boundingBox(),
+        hooks.first().boundingBox(),
+        hooks.last().boundingBox(),
+        collectingAction.boundingBox(),
+      ]);
+      expect(order.every(Boolean)).toBe(true);
+      expect(order[0]!.y).toBeLessThan(order[1]!.y);
+      expect(order[2]!.y).toBeLessThan(order[3]!.y);
+    } finally {
+      cleanupOwnerFixtures(userId, fixtures);
     }
   });
 });

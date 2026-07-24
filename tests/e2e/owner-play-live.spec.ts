@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
+import { randomBytes, randomUUID } from "node:crypto";
 
 import {
   expect,
@@ -17,6 +18,10 @@ import {
 } from "./owner-auth-live-fixture";
 import honestSelfManifest from "../../content/packs/honest-self-v1.json" with { type: "json" };
 import { deriveNetworkKey } from "../../lib/security/network-key.mjs";
+import {
+  canonicalInviteUrl,
+  createShareCredential,
+} from "../../lib/share-links/share-link-session-core.mjs";
 
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const databaseContainer = "supabase_db_gyeop";
@@ -53,6 +58,94 @@ function setOldFriendActive() {
     ],
     { stdio: "ignore" },
   );
+}
+
+function sql(statement: string, output = false) {
+  const result = execFileSync(
+    "docker",
+    [
+      "exec",
+      databaseContainer,
+      "psql",
+      "-U",
+      "postgres",
+      "-d",
+      "postgres",
+      "-v",
+      "ON_ERROR_STOP=1",
+      ...(output ? ["-At"] : []),
+      "-c",
+      statement,
+    ],
+    { encoding: "utf8", stdio: output ? "pipe" : "ignore" },
+  );
+  return typeof result === "string" ? result.trim() : "";
+}
+
+function insertHistoricalPublicInvite(sourceVersion: string) {
+  const playId = randomUUID();
+  const anonymousOwnerId = randomUUID();
+  const credential = createShareCredential();
+  const managementSecretHash = randomBytes(32).toString("hex");
+  sql(`
+    with fixed as (select clock_timestamp() as value)
+    insert into public.anonymous_owners (
+      id, management_secret_hash, management_expires_at, last_active_at,
+      management_revoked_at, created_at, updated_at
+    )
+    select
+      '${anonymousOwnerId}', decode('${managementSecretHash}', 'hex'),
+      fixed.value + interval '7 days', fixed.value, null,
+      fixed.value, fixed.value
+    from fixed;
+
+    with fixed as (select clock_timestamp() as value)
+    insert into public.pack_plays (
+      id, pack_version_id, anonymous_owner_id, owner_id,
+      management_secret_hash, management_expires_at, last_active_at,
+      management_revoked_at, status, current_position, completed_at
+    )
+    select
+      '${playId}', version.id, '${anonymousOwnerId}', null,
+      decode('${managementSecretHash}', 'hex'),
+      fixed.value + interval '7 days', fixed.value, null,
+      'draft', 1, null
+    from public.pack_versions as version
+    cross join fixed
+    where version.version = '${sourceVersion}';
+
+    insert into public.self_answers (
+      pack_play_id, pack_version_id, card_id, choice
+    )
+    select '${playId}', card.pack_version_id, card.id, 'a'
+    from public.pack_cards as card
+    join public.pack_versions as version on version.id = card.pack_version_id
+    where version.version = '${sourceVersion}';
+
+    update public.pack_plays
+    set status = 'completed',
+        current_position = 10,
+        completed_at = clock_timestamp()
+    where id = '${playId}';
+
+    insert into public.share_links (
+      id, public_id, pack_play_id, kind, secret_hash, status
+    ) values (
+      '${credential.linkId}', '${credential.publicId}', '${playId}',
+      'public', decode('${credential.secretHash.toString("hex")}', 'hex'),
+      'active'
+    );
+  `);
+  return {
+    inviteUrl: canonicalInviteUrl(
+      e2eBaseUrl,
+      credential.publicId,
+      credential.secret,
+    ),
+    linkId: credential.linkId,
+    publicId: credential.publicId,
+    secret: credential.secret,
+  };
 }
 
 async function waitForOwnerPlayStart(page: Page) {
@@ -755,6 +848,176 @@ test.describe("live owner flow", () => {
     page,
   }) => {
     await verifyIncompleteOwnerProfileGate(page);
+  });
+
+  test("carries historical v1 and v2 public results into each current same-pack owner flow", async ({
+    browser,
+  }) => {
+    test.setTimeout(120_000);
+    const fixtures = [
+      {
+        sourceVersion: "coworker-v1",
+        packSlug: "coworker",
+        currentVersion: "coworker-v2",
+        ip: "198.51.100.230",
+      },
+      {
+        sourceVersion: "old-friend-v2",
+        packSlug: "old-friend",
+        currentVersion: "old-friend-v3",
+        ip: "198.51.100.231",
+      },
+    ].map((fixture) => ({
+      ...fixture,
+      invite: insertHistoricalPublicInvite(fixture.sourceVersion),
+    }));
+
+    try {
+      for (const fixture of fixtures) {
+        const context = await browser.newContext({
+          extraHTTPHeaders: {
+            ...visitorHeaders,
+            "x-forwarded-for": fixture.ip,
+          },
+        });
+        const page = await context.newPage();
+        try {
+          const metadataPromise = page.waitForResponse(
+            (response) =>
+              response.request().method() === "POST" &&
+              new URL(response.url()).pathname ===
+                `/api/invites/${fixture.invite.publicId}/metadata`,
+          );
+          await page.goto(fixture.invite.inviteUrl);
+          const metadataResponse = await metadataPromise;
+          expect(metadataResponse.status()).toBe(200);
+          expect(await metadataResponse.json()).toMatchObject({
+            packSlug: fixture.packSlug,
+            packVersion: fixture.sourceVersion,
+            kind: "public",
+          });
+
+          await page
+            .getByRole("radio", { name: "오래된 친구", exact: true })
+            .check();
+          await page
+            .getByRole("radio", { name: "10년 이상이에요", exact: true })
+            .check();
+          const responseStartPromise = page.waitForResponse(
+            (response) =>
+              response.request().method() === "POST" &&
+              new URL(response.url()).pathname ===
+                `/api/invites/${fixture.invite.publicId}/responses`,
+          );
+          await page.getByRole("button", { name: "3장 답하러 가기" }).click();
+          expect((await responseStartPromise).status()).toBe(201);
+          const question = page.getByRole("heading", { level: 1 });
+          for (let index = 0; index < 3; index += 1) {
+            const prompt = await question.textContent();
+            await page.getByRole("button", { name: /^A / }).click();
+            if (index < 2) {
+              await expect(question).not.toHaveText(prompt ?? "");
+              await expect(question).toBeFocused();
+            }
+          }
+          await expect(page.getByText("3장 비교 완료")).toBeVisible({
+            timeout: 15_000,
+          });
+          const samePack = page.getByRole("link", {
+            name: "나도 이 팩으로 시작하기",
+          });
+          await expect(samePack).toHaveAttribute(
+            "href",
+            `/play/new?pack=${fixture.packSlug}&source=same_pack_cta`,
+          );
+
+          const responseCookie = (await context.cookies()).find(
+            (cookie) => cookie.name === "__Host-gyeop-response",
+          );
+          expect(responseCookie?.value).toMatch(
+            /^v1\.[0-9a-f-]{36}\.[A-Za-z0-9_-]{43}$/,
+          );
+          const resumed = await postRawVisitorResponse({
+            publicId: fixture.invite.publicId,
+            secret: fixture.invite.secret,
+            cookie: `__Host-gyeop-response=${responseCookie!.value}`,
+            ip: fixture.ip,
+          });
+          expect(resumed.fingerprint.status).toBe(200);
+          const submitted = JSON.parse(resumed.fingerprint.body) as Record<
+            string,
+            unknown
+          >;
+          expect(submitted).toMatchObject({
+            packSlug: fixture.packSlug,
+            packVersion: fixture.sourceVersion,
+            status: "submitted",
+          });
+          expect(JSON.stringify(submitted)).not.toMatch(
+            /token|hash|secret|linkId|playId/i,
+          );
+
+          const wrongSecret = await postRawVisitorResponse({
+            publicId: fixture.invite.publicId,
+            secret: createShareCredential().secret,
+            cookie: `__Host-gyeop-response=${responseCookie!.value}`,
+            ip: fixture.ip,
+          });
+          expect(wrongSecret.fingerprint.status).toBe(404);
+          expect(wrongSecret.fingerprint.body).not.toContain(
+            fixture.sourceVersion,
+          );
+
+          const currentPackPromise = page.waitForResponse(
+            (response) =>
+              response.status() === 200 &&
+              /^\/api\/plays\/[0-9a-f-]{36}\/pack$/.test(
+                new URL(response.url()).pathname,
+              ),
+          );
+          await samePack.click();
+          await waitForOwnerPlayStart(page);
+          const currentPack = (await (
+            await currentPackPromise
+          ).json()) as Record<string, unknown>;
+          expect(currentPack).toMatchObject({
+            slug: fixture.packSlug,
+            version: fixture.currentVersion,
+          });
+          const currentPlayId = new URL(page.url()).pathname.split("/").at(-1);
+          expect(currentPlayId).toMatch(/^[0-9a-f-]{36}$/);
+          const currentState = await page.evaluate(async (playId) => {
+            const response = await fetch(`/api/plays/${playId}`, {
+              cache: "no-store",
+              credentials: "same-origin",
+            });
+            return {
+              status: response.status,
+              body: await response.json(),
+            };
+          }, currentPlayId);
+          expect(currentState.status).toBe(200);
+          expect(currentState.body).toMatchObject({
+            packSlug: fixture.packSlug,
+            packVersion: fixture.currentVersion,
+            status: "draft",
+          });
+
+          await page.goto(fixture.invite.inviteUrl);
+          await expect(page.getByText("3장 비교 완료")).toBeVisible();
+        } finally {
+          await context.close();
+        }
+      }
+    } finally {
+      sql(`
+        update public.share_links
+        set status = 'disabled', updated_at = clock_timestamp()
+        where id in (${fixtures
+          .map(({ invite }) => `'${invite.linkId}'`)
+          .join(", ")});
+      `);
+    }
   });
 
   test("keeps multiple packs under one anonymous owner and resumes each pack", async ({

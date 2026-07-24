@@ -28,7 +28,7 @@ import type {
 } from "../private-one-to-one/private-one-to-one.ts";
 import { decodePublishedPack } from "../packs/published-pack-core.mjs";
 import type { PublishedPack } from "../packs/published-pack.ts";
-import { packManifests } from "../packs/catalog";
+import { findPackManifestVersion } from "../packs/catalog";
 import { decodeOwnerPublicProfileOutcome } from "../auth/owner-public-profile-core.mjs";
 import {
   decodeCreateShareLinkOutcome,
@@ -1236,15 +1236,6 @@ export type GetVisitorResponsePackMetadataResult =
     }>
   | Readonly<{ outcome: "session_invalid" | "legacy_missing" }>;
 
-const packMetadata = Object.freeze(
-  Object.fromEntries(
-    packManifests.map((pack) => [
-      pack.slug,
-      Object.freeze({ packVersion: pack.version, packTitle: pack.title }),
-    ]),
-  ),
-);
-
 function decodeVisitorResponsePackMetadata(
   value: unknown,
 ): GetVisitorResponsePackMetadataResult {
@@ -1274,8 +1265,8 @@ function decodeVisitorResponsePackMetadata(
   const expected =
     metadata &&
     typeof metadata.packSlug === "string" &&
-    Object.prototype.hasOwnProperty.call(packMetadata, metadata.packSlug)
-      ? packMetadata[metadata.packSlug as keyof typeof packMetadata]
+    typeof metadata.packVersion === "string"
+      ? findPackManifestVersion(metadata.packSlug, metadata.packVersion)
       : undefined;
   if (
     record.outcome !== "authorized" ||
@@ -1284,8 +1275,7 @@ function decodeVisitorResponsePackMetadata(
     Object.keys(metadata).sort().join("\0") !==
       "packSlug\0packTitle\0packVersion" ||
     !expected ||
-    metadata.packVersion !== expected.packVersion ||
-    metadata.packTitle !== expected.packTitle
+    metadata.packTitle !== expected.title
   ) {
     throw new Error("Internal visitor response metadata RPC failed");
   }

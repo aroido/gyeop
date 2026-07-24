@@ -1,6 +1,6 @@
 # Issue 157 Lazyweb 디자인 근거
 
-Status: Reviewed reference  
+Status: Reviewed reference
 원문: https://www.lazyweb.com/report/lazyweb/e952b275-d0cc-4f09-b0b8-1c8e8769b40d/?source=create
 
 ## 근거 범위와 한계

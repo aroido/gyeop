@@ -206,18 +206,18 @@ export default function AccountProfileView({
   const shareSelection = firstAccountProfileShareSelection(
     profile.availableLayers,
   );
+  const conceptHooks = conceptProfile?.hooks ?? [];
+  const hasConceptHooks = conceptHooks.length > 0;
   const conceptShare = conceptProfile?.shareOptions[0] ?? null;
-  const primaryHref = conceptShare
-    ? null
-    : shareSelection
-      ? `/me/profile/${shareSelection.playId}?share_relationship=${encodeURIComponent(
-          shareSelection.relationshipCode,
-        )}&share_card=${encodeURIComponent(
-          shareSelection.cardId,
-        )}#shareable-insight`
-      : profile.ctaPlayId
-        ? `/me/plays/${profile.ctaPlayId}`
-        : "/";
+  const primaryHref = shareSelection
+    ? `/me/profile/${shareSelection.playId}?share_relationship=${encodeURIComponent(
+        shareSelection.relationshipCode,
+      )}&share_card=${encodeURIComponent(
+        shareSelection.cardId,
+      )}#shareable-insight`
+    : profile.ctaPlayId
+      ? `/me/plays/${profile.ctaPlayId}`
+      : "/";
   const [selectedShareId, setSelectedShareId] = useState(
     conceptShare?.conceptId ?? "",
   );
@@ -276,7 +276,7 @@ export default function AccountProfileView({
             {profile.nickname}의 겹
           </h1>
           <p className={styles.profileLead}>
-            {conceptProfile?.hooks.length
+            {hasConceptHooks
               ? "한 장면의 답이 여러 팩에서 어떤 결로 이어졌는지 살펴보세요."
               : shareSelection
                 ? "친구가 본 내 모습을 한 장으로 나눠보세요."
@@ -284,7 +284,7 @@ export default function AccountProfileView({
                   ? "친구의 답이 더 모이면 내 겹을 공유할 수 있어요."
                   : "질문팩에 답하고, 내가 보는 나부터 쌓아보세요."}
           </p>
-          {!conceptShare ? (
+          {!hasConceptHooks ? (
             <Link className={styles.primary} href={primaryHref!}>
               {shareSelection
                 ? "내 겹 공유하기"
@@ -300,7 +300,7 @@ export default function AccountProfileView({
           </div>
         </header>
 
-        {conceptProfile?.hooks.length ? (
+        {hasConceptHooks ? (
           <section
             className={styles.concepts}
             aria-labelledby="concept-profile-title"
@@ -310,7 +310,7 @@ export default function AccountProfileView({
               <h2 id="concept-profile-title">나를 단정하지 않는 대화거리</h2>
             </div>
             <div className={styles.conceptList}>
-              {conceptProfile.hooks.map((hook) => (
+              {conceptHooks.map((hook) => (
                 <article className={styles.conceptCard} key={hook.conceptId}>
                   <p>
                     {hook.areaLabel} · {hook.conceptLabel}
@@ -352,7 +352,7 @@ export default function AccountProfileView({
                     <button
                       type="button"
                       onClick={() => {
-                        const option = conceptProfile.shareOptions.find(
+                        const option = conceptProfile?.shareOptions.find(
                           ({ conceptId }) => conceptId === hook.conceptId,
                         );
                         if (option) openSharePicker(option);
@@ -367,7 +367,7 @@ export default function AccountProfileView({
           </section>
         ) : null}
 
-        {conceptShare ? (
+        {hasConceptHooks && conceptShare ? (
           <section
             className={styles.conceptShareAction}
             aria-labelledby="concept-share-title"
@@ -381,6 +381,24 @@ export default function AccountProfileView({
             >
               한 장으로 나누기
             </button>
+          </section>
+        ) : hasConceptHooks ? (
+          <section
+            className={styles.conceptShareAction}
+            aria-labelledby="concept-collect-title"
+          >
+            <h2 id="concept-collect-title">
+              친구의 시선이 모이면 나눌 수 있어요
+            </h2>
+            <p>
+              지금 보이는 결을 먼저 살펴보고, 같은 팩의 시선을 더 모아보세요.
+            </p>
+            <Link
+              className={styles.primary}
+              href={profile.ctaPlayId ? `/me/plays/${profile.ctaPlayId}` : "/"}
+            >
+              {profile.ctaPlayId ? "시선 더 모으기" : "질문팩 시작하기"}
+            </Link>
           </section>
         ) : null}
 

@@ -251,3 +251,27 @@ test("accepts exact-max Korean and unbroken Latin copy and rejects max plus one"
     }
   }
 });
+
+test("counts astral copy with JavaScript UTF-16 code-unit limits", () => {
+  const fields = [
+    ["conceptLabel", CONCEPT_COPY_LIMITS.conceptLabel],
+    ["observation", CONCEPT_COPY_LIMITS.observation],
+    ["evidenceText", CONCEPT_COPY_LIMITS.evidenceText],
+    ["question", CONCEPT_COPY_LIMITS.question],
+    ["packTitle", CONCEPT_COPY_LIMITS.packTitle],
+  ];
+  for (const [field, maximum] of fields) {
+    const exact = "😀".repeat(maximum / 2);
+    assert.equal(exact.length, maximum);
+    assert.doesNotThrow(() =>
+      decodeConceptProfileShareCardModel(conceptCard({ [field]: exact })),
+    );
+    assert.throws(
+      () =>
+        decodeConceptProfileShareCardModel(
+          conceptCard({ [field]: `${exact}😀` }),
+        ),
+      /Invalid concept profile share card/,
+    );
+  }
+});

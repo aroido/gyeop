@@ -343,7 +343,7 @@ async function renderConceptShareCard(
     28,
     "#ffffff",
   );
-  drawTextBlock(context, model.packTitle, 130, 255, 820, 45, 30, 20, "#dfff00");
+  drawTextBlock(context, model.packTitle, 130, 255, 820, 70, 30, 16, "#dfff00");
 
   context.fillStyle = "#315cff";
   context.font = '900 34px Pretendard, "Apple SD Gothic Neo", sans-serif';
@@ -361,18 +361,18 @@ async function renderConceptShareCard(
     950,
   );
 
-  roundedRect(context, 130, 1050, 820, 115, 38);
+  roundedRect(context, 130, 1040, 820, 160, 38);
   context.fillStyle = "#dfff00";
   context.fill();
   drawTextBlock(
     context,
     `${model.stageText} · ${model.evidenceText}`,
     170,
-    1080,
+    1070,
     740,
-    55,
+    100,
     34,
-    22,
+    18,
     "#050505",
   );
 

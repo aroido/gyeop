@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { loadAuthenticatedOwnerConceptProfile } from "@/lib/http/auth-owner";
 import { isOwnerPlayId } from "@/lib/owner-play/owner-play-state-core.mjs";
+import { parseProfileShareSelection } from "@/lib/owner-profile/profile-share-card-core.mjs";
 import { parseShareEntrySource } from "@/lib/share-links/share-link-state-core.mjs";
 
 import ShareLinkManager from "./share-link-manager";
@@ -19,9 +20,23 @@ export default async function ShareLinksPage({
   }>;
 }) {
   const { playId } = await params;
-  const { entry_source: entrySource, share_concept: shareConcept } =
-    await searchParams;
+  const {
+    entry_source: entrySource,
+    share_concept: shareConcept,
+    share_relationship: relationship,
+    share_card: cardId,
+  } = await searchParams;
   const parsedEntrySource = parseShareEntrySource(entrySource);
+  const hasLegacySelection = relationship !== undefined || cardId !== undefined;
+  if (shareConcept !== undefined && hasLegacySelection) notFound();
+
+  const parsedSelection = parseProfileShareSelection(relationship, cardId);
+  const shareSelection =
+    parsedSelection === undefined
+      ? undefined
+      : parsedEntrySource === "profile_reshare"
+        ? parsedSelection
+        : null;
   let conceptShareOption = null;
   if (shareConcept !== undefined) {
     if (
@@ -49,6 +64,7 @@ export default async function ShareLinksPage({
     <ShareLinkManager
       playId={isOwnerPlayId(playId) ? playId : null}
       entrySource={parsedEntrySource}
+      shareSelection={shareSelection}
       conceptShareOption={conceptShareOption}
     />
   );

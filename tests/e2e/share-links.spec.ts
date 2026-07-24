@@ -1,6 +1,10 @@
+import { readFileSync } from "node:fs";
+
 import { expect, test, type Page, type Route } from "@playwright/test";
+import ts from "typescript";
 
 import manifest from "../../content/packs/old-friend-v2.json" with { type: "json" };
+import { CONCEPT_COPY_LIMITS } from "../../lib/concepts/catalog-core.mjs";
 
 import { installOwnerFlowApi, playId } from "./owner-flow-fixture";
 
@@ -27,6 +31,62 @@ const cardIds = [
   "celebration",
   "hard-day",
 ];
+
+function sourceSection(source: string, start: string, end: string) {
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end, startIndex);
+  if (startIndex < 0 || endIndex < 0) {
+    throw new Error(`Missing renderer source section: ${start} -> ${end}`);
+  }
+  return source.slice(startIndex, endIndex);
+}
+
+const shareCardSource = readFileSync(
+  new URL(
+    "../../app/me/plays/[playId]/profile-share-card.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const shareCardCoreSource = readFileSync(
+  new URL(
+    "../../lib/owner-profile/profile-share-card-core.mjs",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const conceptRendererHarness = ts.transpileModule(
+  `
+    const CONCEPT_COPY_LIMITS = ${JSON.stringify(CONCEPT_COPY_LIMITS)};
+    const PROFILE_SHARE_FILENAME = "gyeop-insight.png";
+    ${sourceSection(
+      shareCardCoreSource,
+      "const CONCEPT_SHARE_CARD_KEYS",
+      "export function buildProfileShareCardPresentation",
+    ).replace(
+      "export function decodeConceptProfileShareCardModel",
+      "function decodeConceptProfileShareCardModel",
+    )}
+    ${sourceSection(
+      shareCardSource,
+      "function roundedRect",
+      "function isConceptShareCard",
+    )}
+    ${sourceSection(
+      shareCardSource,
+      "async function renderConceptShareCard",
+      "export function downloadProfileShareCard",
+    )}
+    globalThis.__renderConceptShareCardForTest = async (value) =>
+      renderConceptShareCard(decodeConceptProfileShareCardModel(value));
+  `,
+  {
+    compilerOptions: {
+      module: ts.ModuleKind.None,
+      target: ts.ScriptTarget.ES2022,
+    },
+  },
+).outputText;
 
 type LinkState = {
   id: string;
@@ -190,6 +250,14 @@ async function installBrowserHandoff(
       shareCalls: ShareData[];
       copyCalls: string[];
       canvasText: string[];
+      canvasDraws: Array<{
+        text: string;
+        x: number;
+        y: number;
+        width: number;
+        fontSize: number;
+      }>;
+      canvasCreateCount: number;
       resolveShare?: () => void;
       resolveCopy?: () => void;
     };
@@ -199,6 +267,8 @@ async function installBrowserHandoff(
       shareCalls: [],
       copyCalls: [],
       canvasText: [],
+      canvasDraws: [],
+      canvasCreateCount: 0,
     };
     (
       window as typeof window & { __gyeopHandoff: HandoffState }
@@ -248,6 +318,15 @@ async function installBrowserHandoff(
         },
       },
     });
+    const createElement = document.createElement.bind(document);
+    document.createElement = ((
+      name: string,
+      options?: ElementCreationOptions,
+    ) => {
+      const element = createElement(name, options);
+      if (element instanceof HTMLCanvasElement) state.canvasCreateCount += 1;
+      return element;
+    }) as typeof document.createElement;
     const fillText = CanvasRenderingContext2D.prototype.fillText;
     CanvasRenderingContext2D.prototype.fillText = function (
       text,
@@ -255,7 +334,16 @@ async function installBrowserHandoff(
       y,
       maximumWidth,
     ) {
-      state.canvasText.push(String(text));
+      const value = String(text);
+      const fontSize = Number(this.font.match(/(\d+(?:\.\d+)?)px/)?.[1] ?? 0);
+      state.canvasText.push(value);
+      state.canvasDraws.push({
+        text: value,
+        x,
+        y,
+        width: this.measureText(value).width,
+        fontSize,
+      });
       return maximumWidth === undefined
         ? fillText.call(this, text, x, y)
         : fillText.call(this, text, x, y, maximumWidth);
@@ -833,6 +921,121 @@ test("shows a tie without an agreement badge", async ({ page }) => {
   await expect(preview.getByText("내 선택은 달라요")).toHaveCount(0);
 });
 
+test("fits exact-max Korean and no-space Latin concept copy inside the real canvas", async ({
+  page,
+}) => {
+  await installBrowserHandoff(page, {
+    share: "unsupported",
+    clipboard: "resolve",
+  });
+
+  for (const character of ["가", "W"]) {
+    await page.goto("data:text/html,<main></main>");
+    await page.addScriptTag({ content: conceptRendererHarness });
+    const model = {
+      conceptLabel: character.repeat(CONCEPT_COPY_LIMITS.conceptLabel),
+      observation: character.repeat(CONCEPT_COPY_LIMITS.observation),
+      stageText: "윤곽",
+      evidenceText: character.repeat(CONCEPT_COPY_LIMITS.evidenceText),
+      question: character.repeat(CONCEPT_COPY_LIMITS.question),
+      packTitle: character.repeat(CONCEPT_COPY_LIMITS.packTitle),
+    };
+    const rendered = await page.evaluate(async (value) => {
+      const target = window as typeof window & {
+        __gyeopHandoff: {
+          canvasCreateCount: number;
+          canvasDraws: Array<{
+            text: string;
+            x: number;
+            y: number;
+            width: number;
+            fontSize: number;
+          }>;
+          canvasText: string[];
+        };
+        __renderConceptShareCardForTest: (model: unknown) => Promise<File>;
+      };
+      const file = await target.__renderConceptShareCardForTest(value);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const view = new DataView(bytes.buffer);
+      return {
+        width: view.getUint32(16),
+        height: view.getUint32(20),
+        canvasCreateCount: target.__gyeopHandoff.canvasCreateCount,
+        draws: target.__gyeopHandoff.canvasDraws,
+        text: target.__gyeopHandoff.canvasText.join(""),
+      };
+    }, model);
+
+    expect(rendered.width).toBe(1080);
+    expect(rendered.height).toBe(1920);
+    expect(rendered.canvasCreateCount).toBe(1);
+    for (const value of Object.values(model).filter(
+      (value) => value !== "윤곽",
+    )) {
+      expect(rendered.text).toContain(value);
+    }
+    for (const draw of rendered.draws) {
+      expect(draw.x).toBeGreaterThanOrEqual(0);
+      expect(draw.y).toBeGreaterThanOrEqual(0);
+      expect(draw.x + draw.width).toBeLessThanOrEqual(1080);
+      expect(draw.y + draw.fontSize * 1.22).toBeLessThanOrEqual(1920);
+    }
+    for (const [minimumY, maximumY] of [
+      [150, 225],
+      [255, 370],
+      [500, 1020],
+      [1070, 1200],
+      [1320, 1470],
+    ]) {
+      const block = rendered.draws.filter(
+        ({ y }) => y >= minimumY && y < maximumY,
+      );
+      expect(block.length).toBeGreaterThan(0);
+      expect(
+        block.every(
+          ({ y, fontSize }) => y + fontSize * 1.22 <= maximumY + 0.01,
+        ),
+      ).toBe(true);
+    }
+  }
+
+  await page.goto("data:text/html,<main></main>");
+  await page.addScriptTag({ content: conceptRendererHarness });
+  const rejected = await page.evaluate(
+    async ({ maximum }) => {
+      const target = window as typeof window & {
+        __gyeopHandoff: { canvasCreateCount: number };
+        __renderConceptShareCardForTest: (model: unknown) => Promise<File>;
+      };
+      try {
+        await target.__renderConceptShareCardForTest({
+          conceptLabel: "관계 시작",
+          observation: "W".repeat(maximum + 1),
+          stageText: "윤곽",
+          evidenceText: "서로 다른 팩 2개 · 맥락 2개",
+          question: "다른 자리에서는 먼저 말을 꺼내는 때도 있어?",
+          packTitle: "우리는 아직도 통하는 편",
+        });
+        return {
+          error: null,
+          canvasCreateCount: target.__gyeopHandoff.canvasCreateCount,
+        };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : String(error),
+          canvasCreateCount: target.__gyeopHandoff.canvasCreateCount,
+        };
+      }
+    },
+    { maximum: CONCEPT_COPY_LIMITS.observation },
+  );
+  expect(rejected).toEqual({
+    error: "Invalid concept profile share card",
+    canvasCreateCount: 0,
+  });
+});
+
 test("renders legal maximum Korean card copy into a 1080x1920 PNG", async ({
   page,
 }) => {
@@ -1095,6 +1298,14 @@ test("fails closed when a requested profile card is stale", async ({
   await expect(page.getByText("2명")).toHaveCount(0);
   await expect(page.locator("main").getByRole("button")).toHaveCount(0);
   await expect(page.getByRole("radio")).toHaveCount(0);
+
+  await page.goto(
+    `/me/plays/${playId}?entry_source=profile_reshare&share_concept=rel.start&share_relationship=old_friend&share_card=${manifest.cards[0].id}`,
+  );
+  await expect(
+    page.getByRole("heading", { name: "이 페이지를 찾을 수 없어요" }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "공유 링크" })).toHaveCount(0);
 });
 
 test("reads only an exact fragment and renders generic invite states", async ({
