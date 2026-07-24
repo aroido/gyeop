@@ -404,9 +404,49 @@
   line-height: 1.45;
 }
 
+.conceptComparison {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: #1a1a1a;
+}
+
+.conceptComparison p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.conceptComparison strong {
+  color: var(--lime);
+}
+
+.conceptBasis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.conceptBasis p {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid #444;
+  border-radius: 99rem;
+  color: #ccc;
+  font-size: 0.75rem;
+}
+
+.conceptBasis strong {
+  color: #fff;
+}
+
 .conceptCard > button {
   width: 100%;
-  min-height: 2.8rem;
+  min-height: 2.75rem;
   margin-top: 0.8rem;
   border: 0;
   border-radius: 0.7rem;
@@ -423,9 +463,31 @@
 }
 
 .conceptEvidence summary {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
   color: var(--lime);
   font-weight: 900;
   cursor: pointer;
+}
+
+.conceptShareAction {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--lime);
+  border-radius: 1rem;
+  background: #111;
+}
+
+.conceptShareAction h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.conceptShareAction p {
+  margin: 0.5rem 0 0;
+  color: #ccc;
+  line-height: 1.45;
 }
 
 .conceptEvidence div {
@@ -474,6 +536,7 @@
   display: grid;
   gap: 0.4rem;
   width: 100%;
+  min-height: 2.75rem;
   padding: 0.8rem;
   border: 1px solid #555;
   border-radius: 0.75rem;
@@ -494,12 +557,22 @@
 
 .dialogClose {
   float: right;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   border: 1px solid #555;
   border-radius: 99rem;
   padding: 0.35rem 0.65rem;
   background: #111;
   color: #fff;
   cursor: pointer;
+}
+
+.shareError {
+  min-height: 1.25rem;
+  margin: 0.65rem 0 0;
+  color: #ff9f9f;
+  font-size: 0.85rem;
+  font-weight: 800;
 }
 
 .management > h2 {
@@ -600,9 +673,17 @@
 .secondary:focus-visible,
 .logout button:focus-visible,
 .plays a:focus-visible,
-.relationshipPicker button:focus-visible {
+.relationshipPicker button:focus-visible,
+.conceptCard > button:focus-visible,
+.conceptEvidence summary:focus-visible,
+.sharePicker button:focus-visible {
   outline: 3px solid var(--blue);
   outline-offset: 3px;
+}
+
+.primary:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 @keyframes pulse {
@@ -612,6 +693,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .conceptCard *,
+  .sharePicker * {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+
   .loading > div {
     animation: none;
   }

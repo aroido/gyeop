@@ -243,7 +243,7 @@ export function verifyOwnerProfile() {
     "recordConceptDetailOpened",
     "장면이 쌓여 보이는 결",
     "나를 단정하지 않는 대화거리",
-    "발견한 결 공유하기",
+    "한 장으로 나누기",
     "왜 이렇게 보일까?",
     "친구가 본 내 모습을 한 장으로 나눠보세요.",
     "친구의 답이 더 모이면 내 겹을 공유할 수 있어요.",
@@ -276,10 +276,21 @@ export function verifyOwnerProfile() {
     accountView,
     /완료 응답 기준|완료 질문팩|도착한 관계 종류|아직 완성한 겹이 없어요/,
   );
-  assert.doesNotMatch(
+  assert.match(
     accountView,
-    /recordOwnerProfileReshareClicked/,
+    /await recordOwnerProfileReshareClicked\(selectedConceptShare\.sourcePlayId\)/,
   );
+  assert.ok(
+    accountView.indexOf(
+      "await recordOwnerProfileReshareClicked(selectedConceptShare.sourcePlayId)",
+    ) < accountView.indexOf("router.push("),
+    "concept share must record the reshare before navigation",
+  );
+  const pickerBody = accountView.slice(
+    accountView.indexOf("const openSharePicker"),
+    accountView.indexOf("const confirmConceptShare"),
+  );
+  assert.doesNotMatch(pickerBody, /recordOwnerProfileReshareClicked/);
   assert.match(
     accountView,
     /entry_source=profile_reshare&share_concept=\$\{encodeURIComponent/,

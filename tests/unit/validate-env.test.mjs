@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   validateAccountDeleteEnv,
   validateHttpBoundaryEnv,
+  validateRuntimeEnv,
 } from "../../scripts/validate-env.mjs";
 
 function fixture(overrides = {}) {
@@ -77,4 +78,36 @@ test("validates HTTP boundary origins and secrets without returning key material
       }),
     /HTTPS/,
   );
+});
+
+test("runtime validation exposes only the exact fail-closed concept boolean", () => {
+  const boundary = {
+    NODE_ENV: "test",
+    APP_URL: "http://127.0.0.1:3000",
+    ORIGIN_PROXY_SECRET: Buffer.alloc(32, 8).toString("base64url"),
+    RATE_LIMIT_SECRET: Buffer.alloc(32, 9).toString("base64url"),
+  };
+  for (const [value, expected] of [
+    [undefined, false],
+    ["false", false],
+    ["true", true],
+  ]) {
+    const env = fixture({
+      ...boundary,
+      ...(value === undefined ? {} : { GYEOP_CONCEPT_PROFILE_ENABLED: value }),
+    });
+    assert.equal(validateRuntimeEnv(env).conceptProfileEnabled, expected);
+  }
+  for (const value of ["", "TRUE", "1", "0", " true", "false "]) {
+    assert.throws(
+      () =>
+        validateRuntimeEnv(
+          fixture({
+            ...boundary,
+            GYEOP_CONCEPT_PROFILE_ENABLED: value,
+          }),
+        ),
+      /GYEOP_CONCEPT_PROFILE_ENABLED must be true or false/,
+    );
+  }
 });

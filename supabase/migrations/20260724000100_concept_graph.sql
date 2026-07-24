@@ -181,7 +181,8 @@ as $function$
     on version.id = play.pack_version_id
   join public.pack_templates as template
     on template.id = version.template_id
-  where play.id = p_play_id;
+  where play.id = p_play_id
+    and version.published_at is not null;
 $function$;
 
 create function public.get_owner_play_pack(
@@ -195,6 +196,7 @@ set search_path = ''
 as $function$
 declare
   v_auth jsonb;
+  v_pack jsonb;
 begin
   v_auth := private.authorize_owner_play_capability(
     p_play_id,
@@ -204,9 +206,13 @@ begin
   if v_auth->>'outcome' <> 'authorized' then
     return v_auth;
   end if;
+  v_pack := private.owner_play_pack(p_play_id);
+  if v_pack is null then
+    return jsonb_build_object('outcome', 'not_found');
+  end if;
   return jsonb_build_object(
     'outcome', 'authorized',
-    'pack', private.owner_play_pack(p_play_id)
+    'pack', v_pack
   );
 end
 $function$;
@@ -221,6 +227,8 @@ security definer
 set search_path = ''
 stable
 as $function$
+declare
+  v_pack jsonb;
 begin
   if not exists (
     select 1
@@ -230,9 +238,13 @@ begin
   ) then
     return jsonb_build_object('outcome', 'not_found');
   end if;
+  v_pack := private.owner_play_pack(p_play_id);
+  if v_pack is null then
+    return jsonb_build_object('outcome', 'not_found');
+  end if;
   return jsonb_build_object(
     'outcome', 'authorized',
-    'pack', private.owner_play_pack(p_play_id)
+    'pack', v_pack
   );
 end
 $function$;

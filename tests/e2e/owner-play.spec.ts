@@ -257,7 +257,7 @@ test("falls back to the routed load after one preload pack failure", async ({
   expect(
     api.calls.filter(
       (call) =>
-        call.method === "GET" && call.pathname === "/api/packs/old-friend",
+        call.method === "GET" && call.pathname === `/api/plays/${playId}/pack`,
     ),
   ).toHaveLength(2);
   expect(
@@ -284,7 +284,7 @@ test("bootstraps once and shows the first server-backed question", async ({
   });
   expect(api.calls.slice(0, 2).map((call) => call.pathname)).toEqual([
     "/api/plays",
-    "/api/packs/old-friend",
+    `/api/plays/${playId}/pack`,
   ]);
   await expect(page.locator('main[data-pack="old-friend"]')).toHaveCount(1);
   await expect(page.getByTestId("question-card")).toHaveCSS(

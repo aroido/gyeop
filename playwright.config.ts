@@ -82,6 +82,8 @@ export default defineConfig({
       APP_URL: e2eBaseUrl,
       GYEOP_NEXT_DIST_DIR:
         process.env.GYEOP_NEXT_DIST_DIR ?? `.next/e2e-${e2ePort}`,
+      GYEOP_CONCEPT_PROFILE_ENABLED:
+        process.env.GYEOP_CONCEPT_PROFILE_ENABLED ?? "false",
       NEXT_PUBLIC_GA_MEASUREMENT_ID:
         process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "",
       ...(liveOwnerFlow ? { GYEOP_E2E_LIVE: "1" } : {}),

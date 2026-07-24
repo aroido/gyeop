@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
@@ -19,6 +20,7 @@ import {
   recordConceptProfileViewed,
 } from "@/lib/owner-profile/concept-profile-client";
 import { firstAccountProfileShareSelection } from "@/lib/owner-profile/profile-share-card-core.mjs";
+import { recordOwnerProfileReshareClicked } from "@/lib/owner-profile/owner-profile-client";
 import { relationshipLabel } from "@/lib/visitor-response/visitor-context-core.mjs";
 
 import LogoutButton from "./logout-button";
@@ -166,9 +168,11 @@ export default function AccountProfileView({
   profile: AccountOwnerProfile;
   conceptProfile: ConceptProfile | null;
 }) {
+  const router = useRouter();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const shareDialogRef = useRef<HTMLDialogElement>(null);
   const exposureRecorded = useRef(false);
+  const shareConfirming = useRef(false);
   const relationshipChoices = useMemo(() => {
     const choices: RelationshipChoice[] = [];
     const seen = new Set<string>();
@@ -217,6 +221,8 @@ export default function AccountProfileView({
   const [selectedShareId, setSelectedShareId] = useState(
     conceptShare?.conceptId ?? "",
   );
+  const [shareError, setShareError] = useState("");
+  const [sharePending, setSharePending] = useState(false);
   const selectedConceptShare =
     conceptProfile?.shareOptions.find(
       ({ conceptId }) => conceptId === selectedShareId,
@@ -237,7 +243,29 @@ export default function AccountProfileView({
 
   const openSharePicker = (option?: ConceptShareOption) => {
     if (option) setSelectedShareId(option.conceptId);
+    setShareError("");
     shareDialogRef.current?.showModal();
+  };
+
+  const confirmConceptShare = async () => {
+    if (!selectedConceptShare || shareConfirming.current) return;
+    shareConfirming.current = true;
+    setSharePending(true);
+    setShareError("");
+    try {
+      await recordOwnerProfileReshareClicked(selectedConceptShare.sourcePlayId);
+      router.push(
+        `/me/plays/${selectedConceptShare.sourcePlayId}?entry_source=profile_reshare&share_concept=${encodeURIComponent(
+          selectedConceptShare.conceptId,
+        )}`,
+      );
+    } catch {
+      shareConfirming.current = false;
+      setSharePending(false);
+      setShareError(
+        "공유 준비를 기록하지 못했어요. 잠시 후 다시 시도해 주세요.",
+      );
+    }
   };
 
   return (
@@ -256,15 +284,7 @@ export default function AccountProfileView({
                   ? "친구의 답이 더 모이면 내 겹을 공유할 수 있어요."
                   : "질문팩에 답하고, 내가 보는 나부터 쌓아보세요."}
           </p>
-          {conceptShare ? (
-            <button
-              className={styles.primary}
-              type="button"
-              onClick={() => openSharePicker()}
-            >
-              발견한 결 공유하기
-            </button>
-          ) : (
+          {!conceptShare ? (
             <Link className={styles.primary} href={primaryHref!}>
               {shareSelection
                 ? "내 겹 공유하기"
@@ -272,7 +292,7 @@ export default function AccountProfileView({
                   ? "시선 더 모으기"
                   : "질문팩 시작하기"}
             </Link>
-          )}
+          ) : null}
           <div className={styles.metrics} aria-label="계정 프로필 요약">
             <p>시선 {profile.sightCount}</p>
             <p>완료한 겹 {profile.completedPlayCount}</p>
@@ -298,6 +318,35 @@ export default function AccountProfileView({
                   <strong>{STAGE_TEXT[hook.stage]}</strong>
                   <h3>{hook.observation}</h3>
                   <blockquote>{hook.question}</blockquote>
+                  <div
+                    className={styles.conceptComparison}
+                    aria-label={`${hook.conceptLabel} 방향 비교`}
+                  >
+                    <p>
+                      <strong>나:</strong> {hook.self.directionText}
+                    </p>
+                    <p>
+                      <strong>주변:</strong>{" "}
+                      {hook.privateOthers.status === "available"
+                        ? hook.privateOthers.directionText
+                        : `시선을 모으는 중 · ${hook.privateOthers.sightCount}/3`}
+                    </p>
+                  </div>
+                  <div
+                    className={styles.conceptBasis}
+                    aria-label={`${hook.conceptLabel} 근거 요약`}
+                  >
+                    {hook.profileEvidence.map(({ source, evidence }) => (
+                      <p key={source}>
+                        <strong>
+                          {source === "self" ? "내 답변" : "주변 시선"}
+                        </strong>
+                        <span>
+                          {evidence.packCount}팩 · {evidence.contextCount}맥락
+                        </span>
+                      </p>
+                    ))}
+                  </div>
                   <ConceptEvidence hook={hook} />
                   {hook.shareEligible ? (
                     <button
@@ -315,6 +364,23 @@ export default function AccountProfileView({
                 </article>
               ))}
             </div>
+          </section>
+        ) : null}
+
+        {conceptShare ? (
+          <section
+            className={styles.conceptShareAction}
+            aria-labelledby="concept-share-title"
+          >
+            <h2 id="concept-share-title">한 장면에서 시작한 이야기를 나눠요</h2>
+            <p>안전하게 공유할 수 있는 결만 골라 한 장에 담아드려요.</p>
+            <button
+              className={styles.primary}
+              type="button"
+              onClick={() => openSharePicker()}
+            >
+              한 장으로 나누기
+            </button>
           </section>
         ) : null}
 
@@ -444,15 +510,20 @@ export default function AccountProfileView({
             ))}
           </div>
           {selectedConceptShare ? (
-            <Link
+            <button
               className={styles.primary}
-              href={`/me/plays/${selectedConceptShare.sourcePlayId}?entry_source=profile_reshare&share_concept=${encodeURIComponent(
-                selectedConceptShare.conceptId,
-              )}`}
+              type="button"
+              disabled={sharePending}
+              onClick={confirmConceptShare}
             >
-              이 내용으로 공유 카드 확인
-            </Link>
+              {sharePending
+                ? "공유 카드 준비 중…"
+                : "이 내용으로 공유 카드 확인"}
+            </button>
           ) : null}
+          <p className={styles.shareError} role="status" aria-live="polite">
+            {shareError}
+          </p>
         </dialog>
       ) : null}
     </main>

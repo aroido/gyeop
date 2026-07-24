@@ -11,6 +11,7 @@ import type { ProfileShareCardModel } from "@/lib/owner-profile/owner-profile";
 import type { ConceptShareOption } from "@/lib/owner-profile/concept-profile";
 import { conceptById } from "@/lib/concepts/catalog-core.mjs";
 import { OwnerProfileHttpError } from "@/lib/owner-profile/owner-profile-client";
+import { decodeConceptProfileShareCardModel } from "@/lib/owner-profile/profile-share-card-core.mjs";
 import { defaultShareKind, type ShareKind } from "@/lib/packs/presentation";
 import {
   buildShareData,
@@ -92,16 +93,15 @@ async function readManagerState(
     throw new Error("terminal");
   }
   const shareCard: ProfileShareCardModel | null = conceptShareOption
-    ? {
+    ? decodeConceptProfileShareCardModel({
         conceptLabel: conceptById(conceptShareOption.conceptId).label,
         observation: conceptShareOption.safeCopy,
-        stageText: (conceptShareOption.shareEvidence.stage === "clear"
-          ? "선명"
-          : "윤곽") as "윤곽" | "선명",
+        stageText:
+          conceptShareOption.shareEvidence.stage === "clear" ? "선명" : "윤곽",
         evidenceText: `서로 다른 팩 ${conceptShareOption.shareEvidence.evidence.packCount}개 · 맥락 ${conceptShareOption.shareEvidence.evidence.contextCount}개`,
         question: conceptShareOption.safeQuestion,
         packTitle: pack.title,
-      }
+      })
     : null;
   return {
     kind: "ready",

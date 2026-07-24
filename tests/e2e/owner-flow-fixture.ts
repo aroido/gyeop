@@ -154,10 +154,7 @@ export async function installOwnerFlowApi(
       }
       return noStoreJson(route, 200, api.state);
     }
-    if (
-      method === "GET" &&
-      url.pathname === `/api/packs/${selectedPack.slug}`
-    ) {
+    if (method === "GET" && url.pathname === `/api/plays/${playId}/pack`) {
       if (api.packDelayMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, api.packDelayMs));
       }
@@ -170,11 +167,7 @@ export async function installOwnerFlowApi(
           "질문팩을 불러오지 못했습니다.",
         );
       }
-      return route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(selectedPack),
-      });
+      return noStoreJson(route, 200, selectedPack);
     }
     const save = url.pathname.match(
       new RegExp(`^/api/plays/${playId}/answers/([a-z0-9-]+)$`),

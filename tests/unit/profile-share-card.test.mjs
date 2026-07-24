@@ -5,9 +5,11 @@ import {
   PROFILE_SHARE_FILENAME,
   buildProfileShareCardModel,
   buildProfileShareCardPresentation,
+  decodeConceptProfileShareCardModel,
   firstAccountProfileShareSelection,
   parseProfileShareSelection,
 } from "../../lib/owner-profile/profile-share-card-core.mjs";
+import { CONCEPT_COPY_LIMITS } from "../../lib/concepts/catalog-core.mjs";
 
 const card = Object.freeze({
   cardId: "signature",
@@ -183,4 +185,69 @@ test("fails closed for sensitive, collecting, or stale selections", () => {
     }),
     null,
   );
+});
+
+function conceptCard(overrides = {}) {
+  return {
+    conceptLabel: "관계 시작",
+    observation: "여럿이 있을 때 먼저 분위기를 살피는 장면이 반복됐어요.",
+    stageText: "윤곽",
+    evidenceText: "서로 다른 팩 2개 · 맥락 2개",
+    question: "다른 자리에서는 먼저 말을 꺼내는 때도 있어?",
+    packTitle: "우리는 아직도 통하는 편",
+    ...overrides,
+  };
+}
+
+test("strictly decodes only the six bounded concept share-card fields", () => {
+  const decoded = decodeConceptProfileShareCardModel(conceptCard());
+  assert.deepEqual(decoded, conceptCard());
+  assert.deepEqual(Object.keys(decoded), [
+    "conceptLabel",
+    "observation",
+    "stageText",
+    "evidenceText",
+    "question",
+    "packTitle",
+  ]);
+  assert.equal(Object.isFrozen(decoded), true);
+
+  for (const invalid of [
+    { ...conceptCard(), conceptId: "rel.initiation" },
+    { ...conceptCard(), stageText: "흔적" },
+    { ...conceptCard(), observation: " 앞뒤 공백" },
+    null,
+    [],
+  ]) {
+    assert.throws(
+      () => decodeConceptProfileShareCardModel(invalid),
+      /Invalid concept profile share card/,
+    );
+  }
+});
+
+test("accepts exact-max Korean and unbroken Latin copy and rejects max plus one", () => {
+  const fields = [
+    ["conceptLabel", CONCEPT_COPY_LIMITS.conceptLabel],
+    ["observation", CONCEPT_COPY_LIMITS.observation],
+    ["evidenceText", CONCEPT_COPY_LIMITS.evidenceText],
+    ["question", CONCEPT_COPY_LIMITS.question],
+    ["packTitle", CONCEPT_COPY_LIMITS.packTitle],
+  ];
+  for (const [field, maximum] of fields) {
+    for (const character of ["가", "W"]) {
+      assert.doesNotThrow(() =>
+        decodeConceptProfileShareCardModel(
+          conceptCard({ [field]: character.repeat(maximum) }),
+        ),
+      );
+      assert.throws(
+        () =>
+          decodeConceptProfileShareCardModel(
+            conceptCard({ [field]: character.repeat(maximum + 1) }),
+          ),
+        /Invalid concept profile share card/,
+      );
+    }
+  }
 });

@@ -2,6 +2,7 @@
 
 import {
   buildProfileShareCardPresentation,
+  decodeConceptProfileShareCardModel,
   PROFILE_SHARE_FILENAME,
 } from "@/lib/owner-profile/profile-share-card-core.mjs";
 import type {
@@ -167,7 +168,9 @@ export async function renderProfileShareCard(
   model: ProfileShareCardModel,
 ): Promise<File> {
   if (isConceptShareCard(model)) {
-    return renderConceptShareCard(model);
+    return renderConceptShareCard(
+      decodeConceptProfileShareCardModel(model) as ConceptProfileShareCardModel,
+    );
   }
   const presentation = buildProfileShareCardPresentation(
     model,
