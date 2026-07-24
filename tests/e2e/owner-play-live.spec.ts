@@ -31,6 +31,7 @@ const ownerForwardedIp = "198.51.100.218";
 const rateLimitWindowMilliseconds = 600_000;
 const rateLimitBoundaryGuardMilliseconds = 10_000;
 const visitorManagementSecret = Buffer.alloc(32, 6).toString("base64url");
+const currentOldFriendVersion = "old-friend-v3";
 const e2eBaseUrl = `http://127.0.0.1:${process.env.GYEOP_E2E_PORT ?? "3000"}`;
 const visitorHeaders = {
   "x-forwarded-for": "198.51.100.219",
@@ -716,7 +717,7 @@ function expectExactAssignmentResponse(body: string) {
   ]);
   expect(parsed).toMatchObject({
     packSlug: "old-friend",
-    packVersion: "old-friend-v2",
+    packVersion: currentOldFriendVersion,
     packTitle: "우리는 아직도 통하는 편",
   });
   const assignments = parsed.assignments as Record<string, unknown>[];
@@ -766,7 +767,7 @@ function expectExactSubmittedResponse(body: string) {
   ]);
   expect(parsed).toMatchObject({
     packSlug: "old-friend",
-    packVersion: "old-friend-v2",
+    packVersion: currentOldFriendVersion,
     packTitle: "우리는 아직도 통하는 편",
   });
   expect(parsed.status).toBe("submitted");
@@ -1377,14 +1378,14 @@ test.describe("live owner flow", () => {
         {
           event: "share_handoff_succeeded",
           properties: {
-            packVersion: "old-friend-v2",
+            packVersion: currentOldFriendVersion,
             linkKind: "public",
           },
         },
         {
           event: "share_link_copied",
           properties: {
-            packVersion: "old-friend-v2",
+            packVersion: currentOldFriendVersion,
             linkKind: "one_to_one",
           },
         },
@@ -1993,7 +1994,10 @@ test.describe("live owner flow", () => {
       .poll(() => readProfileReshareClickEvents())
       .toEqual([
         ...initialProfileReshareEvents,
-        { packVersion: "old-friend-v2", entrySource: "profile_reshare" },
+        {
+          packVersion: currentOldFriendVersion,
+          entrySource: "profile_reshare",
+        },
       ]);
     await expect(page.getByLabel("공유 링크 직접 복사")).toHaveCount(0);
     await expect(page.getByText("사용 중")).toHaveCount(2);
@@ -2019,14 +2023,14 @@ test.describe("live owner flow", () => {
         {
           event: "share_handoff_succeeded",
           properties: {
-            packVersion: "old-friend-v2",
+            packVersion: currentOldFriendVersion,
             linkKind: "public",
           },
         },
         {
           event: "share_handoff_succeeded",
           properties: {
-            packVersion: "old-friend-v2",
+            packVersion: currentOldFriendVersion,
             linkKind: "public",
             entrySource: "profile_reshare",
           },
@@ -2034,7 +2038,7 @@ test.describe("live owner flow", () => {
         {
           event: "share_link_copied",
           properties: {
-            packVersion: "old-friend-v2",
+            packVersion: currentOldFriendVersion,
             linkKind: "one_to_one",
           },
         },
@@ -2147,14 +2151,14 @@ test.describe("live owner flow", () => {
       {
         event: "share_link_copied",
         properties: {
-          packVersion: "old-friend-v2",
+          packVersion: currentOldFriendVersion,
           linkKind: "one_to_one",
         },
       },
       {
         event: "share_link_copied",
         properties: {
-          packVersion: "old-friend-v2",
+          packVersion: currentOldFriendVersion,
           linkKind: "one_to_one",
         },
       },
