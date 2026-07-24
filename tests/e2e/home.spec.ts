@@ -49,7 +49,15 @@ test("shows twenty-four active private-MVP packs before the owner flow", async (
   );
   const packLinks = page.getByRole("link", { name: "질문 시작하기" });
   await expect(packLinks).toHaveCount(24);
-  await expect(packLinks.first()).toHaveAttribute(
+  const oldFriendLink = activePacks
+    .filter({
+      has: page.getByRole("heading", {
+        level: 3,
+        name: "우리는 아직도 통하는 편",
+      }),
+    })
+    .getByRole("link", { name: "질문 시작하기" });
+  await expect(oldFriendLink).toHaveAttribute(
     "href",
     "/play/new?pack=old-friend",
   );
@@ -71,7 +79,7 @@ test("shows twenty-four active private-MVP packs before the owner flow", async (
   await expect(page.getByText("문의 접수 채널을 준비 중이에요.")).toBeVisible();
   await page.getByRole("link", { name: "홈으로" }).click();
 
-  await packLinks.first().click();
+  await oldFriendLink.click();
 
   await expect(page).toHaveURL(`/play/${playId}`, { timeout: 15_000 });
   await expect(
@@ -163,10 +171,10 @@ for (const viewport of [
     });
 
     const rail = page.getByTestId("pack-rail");
-    const secondPack = page.getByRole("heading", {
-      level: 3,
-      name: "첫 장면, 네 버전",
-    });
+    const secondPack = page
+      .locator('[data-pack-state="active"]')
+      .nth(1)
+      .getByRole("heading", { level: 3 });
     const ownerEntry = page.getByRole("link", { name: "내 프로필" });
     const cta = page.getByRole("link", { name: "질문 시작하기" }).first();
     const ctaBox = await cta.boundingBox();
