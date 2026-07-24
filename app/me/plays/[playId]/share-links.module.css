@@ -489,8 +489,7 @@
 }
 
 @media (max-height: 40.625rem) {
-  .cardNav,
-  .cardNav .back {
+  .cardNav {
     min-height: 2.25rem;
   }
 

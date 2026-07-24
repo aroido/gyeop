@@ -325,6 +325,7 @@ export default function ShareLinkManager({
       return;
     setFeedback(null);
     let link = readyLink;
+    let focusTarget: "share" | "copy" = "share";
     try {
       if (!link) {
         const result = await createShareLink(playId, "public");
@@ -336,6 +337,7 @@ export default function ShareLinkManager({
         setReadyLink(link);
       }
       if (cardFile.kind !== "ready" || cardFile.model !== state.shareCard) {
+        focusTarget = "copy";
         setForceCardFallback(true);
         setFeedback({
           tone: "alert",
@@ -345,6 +347,7 @@ export default function ShareLinkManager({
         return;
       }
       if (!canShare || !canShareFile(cardFile.file)) {
+        focusTarget = "copy";
         setForceCardFallback(true);
         setFeedback({
           tone: "alert",
@@ -377,6 +380,7 @@ export default function ShareLinkManager({
       } else {
         setForceCardFallback(true);
         const cancelled = isShareCancellation(caught);
+        if (!cancelled) focusTarget = "copy";
         setFeedback(
           cancelled
             ? {
@@ -391,7 +395,7 @@ export default function ShareLinkManager({
         );
       }
     } finally {
-      focusAfterActionRef.current = "share";
+      focusAfterActionRef.current = focusTarget;
       endAction();
     }
   }

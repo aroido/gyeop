@@ -953,7 +953,9 @@ test("preserves the created link when transient activation expires", async ({
     "이미지 저장과 링크 복사를 사용해 주세요",
   );
   await expect(page.getByRole("button", { name: "이미지 저장" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "링크 복사" })).toBeVisible();
+  const copyButton = page.getByRole("button", { name: "링크 복사" });
+  await expect(copyButton).toBeVisible();
+  await expect(copyButton).toBeFocused();
   expect(
     share.calls.filter(
       (call) => call.method === "POST" && call.pathname.endsWith("/links"),
@@ -1006,10 +1008,12 @@ test("keeps card mode isolated and falls back to image plus manual link copy", a
   await expect(
     page.getByRole("button", { name: "이 카드 공유하기" }),
   ).toHaveCount(0);
+  const copyButton = page.getByRole("button", { name: "링크 복사" });
+  await expect(copyButton).toBeFocused();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "이미지 저장" }).click();
   expect((await downloadPromise).suggestedFilename()).toBe("gyeop-insight.png");
-  await page.getByRole("button", { name: "링크 복사" }).click();
+  await copyButton.click();
   const manual = page.getByLabel("공유 링크 직접 복사");
   await expect(manual).toBeFocused();
   await expect(manual).toHaveValue(new RegExp(`#k=${secret}$`));
@@ -1036,9 +1040,11 @@ test("keeps one card action usable without horizontal overflow at 320x568", asyn
   );
 
   const main = page.locator("main");
+  const back = main.getByRole("link", { name: "프로필로" });
   const share = main.getByRole("button", { name: "이 카드 공유하기" });
   await expect(main.getByRole("button")).toHaveCount(1);
   await expect(share).toBeEnabled();
+  expect((await back.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   const shareBox = await share.boundingBox();
   expect(shareBox?.height).toBeGreaterThanOrEqual(44);
   expect(

@@ -64,7 +64,7 @@ Issue: https://github.com/aroido/gyeop/issues/155
 ## 디자인 영향
 
 - [ ] Lazyweb의 F1 `카드 공유 준비하기` 중간 단계와 F2 preview/관리 도구처럼 읽히는 위계를 해소한다. 무료 variant의 테마 picker는 채택하지 않는다.
-- [ ] card mode shell은 `← 프로필로`, 짧은 결과 맥락, 9:16 카드, 단일 Primary 순서만 둔다. 기존 jumbo action 제목, 반복 pack 제목, generic 설명, share kind, 링크 목록과 1:1 panel은 렌더하지 않는다.
+- [ ] card mode shell은 `← 프로필로`, 짧은 결과 맥락, 결과 카드, 단일 Primary 순서만 둔다. export PNG는 항상 9:16이고, 높이 650px 이하 DOM 미리보기만 첫 viewport의 Primary를 보장하기 위해 4:5로 압축한다. 기존 jumbo action 제목, 반복 pack 제목, generic 설명, share kind, 링크 목록과 1:1 panel은 렌더하지 않는다.
 - [ ] DOM 미리보기와 PNG는 같은 presentation model을 다음 순서와 강조로 사용한다.
   1. `오래된 친구 · 3명의 시선`처럼 관계와 해당 질문 표본 수
   2. 친구들이 더 많이 고른 실제 선택지를 가장 큰 결과 문장으로 표시
@@ -96,7 +96,7 @@ Issue: https://github.com/aroido/gyeop/issues/155
 
 - [ ] `lib/owner-profile/profile-share-card-core.mjs`에 `match|mismatch|tie`, 해당 질문 표본, 우세·내 선택·분포 exact copy를 만드는 작은 pure presentation helper를 추가한다.
 - [ ] `profile-share-card.tsx`는 DOM preview와 1080×1920 Canvas renderer가 동일 helper 결과를 소비하도록 바꾼다. 결과 문장을 가장 크게 두고 질문·분포·내 선택의 위계를 맞춘다.
-- [ ] `profile-share-card.module.css`는 큰 빈 row와 반복 header를 제거하고 9:16 안에서 결과-first layout, 장문 줄바꿈과 3자리 count bounds를 유지한다.
+- [ ] `profile-share-card.module.css`는 큰 빈 row와 반복 header를 제거하고 기본 9:16 결과-first layout, 장문 줄바꿈과 3자리 count bounds를 유지한다. 단, 높이 650px 이하 DOM 미리보기만 4:5로 압축하며 9:16 export에는 영향을 주지 않는다.
 - [ ] `share-link-manager.tsx`는 card mode 전용 Primary handler 하나에서 action latch → 필요 시 public link create → `readyLink` 저장 → 가능 시 `navigator.share`를 순서대로 실행한다.
 - [ ] 같은 handler에서 이미 준비된 `readyLink`는 재사용하고 취소·실패·미지원 시 지우지 않는다. native resolve일 때만 기존 성공 event를 한 번 기록한다.
 - [ ] card mode의 `forceCardFallback`, feedback, focus 복귀를 취소까지 같은 계약으로 정리하고, 일반 manager의 `create`, `shareReadyLink`, rotate/disable/copy 경로는 회귀 없이 유지한다.
