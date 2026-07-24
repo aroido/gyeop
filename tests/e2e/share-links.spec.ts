@@ -177,7 +177,8 @@ async function installShareApi(
 async function installBrowserHandoff(
   page: Page,
   options: {
-    share: "unsupported" | "resolve" | "cancel" | "fail" | "pending";
+    share:
+      "unsupported" | "resolve" | "cancel" | "not_allowed" | "fail" | "pending";
     clipboard: "resolve" | "fail" | "pending";
     fileShare?: boolean;
   },
@@ -188,6 +189,7 @@ async function installBrowserHandoff(
       clipboardMode: typeof initial.clipboard;
       shareCalls: ShareData[];
       copyCalls: string[];
+      canvasText: string[];
       resolveShare?: () => void;
       resolveCopy?: () => void;
     };
@@ -196,6 +198,7 @@ async function installBrowserHandoff(
       clipboardMode: initial.clipboard,
       shareCalls: [],
       copyCalls: [],
+      canvasText: [],
     };
     (
       window as typeof window & { __gyeopHandoff: HandoffState }
@@ -207,6 +210,9 @@ async function installBrowserHandoff(
           state.shareCalls.push(data);
           if (state.shareMode === "cancel") {
             throw new DOMException("cancelled", "AbortError");
+          }
+          if (state.shareMode === "not_allowed") {
+            throw new DOMException("activation expired", "NotAllowedError");
           }
           if (state.shareMode === "fail") {
             throw new DOMException("failed", "NotAllowedError");
@@ -242,6 +248,18 @@ async function installBrowserHandoff(
         },
       },
     });
+    const fillText = CanvasRenderingContext2D.prototype.fillText;
+    CanvasRenderingContext2D.prototype.fillText = function (
+      text,
+      x,
+      y,
+      maximumWidth,
+    ) {
+      state.canvasText.push(String(text));
+      return maximumWidth === undefined
+        ? fillText.call(this, text, x, y)
+        : fillText.call(this, text, x, y, maximumWidth);
+    };
   }, options);
 }
 
@@ -678,21 +696,34 @@ test("shares one threshold-safe 9:16 profile card with the public invite", async
   );
 
   await expect(
-    page.getByRole("heading", { name: "내 겹 공유하기" }),
+    page.getByRole("heading", { name: "친구가 본 내 모습" }),
   ).toBeFocused();
-  await expect(
-    page.getByLabel("오래된 친구 시선 공유 카드 미리보기"),
-  ).toContainText(manifest.cards[0].ownerPrompt);
+  const preview = page.getByLabel("오래된 친구 시선 공유 카드 미리보기");
+  await expect(preview).toContainText("오래된 친구 · 3명의 시선");
+  await expect(preview).toContainText(
+    `친구들은 나를 “${manifest.cards[0].optionA}”로 더 많이 봤어요`,
+  );
+  await expect(preview).toContainText("내 선택도 같아요");
+  await expect(preview).toContainText(manifest.cards[0].ownerPrompt);
+  await expect(preview).toContainText("A 2명 · B 1명");
   await expect(page.getByRole("radio")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "만든 링크" })).toHaveCount(0);
   await expect(page.getByText("한 친구에게 1:1")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "카드 공유 준비하기" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "카드와 링크 공유하기" }),
+  ).toHaveCount(0);
 
-  await page.getByRole("button", { name: "카드 공유 준비하기" }).click();
   const shareButton = page.getByRole("button", {
-    name: "카드와 링크 공유하기",
+    name: "이 카드 공유하기",
   });
-  await expect(shareButton).toBeVisible();
-  await shareButton.click();
+  await expect(shareButton).toBeEnabled();
+  await shareButton.evaluate((button) => {
+    (button as HTMLButtonElement).click();
+    (button as HTMLButtonElement).click();
+  });
   await expect(page.getByRole("status")).toHaveText(
     "공유 메뉴로 카드와 링크를 전달했어요.",
   );
@@ -738,6 +769,30 @@ test("shares one threshold-safe 9:16 profile card with the public invite", async
   expect(JSON.stringify(payload)).not.toMatch(
     new RegExp(`${playId}|${cardId}|old_friend|nickname`, "i"),
   );
+  expect(
+    share.calls.filter(
+      (call) => call.method === "POST" && call.pathname.endsWith("/links"),
+    ),
+  ).toHaveLength(1);
+  const canvasText = await page.evaluate(
+    () =>
+      (
+        window as typeof window & {
+          __gyeopHandoff: { canvasText: string[] };
+        }
+      ).__gyeopHandoff.canvasText,
+  );
+  const normalizedCanvasText = canvasText.join("").replaceAll(/\s/g, "");
+  for (const text of [
+    "오래된 친구 · 3명의 시선",
+    `친구들은 나를 “${manifest.cards[0].optionA}”로 더 많이 봤어요`,
+    "내 선택도 같아요",
+    `내 선택 · ${manifest.cards[0].optionA}`,
+    manifest.cards[0].ownerPrompt,
+    "A 2명 · B 1명",
+  ]) {
+    expect(normalizedCanvasText).toContain(text.replaceAll(/\s/g, ""));
+  }
   await expect
     .poll(() =>
       share.calls.filter((call) => call.pathname.endsWith("/share-events")),
@@ -753,6 +808,29 @@ test("shares one threshold-safe 9:16 profile card with the public invite", async
         },
       },
     ]);
+});
+
+test("shows a tie without an agreement badge", async ({ page }) => {
+  await installBrowserHandoff(page, {
+    share: "resolve",
+    clipboard: "resolve",
+    fileShare: true,
+  });
+  await completedOwner(page);
+  await installShareApi(page);
+  await installInsightProfileApi(page, "old_friend", {
+    counts: { a: 2, b: 2 },
+  });
+  await page.goto(
+    `/me/plays/${playId}?entry_source=profile_reshare&share_relationship=old_friend&share_card=${manifest.cards[0].id}`,
+  );
+
+  const preview = page.getByLabel("오래된 친구 시선 공유 카드 미리보기");
+  await expect(preview).toContainText("오래된 친구 · 4명의 시선");
+  await expect(preview).toContainText("시선이 반으로 갈렸어요");
+  await expect(preview).toContainText(`내 선택 · ${manifest.cards[0].optionA}`);
+  await expect(preview.getByText("내 선택도 같아요")).toHaveCount(0);
+  await expect(preview.getByText("내 선택은 달라요")).toHaveCount(0);
 });
 
 test("renders legal maximum Korean card copy into a 1080x1920 PNG", async ({
@@ -783,8 +861,19 @@ test("renders legal maximum Korean card copy into a 1080x1920 PNG", async ({
   await expect(preview).toContainText(ownerPrompt);
   await expect(preview).toContainText("123명");
   await expect(preview).toContainText("456명");
-  await page.getByRole("button", { name: "카드 공유 준비하기" }).click();
-  await page.getByRole("button", { name: "카드와 링크 공유하기" }).click();
+  await page.getByRole("button", { name: "이 카드 공유하기" }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __gyeopHandoff: { shareCalls: ShareData[] };
+            }
+          ).__gyeopHandoff.shareCalls.length,
+      ),
+    )
+    .toBe(1);
 
   const png = await page.evaluate(async () => {
     const data = (
@@ -823,9 +912,8 @@ test("keeps card recovery available after AbortError without recording success",
   await page.goto(
     `/me/plays/${playId}?entry_source=profile_reshare&share_relationship=old_friend&share_card=${manifest.cards[0].id}`,
   );
-  await page.getByRole("button", { name: "카드 공유 준비하기" }).click();
   const shareButton = page.getByRole("button", {
-    name: "카드와 링크 공유하기",
+    name: "이 카드 공유하기",
   });
   await shareButton.click();
 
@@ -834,10 +922,70 @@ test("keeps card recovery available after AbortError without recording success",
   );
   await expect(shareButton).toBeFocused();
   await expect(shareButton).toBeEnabled();
+  await expect(page.getByRole("button", { name: "이미지 저장" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "링크 복사" })).toBeVisible();
   await expect(page.getByRole("link", { name: "프로필로" })).toBeVisible();
   expect(
     share.calls.filter((call) => call.pathname.endsWith("/share-events")),
   ).toHaveLength(0);
+});
+
+test("preserves the created link when transient activation expires", async ({
+  page,
+}) => {
+  await installBrowserHandoff(page, {
+    share: "not_allowed",
+    clipboard: "resolve",
+    fileShare: true,
+  });
+  await completedOwner(page);
+  const share = await installShareApi(page);
+  await installInsightProfileApi(page);
+  await page.goto(
+    `/me/plays/${playId}?entry_source=profile_reshare&share_relationship=old_friend&share_card=${manifest.cards[0].id}`,
+  );
+
+  const shareButton = page.getByRole("button", {
+    name: "이 카드 공유하기",
+  });
+  await shareButton.click();
+  await expect(page.locator("main").getByRole("alert")).toContainText(
+    "이미지 저장과 링크 복사를 사용해 주세요",
+  );
+  await expect(page.getByRole("button", { name: "이미지 저장" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "링크 복사" })).toBeVisible();
+  expect(
+    share.calls.filter(
+      (call) => call.method === "POST" && call.pathname.endsWith("/links"),
+    ),
+  ).toHaveLength(1);
+  expect(
+    share.calls.filter((call) => call.pathname.endsWith("/share-events")),
+  ).toHaveLength(0);
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __gyeopHandoff: { shareMode: string };
+      }
+    ).__gyeopHandoff.shareMode = "resolve";
+  });
+  await shareButton.click();
+  await expect(page.getByRole("status")).toHaveText(
+    "공유 메뉴로 카드와 링크를 전달했어요.",
+  );
+  expect(
+    share.calls.filter(
+      (call) => call.method === "POST" && call.pathname.endsWith("/links"),
+    ),
+  ).toHaveLength(1);
+  await expect
+    .poll(
+      () =>
+        share.calls.filter((call) => call.pathname.endsWith("/share-events"))
+          .length,
+    )
+    .toBe(1);
 });
 
 test("keeps card mode isolated and falls back to image plus manual link copy", async ({
@@ -854,10 +1002,9 @@ test("keeps card mode isolated and falls back to image plus manual link copy", a
   await page.goto(
     `/me/plays/${playId}?entry_source=profile_reshare&share_relationship=old_friend&share_card=${manifest.cards[0].id}`,
   );
-  await page.getByRole("button", { name: "카드 공유 준비하기" }).click();
-
+  await page.getByRole("button", { name: "이 카드 공유하기" }).click();
   await expect(
-    page.getByRole("button", { name: "카드와 링크 공유하기" }),
+    page.getByRole("button", { name: "이 카드 공유하기" }),
   ).toHaveCount(0);
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "이미지 저장" }).click();
@@ -875,6 +1022,7 @@ test("keeps one card action usable without horizontal overflow at 320x568", asyn
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 568 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await installBrowserHandoff(page, {
     share: "resolve",
     clipboard: "resolve",
@@ -888,19 +1036,34 @@ test("keeps one card action usable without horizontal overflow at 320x568", asyn
   );
 
   const main = page.locator("main");
-  const prepare = main.getByRole("button", { name: "카드 공유 준비하기" });
+  const share = main.getByRole("button", { name: "이 카드 공유하기" });
   await expect(main.getByRole("button")).toHaveCount(1);
-  expect((await prepare.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await expect(share).toBeEnabled();
+  const shareBox = await share.boundingBox();
+  expect(shareBox?.height).toBeGreaterThanOrEqual(44);
+  expect(
+    (shareBox?.y ?? Infinity) + (shareBox?.height ?? 0),
+  ).toBeLessThanOrEqual(await page.evaluate(() => window.innerHeight));
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth - window.innerWidth === 0 &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    ),
+  ).toBe(true);
+
+  await share.click();
+  await expect(main.getByRole("button")).toHaveCount(1);
+  expect((await share.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await expect(share).toBeFocused();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,
     ),
   ).toBe(0);
-
-  await prepare.click();
-  const share = main.getByRole("button", { name: "카드와 링크 공유하기" });
-  await expect(main.getByRole("button")).toHaveCount(1);
-  expect((await share.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "32px";
+  });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth - window.innerWidth,

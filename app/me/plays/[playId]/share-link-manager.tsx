@@ -314,6 +314,88 @@ export default function ShareLinkManager({
     }
   }
 
+  async function shareProfileCard() {
+    if (
+      !playId ||
+      state.kind !== "ready" ||
+      !state.shareCard ||
+      cardFile.kind === "idle" ||
+      !beginAction("card_share")
+    )
+      return;
+    setFeedback(null);
+    let link = readyLink;
+    try {
+      if (!link) {
+        const result = await createShareLink(playId, "public");
+        link = {
+          linkId: result.link.id,
+          kind: result.link.kind,
+          inviteUrl: result.inviteUrl,
+        };
+        setReadyLink(link);
+      }
+      if (cardFile.kind !== "ready" || cardFile.model !== state.shareCard) {
+        setForceCardFallback(true);
+        setFeedback({
+          tone: "alert",
+          message:
+            "이미지를 만들지 못했어요. 준비된 링크를 복사해 먼저 보내 주세요.",
+        });
+        return;
+      }
+      if (!canShare || !canShareFile(cardFile.file)) {
+        setForceCardFallback(true);
+        setFeedback({
+          tone: "alert",
+          message:
+            "이 브라우저에서는 카드와 링크를 함께 보낼 수 없어요. 이미지 저장과 링크 복사를 사용해 주세요.",
+        });
+        return;
+      }
+      await navigator.share({
+        ...buildShareData(link.inviteUrl, state.packTitle),
+        files: [cardFile.file],
+      });
+      setForceCardFallback(false);
+      setFeedback({
+        tone: "status",
+        message: "공유 메뉴로 카드와 링크를 전달했어요.",
+      });
+      void recordShareAction(
+        playId,
+        link.linkId,
+        "share_handoff_succeeded",
+        entrySource,
+      ).catch(() => undefined);
+    } catch (caught) {
+      if (!link) {
+        setFeedback({
+          tone: "alert",
+          message: "카드를 공유하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+        });
+      } else {
+        setForceCardFallback(true);
+        const cancelled = isShareCancellation(caught);
+        setFeedback(
+          cancelled
+            ? {
+                tone: "status",
+                message: "공유를 취소했어요. 링크는 그대로 있어요.",
+              }
+            : {
+                tone: "alert",
+                message:
+                  "공유 메뉴를 열지 못했어요. 이미지 저장과 링크 복사를 사용해 주세요.",
+              },
+        );
+      }
+    } finally {
+      focusAfterActionRef.current = "share";
+      endAction();
+    }
+  }
+
   async function disable(link: ShareLink) {
     if (!playId || state.kind !== "ready" || actionLatchRef.current) return;
     if (
@@ -401,28 +483,10 @@ export default function ShareLinkManager({
     setFeedback(null);
     try {
       const shareData = buildShareData(readyLink.inviteUrl, state.packTitle);
-      if (state.shareCard) {
-        if (
-          cardFile.kind !== "ready" ||
-          cardFile.model !== state.shareCard ||
-          !canShareFile(cardFile.file)
-        ) {
-          setForceCardFallback(true);
-          setFeedback({
-            tone: "alert",
-            message: "이 브라우저에서는 카드와 링크를 함께 보낼 수 없어요.",
-          });
-          return;
-        }
-        await navigator.share({ ...shareData, files: [cardFile.file] });
-      } else {
-        await navigator.share(shareData);
-      }
+      await navigator.share(shareData);
       setFeedback({
         tone: "status",
-        message: state.shareCard
-          ? "공유 메뉴로 카드와 링크를 전달했어요."
-          : "공유 메뉴로 링크를 전달했어요.",
+        message: "공유 메뉴로 링크를 전달했어요.",
       });
       void recordShareAction(
         playId,
@@ -432,7 +496,6 @@ export default function ShareLinkManager({
       ).catch(() => undefined);
     } catch (caught) {
       const cancelled = isShareCancellation(caught);
-      if (state.shareCard && !cancelled) setForceCardFallback(true);
       setFeedback(
         cancelled
           ? {
@@ -441,9 +504,7 @@ export default function ShareLinkManager({
             }
           : {
               tone: "alert",
-              message: state.shareCard
-                ? "공유 메뉴를 열지 못했어요. 이미지 저장과 링크 복사를 사용해 주세요."
-                : "공유 메뉴를 열지 못했어요. 링크 복사를 사용해 주세요.",
+              message: "공유 메뉴를 열지 못했어요. 링크 복사를 사용해 주세요.",
             },
       );
     } finally {
@@ -567,15 +628,13 @@ export default function ShareLinkManager({
     const cardFileReady =
       cardFile.kind === "ready" && cardFile.model === state.shareCard;
     const fileShareSupported =
-      canShare &&
-      cardFileReady &&
-      canShareFile(cardFile.file) &&
-      !forceCardFallback;
+      canShare && cardFileReady && canShareFile(cardFile.file);
     const showFallback =
       readyLink &&
       (forceCardFallback ||
         (cardFileReady && !fileShareSupported) ||
         cardFile.kind === "error");
+    const showPrimary = !showFallback || fileShareSupported;
     return (
       <main className={styles.shell}>
         <section className={styles.panel} aria-labelledby="share-title">
@@ -584,34 +643,26 @@ export default function ShareLinkManager({
               ← 프로필로
             </Link>
           </nav>
-          <p className={styles.brand}>겹 · {state.packTitle}</p>
           <h1 id="share-title" ref={headingRef} tabIndex={-1}>
-            내 겹 공유하기
+            친구가 본 내 모습
           </h1>
           <ProfileShareCardPreview model={state.shareCard} />
 
-          {!readyLink ? (
-            <button
-              className={styles.primary}
-              type="button"
-              disabled={busy !== null}
-              onClick={create}
-            >
-              {busy === "create" ? "준비하는 중…" : "카드 공유 준비하기"}
-            </button>
-          ) : cardFile.kind === "idle" || !cardFileReady ? (
-            <p className={styles.feedback} role="status">
-              공유 이미지를 준비하는 중…
-            </p>
-          ) : fileShareSupported ? (
+          {showPrimary ? (
             <button
               ref={shareButtonRef}
               className={styles.primary}
-              disabled={busy !== null}
               type="button"
-              onClick={shareReadyLink}
+              disabled={busy !== null || cardFile.kind === "idle"}
+              onClick={shareProfileCard}
             >
-              {busy === "share" ? "공유 메뉴 여는 중…" : "카드와 링크 공유하기"}
+              {cardFile.kind === "idle"
+                ? "카드를 준비하는 중…"
+                : busy === "card_share"
+                  ? readyLink
+                    ? "공유 메뉴 여는 중…"
+                    : "공유 준비하는 중…"
+                  : "이 카드 공유하기"}
             </button>
           ) : null}
 

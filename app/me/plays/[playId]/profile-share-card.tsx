@@ -1,7 +1,13 @@
 "use client";
 
-import { PROFILE_SHARE_FILENAME } from "@/lib/owner-profile/profile-share-card-core.mjs";
-import type { ProfileShareCardModel } from "@/lib/owner-profile/owner-profile";
+import {
+  buildProfileShareCardPresentation,
+  PROFILE_SHARE_FILENAME,
+} from "@/lib/owner-profile/profile-share-card-core.mjs";
+import type {
+  ProfileShareCardModel,
+  ProfileShareCardPresentation,
+} from "@/lib/owner-profile/owner-profile";
 
 import styles from "./profile-share-card.module.css";
 
@@ -89,65 +95,38 @@ function drawTextBlock(
   });
 }
 
-function drawChoice(
-  context: CanvasRenderingContext2D,
-  model: ProfileShareCardModel,
-  choice: "a" | "b",
-  y: number,
-) {
-  const selected = model.selfChoice === choice;
-  const label = choice === "a" ? "A" : "B";
-  const option = choice === "a" ? model.optionA : model.optionB;
-  const count = model.counts[choice];
-  roundedRect(context, 130, y, 820, 300, 36);
-  context.fillStyle = selected ? "#dfff00" : "#050505";
-  context.fill();
-  context.fillStyle = selected ? "#050505" : "#ffffff";
-  context.font = '900 34px Pretendard, "Apple SD Gothic Neo", sans-serif';
-  context.fillText(selected ? `${label} · 내 선택` : label, 180, y + 38);
-  context.textAlign = "right";
-  context.fillText(`${count}명`, 900, y + 38);
-  context.textAlign = "left";
-  drawTextBlock(
-    context,
-    option,
-    180,
-    y + 100,
-    720,
-    168,
-    46,
-    24,
-    selected ? "#050505" : "#ffffff",
-  );
-}
-
 export function ProfileShareCardPreview({
   model,
 }: {
   model: ProfileShareCardModel;
 }) {
-  const selected = model.selfChoice === "a" ? model.optionA : model.optionB;
+  const presentation = buildProfileShareCardPresentation(
+    model,
+  ) as ProfileShareCardPresentation;
   return (
     <article
       className={styles.preview}
       aria-label={`${model.relationshipLabel} 시선 공유 카드 미리보기`}
     >
       <header>
-        <p>겹 · {model.packTitle}</p>
-        <span>{model.relationshipLabel} 시선</span>
+        <p>{model.packTitle}</p>
+        <span>{presentation.relationshipText}</span>
       </header>
-      <h2>{model.prompt}</h2>
-      <p className={styles.selfChoice}>내 선택 · {selected}</p>
-      <div className={styles.choices}>
-        <p data-selected={model.selfChoice === "a"}>
-          <span>A · {model.optionA}</span>
-          <strong>{model.counts.a}명</strong>
-        </p>
-        <p data-selected={model.selfChoice === "b"}>
-          <span>B · {model.optionB}</span>
-          <strong>{model.counts.b}명</strong>
-        </p>
-      </div>
+      <section className={styles.result}>
+        <p>친구가 본 나</p>
+        <h2>{presentation.resultText}</h2>
+        {presentation.agreementText ? (
+          <strong data-state={presentation.resultState}>
+            {presentation.agreementText}
+          </strong>
+        ) : null}
+        <p className={styles.selfChoice}>{presentation.selfText}</p>
+      </section>
+      <section className={styles.detail}>
+        <p className={styles.detailLabel}>질문</p>
+        <p className={styles.question}>{presentation.questionText}</p>
+        <p className={styles.distribution}>{presentation.distributionText}</p>
+      </section>
       <strong className={styles.brand}>겹</strong>
     </article>
   );
@@ -156,6 +135,9 @@ export function ProfileShareCardPreview({
 export async function renderProfileShareCard(
   model: ProfileShareCardModel,
 ): Promise<File> {
+  const presentation = buildProfileShareCardPresentation(
+    model,
+  ) as ProfileShareCardPresentation;
   await document.fonts?.ready;
   const canvas = document.createElement("canvas");
   canvas.width = 1080;
@@ -185,44 +167,91 @@ export async function renderProfileShareCard(
   context.fillStyle = "#315cff";
   context.fill();
   context.fillStyle = "#ffffff";
-  context.font = '900 40px Pretendard, "Apple SD Gothic Neo", sans-serif';
-  context.fillText("겹", 130, 150);
-  drawTextBlock(context, model.packTitle, 220, 150, 720, 54, 40, 26, "#ffffff");
-  roundedRect(context, 130, 235, 420, 76, 38);
+  drawTextBlock(context, model.packTitle, 130, 150, 820, 54, 40, 26, "#ffffff");
+  roundedRect(context, 130, 235, 560, 76, 38);
   context.fillStyle = "#dfff00";
   context.fill();
   drawTextBlock(
     context,
-    `${model.relationshipLabel} 시선`,
+    presentation.relationshipText,
     164,
     251,
-    350,
+    490,
     44,
     34,
     24,
     "#050505",
   );
 
+  context.fillStyle = "#315cff";
+  context.font = '900 34px Pretendard, "Apple SD Gothic Neo", sans-serif';
+  context.fillText("친구가 본 나", 130, 420);
   drawTextBlock(
     context,
-    model.prompt,
+    presentation.resultText,
     130,
-    430,
+    475,
     820,
-    500,
+    400,
     76,
-    34,
+    26,
     "#050505",
     950,
   );
-  drawChoice(context, model, "a", 970);
-  drawChoice(context, model, "b", 1300);
+
+  if (presentation.agreementText) {
+    roundedRect(context, 130, 900, 390, 82, 41);
+    context.fillStyle =
+      presentation.resultState === "match" ? "#dfff00" : "#ff4d42";
+    context.fill();
+    drawTextBlock(
+      context,
+      presentation.agreementText,
+      170,
+      920,
+      310,
+      42,
+      34,
+      24,
+      "#050505",
+    );
+  }
+  drawTextBlock(
+    context,
+    presentation.selfText,
+    130,
+    presentation.agreementText ? 1010 : 920,
+    820,
+    90,
+    38,
+    18,
+    "#050505",
+  );
+
+  roundedRect(context, 130, 1120, 820, 450, 40);
+  context.fillStyle = "#050505";
+  context.fill();
+  context.fillStyle = "#dfff00";
+  context.font = '900 30px Pretendard, "Apple SD Gothic Neo", sans-serif';
+  context.fillText("질문", 180, 1170);
+  drawTextBlock(
+    context,
+    presentation.questionText,
+    180,
+    1220,
+    720,
+    250,
+    42,
+    22,
+    "#ffffff",
+  );
+  context.fillStyle = "#ffffff";
+  context.font = '900 34px Pretendard, "Apple SD Gothic Neo", sans-serif';
+  context.fillText(presentation.distributionText, 180, 1490);
 
   context.fillStyle = "#050505";
-  context.font = '900 34px Pretendard, "Apple SD Gothic Neo", sans-serif';
-  context.fillText("관계마다 다르게 보이는 나", 130, 1650);
   context.font = '950 72px Pretendard, "Apple SD Gothic Neo", sans-serif';
-  context.fillText("겹", 130, 1720);
+  context.fillText("겹", 130, 1680);
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
