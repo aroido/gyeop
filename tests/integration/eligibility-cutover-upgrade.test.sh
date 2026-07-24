@@ -16,7 +16,15 @@ restore_latest() {
 trap restore_latest EXIT
 
 cd "$ROOT"
-pnpm exec supabase db reset --local --version 20260719000400 >/dev/null
+pnpm exec supabase db reset \
+  --local \
+  --version 20260719000400 \
+  --no-seed \
+  >/dev/null
+
+docker exec -i "$DATABASE_CONTAINER" psql \
+  -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null \
+  <"$ROOT/tests/integration/fixtures/legacy-old-friend-v1.sql"
 
 docker exec -i "$DATABASE_CONTAINER" psql \
   -U postgres -d postgres -v ON_ERROR_STOP=1 >/dev/null <<'SQL'
