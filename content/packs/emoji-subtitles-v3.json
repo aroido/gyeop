@@ -1,0 +1,186 @@
+{
+  "slug": "emoji-subtitles",
+  "version": "emoji-subtitles-v3",
+  "title": "이모지 자막 켜기",
+  "targetRelationship": "new_connection",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "밈 번역기",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "emoji-subtitles-card-v1",
+    "coverTone": "lime"
+  },
+  "cards": [
+    {
+      "id": "reaction-style",
+      "position": 1,
+      "ownerPrompt": "말보다 반응이 먼저 나올 때 나는?",
+      "visitorPrompt": "말보다 반응이 먼저 나올 때 이 사람은?",
+      "optionA": "이모지나 짤로 답한다",
+      "optionB": "짧은 문장으로 바로 말한다",
+      "isSignature": true,
+      "conceptContext": "메시지·표현",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.form",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "funny-post",
+      "position": 2,
+      "ownerPrompt": "웃긴 걸 발견하면 나는?",
+      "visitorPrompt": "웃긴 걸 발견하면 이 사람은?",
+      "optionA": "딱 생각나는 사람에게 보낸다",
+      "optionB": "내 저장 목록에 넣어 둔다",
+      "isSignature": false,
+      "conceptContext": "콘텐츠·공유",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.reaction",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "tone",
+      "position": 3,
+      "ownerPrompt": "장난을 칠 때 나는?",
+      "visitorPrompt": "장난을 칠 때 이 사람은?",
+      "optionA": "표정이나 이모지를 덧붙인다",
+      "optionB": "말투만으로 전달한다",
+      "isSignature": false,
+      "conceptContext": "장난·표현",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.form",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "inside-reference",
+      "position": 4,
+      "ownerPrompt": "상대가 낯선 표현을 쓰면 나는?",
+      "visitorPrompt": "상대가 낯선 표현을 쓰면 이 사람은?",
+      "optionA": "뜻을 물어보고 따라 써 본다",
+      "optionB": "맥락을 보며 천천히 익힌다",
+      "isSignature": false,
+      "conceptContext": "새표현·관계",
+      "conceptSignals": [
+        {
+          "conceptId": "rel.distance",
+          "directionForOptionA": "a"
+        },
+        {
+          "conceptId": "dec.experiment",
+          "directionForOptionA": "b"
+        }
+      ]
+    },
+    {
+      "id": "misread",
+      "position": 5,
+      "ownerPrompt": "장난이 오해될 것 같으면 나는?",
+      "visitorPrompt": "장난이 오해될 것 같으면 이 사람은?",
+      "optionA": "표정 이모지를 하나 붙인다",
+      "optionB": "짧게 진심을 덧붙인다",
+      "isSignature": false,
+      "conceptContext": "오해·표현",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.form",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "gif-choice",
+      "position": 6,
+      "ownerPrompt": "새 이모지 목록에서 반응 하나를 찾을 때 나는?",
+      "visitorPrompt": "새 이모지 목록에서 반응 하나를 찾을 때 이 사람은?",
+      "optionA": "처음부터 하나씩 차례로 훑는다",
+      "optionB": "눈에 띄는 핵심 반응부터 고른다",
+      "isSignature": false,
+      "conceptContext": "메시지·정보",
+      "conceptSignals": [
+        {
+          "conceptId": "att.reading",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "new-slang",
+      "position": 7,
+      "ownerPrompt": "새로운 말투를 들으면 나는?",
+      "visitorPrompt": "새로운 말투를 들으면 이 사람은?",
+      "optionA": "재밌으면 바로 써 본다",
+      "optionB": "어울릴 때까지 지켜본다",
+      "isSignature": false,
+      "conceptContext": "새표현·시도",
+      "conceptSignals": [
+        {
+          "conceptId": "rel.distance",
+          "directionForOptionA": "a"
+        },
+        {
+          "conceptId": "dec.experiment",
+          "directionForOptionA": "b"
+        }
+      ]
+    },
+    {
+      "id": "laughter",
+      "position": 8,
+      "ownerPrompt": "텍스트로 웃음을 표현할 때 나는?",
+      "visitorPrompt": "텍스트로 웃음을 표현할 때 이 사람은?",
+      "optionA": "크고 분명하게 반응한다",
+      "optionB": "조용히 한 마디를 남긴다",
+      "isSignature": false,
+      "conceptContext": "메시지·반응",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.intensity",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "reply-context",
+      "position": 9,
+      "ownerPrompt": "한 장면을 채팅으로 설명해야 할 때 나는?",
+      "visitorPrompt": "한 장면을 채팅으로 설명해야 할 때 이 사람은?",
+      "optionA": "이모지를 이어 맥락을 펼친다",
+      "optionB": "핵심이 되는 한 문장만 보낸다",
+      "isSignature": false,
+      "conceptContext": "메시지·설명",
+      "conceptSignals": [
+        {
+          "conceptId": "att.story",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "translate",
+      "position": 10,
+      "ownerPrompt": "상대의 이모지를 못 알아들으면 나는?",
+      "visitorPrompt": "상대의 이모지를 못 알아들으면 이 사람은?",
+      "optionA": "뜻을 바로 물어본다",
+      "optionB": "내가 이해한 뜻을 먼저 말해 확인한다",
+      "isSignature": false,
+      "conceptContext": "메시지·애매함",
+      "conceptSignals": [
+        {
+          "conceptId": "coop.ambiguity",
+          "directionForOptionA": "a"
+        }
+      ]
+    }
+  ],
+  "conceptVersion": 1
+}

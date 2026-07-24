@@ -10,10 +10,10 @@ import { createClient } from "@supabase/supabase-js";
 
 const root = path.resolve(new URL("../../", import.meta.url).pathname);
 const manifestFiles = [
-  "old-friend-v2.json",
-  "first-impression-v2.json",
-  "coworker-v1.json",
-  "honest-self-v2.json",
+  "old-friend-v3.json",
+  "first-impression-v3.json",
+  "coworker-v2.json",
+  "honest-self-v3.json",
 ];
 const manifests = manifestFiles.map((file) =>
   JSON.parse(readFileSync(path.join(root, "content/packs", file), "utf8")),

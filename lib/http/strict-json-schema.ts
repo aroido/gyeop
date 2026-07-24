@@ -10,8 +10,12 @@ export type StrictJsonSchema<Shape extends ZodRawShape> = Readonly<{
 
 export function strictJsonObject<Shape extends ZodRawShape>(
   shape: Shape,
+  refine?: (value: output<ReturnType<typeof z.strictObject<Shape>>>) => boolean,
 ): StrictJsonSchema<Shape> {
-  const schema = z.strictObject(shape);
+  const base = z.strictObject(shape);
+  const schema = refine
+    ? base.refine(refine, { message: "Invalid strict object" })
+    : base;
   const wrapper = Object.create(null) as StrictJsonSchema<Shape>;
   Object.defineProperty(wrapper, "safeParse", {
     configurable: false,

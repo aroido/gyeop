@@ -38,7 +38,7 @@ raw `analytics_events`는 `occurred_at + 30일`에 삭제 대상이 되고 다�
 | `visitor_same_pack` | `visitor_required_submitted` → `comparison_viewed` → `same_pack_start_clicked` → `new_owner_pack_opened` |
 | `profile_reshare` | `profile_viewed` → `profile_reshare_clicked` → `profile_share_succeeded` → `downstream_visitor_submitted` |
 
-각 단계는 앞 단계와 같은 owner 또는 response subject의 교집합만 센다. same-pack click RPC는 같은 transaction에서 `comparison_viewed`를 먼저 idempotent하게 보장한다. profile reshare click RPC도 독립 render-event 요청과 경합하지 않도록 같은 transaction에서 `profile_viewed`를 먼저 기록한다. 브라우저의 click 기록과 navigation 요청은 서로 경합할 수 있으므로 `same_pack_start_clicked`와 연결된 `pack_opened`의 상호 도착 순서는 요구하지 않고 둘 다 marker 이후인지만 확인한다. `profile_reshare`의 마지막 단계는 profile-source 공유 성공 뒤 같은 공개 링크에 제출된 response가 있어야 한다. `visitor_same_pack`의 마지막 단계는 유효한 HttpOnly response capability, 제출 상태, session 만료, 같은 pack version을 DB에서 확인한 새 owner 생성만 센다.
+각 단계는 앞 단계와 같은 owner 또는 response subject의 교집합만 센다. same-pack click RPC는 같은 transaction에서 `comparison_viewed`를 먼저 idempotent하게 보장한다. profile reshare click RPC도 독립 render-event 요청과 경합하지 않도록 같은 transaction에서 `profile_viewed`를 먼저 기록한다. 브라우저의 click 기록과 navigation 요청은 서로 경합할 수 있으므로 `same_pack_start_clicked`와 연결된 `pack_opened`의 상호 도착 순서는 요구하지 않고 둘 다 marker 이후인지만 확인한다. `profile_reshare`의 마지막 단계는 profile-source 공유 성공 뒤 같은 공개 링크에 제출된 response가 있어야 한다. `visitor_same_pack`의 마지막 단계는 유효한 HttpOnly response capability, 제출 상태와 session 만료를 통과한 response의 원본 version과 새 owner play의 현재 version이 DB에서 같은 canonical `pack_templates.id + slug`에 속할 때만 센다. analytics `packVersion` 문자열 동일성은 identity 조건이 아니므로 v1/v2 invite에서 현재 v2/v3로 전환해도 한 건이며, 다른 template/slug는 세지 않는다.
 
 `private.analytics_measurement_markers.core_funnel_v1` 이전 event는 제외한다. 따라서 배포 전의 subject 없는 legacy row가 새 퍼널 분모에 섞이지 않는다.
 

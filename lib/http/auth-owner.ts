@@ -9,13 +9,21 @@ import {
   claimAnonymousOwner,
   getAuthenticatedOwnerAccountProfiles,
   getAuthenticatedOwnerPlay,
+  getAuthenticatedOwnerPlayPack,
   getAuthenticatedOwnerPublicProfile,
   getOwnerPlay,
   listAuthenticatedOwnerPlays,
 } from "../db/internal-rpc.ts";
 import { buildAccountOwnerProfile } from "../owner-profile/account-profile-core.mjs";
 import type { AccountOwnerProfile } from "../owner-profile/account-profile.ts";
+import {
+  buildConceptProfile,
+  selectConceptProfileSourcePairs,
+} from "../owner-profile/concept-profile-core.mjs";
+import { conceptProfileEnabled } from "../owner-profile/concept-profile-feature.mjs";
+import type { ConceptProfile } from "../owner-profile/concept-profile.ts";
 import type { ParsedOwnerCookie } from "../owner-play/owner-play-session.ts";
+import { packManifestHistory } from "../packs/catalog.ts";
 import { parseRateLimitSecret } from "../security/network-key.mjs";
 import { validateAppUrl } from "./http-boundary-core.mjs";
 import { ownerAuthRequiredResponse } from "./auth-errors.ts";
@@ -180,6 +188,11 @@ export async function loadAuthenticatedOwnerPlays() {
 export async function loadAuthenticatedOwnerAccountProfile(
   nickname: string,
 ): Promise<AccountOwnerProfile> {
+  const { accountProfile } = await loadAuthenticatedOwnerPageProfiles(nickname);
+  return accountProfile;
+}
+
+async function loadAuthenticatedOwnerProfileInputs() {
   const plays = await listAuthenticatedOwnerPlays();
   const completed = plays.filter(({ status }) => status === "completed");
   const outcomes = await getAuthenticatedOwnerAccountProfiles(
@@ -191,7 +204,45 @@ export async function loadAuthenticatedOwnerAccountProfile(
     }
     return result.profile;
   });
-  return buildAccountOwnerProfile({ nickname, plays, profiles });
+  return Object.freeze({ plays, profiles });
+}
+
+export async function loadAuthenticatedOwnerPageProfiles(
+  nickname: string,
+): Promise<
+  Readonly<{
+    accountProfile: AccountOwnerProfile;
+    conceptProfile: ConceptProfile | null;
+  }>
+> {
+  const { plays, profiles } = await loadAuthenticatedOwnerProfileInputs();
+  const accountProfile = buildAccountOwnerProfile({
+    nickname,
+    plays,
+    profiles,
+  });
+  const conceptProfile = conceptProfileEnabled()
+    ? buildConceptProfile({
+        pairs: selectConceptProfileSourcePairs({
+          plays,
+          profiles,
+          manifests: packManifestHistory,
+        }),
+      })
+    : null;
+  return Object.freeze({ accountProfile, conceptProfile });
+}
+
+export async function loadAuthenticatedOwnerConceptProfile(): Promise<ConceptProfile> {
+  if (!conceptProfileEnabled()) throw new Error("NOT_FOUND");
+  const { plays, profiles } = await loadAuthenticatedOwnerProfileInputs();
+  return buildConceptProfile({
+    pairs: selectConceptProfileSourcePairs({
+      plays,
+      profiles,
+      manifests: packManifestHistory,
+    }),
+  });
 }
 
 export async function signOutOwnerAccountResponse() {
@@ -219,6 +270,18 @@ export async function readAuthenticatedOwnerPlayResponse(input: {
     const result = await getAuthenticatedOwnerPlay(input);
     if (result.outcome !== "authorized") return ownerNotFoundResponse();
     return privateNoStore(Response.json(result.play));
+  } catch {
+    return ownerAuthRequiredResponse();
+  }
+}
+
+export async function readAuthenticatedOwnerPlayPackResponse(input: {
+  playId: string;
+}) {
+  try {
+    const result = await getAuthenticatedOwnerPlayPack(input);
+    if (result.outcome !== "authorized") return ownerNotFoundResponse();
+    return privateNoStore(Response.json(result.pack));
   } catch {
     return ownerAuthRequiredResponse();
   }

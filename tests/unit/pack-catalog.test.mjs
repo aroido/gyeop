@@ -30,18 +30,18 @@ test("catalog selects the latest manifest without discarding frozen v1 files", (
   assert.equal(manifests.length, 24);
   assert.equal(
     manifests.find(({ slug }) => slug === "old-friend")?.version,
-    "old-friend-v2",
+    "old-friend-v3",
   );
   assert.equal(
     manifests.find(({ slug }) => slug === "coworker")?.version,
-    "coworker-v1",
+    "coworker-v2",
   );
-  assert.equal(seedManifests.length, 45);
+  assert.equal(seedManifests.length, 69);
   assert.deepEqual(
     seedManifests
       .filter(({ slug }) => slug === "old-friend")
       .map(({ version }) => version),
-    ["old-friend-v1", "old-friend-v2"],
+    ["old-friend-v1", "old-friend-v2", "old-friend-v3"],
   );
 });
 

@@ -22,3 +22,5 @@ services:
         sync: false
       - key: ACCOUNT_DELETE_REAUTH_ACTIVE_VERSION
         sync: false
+      - key: GYEOP_CONCEPT_PROFILE_ENABLED
+        value: false

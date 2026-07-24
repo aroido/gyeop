@@ -1,126 +1,174 @@
-import afterWork from "@/content/packs/after-work-v2.json";
 import afterWorkV1 from "@/content/packs/after-work-v1.json";
-import algorithmMirror from "@/content/packs/algorithm-mirror-v2.json";
+import afterWorkV2 from "@/content/packs/after-work-v2.json";
+import afterWorkV3 from "@/content/packs/after-work-v3.json";
 import algorithmMirrorV1 from "@/content/packs/algorithm-mirror-v1.json";
-import cameraRoll from "@/content/packs/camera-roll-v2.json";
+import algorithmMirrorV2 from "@/content/packs/algorithm-mirror-v2.json";
+import algorithmMirrorV3 from "@/content/packs/algorithm-mirror-v3.json";
 import cameraRollV1 from "@/content/packs/camera-roll-v1.json";
-import commentSection from "@/content/packs/comment-section-v2.json";
+import cameraRollV2 from "@/content/packs/camera-roll-v2.json";
+import cameraRollV3 from "@/content/packs/camera-roll-v3.json";
 import commentSectionV1 from "@/content/packs/comment-section-v1.json";
-import complimentReceipt from "@/content/packs/compliment-receipt-v2.json";
+import commentSectionV2 from "@/content/packs/comment-section-v2.json";
+import commentSectionV3 from "@/content/packs/comment-section-v3.json";
 import complimentReceiptV1 from "@/content/packs/compliment-receipt-v1.json";
-import coworker from "@/content/packs/coworker-v1.json";
-import deadlineMode from "@/content/packs/deadline-mode-v1.json";
-import decisionSpiral from "@/content/packs/decision-spiral-v2.json";
+import complimentReceiptV2 from "@/content/packs/compliment-receipt-v2.json";
+import complimentReceiptV3 from "@/content/packs/compliment-receipt-v3.json";
+import coworkerV1 from "@/content/packs/coworker-v1.json";
+import coworkerV2 from "@/content/packs/coworker-v2.json";
+import deadlineModeV1 from "@/content/packs/deadline-mode-v1.json";
+import deadlineModeV2 from "@/content/packs/deadline-mode-v2.json";
 import decisionSpiralV1 from "@/content/packs/decision-spiral-v1.json";
-import emojiSubtitles from "@/content/packs/emoji-subtitles-v2.json";
+import decisionSpiralV2 from "@/content/packs/decision-spiral-v2.json";
+import decisionSpiralV3 from "@/content/packs/decision-spiral-v3.json";
 import emojiSubtitlesV1 from "@/content/packs/emoji-subtitles-v1.json";
-import firstImpression from "@/content/packs/first-impression-v2.json";
+import emojiSubtitlesV2 from "@/content/packs/emoji-subtitles-v2.json";
+import emojiSubtitlesV3 from "@/content/packs/emoji-subtitles-v3.json";
 import firstImpressionV1 from "@/content/packs/first-impression-v1.json";
-import friendFusion from "@/content/packs/friend-fusion-v2.json";
+import firstImpressionV2 from "@/content/packs/first-impression-v2.json";
+import firstImpressionV3 from "@/content/packs/first-impression-v3.json";
 import friendFusionV1 from "@/content/packs/friend-fusion-v1.json";
-import groupChatRole from "@/content/packs/group-chat-role-v2.json";
+import friendFusionV2 from "@/content/packs/friend-fusion-v2.json";
+import friendFusionV3 from "@/content/packs/friend-fusion-v3.json";
 import groupChatRoleV1 from "@/content/packs/group-chat-role-v1.json";
-import honestSelf from "@/content/packs/honest-self-v2.json";
+import groupChatRoleV2 from "@/content/packs/group-chat-role-v2.json";
+import groupChatRoleV3 from "@/content/packs/group-chat-role-v3.json";
 import honestSelfV1 from "@/content/packs/honest-self-v1.json";
-import laughTrack from "@/content/packs/laugh-track-v1.json";
-import oldFriend from "@/content/packs/old-friend-v2.json";
+import honestSelfV2 from "@/content/packs/honest-self-v2.json";
+import honestSelfV3 from "@/content/packs/honest-self-v3.json";
+import laughTrackV1 from "@/content/packs/laugh-track-v1.json";
+import laughTrackV2 from "@/content/packs/laugh-track-v2.json";
 import oldFriendV1 from "@/content/packs/old-friend-v1.json";
-import replyTemperature from "@/content/packs/reply-temperature-v2.json";
+import oldFriendV2 from "@/content/packs/old-friend-v2.json";
+import oldFriendV3 from "@/content/packs/old-friend-v3.json";
 import replyTemperatureV1 from "@/content/packs/reply-temperature-v1.json";
-import roomTemperature from "@/content/packs/room-temperature-v2.json";
+import replyTemperatureV2 from "@/content/packs/reply-temperature-v2.json";
+import replyTemperatureV3 from "@/content/packs/reply-temperature-v3.json";
 import roomTemperatureV1 from "@/content/packs/room-temperature-v1.json";
-import smallLuxury from "@/content/packs/small-luxury-v2.json";
+import roomTemperatureV2 from "@/content/packs/room-temperature-v2.json";
+import roomTemperatureV3 from "@/content/packs/room-temperature-v3.json";
 import smallLuxuryV1 from "@/content/packs/small-luxury-v1.json";
-import snackPersonality from "@/content/packs/snack-personality-v2.json";
+import smallLuxuryV2 from "@/content/packs/small-luxury-v2.json";
+import smallLuxuryV3 from "@/content/packs/small-luxury-v3.json";
 import snackPersonalityV1 from "@/content/packs/snack-personality-v1.json";
-import socialBattery from "@/content/packs/social-battery-v2.json";
+import snackPersonalityV2 from "@/content/packs/snack-personality-v2.json";
+import snackPersonalityV3 from "@/content/packs/snack-personality-v3.json";
 import socialBatteryV1 from "@/content/packs/social-battery-v1.json";
-import spontaneousPlan from "@/content/packs/spontaneous-plan-v2.json";
+import socialBatteryV2 from "@/content/packs/social-battery-v2.json";
+import socialBatteryV3 from "@/content/packs/social-battery-v3.json";
 import spontaneousPlanV1 from "@/content/packs/spontaneous-plan-v1.json";
-import tinyRoutine from "@/content/packs/tiny-routine-v2.json";
+import spontaneousPlanV2 from "@/content/packs/spontaneous-plan-v2.json";
+import spontaneousPlanV3 from "@/content/packs/spontaneous-plan-v3.json";
 import tinyRoutineV1 from "@/content/packs/tiny-routine-v1.json";
-import tripChemistry from "@/content/packs/trip-chemistry-v2.json";
+import tinyRoutineV2 from "@/content/packs/tiny-routine-v2.json";
+import tinyRoutineV3 from "@/content/packs/tiny-routine-v3.json";
 import tripChemistryV1 from "@/content/packs/trip-chemistry-v1.json";
-import weekendEscape from "@/content/packs/weekend-escape-v2.json";
+import tripChemistryV2 from "@/content/packs/trip-chemistry-v2.json";
+import tripChemistryV3 from "@/content/packs/trip-chemistry-v3.json";
 import weekendEscapeV1 from "@/content/packs/weekend-escape-v1.json";
+import weekendEscapeV2 from "@/content/packs/weekend-escape-v2.json";
+import weekendEscapeV3 from "@/content/packs/weekend-escape-v3.json";
 
 export const packManifests = Object.freeze([
-  oldFriend,
-  firstImpression,
-  coworker,
-  honestSelf,
-  afterWork,
-  algorithmMirror,
-  cameraRoll,
-  commentSection,
-  complimentReceipt,
-  deadlineMode,
-  decisionSpiral,
-  emojiSubtitles,
-  friendFusion,
-  groupChatRole,
-  laughTrack,
-  replyTemperature,
-  roomTemperature,
-  smallLuxury,
-  snackPersonality,
-  socialBattery,
-  spontaneousPlan,
-  tinyRoutine,
-  tripChemistry,
-  weekendEscape,
+  afterWorkV3,
+  algorithmMirrorV3,
+  cameraRollV3,
+  commentSectionV3,
+  complimentReceiptV3,
+  coworkerV2,
+  deadlineModeV2,
+  decisionSpiralV3,
+  emojiSubtitlesV3,
+  firstImpressionV3,
+  friendFusionV3,
+  groupChatRoleV3,
+  honestSelfV3,
+  laughTrackV2,
+  oldFriendV3,
+  replyTemperatureV3,
+  roomTemperatureV3,
+  smallLuxuryV3,
+  snackPersonalityV3,
+  socialBatteryV3,
+  spontaneousPlanV3,
+  tinyRoutineV3,
+  tripChemistryV3,
+  weekendEscapeV3,
 ]);
 
 export function findPackManifest(slug: string) {
   return packManifests.find((pack) => pack.slug === slug) ?? null;
 }
 
-const packManifestHistory = Object.freeze([
+export const packManifestHistory = Object.freeze([
   afterWorkV1,
-  afterWork,
+  afterWorkV2,
+  afterWorkV3,
   algorithmMirrorV1,
-  algorithmMirror,
+  algorithmMirrorV2,
+  algorithmMirrorV3,
   cameraRollV1,
-  cameraRoll,
+  cameraRollV2,
+  cameraRollV3,
   commentSectionV1,
-  commentSection,
+  commentSectionV2,
+  commentSectionV3,
   complimentReceiptV1,
-  complimentReceipt,
-  coworker,
-  deadlineMode,
+  complimentReceiptV2,
+  complimentReceiptV3,
+  coworkerV1,
+  coworkerV2,
+  deadlineModeV1,
+  deadlineModeV2,
   decisionSpiralV1,
-  decisionSpiral,
+  decisionSpiralV2,
+  decisionSpiralV3,
   emojiSubtitlesV1,
-  emojiSubtitles,
+  emojiSubtitlesV2,
+  emojiSubtitlesV3,
   firstImpressionV1,
-  firstImpression,
+  firstImpressionV2,
+  firstImpressionV3,
   friendFusionV1,
-  friendFusion,
+  friendFusionV2,
+  friendFusionV3,
   groupChatRoleV1,
-  groupChatRole,
+  groupChatRoleV2,
+  groupChatRoleV3,
   honestSelfV1,
-  honestSelf,
-  laughTrack,
+  honestSelfV2,
+  honestSelfV3,
+  laughTrackV1,
+  laughTrackV2,
   oldFriendV1,
-  oldFriend,
+  oldFriendV2,
+  oldFriendV3,
   replyTemperatureV1,
-  replyTemperature,
+  replyTemperatureV2,
+  replyTemperatureV3,
   roomTemperatureV1,
-  roomTemperature,
+  roomTemperatureV2,
+  roomTemperatureV3,
   smallLuxuryV1,
-  smallLuxury,
+  smallLuxuryV2,
+  smallLuxuryV3,
   snackPersonalityV1,
-  snackPersonality,
+  snackPersonalityV2,
+  snackPersonalityV3,
   socialBatteryV1,
-  socialBattery,
+  socialBatteryV2,
+  socialBatteryV3,
   spontaneousPlanV1,
-  spontaneousPlan,
+  spontaneousPlanV2,
+  spontaneousPlanV3,
   tinyRoutineV1,
-  tinyRoutine,
+  tinyRoutineV2,
+  tinyRoutineV3,
   tripChemistryV1,
-  tripChemistry,
+  tripChemistryV2,
+  tripChemistryV3,
   weekendEscapeV1,
-  weekendEscape,
+  weekendEscapeV2,
+  weekendEscapeV3,
 ]);
 
 export function findPackManifestVersion(slug: string, version: string) {

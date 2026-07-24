@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { loadAuthenticatedOwnerAccountProfile } from "@/lib/http/auth-owner";
+import { loadAuthenticatedOwnerPageProfiles } from "@/lib/http/auth-owner";
 import { loadOwnerPublicProfileGate } from "@/lib/http/owner-public-profile";
 
 import AccountProfileView from "./account-profile-view";
@@ -44,13 +44,16 @@ export default async function OwnerPage() {
   return profile === null ? (
     <LoadFailure />
   ) : (
-    <AccountProfileView profile={profile} />
+    <AccountProfileView
+      profile={profile.accountProfile}
+      conceptProfile={profile.conceptProfile}
+    />
   );
 }
 
 async function loadAccountProfile(nickname: string) {
   try {
-    return await loadAuthenticatedOwnerAccountProfile(nickname);
+    return await loadAuthenticatedOwnerPageProfiles(nickname);
   } catch {
     return null;
   }

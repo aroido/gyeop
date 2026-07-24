@@ -1,5 +1,15 @@
 # 질문팩 제품 명세 v0.4
 
+## 2026-07-24 — concept v1 카드 계약
+
+활성 최신 공식 팩은 24개이고 각 10장, 총 240장이다. 새 play는 slug별 최신 v2/v3를 사용하지만 공개된 과거 매니페스트는 수정하지 않는다. 런타임은 `packManifestHistory`와 `OFFICIAL_PACK_HISTORY`의 69개 version·690개 card를 보존해 과거 owner play와 방문자 결과를 exact `slug + version`으로 계속 읽는다.
+
+concept v1 매니페스트는 루트 `conceptVersion: 1`과 카드별 `conceptContext`, `conceptSignals`를 가진다. `conceptSignals`는 정확히 1~2개이며 각 항목은 `{ "conceptId", "directionForOptionA" }` exact key만 허용한다. 결 정의는 `content/concepts-v1.json`의 8개 영역·32개 양방향 결, 카드 연결은 활성 최신 매니페스트가 런타임 SSOT다. 검수 추적 자료 `concept-card-mapping-v0.tsv`는 240문항·289신호, `concept-card-rewrites-v0.tsv`는 재작성 48문항과 일치해야 한다.
+
+저장 답은 화면 위치가 아니라 계속 의미 식별자 `"a" | "b"`다. owner의 global ordinal 1~10과 visitor의 required 1~3, optional 4~5를 기준으로 홀수는 A/B, 짝수는 B/A 순서로 렌더한다. 뒤로 가기·재개에서도 같은 ordinal을 사용하고 optional에서 홀짝을 다시 시작하지 않는다.
+
+발행된 version/card는 불변이다. 새 content migration과 generated seed는 expected template/version/card를 DB readback한 뒤에만 발행하고 pointer를 옮긴다. 공개 `GET /api/packs/[slug]`는 current-only이며, owner의 과거 play는 소유권 검증 뒤 `pack_plays.pack_version_id`에 연결된 exact historical pack을 읽는다.
+
 ## 1. 목적
 
 질문팩은 팩 주인의 자기인식과 방문자의 관점을 빠르게 비교하고, 방문자를 동일한 팩의 다음 주인으로 전환하는 핵심 콘텐츠 단위다.

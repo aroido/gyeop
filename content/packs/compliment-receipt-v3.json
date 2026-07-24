@@ -1,0 +1,186 @@
+{
+  "slug": "compliment-receipt",
+  "version": "compliment-receipt-v3",
+  "title": "칭찬 영수증",
+  "targetRelationship": "close_relationship",
+  "sensitivity": "medium",
+  "active": true,
+  "presentation": {
+    "moodLabel": "다정함 사용법",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "one_to_one",
+    "coverRecipe": "compliment-receipt-card-v1",
+    "coverTone": "ink"
+  },
+  "cards": [
+    {
+      "id": "receive",
+      "position": 1,
+      "ownerPrompt": "칭찬을 들으면 나는?",
+      "visitorPrompt": "칭찬을 들으면 이 사람은?",
+      "optionA": "기분 좋은 티가 바로 난다",
+      "optionB": "쑥스러워도 조용히 기억한다",
+      "isSignature": true,
+      "conceptContext": "칭찬·반응",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.intensity",
+          "directionForOptionA": "a"
+        },
+        {
+          "conceptId": "exp.reaction",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "give",
+      "position": 2,
+      "ownerPrompt": "좋은 점을 발견하면 나는?",
+      "visitorPrompt": "좋은 점을 발견하면 이 사람은?",
+      "optionA": "그 자리에서 바로 말한다",
+      "optionB": "딱 맞는 순간까지 아껴 둔다",
+      "isSignature": false,
+      "conceptContext": "칭찬·표현",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.reaction",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "specific",
+      "position": 3,
+      "ownerPrompt": "누군가를 칭찬할 때 나는?",
+      "visitorPrompt": "이 사람이 누군가를 칭찬할 때는?",
+      "optionA": "구체적인 장면을 말한다",
+      "optionB": "느낀 마음을 크게 전한다",
+      "isSignature": false,
+      "conceptContext": "칭찬·기억",
+      "conceptSignals": [
+        {
+          "conceptId": "att.memory",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "achievement",
+      "position": 4,
+      "ownerPrompt": "함께 만든 성과를 칭찬할 때 나는?",
+      "visitorPrompt": "함께 만든 성과를 칭찬할 때 이 사람은?",
+      "optionA": "서로 속도를 맞춘 과정을 말한다",
+      "optionB": "각자 다른 역할로 채운 부분을 말한다",
+      "isSignature": false,
+      "conceptContext": "성취",
+      "conceptSignals": [
+        {
+          "conceptId": "coop.sync",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "awkward",
+      "position": 5,
+      "ownerPrompt": "갑자기 다정한 말을 들으면 나는?",
+      "visitorPrompt": "갑자기 다정한 말을 들으면 이 사람은?",
+      "optionA": "장난으로 받아친다",
+      "optionB": "고맙다고 그대로 받는다",
+      "isSignature": false,
+      "conceptContext": "칭찬·표현",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.form",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "encourage",
+      "position": 6,
+      "ownerPrompt": "힘들어 보이는 사람에게 나는?",
+      "visitorPrompt": "힘들어 보이는 사람에게 이 사람은?",
+      "optionA": "실질적인 도움을 제안한다",
+      "optionB": "먼저 마음을 알아준다",
+      "isSignature": false,
+      "conceptContext": "위로·도움",
+      "conceptSignals": [
+        {
+          "conceptId": "coop.support",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "small-win",
+      "position": 7,
+      "ownerPrompt": "작은 성공이 생기면 나는?",
+      "visitorPrompt": "작은 성공이 생기면 이 사람은?",
+      "optionA": "누군가에게 바로 알린다",
+      "optionB": "혼자 뿌듯해하며 쌓아 둔다",
+      "isSignature": false,
+      "conceptContext": "성취·공유",
+      "conceptSignals": [
+        {
+          "conceptId": "exp.intensity",
+          "directionForOptionA": "a"
+        },
+        {
+          "conceptId": "reg.source",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "feedback",
+      "position": 8,
+      "ownerPrompt": "좋은 피드백을 받으면 다음에는?",
+      "visitorPrompt": "좋은 피드백을 받으면 다음에 이 사람은?",
+      "optionA": "잘된 방식을 그대로 한 번 더 써 본다",
+      "optionB": "한 부분을 바꿔 더 나은지 확인한다",
+      "isSignature": false,
+      "conceptContext": "피드백",
+      "conceptSignals": [
+        {
+          "conceptId": "dec.revision",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "support",
+      "position": 9,
+      "ownerPrompt": "친구가 스스로를 깎아내리면 나는?",
+      "visitorPrompt": "친구가 스스로를 깎아내리면 이 사람은?",
+      "optionA": "구체적으로 잘한 점을 말한다",
+      "optionB": "그 말이 나온 마음부터 묻는다",
+      "isSignature": false,
+      "conceptContext": "위로·도움",
+      "conceptSignals": [
+        {
+          "conceptId": "coop.support",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "memory",
+      "position": 10,
+      "ownerPrompt": "누군가에게 오래 남을 칭찬을 한다면?",
+      "visitorPrompt": "누군가에게 오래 남을 칭찬을 할 때 이 사람은?",
+      "optionA": "구체적인 장면과 이유를 자세히 말한다",
+      "optionB": "가장 중요한 한마디로 전한다",
+      "isSignature": false,
+      "conceptContext": "칭찬·기억",
+      "conceptSignals": [
+        {
+          "conceptId": "att.story",
+          "directionForOptionA": "a"
+        }
+      ]
+    }
+  ],
+  "conceptVersion": 1
+}

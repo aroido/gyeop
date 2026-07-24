@@ -58,7 +58,7 @@ select is(
       'historyCards', (select count(*) from public.pack_cards)
     )
   ),
-  '{"activeCards":240,"historyCards":450}'::jsonb,
+  '{"activeCards":240,"historyCards":690}'::jsonb,
   'the active catalog has two hundred forty cards and preserves version history'
 );
 
@@ -80,14 +80,14 @@ select is(
 select ok(
   (
     select published_at is not null
-      and published_version_id = 'e05e6366-2a00-4798-8273-0af5f16aad10'
+      and published_version_id = 'ff63ec5c-11de-456d-a3a2-28ad65758e0f'
     from public.pack_templates template
     join public.pack_versions version
       on version.template_id = template.id
      and version.id = template.published_version_id
     where template.id = '11111111-1111-4111-8111-111111111111'
   ),
-  'seed publishes v2 and sets the composite current pointer'
+  'seed publishes concept v1 v3 and sets the composite current pointer'
 );
 
 select is(
@@ -135,7 +135,7 @@ select is(
     )
     from (select public.get_published_pack('old-friend') pack) published
   ),
-  '{"slug":"old-friend","version":"old-friend-v2","cardCount":10}'::jsonb,
+  '{"slug":"old-friend","version":"old-friend-v3","cardCount":10}'::jsonb,
   'active private-MVP seed exposes the reviewed published pack'
 );
 
@@ -362,8 +362,17 @@ update public.pack_templates set is_active = false where id = '11111111-1111-411
 select is(public.get_published_pack('old-friend'), null::jsonb, 'deactivation takes effect immediately');
 
 select ok(
-  (select bool_and(attnotnull) from pg_catalog.pg_attribute where attrelid = 'public.pack_cards'::regclass and attnum > 0 and not attisdropped),
-  'every pack card column is NOT NULL'
+  (
+    select bool_and(attnotnull)
+    from pg_catalog.pg_attribute
+    where attrelid = 'public.pack_cards'::regclass
+      and attname in (
+        'pack_version_id', 'id', 'position', 'owner_prompt',
+        'visitor_prompt', 'option_a', 'option_b', 'is_signature',
+        'created_at'
+      )
+  ),
+  'required pack card columns are NOT NULL while concept columns remain historical-nullable'
 );
 
 select ok(

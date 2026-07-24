@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -38,7 +38,7 @@ function stableUuid(value) {
   ].join("-");
 }
 
-function packIds({ slug, version }) {
+export function packIds({ slug, version }) {
   const frozen = PACK_IDS[version];
   const original = PACK_IDS[`${slug}-v1`];
   return Object.freeze({
@@ -48,211 +48,321 @@ function packIds({ slug, version }) {
   });
 }
 
-function renderPack(pack) {
-  const ids = packIds(pack);
-  const isLegacyCompatiblePack = pack.slug === "old-friend";
-  const rows = pack.cards.map((card) =>
-    [
-      ids.version,
-      card.id,
-      card.position,
-      card.ownerPrompt,
-      card.visitorPrompt,
-      card.optionA,
-      card.optionB,
-      card.isSignature,
-    ]
-      .map((value, index) =>
-        index === 0
-          ? `${sqlString(value)}::uuid`
-          : index === 2 || index === 7
-            ? String(value)
-            : sqlString(value),
-      )
-      .join(", "),
-  );
-
-  const templateInsert = isLegacyCompatiblePack
-    ? `insert into public.pack_templates (
-  id,
-  slug,
-  title,
-  target_relationship,
-  sensitivity,
-  is_active
-)
-values (
-  ${sqlString(ids.template)},
-  ${sqlString(pack.slug)},
-  ${sqlString(pack.title)},
-  ${sqlString(pack.targetRelationship)},
-  ${sqlString(pack.sensitivity)},
-  ${pack.active}
-)
-on conflict (id) do nothing;`
-    : `insert into public.pack_templates (
-  id,
-  slug,
-  title,
-  target_relationship,
-  sensitivity,
-  is_active
-)
-select seed.*
-from (
-  values (
-    ${sqlString(ids.template)}::uuid,
-    ${sqlString(pack.slug)},
-    ${sqlString(pack.title)},
-    ${sqlString(pack.targetRelationship)},
-    ${sqlString(pack.sensitivity)},
-    ${pack.active}
-  )
-) as seed (
-  id,
-  slug,
-  title,
-  target_relationship,
-  sensitivity,
-  is_active
-)
-where to_regprocedure(
-  'public.get_visitor_response_pack_metadata(uuid,bytea)'
-) is not null
-on conflict (id) do nothing;`;
-
-  const versionInsert = isLegacyCompatiblePack
-    ? `insert into public.pack_versions (id, template_id, version)
-values (
-  ${sqlString(ids.version)},
-  ${sqlString(ids.template)},
-  ${sqlString(pack.version)}
-)
-on conflict (id) do nothing;`
-    : `insert into public.pack_versions (id, template_id, version)
-select seed.*
-from (
-  values (
-    ${sqlString(ids.version)}::uuid,
-    ${sqlString(ids.template)}::uuid,
-    ${sqlString(pack.version)}
-  )
-) as seed (id, template_id, version)
-where exists (
-  select 1
-  from public.pack_templates as template
-  where template.id = ${sqlString(ids.template)}
-)
-on conflict (id) do nothing;`;
-
-  return `${templateInsert}
-
-${versionInsert}
-
-insert into public.pack_cards (
-  pack_version_id,
-  id,
-  position,
-  owner_prompt,
-  visitor_prompt,
-  option_a,
-  option_b,
-  is_signature
-)
-select seed.*
-from (
-  values
-${rows.map((row, index) => `    (${row})${index === rows.length - 1 ? "" : ","}`).join("\n")}
-) as seed (
-  pack_version_id,
-  id,
-  position,
-  owner_prompt,
-  visitor_prompt,
-  option_a,
-  option_b,
-  is_signature
-)
-where exists (
-  select 1
-  from public.pack_versions as version
-  where version.id = ${sqlString(ids.version)}
-    and version.published_at is null
-)
-on conflict (pack_version_id, id) do nothing;
-
-select public.publish_pack_version(${sqlString(ids.version)})
-where exists (
-  select 1
-  from public.pack_versions as version
-  where version.id = ${sqlString(ids.version)}
-    and version.published_at is null
-);`;
+function versionNumber(pack) {
+  const value = Number.parseInt(pack.version.match(/-v(\d+)$/)?.[1], 10);
+  if (!Number.isSafeInteger(value)) throw new Error("Invalid pack version");
+  return value;
 }
 
-function renderCurrentPointers(packs) {
-  const latestBySlug = new Map();
+function canonicalPacks(input) {
+  return [...(Array.isArray(input) ? input : [input])].sort(
+    (left, right) =>
+      left.slug.localeCompare(right.slug) ||
+      versionNumber(left) - versionNumber(right),
+  );
+}
+
+function expectedTemplateRows(packs) {
+  const latest = new Map();
   for (const pack of packs) {
-    const current = latestBySlug.get(pack.slug);
-    const version = Number.parseInt(pack.version.match(/-v(\d+)$/)?.[1], 10);
-    if (!current || version > current.version) {
-      latestBySlug.set(pack.slug, { pack, version });
+    const current = latest.get(pack.slug);
+    if (!current || versionNumber(pack) > versionNumber(current)) {
+      latest.set(pack.slug, pack);
     }
   }
-  const rows = [...latestBySlug.values()]
-    .map(({ pack }) => {
+  return [...latest.values()]
+    .sort((left, right) => left.slug.localeCompare(right.slug))
+    .map((pack) => {
+      const ids = packIds(pack);
+      return `    (${sqlString(ids.template)}::uuid, ${sqlString(pack.slug)}, ${sqlString(pack.title)}, ${sqlString(pack.targetRelationship)}, ${sqlString(pack.sensitivity)}, ${pack.active})`;
+    });
+}
+
+function expectedVersionRows(packs) {
+  return packs.map((pack) => {
+    const ids = packIds(pack);
+    return `    (${sqlString(ids.version)}::uuid, ${sqlString(ids.template)}::uuid, ${sqlString(pack.version)}, ${
+      pack.conceptVersion === 1 ? "1::smallint" : "null::smallint"
+    })`;
+  });
+}
+
+function expectedCardRows(packs) {
+  return packs.flatMap((pack) => {
+    const ids = packIds(pack);
+    return pack.cards.map((card) => {
+      const context =
+        pack.conceptVersion === 1
+          ? sqlString(card.conceptContext)
+          : "null::text";
+      const signals =
+        pack.conceptVersion === 1
+          ? `${sqlString(JSON.stringify(card.conceptSignals))}::jsonb`
+          : "null::jsonb";
+      return `    (${sqlString(ids.version)}::uuid, ${sqlString(card.id)}, ${card.position}, ${sqlString(card.ownerPrompt)}, ${sqlString(card.visitorPrompt)}, ${sqlString(card.optionA)}, ${sqlString(card.optionB)}, ${card.isSignature}, ${context}, ${signals})`;
+    });
+  });
+}
+
+function values(rows) {
+  return rows
+    .map((row, index) => `${row}${index === rows.length - 1 ? "" : ","}`)
+    .join("\n");
+}
+
+function currentPointerRows(packs) {
+  const latest = new Map();
+  for (const pack of packs) {
+    const current = latest.get(pack.slug);
+    if (!current || versionNumber(pack) > versionNumber(current)) {
+      latest.set(pack.slug, pack);
+    }
+  }
+  return [...latest.values()]
+    .sort((left, right) => left.slug.localeCompare(right.slug))
+    .map((pack) => {
       const ids = packIds(pack);
       return `    (${sqlString(ids.template)}::uuid, ${sqlString(ids.version)}::uuid)`;
-    })
-    .join(",\n");
+    });
+}
 
-  return `do $pack_current$
-declare
-  v_current record;
+export function renderPackSeed(input, options = {}) {
+  const packs = canonicalPacks(input);
+  const expectedTemplates = expectedTemplateRows(packs);
+  const expectedVersions = expectedVersionRows(packs);
+  const expectedCards = expectedCardRows(packs);
+  const pointers = currentPointerRows(packs);
+  const label = options.label ?? "active and compatibility";
+  const versionScope =
+    options.fullHistory === false
+      ? "version.id in (select id from expected_pack_versions)"
+      : "version.template_id in (select id from expected_pack_templates)";
+  let rendered = `-- Generated from ${label} content/packs/*-vN.json by scripts/render-pack-seed.mjs.
+-- Do not edit this file directly.
+begin;
+
+create temp table expected_pack_templates (
+  id uuid primary key,
+  slug text not null unique,
+  title text not null,
+  target_relationship text not null,
+  sensitivity text not null,
+  is_active boolean not null
+) on commit drop;
+
+create temp table expected_pack_versions (
+  id uuid primary key,
+  template_id uuid not null,
+  version text not null,
+  concept_version smallint
+) on commit drop;
+
+create temp table expected_pack_cards (
+  pack_version_id uuid not null,
+  id text not null,
+  position smallint not null,
+  owner_prompt text not null,
+  visitor_prompt text not null,
+  option_a text not null,
+  option_b text not null,
+  is_signature boolean not null,
+  concept_context text,
+  concept_signals jsonb,
+  primary key (pack_version_id, id)
+) on commit drop;
+
+insert into expected_pack_templates values
+${values(expectedTemplates)};
+
+insert into expected_pack_versions values
+${values(expectedVersions)};
+
+insert into expected_pack_cards values
+${values(expectedCards)};
+
+insert into public.pack_templates (
+  id, slug, title, target_relationship, sensitivity, is_active
+)
+select id, slug, title, target_relationship, sensitivity, is_active
+from expected_pack_templates
+on conflict (id) do nothing;
+
+insert into public.pack_versions (id, template_id, version, concept_version)
+select id, template_id, version, concept_version
+from expected_pack_versions
+on conflict (id) do nothing;
+
+insert into public.pack_cards (
+  pack_version_id, id, position, owner_prompt, visitor_prompt, option_a,
+  option_b, is_signature, concept_context, concept_signals
+)
+select
+  expected.pack_version_id,
+  expected.id,
+  expected.position,
+  expected.owner_prompt,
+  expected.visitor_prompt,
+  expected.option_a,
+  expected.option_b,
+  expected.is_signature,
+  expected.concept_context,
+  expected.concept_signals
+from expected_pack_cards as expected
+join public.pack_versions as version
+  on version.id = expected.pack_version_id
+ and version.published_at is null
+on conflict (pack_version_id, id) do nothing;
+
+do $pack_readback$
 begin
-  for v_current in
-    select current_version.template_id, current_version.version_id
-    from (
-      values
-${rows}
-    ) as current_version (template_id, version_id)
+  if (select count(*) from expected_pack_templates) <> ${expectedTemplates.length}
+    or (select count(*) from expected_pack_versions) <> ${expectedVersions.length}
+    or (select count(*) from expected_pack_cards) <> ${expectedCards.length}
+    or exists (
+      select * from expected_pack_templates
+      except
+      select
+        template.id, template.slug, template.title,
+        template.target_relationship, template.sensitivity, template.is_active
+      from public.pack_templates as template
+      where template.id in (select id from expected_pack_templates)
+    )
+    or exists (
+      select
+        template.id, template.slug, template.title,
+        template.target_relationship, template.sensitivity, template.is_active
+      from public.pack_templates as template
+      where template.id in (select id from expected_pack_templates)
+      except
+      select * from expected_pack_templates
+    )
+    or exists (
+      select * from expected_pack_versions
+      except
+      select
+        version.id, version.template_id, version.version,
+        version.concept_version
+      from public.pack_versions as version
+      where ${versionScope}
+    )
+    or exists (
+      select
+        version.id, version.template_id, version.version,
+        version.concept_version
+      from public.pack_versions as version
+      where ${versionScope}
+      except
+      select * from expected_pack_versions
+    )
+    or exists (
+      select * from expected_pack_cards
+      except
+      select
+        card.pack_version_id, card.id, card.position, card.owner_prompt,
+        card.visitor_prompt, card.option_a, card.option_b, card.is_signature,
+        card.concept_context, card.concept_signals
+      from public.pack_cards as card
+      where card.pack_version_id in (select id from expected_pack_versions)
+    )
+    or exists (
+      select
+        card.pack_version_id, card.id, card.position, card.owner_prompt,
+        card.visitor_prompt, card.option_a, card.option_b, card.is_signature,
+        card.concept_context, card.concept_signals
+      from public.pack_cards as card
+      where card.pack_version_id in (select id from expected_pack_versions)
+      except
+      select * from expected_pack_cards
+    )
+  then
+    raise exception 'pack catalog canonical readback failed';
+  end if;
+end
+$pack_readback$;
+
+do $pack_publish$
+declare
+  publication record;
+begin
+  for publication in
+    select version.id
+    from expected_pack_versions as version
+    join expected_pack_templates as template on template.id = version.template_id
+    order by
+      substring(version.version from '-v([0-9]+)$')::integer,
+      template.slug
   loop
     if exists (
       select 1
       from public.pack_versions as version
-      where version.id = v_current.version_id
-        and version.published_at is not null
+      where version.id = publication.id
+        and version.published_at is null
     ) then
-      perform set_config(
-        'gyeop.pack_publish_version_id',
-        v_current.version_id::text,
-        true
-      );
-      update public.pack_templates as template
-      set published_version_id = v_current.version_id,
-          updated_at = clock_timestamp()
-      where template.id = v_current.template_id
-        and template.published_version_id is distinct from v_current.version_id;
+      perform public.publish_pack_version(publication.id);
     end if;
   end loop;
 end
-$pack_current$;`;
-}
+$pack_publish$;
 
-export function renderPackSeed(input) {
-  const packs = (Array.isArray(input) ? input : [input]).toSorted(
-    (left, right) => left.slug.localeCompare(right.slug),
-  );
-  return `-- Generated from active and compatibility content/packs/*-vN.json by scripts/render-pack-seed.mjs.
--- Do not edit this file directly.
-begin;
-
-${packs.map(renderPack).join("\n\n")}
-
-${renderCurrentPointers(packs)}
+do $pack_postcheck$
+begin
+  if exists (
+    select 1
+    from expected_pack_versions as expected
+    left join public.pack_versions as version on version.id = expected.id
+    where version.published_at is null
+  )
+    or exists (
+      select 1
+      from (
+        values
+${values(pointers)}
+      ) as expected(template_id, version_id)
+      join public.pack_templates as template on template.id = expected.template_id
+      where template.published_version_id is distinct from expected.version_id
+    )
+  then
+    raise exception 'pack catalog publication postcheck failed';
+  end if;
+end
+$pack_postcheck$;
 
 commit;
 `;
+  if (options.persistentExpected === true) {
+    const tables = [
+      "expected_pack_templates",
+      "expected_pack_versions",
+      "expected_pack_cards",
+    ];
+    const qualified = tables.map((table) => `private.seed_${table}`);
+    for (const [table, replacement] of tables.map((table, index) => [
+      table,
+      qualified[index],
+    ])) {
+      rendered = rendered.replaceAll(table, replacement);
+    }
+    rendered = rendered.replaceAll("create temp table", "create table");
+    rendered = rendered.replaceAll(") on commit drop;", ");");
+    const cleanup = `drop table if exists ${qualified.toReversed().join(", ")};`;
+    rendered = rendered.replace("begin;\n", `begin;\n\n${cleanup}\n`);
+    rendered = rendered.replace("\ncommit;\n", `\n${cleanup}\n\ncommit;\n`);
+  }
+  if (options.singleStatement === true) {
+    rendered = rendered
+      .replace(
+        "begin;\n\n",
+        "do $pack_seed$\ndeclare\n  publication record;\nbegin\n",
+      )
+      .replace("do $pack_readback$\nbegin\n", "")
+      .replace("end\n$pack_readback$;\n", "")
+      .replace("do $pack_publish$\ndeclare\n  publication record;\nbegin\n", "")
+      .replace("end\n$pack_publish$;\n", "")
+      .replace("do $pack_postcheck$\nbegin\n", "")
+      .replace("end\n$pack_postcheck$;\n", "")
+      .replace("commit;\n", "end\n$pack_seed$;\n");
+  }
+  return rendered;
 }
 
 export function readPackManifest(root = ROOT, file = "old-friend-v1.json") {
@@ -272,25 +382,23 @@ export function readPackManifests(root = ROOT) {
   const manifests = readAllPackManifests(root);
   const latestBySlug = new Map();
   for (const manifest of manifests) {
-    const version = Number.parseInt(
-      manifest.version.match(/-v(\d+)$/)?.[1],
-      10,
-    );
     const current = latestBySlug.get(manifest.slug);
-    if (!current || version > current.version) {
-      latestBySlug.set(manifest.slug, { manifest, version });
+    if (!current || versionNumber(manifest) > versionNumber(current)) {
+      latestBySlug.set(manifest.slug, manifest);
     }
   }
-  return [...latestBySlug.values()]
-    .map(({ manifest }) => manifest)
-    .sort((left, right) => left.slug.localeCompare(right.slug));
+  return [...latestBySlug.values()].sort((left, right) =>
+    left.slug.localeCompare(right.slug),
+  );
 }
 
 export function readPackSeedManifests(root = ROOT) {
-  return readAllPackManifests(root).sort(
-    (left, right) =>
-      left.slug.localeCompare(right.slug) ||
-      left.version.localeCompare(right.version),
+  return canonicalPacks(readAllPackManifests(root));
+}
+
+export function readConceptUpgradeManifests(root = ROOT) {
+  return readPackManifests(root).filter(
+    ({ conceptVersion }) => conceptVersion === 1,
   );
 }
 
@@ -298,5 +406,7 @@ if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  process.stdout.write(renderPackSeed(readPackSeedManifests()));
+  process.stdout.write(
+    renderPackSeed(readPackSeedManifests(), { singleStatement: true }),
+  );
 }

@@ -185,8 +185,11 @@ export function verifyRenderYaml(renderYaml) {
       );
       const entry = mapping(text, lineNumber);
       invariant(
-        entry.key === "sync" && entry.value === "false",
-        `render.yaml:${lineNumber}: only sync: false is supported for envVars`,
+        (entry.key === "sync" && entry.value === "false") ||
+          (entry.key === "value" &&
+            entry.value === "false" &&
+            envVar.get("key") === "GYEOP_CONCEPT_PROFILE_ENABLED"),
+        `render.yaml:${lineNumber}: envVars require sync: false or the disabled concept gate`,
       );
       setUnique(envVar, entry.key, entry.value, lineNumber);
       continue;

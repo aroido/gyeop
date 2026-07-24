@@ -77,7 +77,20 @@ future 설계가 문서나 spec에 남아 있어도 별도 제품 결정, 월 �
 
 Render Free cold start와 Supabase Free pause는 production SLA가 아니다. free tier가 사라지거나 한도가 부족해지면 자동 upgrade하지 않고 해당 기능 또는 private MVP 모집을 중단한다.
 
-### 5.1 2026-07-22 read-only 확인 기록
+### 5.1 concept profile 전환과 rollback
+
+실행 주체는 외부 Render 설정 변경 권한을 가진 운영자다. 저장소 작업만으로 live env를 변경했다고 간주하지 않는다.
+
+1. `render.yaml`의 `GYEOP_CONCEPT_PROFILE_ENABLED: "false"` 기본값과 startup validation을 먼저 배포한다.
+2. DB schema/content migration 뒤 24 template·69 version·690 card, 신규 concept v1 24 version·240 card와 24개 current pointer를 readback한다.
+3. gate가 false인 상태에서 v1/v2/v3 owner play, public invite/result, same-pack CTA와 기존 `/me`가 동작하고 concept API가 404인지 확인한다.
+4. 운영자가 Render server-only env를 exact `true`로 변경해 새 deploy를 성공시킨 뒤 `/me`의 3~5 훅, concept API, exposure/detail event, 9:16 공유 카드와 같은 source pack 초대를 확인한다.
+5. concept 기능에 문제가 있으면 운영자가 값을 exact `false`로 되돌려 재배포한다. 이 rollback은 concept UI/API/event variant만 중단하고 DB column, 69개 history, v3 play/answer/share와 current pointer는 보존한다.
+6. pack content 자체에 문제가 있을 때만 별도 승인된 forward corrective migration으로 24 template pointer를 직전 원본 version으로 옮긴다. 발행된 신규 version/card를 update/delete하거나 v3를 모르는 pre-v3 app을 재배포하지 않는다.
+
+빈 문자열, `TRUE`, `1`, 공백이 포함된 값은 허용하지 않는다. threshold·strict decoder 완화나 down migration은 rollback 수단이 아니다.
+
+### 5.2 2026-07-22 read-only 확인 기록
 
 - GitHub repository visibility: `PUBLIC`
 - latest deployment environment: `main - gyeop-private-mvp`
@@ -89,7 +102,7 @@ Render Free cold start와 Supabase Free pause는 production SLA가 아니다. fr
 
 이 기록은 당시 상태를 확인한 non-secret evidence일 뿐 상시 가용성이나 응답 시간 SLA가 아니다. 약 28.1초 cold start를 허용하는 best-effort private 검증으로만 사용한다.
 
-### 5.2 무료 성능 smoke
+### 5.3 무료 성능 smoke
 
 별도 staging·부하 SaaS·RUM 없이 기존 Node와 Playwright만 사용한다. 측정 CLI는 전용 local production origin과 기존 Render Free origin만 받으며 `/`와 공개 질문팩을 `HEAD`/`GET`으로만 읽는다.
 
@@ -108,7 +121,7 @@ node scripts/verify-private-mvp-performance.mjs --base-url https://gyeop-private
 
 Render Free의 cold start는 35초까지 별도 허용하고 warm 표본과 합치지 않는다. 홈 LCP 중앙값 2.5초와 pack GET p95 1초는 private MVP 회귀 smoke 예산이며 production SLA가 아니다. 원격 변동 결과는 required CI에 넣지 않고 실패 시 유료 전환이나 provider 설정 변경을 자동 수행하지 않는다.
 
-### 5.3 무료 보안 경계 gate
+### 5.4 무료 보안 경계 gate
 
 원격 요청 없이 활성 Route, data access, HTTP boundary, repository secret, zero-cost 선언과 비활성 email/Cron/account-delete 경계를 한 번에 확인한다.
 

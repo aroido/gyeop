@@ -328,6 +328,34 @@ export type GetOwnerPlayResult =
   | Readonly<{ outcome: "authorized"; play: OwnerPlayState }>
   | Readonly<{ outcome: "expired" | "not_found" }>;
 
+export type GetOwnerPlayPackResult =
+  | Readonly<{ outcome: "authorized"; pack: PublishedPack }>
+  | Readonly<{ outcome: "expired" | "not_found" }>;
+
+function decodeOwnerPlayPackOutcome(value: unknown): GetOwnerPlayPackResult {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Internal owner play pack RPC failed");
+  }
+  const record = value as { outcome?: unknown; pack?: unknown };
+  if (
+    (record.outcome === "expired" || record.outcome === "not_found") &&
+    Object.keys(record).join("\0") === "outcome"
+  ) {
+    return Object.freeze({ outcome: record.outcome });
+  }
+  if (record.outcome !== "authorized") {
+    throw new Error("Internal owner play pack RPC failed");
+  }
+  try {
+    return Object.freeze({
+      outcome: "authorized",
+      pack: decodePublishedPack(record.pack) as PublishedPack,
+    });
+  } catch {
+    throw new Error("Internal owner play pack RPC failed");
+  }
+}
+
 export async function getOwnerPlay(input: {
   playId: string;
   managementSecretHash: Uint8Array;
@@ -345,6 +373,21 @@ export async function getOwnerPlay(input: {
     "expired",
     "not_found",
   ]) as GetOwnerPlayResult;
+}
+
+export async function getOwnerPlayPack(input: {
+  playId: string;
+  managementSecretHash: Uint8Array;
+  signal?: AbortSignal;
+}): Promise<GetOwnerPlayPackResult> {
+  let query = getInternalClient().rpc("get_owner_play_pack", {
+    p_play_id: input.playId,
+    p_management_secret_hash: bytea(input.managementSecretHash),
+  });
+  if (input.signal) query = query.abortSignal(input.signal);
+  const { data, error } = await query;
+  if (error) throw new Error("Internal owner play pack RPC failed");
+  return decodeOwnerPlayPackOutcome(data);
 }
 
 export type OwnerClaimStateResult = Readonly<{
@@ -440,6 +483,7 @@ export type AuthenticatedOwnerPlaySummary = Readonly<{
   status: "draft" | "completed";
   answeredCount: number;
   updatedAt: string;
+  completedAt: string | null;
 }>;
 
 export async function listAuthenticatedOwnerPlays(): Promise<
@@ -473,7 +517,10 @@ export async function listAuthenticatedOwnerPlays(): Promise<
           typeof play.packTitle !== "string" ||
           (play.status !== "draft" && play.status !== "completed") ||
           !Number.isInteger(play.answeredCount) ||
-          typeof play.updatedAt !== "string"
+          typeof play.updatedAt !== "string" ||
+          (play.completedAt !== null && typeof play.completedAt !== "string") ||
+          (play.status === "draft" && play.completedAt !== null) ||
+          (play.status === "completed" && typeof play.completedAt !== "string")
         ) {
           throw new Error("Internal authenticated owner list RPC failed");
         }
@@ -485,6 +532,7 @@ export async function listAuthenticatedOwnerPlays(): Promise<
           status: play.status,
           answeredCount: play.answeredCount as number,
           updatedAt: play.updatedAt,
+          completedAt: play.completedAt as string | null,
         });
       }),
     );
@@ -506,6 +554,23 @@ export async function getAuthenticatedOwnerPlay(input: {
       "authorized",
       "not_found",
     ]) as GetOwnerPlayResult;
+  });
+}
+
+export async function getAuthenticatedOwnerPlayPack(input: {
+  playId: string;
+}): Promise<GetOwnerPlayPackResult> {
+  return withOwnerMutationActor(async ({ actor, signal }) => {
+    const { data, error } = await getInternalClient()
+      .rpc("get_authenticated_owner_play_pack", {
+        p_play_id: input.playId,
+        p_actor_id: actor.uid,
+      })
+      .abortSignal(signal);
+    if (error) {
+      throw new Error("Internal authenticated owner play pack RPC failed");
+    }
+    return decodeOwnerPlayPackOutcome(data);
   });
 }
 
@@ -640,7 +705,11 @@ export async function setAuthenticatedOwnerNickname(input: {
 
 export async function recordAuthenticatedOwnerProfileEvent(input: {
   playId: string;
-  event: "profile_viewed" | "profile_reshare_clicked";
+  event:
+    | "profile_viewed"
+    | "profile_reshare_clicked"
+    | "concept_profile_viewed"
+    | "concept_detail_opened";
 }): Promise<OwnerProfileEventResult> {
   return withOwnerMutationActor(async ({ actor, signal }) => {
     const { data, error } = await getInternalClient()

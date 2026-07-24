@@ -9,6 +9,15 @@ import type {
   AccountOwnerProfile,
   AccountOwnerSelfLayer,
 } from "@/lib/owner-profile/account-profile";
+import type {
+  ConceptHook,
+  ConceptProfile,
+  ConceptShareOption,
+} from "@/lib/owner-profile/concept-profile";
+import {
+  recordConceptDetailOpened,
+  recordConceptProfileViewed,
+} from "@/lib/owner-profile/concept-profile-client";
 import { firstAccountProfileShareSelection } from "@/lib/owner-profile/profile-share-card-core.mjs";
 import { relationshipLabel } from "@/lib/visitor-response/visitor-context-core.mjs";
 
@@ -98,12 +107,68 @@ function StackCard({ layer, index }: { layer: StackLayer; index: number }) {
   );
 }
 
+const STAGE_TEXT = Object.freeze({
+  trace: "흔적",
+  outline: "윤곽",
+  clear: "선명",
+});
+
+function ConceptEvidence({ hook }: { hook: ConceptHook }) {
+  const opened = useRef(false);
+  const recordDetail = () => {
+    if (opened.current) return;
+    const key = `${hook.profileSourcePlayId}\0${hook.conceptId}`;
+    try {
+      if (sessionStorage.getItem(key) === "1") {
+        opened.current = true;
+        return;
+      }
+      sessionStorage.setItem(key, "1");
+    } catch {
+      // The in-memory latch still prevents duplicate events in this mount.
+    }
+    opened.current = true;
+    void recordConceptDetailOpened(
+      hook.profileSourcePlayId,
+      hook.conceptId,
+    ).catch(() => undefined);
+  };
+  return (
+    <details className={styles.conceptEvidence} onToggle={recordDetail}>
+      <summary>왜 이렇게 보일까?</summary>
+      {hook.profileEvidence.map(({ source, evidence }) => (
+        <div key={source}>
+          <strong>{source === "self" ? "내 답변" : "주변 시선"}</strong>
+          <span>
+            {evidence.packCount}팩 · {evidence.contextCount}맥락
+          </span>
+          <p>
+            {evidence.packs
+              .map(
+                ({ packTitle, contexts }) =>
+                  `${packTitle} · ${contexts.join(", ")}`,
+              )
+              .join(" / ")}
+          </p>
+        </div>
+      ))}
+      {hook.privateOthers.status === "locked" ? (
+        <p>시선을 모으는 중 · {hook.privateOthers.sightCount}/3</p>
+      ) : null}
+    </details>
+  );
+}
+
 export default function AccountProfileView({
   profile,
+  conceptProfile,
 }: {
   profile: AccountOwnerProfile;
+  conceptProfile: ConceptProfile | null;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const shareDialogRef = useRef<HTMLDialogElement>(null);
+  const exposureRecorded = useRef(false);
   const relationshipChoices = useMemo(() => {
     const choices: RelationshipChoice[] = [];
     const seen = new Set<string>();
@@ -137,19 +202,43 @@ export default function AccountProfileView({
   const shareSelection = firstAccountProfileShareSelection(
     profile.availableLayers,
   );
-  const primaryHref = shareSelection
-    ? `/me/profile/${shareSelection.playId}?share_relationship=${encodeURIComponent(
-        shareSelection.relationshipCode,
-      )}&share_card=${encodeURIComponent(
-        shareSelection.cardId,
-      )}#shareable-insight`
-    : profile.ctaPlayId
-      ? `/me/plays/${profile.ctaPlayId}`
-      : "/";
+  const conceptShare = conceptProfile?.shareOptions[0] ?? null;
+  const primaryHref = conceptShare
+    ? null
+    : shareSelection
+      ? `/me/profile/${shareSelection.playId}?share_relationship=${encodeURIComponent(
+          shareSelection.relationshipCode,
+        )}&share_card=${encodeURIComponent(
+          shareSelection.cardId,
+        )}#shareable-insight`
+      : profile.ctaPlayId
+        ? `/me/plays/${profile.ctaPlayId}`
+        : "/";
+  const [selectedShareId, setSelectedShareId] = useState(
+    conceptShare?.conceptId ?? "",
+  );
+  const selectedConceptShare =
+    conceptProfile?.shareOptions.find(
+      ({ conceptId }) => conceptId === selectedShareId,
+    ) ??
+    conceptShare ??
+    null;
 
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    const source = conceptProfile?.hooks[0]?.profileSourcePlayId;
+    if (!source || exposureRecorded.current) return;
+    exposureRecorded.current = true;
+    void recordConceptProfileViewed(source).catch(() => undefined);
+  }, [conceptProfile]);
+
+  const openSharePicker = (option?: ConceptShareOption) => {
+    if (option) setSelectedShareId(option.conceptId);
+    shareDialogRef.current?.showModal();
+  };
 
   return (
     <main className={styles.shell}>
@@ -159,25 +248,75 @@ export default function AccountProfileView({
             {profile.nickname}의 겹
           </h1>
           <p className={styles.profileLead}>
-            {shareSelection
-              ? "친구가 본 내 모습을 한 장으로 나눠보세요."
-              : profile.ctaPlayId
-                ? "친구의 답이 더 모이면 내 겹을 공유할 수 있어요."
-                : "질문팩에 답하고, 내가 보는 나부터 쌓아보세요."}
+            {conceptProfile?.hooks.length
+              ? "한 장면의 답이 여러 팩에서 어떤 결로 이어졌는지 살펴보세요."
+              : shareSelection
+                ? "친구가 본 내 모습을 한 장으로 나눠보세요."
+                : profile.ctaPlayId
+                  ? "친구의 답이 더 모이면 내 겹을 공유할 수 있어요."
+                  : "질문팩에 답하고, 내가 보는 나부터 쌓아보세요."}
           </p>
-          <Link className={styles.primary} href={primaryHref}>
-            {shareSelection
-              ? "내 겹 공유하기"
-              : profile.ctaPlayId
-                ? "시선 더 모으기"
-                : "질문팩 시작하기"}
-          </Link>
+          {conceptShare ? (
+            <button
+              className={styles.primary}
+              type="button"
+              onClick={() => openSharePicker()}
+            >
+              발견한 결 공유하기
+            </button>
+          ) : (
+            <Link className={styles.primary} href={primaryHref!}>
+              {shareSelection
+                ? "내 겹 공유하기"
+                : profile.ctaPlayId
+                  ? "시선 더 모으기"
+                  : "질문팩 시작하기"}
+            </Link>
+          )}
           <div className={styles.metrics} aria-label="계정 프로필 요약">
             <p>시선 {profile.sightCount}</p>
             <p>완료한 겹 {profile.completedPlayCount}</p>
             <p>관계 {profile.relationshipCount}</p>
           </div>
         </header>
+
+        {conceptProfile?.hooks.length ? (
+          <section
+            className={styles.concepts}
+            aria-labelledby="concept-profile-title"
+          >
+            <div className={styles.conceptHeading}>
+              <p className={styles.eyebrow}>장면이 쌓여 보이는 결</p>
+              <h2 id="concept-profile-title">나를 단정하지 않는 대화거리</h2>
+            </div>
+            <div className={styles.conceptList}>
+              {conceptProfile.hooks.map((hook) => (
+                <article className={styles.conceptCard} key={hook.conceptId}>
+                  <p>
+                    {hook.areaLabel} · {hook.conceptLabel}
+                  </p>
+                  <strong>{STAGE_TEXT[hook.stage]}</strong>
+                  <h3>{hook.observation}</h3>
+                  <blockquote>{hook.question}</blockquote>
+                  <ConceptEvidence hook={hook} />
+                  {hook.shareEligible ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const option = conceptProfile.shareOptions.find(
+                          ({ conceptId }) => conceptId === hook.conceptId,
+                        );
+                        if (option) openSharePicker(option);
+                      }}
+                    >
+                      이 결로 대화 시작하기
+                    </button>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {stackLayers.length > 0 ? (
           <div
@@ -276,6 +415,46 @@ export default function AccountProfileView({
         </Link>
         <LogoutButton />
       </section>
+      {conceptShare ? (
+        <dialog className={styles.sharePicker} ref={shareDialogRef}>
+          <form method="dialog">
+            <button className={styles.dialogClose} value="cancel">
+              닫기
+            </button>
+          </form>
+          <p className={styles.eyebrow}>공유할 결 고르기</p>
+          <h2>어떤 이야기로 이어갈까요?</h2>
+          <div role="radiogroup" aria-label="공유할 결">
+            {conceptProfile!.shareOptions.map((option, index) => (
+              <button
+                key={option.conceptId}
+                type="button"
+                role="radio"
+                aria-checked={
+                  option.conceptId === selectedConceptShare?.conceptId
+                }
+                onClick={() => setSelectedShareId(option.conceptId)}
+              >
+                <strong>
+                  {index === 0 ? "추천 · " : ""}
+                  {option.safeCopy}
+                </strong>
+                <span>{option.safeQuestion}</span>
+              </button>
+            ))}
+          </div>
+          {selectedConceptShare ? (
+            <Link
+              className={styles.primary}
+              href={`/me/plays/${selectedConceptShare.sourcePlayId}?entry_source=profile_reshare&share_concept=${encodeURIComponent(
+                selectedConceptShare.conceptId,
+              )}`}
+            >
+              이 내용으로 공유 카드 확인
+            </Link>
+          ) : null}
+        </dialog>
+      ) : null}
     </main>
   );
 }

@@ -15,7 +15,10 @@ export function POST(request: Request) {
       const event = input?.event;
       const playId = input?.playId;
       if (
-        (event !== "profile_viewed" && event !== "profile_reshare_clicked") ||
+        (event !== "profile_viewed" &&
+          event !== "profile_reshare_clicked" &&
+          event !== "concept_profile_viewed" &&
+          event !== "concept_detail_opened") ||
         typeof playId !== "string"
       ) {
         throw new Error("INTERNAL_ERROR");
@@ -32,6 +35,10 @@ export function POST(request: Request) {
           recordOwnerProfileEventResponse({
             playId,
             event,
+            conceptId:
+              typeof input?.conceptId === "string"
+                ? input.conceptId
+                : undefined,
             signal,
           }),
       );

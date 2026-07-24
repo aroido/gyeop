@@ -4,6 +4,7 @@ import { parseAccountDeleteKeyring } from "../lib/security/account-delete-keyrin
 import { validateAppUrl } from "../lib/http/http-boundary-core.mjs";
 import { parseRateLimitSecret } from "../lib/security/network-key.mjs";
 import { parseProxyOriginSecret } from "../lib/security/proxy-origin-secret.mjs";
+import { parseConceptProfileEnabled } from "../lib/owner-profile/concept-profile-feature.mjs";
 
 export function validateAccountDeleteEnv(env = process.env) {
   const { activeVersion, versions } = parseAccountDeleteKeyring(env);
@@ -24,6 +25,9 @@ export function validateHttpBoundaryEnv(env = process.env) {
 export function validateRuntimeEnv(env = process.env) {
   return Object.freeze({
     accountDelete: validateAccountDeleteEnv(env),
+    conceptProfileEnabled: parseConceptProfileEnabled(
+      env.GYEOP_CONCEPT_PROFILE_ENABLED,
+    ),
     httpBoundary: validateHttpBoundaryEnv(env),
   });
 }

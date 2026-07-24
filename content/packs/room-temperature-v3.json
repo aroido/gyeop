@@ -1,0 +1,178 @@
+{
+  "slug": "room-temperature",
+  "version": "room-temperature-v3",
+  "title": "방 온도와 내 기분",
+  "targetRelationship": "close_relationship",
+  "sensitivity": "low",
+  "active": true,
+  "presentation": {
+    "moodLabel": "공간 취향 추리",
+    "estimatedMinutes": 2,
+    "defaultShareKind": "public",
+    "coverRecipe": "room-temperature-card-v1",
+    "coverTone": "violet"
+  },
+  "cards": [
+    {
+      "id": "reset-space",
+      "position": 1,
+      "ownerPrompt": "집에 돌아와 일상 모드를 바꿀 때 나는?",
+      "visitorPrompt": "집에 돌아와 일상 모드를 바꿀 때 이 사람은?",
+      "optionA": "씻고 옷을 갈아입으며 바로 전환한다",
+      "optionB": "잠깐 앉아 바깥의 여운부터 정리한다",
+      "isSignature": true,
+      "conceptContext": "귀가·공간",
+      "conceptSignals": [
+        {
+          "conceptId": "reg.transition",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "lighting",
+      "position": 2,
+      "ownerPrompt": "피곤한 밤에 방 분위기를 바꾼다면?",
+      "visitorPrompt": "피곤한 밤에 방 분위기를 바꿀 때 이 사람은?",
+      "optionA": "조명을 밝히거나 음악을 틀어 전환한다",
+      "optionB": "불빛과 소리를 줄여 가라앉힌다",
+      "isSignature": false,
+      "conceptContext": "공간·빛",
+      "conceptSignals": [
+        {
+          "conceptId": "reg.stimulus",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "sound",
+      "position": 3,
+      "ownerPrompt": "집에서 나는?",
+      "visitorPrompt": "집에서 이 사람은?",
+      "optionA": "무언가 틀어 두는 편이다",
+      "optionB": "조용한 편이 좋다",
+      "isSignature": false,
+      "conceptContext": "공간·소리",
+      "conceptSignals": [
+        {
+          "conceptId": "reg.stimulus",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "tidy",
+      "position": 4,
+      "ownerPrompt": "정리가 필요해 보이면 나는?",
+      "visitorPrompt": "정리가 필요해 보이면 이 사람은?",
+      "optionA": "바로 눈에 보이는 곳부터 한다",
+      "optionB": "각 잡고 한 번에 한다",
+      "isSignature": false,
+      "conceptContext": "공간·정리",
+      "conceptSignals": [
+        {
+          "conceptId": "act.start",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "blanket",
+      "position": 5,
+      "ownerPrompt": "집에서 쉬기 시작할 때 나는?",
+      "visitorPrompt": "집에서 쉬기 시작할 때 이 사람은?",
+      "optionA": "편한 옷으로 완전히 갈아입는다",
+      "optionB": "지금 차림 그대로 편하게 앉는다",
+      "isSignature": false,
+      "conceptContext": "귀가·전환",
+      "conceptSignals": [
+        {
+          "conceptId": "reg.transition",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "window",
+      "position": 6,
+      "ownerPrompt": "방이 답답해 손보고 싶을 때 나는?",
+      "visitorPrompt": "방이 답답해 손보고 싶을 때 이 사람은?",
+      "optionA": "창문 하나부터 열어 변화를 시작한다",
+      "optionB": "빛과 온도와 공기를 전체적으로 살핀다",
+      "isSignature": false,
+      "conceptContext": "공간·환경",
+      "conceptSignals": [
+        {
+          "conceptId": "act.start",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "plant",
+      "position": 7,
+      "ownerPrompt": "방에 쓸 수 있는 작은 예산이 생기면?",
+      "visitorPrompt": "방에 쓸 수 있는 작은 예산이 생기면 이 사람은?",
+      "optionA": "오래 마음에 들 좋은 하나를 고른다",
+      "optionB": "작은 장식 여러 개로 분위기를 만든다",
+      "isSignature": false,
+      "conceptContext": "공간·선택",
+      "conceptSignals": [
+        {
+          "conceptId": "pref.focus",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "desk",
+      "position": 8,
+      "ownerPrompt": "책상 위가 복잡해지면 나는?",
+      "visitorPrompt": "책상 위가 복잡해지면 이 사람은?",
+      "optionA": "정리해야 집중된다",
+      "optionB": "익숙한 어수선함도 괜찮다",
+      "isSignature": false,
+      "conceptContext": "공간·집중",
+      "conceptSignals": [
+        {
+          "conceptId": "act.preparation",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "scent",
+      "position": 9,
+      "ownerPrompt": "방에 새로운 분위기를 들이고 싶다면?",
+      "visitorPrompt": "방에 새로운 분위기를 들이고 싶을 때 이 사람은?",
+      "optionA": "좋아하던 향이나 음악을 더 깊게 찾는다",
+      "optionB": "일부러 전혀 다른 조합을 찾아본다",
+      "isSignature": false,
+      "conceptContext": "공간·환경",
+      "conceptSignals": [
+        {
+          "conceptId": "pref.discovery",
+          "directionForOptionA": "a"
+        }
+      ]
+    },
+    {
+      "id": "guest",
+      "position": 10,
+      "ownerPrompt": "지친 손님이 집에 찾아오면 나는?",
+      "visitorPrompt": "지친 손님이 집에 찾아오면 이 사람은?",
+      "optionA": "먹을 것처럼 필요한 도움부터 챙긴다",
+      "optionB": "편히 앉혀 이야기를 먼저 들어준다",
+      "isSignature": false,
+      "conceptContext": "공간·돌봄",
+      "conceptSignals": [
+        {
+          "conceptId": "coop.support",
+          "directionForOptionA": "a"
+        }
+      ]
+    }
+  ],
+  "conceptVersion": 1
+}

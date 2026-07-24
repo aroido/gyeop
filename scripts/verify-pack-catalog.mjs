@@ -9,7 +9,14 @@ import {
   readPackSeedManifests,
   renderPackSeed,
 } from "./render-pack-seed.mjs";
-import { OFFICIAL_PACKS } from "../lib/packs/official-pack-registry.mjs";
+import {
+  OFFICIAL_PACK_HISTORY,
+  OFFICIAL_PACKS,
+} from "../lib/packs/official-pack-registry.mjs";
+import {
+  CONCEPT_CATALOG_V1,
+  CONCEPT_CONTEXT_V1_ALLOWLIST,
+} from "../lib/concepts/catalog-core.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LOWER_KEBAB = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -44,6 +51,25 @@ function boundedString(value, maximum, pattern) {
   );
 }
 
+function parseTsv(source, expectedHeaders) {
+  const [header, ...lines] = source.trimEnd().split("\n");
+  assert.deepEqual(header.split("\t"), expectedHeaders);
+  return lines.map((line) =>
+    Object.fromEntries(
+      line.split("\t").map((value, index) => [expectedHeaders[index], value]),
+    ),
+  );
+}
+
+function renderedSignals(card) {
+  return card.conceptSignals
+    .map(
+      ({ conceptId, directionForOptionA }) =>
+        `${conceptId}:${directionForOptionA.toUpperCase()}`,
+    )
+    .join(",");
+}
+
 export function validatePackManifest(pack) {
   assert.ok(boundedString(pack.slug, 64, LOWER_KEBAB));
   assert.ok(boundedString(pack.version, 80, LOWER_KEBAB));
@@ -76,6 +102,28 @@ export function validatePackManifest(pack) {
     assert.ok(boundedString(card.optionB, 120));
     assert.notEqual(card.optionA, card.optionB);
     assert.equal(typeof card.isSignature, "boolean");
+    if (pack.conceptVersion === 1) {
+      assert.ok(CONCEPT_CONTEXT_V1_ALLOWLIST.has(card.conceptContext));
+      assert.ok(
+        Array.isArray(card.conceptSignals) &&
+          card.conceptSignals.length >= 1 &&
+          card.conceptSignals.length <= 2,
+      );
+      assert.equal(
+        new Set(card.conceptSignals.map(({ conceptId }) => conceptId)).size,
+        card.conceptSignals.length,
+      );
+      for (const signal of card.conceptSignals) {
+        assert.ok(
+          CONCEPT_CATALOG_V1.concepts.some(({ id }) => id === signal.conceptId),
+        );
+        assert.ok(["a", "b"].includes(signal.directionForOptionA));
+      }
+    } else {
+      assert.equal(pack.conceptVersion, undefined);
+      assert.equal(card.conceptContext, undefined);
+      assert.equal(card.conceptSignals, undefined);
+    }
   }
   return true;
 }
@@ -117,6 +165,7 @@ export function validateCoverSources(homeSource, cssSource) {
 
 export async function verifyPackCatalog(root = ROOT) {
   const manifests = readPackManifests(root);
+  const history = readPackSeedManifests(root);
   assert.equal(
     manifests.length,
     24,
@@ -126,6 +175,69 @@ export async function verifyPackCatalog(root = ROOT) {
     assert.ok(manifests.some((pack) => pack.slug === slug));
   }
   for (const manifest of manifests) validatePackManifest(manifest);
+  assert.equal(history.length, 69, "pack history must contain 69 versions");
+  assert.equal(
+    history.reduce((count, pack) => count + pack.cards.length, 0),
+    690,
+    "pack history must contain 690 cards",
+  );
+  for (const manifest of history) {
+    assert.match(manifest.version, new RegExp(`^${manifest.slug}-v[1-9]\\d*$`));
+    assert.equal(manifest.cards.length, 10);
+    assert.equal(new Set(manifest.cards.map(({ id }) => id)).size, 10);
+  }
+  assert.ok(manifests.every(({ conceptVersion }) => conceptVersion === 1));
+  const currentCards = manifests.flatMap(({ cards }) => cards);
+  assert.equal(currentCards.length, 240);
+  assert.equal(
+    currentCards.reduce(
+      (count, { conceptSignals }) => count + conceptSignals.length,
+      0,
+    ),
+    289,
+  );
+  assert.deepEqual(
+    new Set(currentCards.map(({ conceptContext }) => conceptContext)),
+    CONCEPT_CONTEXT_V1_ALLOWLIST,
+  );
+
+  const conceptDistribution = new Map(
+    CONCEPT_CATALOG_V1.concepts.map(({ id }) => [
+      id,
+      { cards: new Set(), packs: new Set(), contexts: new Set() },
+    ]),
+  );
+  for (const manifest of manifests) {
+    const packConcepts = new Map();
+    const packAreas = new Set();
+    for (const card of manifest.cards) {
+      for (const { conceptId } of card.conceptSignals) {
+        const concept = CONCEPT_CATALOG_V1.concepts.find(
+          ({ id }) => id === conceptId,
+        );
+        packAreas.add(concept.areaId);
+        packConcepts.set(conceptId, (packConcepts.get(conceptId) ?? 0) + 1);
+        const distribution = conceptDistribution.get(conceptId);
+        distribution.cards.add(`${manifest.slug}\0${card.id}`);
+        distribution.packs.add(manifest.slug);
+        distribution.contexts.add(card.conceptContext);
+      }
+    }
+    assert.ok(packAreas.size >= 4, `${manifest.slug} has too few areas`);
+    assert.ok(packConcepts.size >= 6, `${manifest.slug} has too few concepts`);
+    assert.ok(
+      [...packConcepts.values()].every((count) => count <= 3),
+      `${manifest.slug} repeats one concept too often`,
+    );
+  }
+  for (const [conceptId, distribution] of conceptDistribution) {
+    assert.ok(distribution.cards.size >= 6, `${conceptId} has too few cards`);
+    assert.ok(distribution.packs.size >= 3, `${conceptId} has too few packs`);
+    assert.ok(
+      distribution.contexts.size >= 3,
+      `${conceptId} has too few contexts`,
+    );
+  }
   assert.equal(
     new Set(manifests.map(({ title }) => title)).size,
     manifests.length,
@@ -145,6 +257,7 @@ export async function verifyPackCatalog(root = ROOT) {
   const registryByVersion = new Map(
     OFFICIAL_PACKS.map((pack) => [`${pack.slug}\0${pack.version}`, pack]),
   );
+  assert.equal(OFFICIAL_PACK_HISTORY.length, 69);
   assert.equal(
     registryByVersion.size,
     manifests.length,
@@ -182,8 +295,56 @@ export async function verifyPackCatalog(root = ROOT) {
   const hash = createHash("sha256").update(manifestBytes).digest("hex");
   assert.ok(docs.includes(`manifest SHA-256: \`${hash}\``));
   assert.deepEqual(parseFrozenPackTable(docs), frozenOldFriend.cards);
-  assert.equal(seed, renderPackSeed(readPackSeedManifests(root)));
+  assert.equal(
+    seed,
+    renderPackSeed(readPackSeedManifests(root), {
+      singleStatement: true,
+    }),
+  );
   validateCoverSources(homeSource, cssSource);
+
+  const mapping = parseTsv(
+    readFileSync(
+      path.join(root, "docs/product/concept-card-mapping-v0.tsv"),
+      "utf8",
+    ),
+    ["pack", "version", "card_id", "signature", "context", "signals"],
+  );
+  const rewrites = parseTsv(
+    readFileSync(
+      path.join(root, "docs/product/concept-card-rewrites-v0.tsv"),
+      "utf8",
+    ),
+    [
+      "pack",
+      "source_version",
+      "card_id",
+      "owner_prompt",
+      "visitor_prompt",
+      "option_a",
+      "option_b",
+      "signals",
+    ],
+  );
+  assert.equal(mapping.length, 240);
+  assert.equal(rewrites.length, 48);
+  const mappingByKey = new Map(
+    mapping.map((row) => [`${row.pack}\0${row.version}\0${row.card_id}`, row]),
+  );
+  for (const row of rewrites) {
+    const current = manifests.find(({ slug }) => slug === row.pack);
+    const card = current?.cards.find(({ id }) => id === row.card_id);
+    const mapped = mappingByKey.get(
+      `${row.pack}\0${row.source_version}\0${row.card_id}`,
+    );
+    assert.ok(card && mapped);
+    assert.equal(card.ownerPrompt, row.owner_prompt);
+    assert.equal(card.visitorPrompt, row.visitor_prompt);
+    assert.equal(card.optionA, row.option_a);
+    assert.equal(card.optionB, row.option_b);
+    assert.equal(row.signals, mapped.signals);
+    assert.equal(renderedSignals(card), row.signals);
+  }
 
   for (const manifest of manifests) {
     assert.equal(

@@ -330,8 +330,11 @@
 }
 
 .primary {
+  width: 100%;
+  border: 0;
   background: var(--lime);
   color: #050505;
+  cursor: pointer;
 }
 
 .secondary {
@@ -341,6 +344,162 @@
 
 .management {
   margin-top: 2.5rem;
+}
+
+.concepts {
+  margin-top: 2rem;
+}
+
+.conceptHeading h2 {
+  margin: 0.35rem 0 0;
+  font-size: clamp(1.8rem, 8vw, 2.75rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  word-break: keep-all;
+}
+
+.conceptList {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.conceptCard {
+  padding: 1rem;
+  border: 1px solid #555;
+  border-radius: 1rem;
+  background: #111;
+}
+
+.conceptCard > p {
+  margin: 0;
+  color: #bdbdbd;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.conceptCard > strong {
+  display: inline-block;
+  margin-top: 0.55rem;
+  padding: 0.18rem 0.45rem;
+  border-radius: 99rem;
+  background: var(--lime);
+  color: #050505;
+  font-size: 0.72rem;
+}
+
+.conceptCard h3 {
+  margin: 0.75rem 0 0;
+  font-size: clamp(1.35rem, 6vw, 2rem);
+  line-height: 1.12;
+  word-break: keep-all;
+}
+
+.conceptCard blockquote {
+  margin: 0.7rem 0 0;
+  padding-left: 0.7rem;
+  border-left: 0.25rem solid var(--blue);
+  color: #ddd;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.conceptCard > button {
+  width: 100%;
+  min-height: 2.8rem;
+  margin-top: 0.8rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: var(--blue);
+  color: #fff;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.conceptEvidence {
+  margin-top: 0.8rem;
+  border-top: 1px solid #383838;
+  padding-top: 0.7rem;
+}
+
+.conceptEvidence summary {
+  color: var(--lime);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.conceptEvidence div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem 0.75rem;
+  margin-top: 0.7rem;
+}
+
+.conceptEvidence div p,
+.conceptEvidence > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #bbb;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.sharePicker {
+  width: min(calc(100% - 1.5rem), 36rem);
+  max-height: min(82svh, 46rem);
+  padding: 1rem;
+  overflow: auto;
+  border: 1px solid #666;
+  border-top: 0.45rem solid var(--lime);
+  border-radius: 1rem;
+  background: #111;
+  color: #fff;
+}
+
+.sharePicker::backdrop {
+  background: rgb(0 0 0 / 78%);
+}
+
+.sharePicker h2 {
+  margin: 0.4rem 0 1rem;
+  font-size: 1.7rem;
+}
+
+.sharePicker [role="radiogroup"] {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.sharePicker [role="radio"] {
+  display: grid;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px solid #555;
+  border-radius: 0.75rem;
+  background: #090909;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sharePicker [role="radio"][aria-checked="true"] {
+  border-color: var(--lime);
+  background: #18245d;
+}
+
+.sharePicker [role="radio"] span {
+  color: #ccc;
+}
+
+.dialogClose {
+  float: right;
+  border: 1px solid #555;
+  border-radius: 99rem;
+  padding: 0.35rem 0.65rem;
+  background: #111;
+  color: #fff;
+  cursor: pointer;
 }
 
 .management > h2 {

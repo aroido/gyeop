@@ -92,8 +92,10 @@ test("owner client consumes a successful opening preload exactly once", async ()
   try {
     globalThis.fetch = async (url) => {
       fetches += 1;
-      assert.equal(url, "/api/packs/old-friend");
-      return Response.json(publishedPack);
+      assert.equal(url, "/api/plays/19000000-0000-4000-8000-000000000011/pack");
+      return Response.json(publishedPack, {
+        headers: { "cache-control": "private, no-store" },
+      });
     };
     const preload = preloadOwnerFlow(play);
     assert.equal(preloadOwnerFlow(play), preload);

@@ -168,7 +168,7 @@ export function preloadOwnerFlow(
   }
   const existing = preloadedOwnerFlows.get(play.id);
   if (existing) return existing;
-  const request = readOwnerPack(play.packSlug).then((pack) => ({ play, pack }));
+  const request = readOwnerPlayPack(play.id).then((pack) => ({ play, pack }));
   preloadedOwnerFlows.set(play.id, request);
   void request.catch(() => {
     if (preloadedOwnerFlows.get(play.id) === request) {
@@ -195,7 +195,7 @@ export function loadOwnerFlow(
   if (existing) return existing;
   const request = readOwnerPlay(playId).then(async (play) => ({
     play,
-    pack: await readOwnerPack(play.packSlug),
+    pack: await readOwnerPlayPack(play.id),
   }));
   ownerFlowLoads.set(playId, request);
   const clear = () => {
@@ -214,6 +214,35 @@ export async function readOwnerPack(packSlug: string): Promise<OwnerPack> {
   });
   const value = await responseJson(response);
   if (!response.ok) invalidResponse(response.status);
+  try {
+    return decodePublishedPack(value) as OwnerPack;
+  } catch {
+    invalidResponse(response.status);
+  }
+}
+
+export async function readOwnerPlayPack(playId: string): Promise<OwnerPack> {
+  const response = await fetch(`${ownerPlayPath(playId)}/pack`, {
+    method: "GET",
+    cache: "no-store",
+    credentials: "same-origin",
+  });
+  ensureOwnerNoStore(response);
+  const value = await responseJson(response);
+  if (!response.ok) {
+    if (
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      typeof (value as { code?: unknown }).code === "string"
+    ) {
+      throw new OwnerFlowHttpError(
+        response.status,
+        (value as { code: string }).code,
+      );
+    }
+    invalidResponse(response.status);
+  }
   try {
     return decodePublishedPack(value) as OwnerPack;
   } catch {

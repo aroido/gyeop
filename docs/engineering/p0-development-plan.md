@@ -38,7 +38,7 @@ Reviewer Agent: development_plan_review, issue_backlog_review, issue17_spec_revi
 - `docs/assets/mockups/06-friend-contribution-flow.png`
 - `docs/assets/mockups/owner-profile-relationship-layers-v1.png`
 
-P0에는 사람이 검수한 공식 팩 4개를 포함한다. 사용자 팩 제작, 공개 프로필 링크, 결제, 광고, 자유 텍스트, 댓글, DM, 점수·순위, AI 생성·요약은 구현하지 않는다.
+P0에는 사람이 검수한 활성 최신 공식 팩 24개·240문항을 포함한다. concept v1은 8개 영역·32개 양방향 결과 289개 카드 신호를 사용하며, 기존 45개와 신규 24개를 합친 69 version·690 card history를 불변으로 보존한다. 사용자 팩 제작, 공개 프로필 링크, 결제, 광고, 자유 텍스트, 댓글, DM, 점수·순위, AI 생성·요약은 구현하지 않는다.
 
 ### 2.1 검증 단계별 적용
 
@@ -128,7 +128,7 @@ lib/
   security/                 토큰·rate limit·로그 삭제 규칙
 supabase/
   migrations/               스키마·RLS·함수
-  seed.sql                   오래된 친구팩 1개와 카드 10장
+  seed.sql                   공식 24 template·69 version·690 card
   tests/                     pgTAP
 tests/
   unit/                      `node:test`
@@ -196,13 +196,13 @@ future production은 Supabase 기본 SMTP를 전달 경로로 사용하지 않�
 
 | 경로 | 사용자 | 책임 |
 |---|---|---|
-| `/` | 모두 | 오래된 친구팩 소개와 `팩 열어보기` |
+| `/` | 모두 | 활성 최신 공식 팩 24개 선택과 `팩 열어보기` |
 | `/play/[playId]` | 예비 주인 | 셀프 10장, 명시적 이전·나가기, 순서 보존 자동 저장 상태, 재시도, 완료·새로고침 복구 |
 | `/auth/sign-in` | 예비 주인 | Google 단일 로그인 CTA와 실패 안내 |
 | `/auth/google` | 예비 주인 | 완료 play·owner capability 검증 뒤 Supabase Google OAuth PKCE 시작 |
 | `/auth/callback` | 주인 | 세션 생성과 완료 draft claim |
 | `/auth/account-delete/callback` | 주인 | same-browser 기존-user 매직 링크 재로그인과 삭제 전용 freshness 증거 발급 |
-| `/me` | 주인 | 팩별 셀프 응답, 시선 수, 표본 상태, 최근 변화 |
+| `/me` | 주인 | feature enabled 시 실제 근거 기반 concept 훅 3~5개와 owner 선택형 safe share picker; disabled 시 기존 관계 레이어 |
 | `/me/plays/[playId]` | 주인 | 링크 생성·비활성화와 팩 상세 |
 | `/me/settings` | 주인 | 계정 삭제 확인과 보관 정책 안내 |
 | `/account-deletion/status` | 삭제 요청자 | owner session 없이 status receipt cookie만으로 generic pending·retry·completed 복구 |
@@ -375,6 +375,8 @@ DB constraint와 transaction이 허용된 전이만 수행한다. 클라이언�
 | `list_owner_share_links` | server wrapper | 같은 play capability·completed 상태 검증 뒤 `id/public_id/kind/status/expires_at`과 현재 `consumed_at=null`만 반환; secret/hash·응답 내용 금지 |
 | `record_owner_share_action` | server wrapper | 같은 play capability·completed 상태·active public/1:1 link를 확인한 뒤 browser-reported `share_handoff_succeeded|share_link_copied`만 기록; properties는 DB-derived `packVersion|linkKind` exact 두 key |
 | `record_owner_share_action_with_source` | server wrapper | 새 app의 share action 경계. 기존 검증에 더해 `null|profile_reshare`만 받고 null은 기존 두 key, profile 진입은 fixed `entrySource`가 추가된 exact 세 key를 기록. 별도 이름으로 4-argument rollback RPC와 PostgREST ambiguity 없이 공존 |
+| `get_owner_play_pack` | server wrapper | anonymous owner capability를 검증한 뒤 play의 immutable `pack_version_id`에 연결된 published historical pack을 기존 공개 pack shape로 반환 |
+| `get_authenticated_owner_play_pack` | server wrapper | fresh actor와 play 소유권을 검증한 뒤 exact historical pack 반환; current pointer로 재조회하지 않음 |
 | `get_invite_metadata` | server wrapper | public ID·secret 검증과 일반 팩 맥락 반환 |
 | `start_response` | server wrapper | #22는 공개 링크의 유효한 기존 session이면 response·저장 관계·시점을 idempotent 반환하고 없을 때만 response·서버 activity+24시간 만료를 원자 생성. #23이 `public|one_to_one`과 필수 3장 assignment까지 같은 transaction으로 확장 |
 | `save_response_answer` | server wrapper | 유효한 response session·만료·assignment 검증, 답변 upsert |
@@ -383,7 +385,7 @@ DB constraint와 transaction이 허용된 전이만 수행한다. 클라이언�
 | `get_visitor_response` | server wrapper | 유효·만료 전 response session 검증 뒤 assignments·저장한 방문자 선택·상태를 반환하고, submitted면 본인이 답한 카드에 한한 owner 선택·결정적 비교도 반환 |
 | `withdraw_response` | server wrapper | token 검증, 응답 제거·비식별화. 알림 이슈에서 같은 lock order로 response 철회와 연결 job 취소를 한 transaction에 추가 |
 | `get_owner_profile` | server wrapper | owner 검증과 권한별 집계 반환 |
-| `record_owner_profile_event` | server wrapper | completed owner의 `profile_viewed`와 submitted public 시선이 1건 이상인 `profile_reshare_clicked`만 기록; 후자는 fixed `entrySource=profile_reshare`, 둘 다 visitor 식별자 없음 |
+| `record_owner_profile_event` | server wrapper | 기존 profile 두 event와 enabled concept의 `concept_profile_viewed|concept_detail_opened`을 owner source play에만 기록. conceptId·방향·관계는 폐기하고 properties는 DB-derived exact `{packVersion}` |
 | `list_owner_1to1_responses` | server wrapper | owner actor·play 소유권 검증 뒤 1:1 response의 `id/share_link_id/status/relationship_code/known_since_code/submitted_at/withdrawn_at`만 반환; 선택값 금지 |
 | `get_private_1to1_comparison` | server wrapper | play owner 검증과 지정 1:1 response 카드 비교 반환; visitor는 `get_visitor_response` 사용 |
 | `consume_rate_limit` | server wrapper | action·network/link key bucket 원자 증가와 허용 여부 반환 |
@@ -430,7 +432,9 @@ DB constraint와 transaction이 허용된 전이만 수행한다. 클라이언�
 | `POST /api/responses/[id]/continue` | response session cookie | 선택 2장 배정 |
 | `POST /api/responses/withdraw` | management token | 응답 철회 |
 | `GET /api/me/profile?playId=[id]` | fresh Auth session | 본인 play의 권한별 프로필 집계 |
-| `POST /api/me/profile/events` | fresh Auth session | `playId`와 `profile_viewed|profile_reshare_clicked` exact event만 204/private no-store로 기록 |
+| `GET /api/me/concept-profile` | fresh Auth session | enabled일 때 전체 completed play에서 strict-decoded concept 훅 3~5개와 safe shareOptions 반환; disabled는 404 |
+| `GET /api/plays/[playId]/pack` | owner capability 또는 fresh Auth | 소유한 play의 exact historical pack을 private/no-store로 반환 |
+| `POST /api/me/profile/events` | fresh Auth session | 기존 두 event와 enabled concept exposure/detail의 exact discriminated body만 204/private no-store로 기록 |
 | `GET /api/me/plays/[id]/responses?kind=one_to_one` | fresh Auth session | 선택값 없는 1:1 response 상태 목록 |
 | `GET /api/me/responses/[id]?playId=[playId]` | fresh Auth session | 본인 play의 1:1 개별 비교 |
 | `POST /api/me/account/reauth` | owner session + CAPTCHA | 현재 owner email에 `shouldCreateUser:false` account-delete 전용 same-browser PKCE magic link 요청 |
@@ -486,7 +490,7 @@ DB constraint와 transaction이 허용된 전이만 수행한다. 클라이언�
 
 ## 12. 프로필 집계
 
-P0에는 별도 aggregate table을 만들지 않는다.
+P0에는 별도 aggregate table을 만들지 않는다. 기존 play별 관계 집계를 privacy threshold의 원천으로 재사용하고 애플리케이션 pure builder에서 concept profile을 만든다.
 
 - 비공개 재미 검증의 유효 시선: 공개 link에 귀속된 `visitor_responses.status = 'submitted'` 완료 응답
 - 주인용 비공개 전체 시선 수: 위 submitted 공개 link 응답 수
@@ -504,7 +508,11 @@ owner profile SQL 함수는 공개 링크의 raw 방문자 row나 개별 선택�
 
 인증 owner의 `/me` 계정 프로필은 새 aggregate SQL을 만들지 않는다. `list_authenticated_owner_plays`의 완료 play를 최신 활동순으로 유지하고, fresh Auth actor 한 번과 30초 전체 deadline 아래 `get_authenticated_owner_profile`을 최대 4개 동시 실행한다. completed play를 임의 절단하지 않으며 개별 profile에는 8초 deadline을 둔다. 한 결과라도 timeout·권한·decode·metadata 교차 검증에 실패하면 partial RSC를 만들지 않고 generic retry 화면으로 수렴한다. 계정 모델은 play별 strict profile의 첫 셀프 카드, collecting 관계의 play-bound `1/3|2/3`, 이미 available인 관계 질문만 직렬화한다. 서로 다른 play의 소표본은 합산하지 않는다.
 
-owner profile 화면은 시선 0건에서 재공유 CTA를 표시하지 않는다. 시선 1건 이상에서는 기존 질문팩 `시선 더 모으기`, `profile_viewed`, `profile_reshare_clicked` 조건을 유지한다. 관계 카드 PNG·다운로드·외부 공유는 #147이 소유한다.
+concept profile은 완료한 concept v1 play를 `completedAt DESC, playId ASC`로 정렬하고 slug별 하나만 선택한다. 같은 팩의 카드 신호는 팩 평균으로 묶어 반복 완료와 한 팩 안 여러 카드가 결과를 중복 가중하지 않게 한다. 셀프 `self`, threshold-safe 전체 관계의 `privateOthers`, 비연애 7개 공개 관계만의 `shareSafeOthers`를 각각 계산하며 romantic은 비공개 훅에는 들어갈 수 있어도 공유에는 절대 들어가지 않는다.
+
+첫 화면은 고정 유형 대신 반복·차이·상황 의존 자격을 만족한 훅 3~5개만 보여 준다. provenance에는 팩 제목과 exact context만 표시하고 개인 응답·관계 원자료·점수·퍼센트는 반환하지 않는다. 전체 share-eligible 후보는 stable rank의 `shareOptions`에 보존하며 추천 첫 항목도 owner가 picker에서 확인한 뒤에만 9:16 카드와 그 source pack 공개 초대로 이어진다. 위조한 concept/source query는 서버에서 현재 계정 profile로 재검증해 404로 닫는다.
+
+`GYEOP_CONCEPT_PROFILE_ENABLED`가 missing 또는 exact `false`면 이 UI/API/event variant만 비활성화하고 기존 관계 레이어, 공유 관리와 v1/v2/v3 owner·visitor 읽기는 유지한다. exact `true`만 활성화하며 다른 값은 startup error다.
 
 ## 13. 알림과 분석
 
