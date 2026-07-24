@@ -41,6 +41,7 @@ type VisitorFixture = {
   context: BrowserContext;
   page: Page;
 };
+type VisitorEvent = "comparison_viewed" | "same_pack_start_clicked";
 
 const visitorHeaders = {
   "x-forwarded-host": "127.0.0.1",
@@ -146,6 +147,27 @@ function coreFunnelDelta(initial: Record<CoreFunnelKey, number>) {
       (current[key] ?? 0) - (initial[key] ?? 0),
     ]),
   );
+}
+
+async function waitForVisitorEvent(page: Page, event: VisitorEvent) {
+  const response = await page.waitForResponse((candidate) => {
+    const request = candidate.request();
+    if (
+      request.method() !== "POST" ||
+      !/\/api\/responses\/[0-9a-f-]{36}\/events$/.test(
+        new URL(candidate.url()).pathname,
+      )
+    ) {
+      return false;
+    }
+    try {
+      return (request.postDataJSON() as { event?: unknown }).event === event;
+    } catch {
+      return false;
+    }
+  });
+  expect(response.status()).toBe(204);
+  expect(await response.headerValue("cache-control")).toBe("private, no-store");
 }
 
 async function installFailedClipboard(context: BrowserContext) {
@@ -323,11 +345,13 @@ async function completeVisitor(
       'section[data-kind="response"] [role="progressbar"] + div span',
     ),
   );
+  const comparisonRecorded = waitForVisitorEvent(page, "comparison_viewed");
   for (const [index, choice] of ["B", "A", "A"].entries()) {
     const prompt = await question.textContent();
     await page.getByRole("button", { name: new RegExp(`^${choice} `) }).click();
     if (index < 2) await expect(question).not.toHaveText(prompt ?? "");
   }
+  await comparisonRecorded;
   await expect(page.getByText("3장 비교 완료")).toBeVisible({
     timeout: 15_000,
   });
@@ -535,7 +559,12 @@ test.describe("core MVP live gate", () => {
       name: "나도 이 팩으로 시작하기",
     });
     await samePack.focus();
+    const samePackStartRecorded = waitForVisitorEvent(
+      visitors[0].page,
+      "same_pack_start_clicked",
+    );
     await visitors[0].page.keyboard.press("Enter");
+    await samePackStartRecorded;
     await visitors[0].page.waitForURL(/\/play\/[0-9a-f-]{36}$/);
     await expect(
       visitors[0].page.getByRole("heading", {
