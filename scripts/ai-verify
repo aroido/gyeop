@@ -241,6 +241,7 @@ case "$MODE" in
   ci-live-owner)
     start_supabase
     pnpm test:e2e:owner:run
+    reset_supabase_for_app
     pnpm test:e2e:concept:run
     echo "GYEOP CI live owner verification passed."
     exit 0
@@ -284,6 +285,7 @@ case "$MODE" in
     restart_supabase
     pnpm test:e2e:mvp:run
     pnpm test:e2e:owner
+    reset_supabase_for_app
     pnpm test:e2e:concept:run
     run_mock_verification
     ;;
