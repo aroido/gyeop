@@ -852,7 +852,8 @@
   .conceptCard *,
   .sharePicker * {
     scroll-behavior: auto !important;
-    transition-duration: 0.001ms !important;
+    animation: none !important;
+    transition: none !important;
   }
 
   .loading > div {

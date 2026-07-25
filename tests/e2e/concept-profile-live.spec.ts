@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
+import { mkdirSync } from "node:fs";
 
 import { expect, test } from "@playwright/test";
 
@@ -9,6 +10,7 @@ import { signInOwnerAccount } from "./owner-auth-live-fixture";
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const conceptEnabled = process.env.GYEOP_CONCEPT_PROFILE_ENABLED === "true";
 const databaseContainer = "supabase_db_gyeop";
+const screenshotDirectory = "docs/temp/qa/issue-161";
 
 function sql(statement: string, output = false) {
   const result = execFileSync(
@@ -45,11 +47,13 @@ function insertCompletedConceptPlay({
   packVersion,
   requiredCards,
   responseCount = 3,
+  selfChoices = {},
 }: {
   userId: string;
   packVersion: string;
   requiredCards: [string, string, string];
-  responseCount?: 0 | 3;
+  responseCount?: 0 | 1 | 2 | 3;
+  selfChoices?: Record<string, "a" | "b">;
 }) {
   const playId = randomUUID();
   const anonymousOwnerId = randomUUID();
@@ -131,6 +135,12 @@ function insertCompletedConceptPlay({
           ${answerValues}
         ) as fixture(response_id, pack_version_id, card_id, choice);
       `;
+  const selfChoiceCases = Object.entries(selfChoices)
+    .map(([cardId, choice]) => `when '${cardId}' then '${choice}'`)
+    .join(" ");
+  const selfChoiceSql = selfChoiceCases
+    ? `case card.id ${selfChoiceCases} else 'a' end`
+    : "'a'";
   sql(`
     with fixed as (select clock_timestamp() as value)
     insert into public.anonymous_owners (
@@ -158,7 +168,11 @@ function insertCompletedConceptPlay({
     insert into public.self_answers (
       pack_play_id, pack_version_id, card_id, choice
     )
-    select '${playId}', version.id, card.id, 'a'
+    select
+      '${playId}',
+      version.id,
+      card.id,
+      ${selfChoiceSql}
     from public.pack_versions as version
     join public.pack_cards as card on card.pack_version_id = version.id
     where version.version = '${packVersion}';
@@ -203,8 +217,10 @@ test.describe("concept owner profile live", () => {
 
   test("renders and confirms a safe hook at 320, 390, and 430px", async ({
     page,
+    request,
   }) => {
     test.setTimeout(120_000);
+    mkdirSync(screenshotDirectory, { recursive: true });
     await page.addInitScript({
       content: `
         (() => {
@@ -251,8 +267,13 @@ test.describe("concept owner profile live", () => {
           requiredCards: ["message-after", "decompress", "weeknight"],
         }),
       );
-      for (const width of [320, 390, 430]) {
-        await page.setViewportSize({ width, height: 800 });
+      const viewports = [
+        { width: 320, height: 568 },
+        { width: 390, height: 844 },
+        { width: 430, height: 932 },
+      ];
+      for (const viewport of viewports) {
+        await page.setViewportSize(viewport);
         await page.goto("/me");
         const hooks = page.locator("[data-concept-card]");
         await expect(hooks).toHaveCount(3);
@@ -269,6 +290,9 @@ test.describe("concept owner profile live", () => {
         await expect(
           hooks.first().getByLabel(/내 위치:.*근거 (흔적|윤곽|선명)/),
         ).toBeVisible();
+        await expect(
+          hooks.locator('[aria-label^="지인 익명 집계:"]'),
+        ).toHaveCount(3);
         await expect(page.locator("blockquote")).toHaveCount(0);
         await expect(
           page.getByText(
@@ -303,6 +327,51 @@ test.describe("concept owner profile live", () => {
           ),
         ).toBe(true);
         expect(
+          await hooks.evaluateAll((cards) =>
+            cards.every(
+              (card) =>
+                card.scrollWidth <= card.clientWidth &&
+                card.scrollHeight <= card.clientHeight,
+            ),
+          ),
+        ).toBe(true);
+        expect(
+          await hooks.first().evaluate((card) => {
+            const endpoints = card.querySelector("h3")?.nextElementSibling;
+            const [left, right] = endpoints
+              ? [...endpoints.children].map((node) =>
+                  node.getBoundingClientRect(),
+                )
+              : [];
+            return Boolean(left && right && left.right <= right.left);
+          }),
+        ).toBe(true);
+        expect(
+          await share.evaluate(
+            (node) =>
+              node.getBoundingClientRect().width >= 44 &&
+              node.getBoundingClientRect().height >= 44,
+          ),
+        ).toBe(true);
+        expect(
+          await hooks.first().evaluate((card) => {
+            const text = card.textContent ?? "";
+            const labels = [
+              "내 위치",
+              "지인 익명 집계",
+              "고유 문항",
+              "근거",
+              "왜 이렇게 보일까?",
+            ];
+            const positions = labels.map((label) => text.indexOf(label));
+            return positions.every(
+              (position, index) =>
+                position >= 0 &&
+                (index === 0 || position > positions[index - 1]),
+            );
+          }),
+        ).toBe(true);
+        expect(
           await page.evaluate(() => {
             const cards = [...document.querySelectorAll("article")].filter(
               (element) => element.hasAttribute("data-concept-card"),
@@ -318,14 +387,28 @@ test.describe("concept owner profile live", () => {
             );
           }),
         ).toBe(true);
+        await page.screenshot({
+          path: `${screenshotDirectory}/${viewport.width}.png`,
+          fullPage: true,
+        });
       }
+
+      const privateResponse = await page.request.get("/api/me/concept-profile");
+      expect(privateResponse.status()).toBe(200);
+      expect(privateResponse.headers()["cache-control"]).toContain("no-store");
+      const anonymousResponse = await request.get("/api/me/concept-profile");
+      expect(anonymousResponse.status()).toBe(401);
+      expect(anonymousResponse.headers()["cache-control"]).toContain(
+        "no-store",
+      );
 
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto("/me");
       await page.evaluate(() => {
         document.documentElement.style.fontSize = "200%";
       });
-      await expect(page.locator("[data-concept-card]")).toHaveCount(3);
+      const zoomedHooks = page.locator("[data-concept-card]");
+      await expect(zoomedHooks).toHaveCount(3);
       expect(
         await page.evaluate(
           () =>
@@ -333,8 +416,58 @@ test.describe("concept owner profile live", () => {
             document.documentElement.clientWidth,
         ),
       ).toBe(true);
+      expect(
+        await zoomedHooks.evaluateAll((cards) =>
+          cards.every(
+            (card) =>
+              card.scrollWidth <= card.clientWidth &&
+              card.scrollHeight <= card.clientHeight,
+          ),
+        ),
+      ).toBe(true);
+      const zoomedShare = page.getByRole("button", {
+        name: "한 장으로 나누기",
+      });
+      expect(
+        await zoomedShare.evaluate(
+          (node) =>
+            node.getBoundingClientRect().width >= 44 &&
+            node.getBoundingClientRect().height >= 44,
+        ),
+      ).toBe(true);
+      await zoomedShare.focus();
+      await expect(zoomedShare).toBeFocused();
+      expect(
+        await zoomedShare.evaluate(
+          (node) => getComputedStyle(node).outlineStyle !== "none",
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: `${screenshotDirectory}/zoom-200.png`,
+        fullPage: true,
+      });
       await page.evaluate(() => {
         document.documentElement.style.fontSize = "";
+      });
+
+      expect(
+        await page
+          .locator("[data-concept-card]")
+          .first()
+          .evaluate((card) => {
+            const animated = [...card.querySelectorAll("*")];
+            return animated.every((node) => {
+              const style = getComputedStyle(node);
+              return (
+                style.animationName === "none" &&
+                Number.parseFloat(style.transitionDuration) === 0
+              );
+            });
+          }),
+      ).toBe(true);
+      await page.screenshot({
+        path: `${screenshotDirectory}/reduced-motion.png`,
+        fullPage: true,
       });
 
       const stageStyles = await page
@@ -358,6 +491,10 @@ test.describe("concept owner profile live", () => {
       await detail.focus();
       await page.keyboard.press("Enter");
       await expect(detail.locator("..")).toHaveAttribute("open", "");
+      await page.keyboard.press("Space");
+      await expect(detail.locator("..")).not.toHaveAttribute("open", "");
+      await page.keyboard.press("Enter");
+      await expect(detail.locator("..")).toHaveAttribute("open", "");
       expect(
         await detail.evaluate((node) => node.getBoundingClientRect().height),
       ).toBeGreaterThanOrEqual(44);
@@ -370,8 +507,28 @@ test.describe("concept owner profile live", () => {
       );
       const share = page.getByRole("button", { name: "한 장으로 나누기" });
       await share.focus();
+      expect(
+        await share.evaluate(
+          (node) => getComputedStyle(node).outlineStyle !== "none",
+        ),
+      ).toBe(true);
+      await page.screenshot({
+        path: `${screenshotDirectory}/keyboard-focus.png`,
+        fullPage: true,
+      });
+      await page.keyboard.press("Shift+Tab");
+      await expect(share).not.toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(share).toBeFocused();
       await page.keyboard.press("Enter");
       const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      const close = dialog.getByRole("button", { name: "닫기" });
+      await close.focus();
+      await page.keyboard.press("Space");
+      await expect(dialog).not.toBeVisible();
+      await expect(share).toBeFocused();
+      await page.keyboard.press("Enter");
       await expect(dialog).toBeVisible();
       expect(
         Number(
@@ -382,7 +539,7 @@ test.describe("concept owner profile live", () => {
         ),
       ).toBe(before);
       for (const control of [
-        dialog.getByRole("button", { name: "닫기" }),
+        close,
         dialog.getByRole("radio").first(),
         dialog.getByRole("button", { name: "이 내용으로 공유 카드 확인" }),
       ]) {
@@ -445,12 +602,107 @@ test.describe("concept owner profile live", () => {
     }
   });
 
-  test("keeps the collecting action below hooks when no concept is shareable", async ({
+  for (const responseCount of [0, 1, 2] as const) {
+    test(`keeps ${responseCount}/3 private and the collecting action below hooks`, async ({
+      page,
+    }) => {
+      test.setTimeout(120_000);
+      mkdirSync(screenshotDirectory, { recursive: true });
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      const email = `concept-collecting-e2e-${randomUUID()}@example.com`;
+      await signInOwnerAccount(page, email, { profile: "new" });
+      const userId = sql(
+        `select id from auth.users where email = '${email}'`,
+        true,
+      );
+      expect(userId).toMatch(/^[0-9a-f-]{36}$/);
+      const fixtures: Array<{ playId: string }> = [];
+      try {
+        fixtures.push(
+          insertCompletedConceptPlay({
+            userId,
+            packVersion: "old-friend-v3",
+            requiredCards: ["conflict", "celebration", "plans"],
+            responseCount,
+          }),
+          insertCompletedConceptPlay({
+            userId,
+            packVersion: "after-work-v3",
+            requiredCards: ["message-after", "decompress", "weeknight"],
+            responseCount,
+          }),
+        );
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto("/me");
+
+        const lead = page.getByText(
+          "한 장면의 답이 여러 팩에서 어떤 결로 이어졌는지 살펴보세요.",
+          { exact: true },
+        );
+        const hooks = page.locator("[data-concept-card]");
+        await expect(lead).toHaveCount(0);
+        await expect(hooks).toHaveCount(3);
+        const lockedStatus = hooks
+          .first()
+          .locator("p")
+          .filter({ hasText: `시선을 모으는 중 · ${responseCount}/3` })
+          .first();
+        await expect(lockedStatus).toBeVisible();
+        await expect(
+          hooks.locator('[aria-label^="지인 익명 집계:"]'),
+        ).toHaveCount(0);
+        await expect(hooks.locator("[data-band]")).toHaveCount(0);
+        expect((await hooks.allTextContents()).join("\n")).not.toMatch(
+          /지인 익명 집계:.*(왼쪽|오른쪽)/,
+        );
+        expect(
+          await lockedStatus.evaluate(
+            (node) =>
+              ![...node.attributes].some(
+                ({ name }) => name.startsWith("data-") || name === "aria-label",
+              ),
+          ),
+        ).toBe(true);
+        const collectingAction = page.getByRole("link", {
+          name: "시선 더 모으기",
+        });
+        await expect(collectingAction).toBeVisible();
+        await expect(
+          page.getByRole("button", { name: "한 장으로 나누기" }),
+        ).toHaveCount(0);
+        await expect(
+          page.getByRole("link", { name: "내 겹 공유하기" }),
+        ).toHaveCount(0);
+        await expect(page.locator("main header").getByRole("link")).toHaveCount(
+          0,
+        );
+        const order = await Promise.all([
+          hooks.first().boundingBox(),
+          hooks.last().boundingBox(),
+          collectingAction.boundingBox(),
+        ]);
+        expect(order.every(Boolean)).toBe(true);
+        expect(order[0]!.y).toBeLessThan(order[1]!.y);
+        expect(order[1]!.y).toBeLessThan(order[2]!.y);
+        if (responseCount === 2) {
+          await page.screenshot({
+            path: `${screenshotDirectory}/locked.png`,
+            fullPage: true,
+          });
+        }
+      } finally {
+        cleanupOwnerFixtures(userId, fixtures);
+      }
+    });
+  }
+
+  test("names a contextual signal without forcing one position", async ({
     page,
   }) => {
     test.setTimeout(120_000);
+    mkdirSync(screenshotDirectory, { recursive: true });
     await page.emulateMedia({ reducedMotion: "reduce" });
-    const email = `concept-collecting-e2e-${randomUUID()}@example.com`;
+    const email = `concept-contextual-e2e-${randomUUID()}@example.com`;
     await signInOwnerAccount(page, email, { profile: "new" });
     const userId = sql(
       `select id from auth.users where email = '${email}'`,
@@ -464,60 +716,49 @@ test.describe("concept owner profile live", () => {
           userId,
           packVersion: "old-friend-v3",
           requiredCards: ["conflict", "celebration", "plans"],
-          responseCount: 0,
+          selfChoices: { conflict: "b" },
+        }),
+        insertCompletedConceptPlay({
+          userId,
+          packVersion: "algorithm-mirror-v3",
+          requiredCards: ["save-first", "share-find", "feed-clue"],
+          selfChoices: { "save-first": "b" },
         }),
         insertCompletedConceptPlay({
           userId,
           packVersion: "after-work-v3",
           requiredCards: ["message-after", "decompress", "weeknight"],
-          responseCount: 0,
+          selfChoices: { "message-after": "b" },
         }),
       );
       await page.setViewportSize({ width: 390, height: 844 });
       await page.goto("/me");
-
-      const lead = page.getByText(
-        "한 장면의 답이 여러 팩에서 어떤 결로 이어졌는지 살펴보세요.",
-        { exact: true },
-      );
-      const hooks = page.locator("[data-concept-card]");
-      await expect(lead).toHaveCount(0);
-      await expect(hooks).toHaveCount(3);
-      const lockedStatus = hooks
-        .first()
-        .locator("p")
-        .filter({ hasText: /시선을 모으는 중 · [0-2]\/3/ })
+      const contextual = page
+        .getByLabel(/내 위치: 상황에 따라 양쪽 모습, 근거/)
         .first();
-      await expect(lockedStatus).toBeVisible();
-      expect(
-        await lockedStatus.evaluate(
-          (node) =>
-            ![...node.attributes].some(
-              ({ name }) => name.startsWith("data-") || name === "aria-label",
-            ),
-        ),
-      ).toBe(true);
-      const collectingAction = page.getByRole("link", {
-        name: "시선 더 모으기",
+      await expect(contextual).toBeVisible();
+      await expect(contextual).toHaveAttribute("data-display", "contextual");
+      await expect(contextual).not.toHaveAttribute("style", /concept-position/);
+      await page.screenshot({
+        path: `${screenshotDirectory}/contextual.png`,
+        fullPage: true,
       });
-      await expect(collectingAction).toBeVisible();
-      await expect(
-        page.getByRole("button", { name: "한 장으로 나누기" }),
-      ).toHaveCount(0);
-      await expect(
-        page.getByRole("link", { name: "내 겹 공유하기" }),
-      ).toHaveCount(0);
-      await expect(page.locator("main header").getByRole("link")).toHaveCount(
-        0,
-      );
-      const order = await Promise.all([
-        hooks.first().boundingBox(),
-        hooks.last().boundingBox(),
-        collectingAction.boundingBox(),
-      ]);
-      expect(order.every(Boolean)).toBe(true);
-      expect(order[0]!.y).toBeLessThan(order[1]!.y);
-      expect(order[1]!.y).toBeLessThan(order[2]!.y);
+      sql(`
+        update public.pack_plays
+        set owner_id = null
+        where id in ('${fixtures[1].playId}', '${fixtures[2].playId}');
+      `);
+      await page.reload();
+      const unsettled = page
+        .getByLabel(/내 위치: 아직 한쪽으로 모이지 않음, 근거/)
+        .first();
+      await expect(unsettled).toBeVisible();
+      await expect(unsettled).toHaveAttribute("data-display", "unsettled");
+      await expect(unsettled).not.toHaveAttribute("style", /concept-position/);
+      await page.screenshot({
+        path: `${screenshotDirectory}/unsettled.png`,
+        fullPage: true,
+      });
     } finally {
       cleanupOwnerFixtures(userId, fixtures);
     }
