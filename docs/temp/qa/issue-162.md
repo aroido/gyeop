@@ -1,6 +1,6 @@
 # Issue 162 독립 QA
 
-검증 구현 HEAD: `d0ce43b22da7c4103a60543dff811c384c0e0ae3`
+검증 구현 HEAD: `65a62809868fe0fab6d9132d15a41a4b3afb25e0`
 비교 기준: `1b27c9ca8c563f43b68a7a12fd249a43e7b9914a`
 
 ## QA 판정
@@ -30,6 +30,7 @@ P0/P1 Findings: 0
 2. live 대표 흐름의 3축 문항 수 assertion이 축별 strict-safe 검사로 바뀌어 concept E2E 5/5가 통과했다.
 3. screenshot 경로가 `docs/temp/qa/issue-162`로 바뀌었고 요구된 PNG가 정확히 9개 생성됐다.
 4. source policy 검사가 폐기된 `한 장으로 나누기` 대신 현재 결과-first heading `세 가지 겹을 한 장에 담아요`를 요구하며, CTA `내 겹 공유하기` 검사는 그대로 유지된다.
+5. 공유 성공 UI보다 늦게 전송되던 `profile_reshare` 귀속 이벤트를 best-effort로 먼저 기다려, 다음 단계나 서버 종료 타이밍에도 퍼널 연결이 유실되지 않는다.
 
 ## 검증 명령과 결과
 
@@ -49,8 +50,12 @@ P0/P1 Findings: 0
   - owner auth와 `private, no-store`, 대표 picker → 관리 화면 preview, analytics one-shot, exact 3축, 0/1/2 privacy fallback, contextual split, 320/390/430, 200% 확대, 키보드/focus 복귀, reduced motion, 실제 PNG 다운로드를 확인했다.
   - DB 초기화 전 첫 시도는 모든 magic-link 요청이 이전 로컬 상태의 429를 받아 종료됐으며 구현 assertion에는 도달하지 않았다.
 - `GYEOP_E2E_PORT=32163 pnpm exec playwright test tests/e2e/share-links.spec.ts --project=mobile-chromium`
-  - PASS: 21/21.
+  - PASS: 22/22.
   - 기존 relationship 카드, native share 취소/실패, `NotAllowedError`, PNG/context/toBlob/font 경계, 수동 복사 focus, mixed query 404, 1080×1920 concept Canvas와 320/390/430 접근성 회귀를 확인했다.
+  - 귀속 요청이 대기 중일 때 버튼 disabled와 성공 문구 미노출, 완료 뒤 focus 복귀와 exact `profile_reshare` body를 확인했다. 분석 요청이 실패해도 실제 사용자 공유·복사 성공은 유지되고 취소·실패에서는 성공 이벤트가 생기지 않는다.
+- `pnpm test:e2e:mvp:pr:run`
+  - PASS: 수정 후 연속 2회 1/1, 독립 재검증 1/1.
+  - `profile_reshare_clicked → profile_share_succeeded → downstream_visitor_submitted` 귀속과 replacement link 연결을 확인했다.
 - `node scripts/verify-owner-profile.mjs`
   - PASS: 현재 `/me` heading `세 가지 겹을 한 장에 담아요`와 CTA `내 겹 공유하기` 계약을 모두 확인한다.
 - `pnpm test:owner-profile`
