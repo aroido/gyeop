@@ -70,10 +70,31 @@ export type ConceptHook = Readonly<{
 
 export type ConceptShareOption = Readonly<{
   conceptId: string;
-  safeCopy: string;
-  safeQuestion: string;
-  shareEvidence: Exclude<ConceptShareEvidence, { status: "unavailable" }>;
   sourcePlayId: string;
+  bundle: readonly ConceptProfileShareAxis[];
+}>;
+
+export type ConceptProfileShareAxis = Readonly<{
+  areaLabel: string;
+  conceptLabel: string;
+  directionA: string;
+  directionB: string;
+  selfPosition: number;
+  others:
+    | Readonly<{
+        source: "shareSafeOthers";
+        direction: "a" | "b";
+        stage: "outline" | "clear";
+        position: number;
+        range: "medium" | "narrow";
+      }>
+    | Readonly<{
+        source: "shareSafeOthers";
+        direction: "contextual";
+        stage: "outline" | "clear";
+        range: "split";
+      }>;
+  cardCount: number;
 }>;
 
 export type ConceptAreaSummary = Readonly<{

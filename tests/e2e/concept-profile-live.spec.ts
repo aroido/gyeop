@@ -259,12 +259,17 @@ test.describe("concept owner profile live", () => {
         insertCompletedConceptPlay({
           userId,
           packVersion: "old-friend-v3",
-          requiredCards: ["conflict", "celebration", "plans"],
+          requiredCards: ["conflict", "celebration", "hard-day"],
         }),
         insertCompletedConceptPlay({
           userId,
           packVersion: "after-work-v3",
           requiredCards: ["message-after", "decompress", "weeknight"],
+        }),
+        insertCompletedConceptPlay({
+          userId,
+          packVersion: "algorithm-mirror-v3",
+          requiredCards: ["save-first", "share-find", "feed-clue"],
         }),
       );
       const viewports = [
@@ -315,7 +320,7 @@ test.describe("concept owner profile live", () => {
           page.getByRole("heading", { name: "내 질문팩 관리" }),
         ).toBeVisible();
         const share = page.getByRole("button", {
-          name: "한 장으로 나누기",
+          name: "내 겹 공유하기",
         });
         await expect(share).toHaveCount(1);
         await expect(share).toBeVisible();
@@ -377,7 +382,7 @@ test.describe("concept owner profile live", () => {
               (element) => element.hasAttribute("data-concept-card"),
             );
             const action = [...document.querySelectorAll("button")].find(
-              (element) => element.textContent?.trim() === "한 장으로 나누기",
+              (element) => element.textContent?.trim() === "내 겹 공유하기",
             );
             return Boolean(
               cards.at(-1) &&
@@ -426,7 +431,7 @@ test.describe("concept owner profile live", () => {
         ),
       ).toBe(true);
       const zoomedShare = page.getByRole("button", {
-        name: "한 장으로 나누기",
+        name: "내 겹 공유하기",
       });
       expect(
         await zoomedShare.evaluate(
@@ -505,7 +510,7 @@ test.describe("concept owner profile live", () => {
           true,
         ),
       );
-      const share = page.getByRole("button", { name: "한 장으로 나누기" });
+      const share = page.getByRole("button", { name: "내 겹 공유하기" });
       await share.focus();
       expect(
         await share.evaluate(
@@ -547,6 +552,17 @@ test.describe("concept owner profile live", () => {
           await control.evaluate((node) => node.getBoundingClientRect().height),
         ).toBeGreaterThanOrEqual(44);
       }
+      const shareChoices = dialog.getByRole("radio");
+      await expect(shareChoices).toHaveCount(3);
+      await expect(shareChoices.first()).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      await expect(shareChoices.first()).toContainText("추천 · ");
+      const selectedAxisLabels = (await shareChoices.first().innerText())
+        .replace("추천 · ", "")
+        .split(/ · |—/)
+        .map((value) => value.trim());
 
       let failOnce = true;
       await page.route("**/api/me/profile/events", async (route) => {
@@ -575,7 +591,17 @@ test.describe("concept owner profile live", () => {
       await expect(page).toHaveURL(
         /entry_source=profile_reshare&share_concept=/,
       );
-      await expect(page.getByLabel(/공유 카드 미리보기$/)).toBeVisible();
+      const preview = page.getByLabel(/의 3축 겹 공유 카드 미리보기$/);
+      await expect(preview).toBeVisible();
+      await expect(preview.locator("[data-axis]")).toHaveCount(3);
+      await expect(preview).toContainText("● 나 / ○ 지인");
+      for (const label of selectedAxisLabels) {
+        await expect(preview.locator("[data-axis='1']")).toContainText(label);
+      }
+      await expect(preview.locator("[data-axis]")).toContainText(/고유 문항/);
+      expect(await preview.innerText()).not.toMatch(
+        /observation|safeCopy|safeQuestion|점수|퍼센트|응답자/,
+      );
       await expect(
         page.getByRole("button", { name: "이 카드 공유하기" }),
       ).toBeEnabled();
@@ -668,7 +694,7 @@ test.describe("concept owner profile live", () => {
         });
         await expect(collectingAction).toBeVisible();
         await expect(
-          page.getByRole("button", { name: "한 장으로 나누기" }),
+          page.getByRole("button", { name: "내 겹 공유하기" }),
         ).toHaveCount(0);
         await expect(
           page.getByRole("link", { name: "내 겹 공유하기" }),

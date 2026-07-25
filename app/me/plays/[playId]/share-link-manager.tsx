@@ -8,15 +8,11 @@ import {
   OwnerFlowHttpError,
 } from "@/lib/owner-flow/owner-flow-client";
 import type {
+  ConceptProfileShareCardModel,
   ProfileShareCardModel,
   ProfileShareSelection,
 } from "@/lib/owner-profile/owner-profile";
-import type { ConceptShareOption } from "@/lib/owner-profile/concept-profile";
-import { conceptById } from "@/lib/concepts/catalog-core.mjs";
-import {
-  buildProfileShareCardModel,
-  decodeConceptProfileShareCardModel,
-} from "@/lib/owner-profile/profile-share-card-core.mjs";
+import { buildProfileShareCardModel } from "@/lib/owner-profile/profile-share-card-core.mjs";
 import {
   loadOwnerProfile,
   OwnerProfileHttpError,
@@ -86,7 +82,7 @@ function isAuthenticationRequired(error: unknown) {
 async function readManagerState(
   playId: string,
   shareSelection: ProfileShareSelection | null | undefined,
-  conceptShareOption: ConceptShareOption | null,
+  conceptShareCard: ConceptProfileShareCardModel | null,
 ): Promise<
   | Extract<State, { kind: "ready" }>
   | Extract<State, { kind: "share_unavailable" }>
@@ -95,7 +91,7 @@ async function readManagerState(
   const isLegacyCard = shareSelection !== undefined;
   const [{ play, pack }, links, profile] = await Promise.all([
     loadOwnerFlow(playId),
-    conceptShareOption || isLegacyCard
+    conceptShareCard || isLegacyCard
       ? Promise.resolve([])
       : listShareLinks(playId),
     isLegacyCard ? loadOwnerProfile(playId) : Promise.resolve(null),
@@ -107,16 +103,8 @@ async function readManagerState(
   ) {
     throw new Error("terminal");
   }
-  const shareCard: ProfileShareCardModel | null = conceptShareOption
-    ? decodeConceptProfileShareCardModel({
-        conceptLabel: conceptById(conceptShareOption.conceptId).label,
-        observation: conceptShareOption.safeCopy,
-        stageText:
-          conceptShareOption.shareEvidence.stage === "clear" ? "선명" : "윤곽",
-        evidenceText: `서로 다른 팩 ${conceptShareOption.shareEvidence.evidence.packCount}개 · 맥락 ${conceptShareOption.shareEvidence.evidence.contextCount}개`,
-        question: conceptShareOption.safeQuestion,
-        packTitle: pack.title,
-      })
+  const shareCard: ProfileShareCardModel | null = conceptShareCard
+    ? conceptShareCard
     : profile && shareSelection
       ? buildProfileShareCardModel(profile, shareSelection)
       : null;
@@ -159,12 +147,12 @@ export default function ShareLinkManager({
   playId,
   entrySource,
   shareSelection,
-  conceptShareOption,
+  conceptShareCard,
 }: {
   playId: string | null;
   entrySource: ShareEntrySource;
   shareSelection?: ProfileShareSelection | null;
-  conceptShareOption: ConceptShareOption | null;
+  conceptShareCard: ConceptProfileShareCardModel | null;
 }) {
   const [state, setState] = useState<State>(
     playId ? { kind: "loading" } : { kind: "terminal" },
@@ -225,7 +213,7 @@ export default function ShareLinkManager({
       const next = await readManagerState(
         playId,
         shareSelection,
-        conceptShareOption,
+        conceptShareCard,
       );
       if (next.kind === "ready") {
         setSelectedKind(next.shareCard ? "public" : next.defaultShareKind);
@@ -239,7 +227,7 @@ export default function ShareLinkManager({
   useEffect(() => {
     if (!playId) return;
     let active = true;
-    void readManagerState(playId, shareSelection, conceptShareOption)
+    void readManagerState(playId, shareSelection, conceptShareCard)
       .then((next) => {
         if (active) {
           if (next.kind === "ready") {
@@ -258,7 +246,7 @@ export default function ShareLinkManager({
     return () => {
       active = false;
     };
-  }, [playId, shareSelection, conceptShareOption]);
+  }, [playId, shareSelection, conceptShareCard]);
 
   useEffect(() => {
     if (!shareCard) return;

@@ -1,8 +1,12 @@
 import { notFound } from "next/navigation";
 
 import { loadAuthenticatedOwnerConceptProfile } from "@/lib/http/auth-owner";
+import { loadOwnerPublicProfileGate } from "@/lib/http/owner-public-profile";
 import { isOwnerPlayId } from "@/lib/owner-play/owner-play-state-core.mjs";
-import { parseProfileShareSelection } from "@/lib/owner-profile/profile-share-card-core.mjs";
+import {
+  decodeConceptProfileShareCardModel,
+  parseProfileShareSelection,
+} from "@/lib/owner-profile/profile-share-card-core.mjs";
 import { parseShareEntrySource } from "@/lib/share-links/share-link-state-core.mjs";
 
 import ShareLinkManager from "./share-link-manager";
@@ -37,7 +41,7 @@ export default async function ShareLinksPage({
       : parsedEntrySource === "profile_reshare"
         ? parsedSelection
         : null;
-  let conceptShareOption = null;
+  let conceptShareCard = null;
   if (shareConcept !== undefined) {
     if (
       typeof shareConcept !== "string" ||
@@ -47,25 +51,31 @@ export default async function ShareLinksPage({
       notFound();
     }
     try {
-      const profile = await loadAuthenticatedOwnerConceptProfile();
-      conceptShareOption =
+      const [profile, gate] = await Promise.all([
+        loadAuthenticatedOwnerConceptProfile(),
+        loadOwnerPublicProfileGate(),
+      ]);
+      const option =
         profile.shareOptions.find(
           (option) =>
-            option.conceptId === shareConcept &&
-            option.sourcePlayId === playId &&
-            option.shareEvidence.status === "available",
+            option.conceptId === shareConcept && option.sourcePlayId === playId,
         ) ?? null;
+      if (!option || !gate || gate.outcome === "incomplete") notFound();
+      conceptShareCard = decodeConceptProfileShareCardModel({
+        nickname: gate.nickname,
+        axes: option.bundle,
+      });
     } catch {
       notFound();
     }
-    if (!conceptShareOption) notFound();
+    if (!conceptShareCard) notFound();
   }
   return (
     <ShareLinkManager
       playId={isOwnerPlayId(playId) ? playId : null}
       entrySource={parsedEntrySource}
       shareSelection={shareSelection}
-      conceptShareOption={conceptShareOption}
+      conceptShareCard={conceptShareCard}
     />
   );
 }

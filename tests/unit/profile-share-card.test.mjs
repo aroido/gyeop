@@ -9,7 +9,7 @@ import {
   firstAccountProfileShareSelection,
   parseProfileShareSelection,
 } from "../../lib/owner-profile/profile-share-card-core.mjs";
-import { CONCEPT_COPY_LIMITS } from "../../lib/concepts/catalog-core.mjs";
+import { CONCEPT_CATALOG_V1 } from "../../lib/concepts/catalog-core.mjs";
 
 const card = Object.freeze({
   cardId: "signature",
@@ -187,35 +187,123 @@ test("fails closed for sensitive, collecting, or stale selections", () => {
   );
 });
 
-function conceptCard(overrides = {}) {
+function conceptAxis(catalogIndex, overrides = {}) {
+  const concept = CONCEPT_CATALOG_V1.concepts[catalogIndex];
+  const area = CONCEPT_CATALOG_V1.areas.find(({ id }) => id === concept.areaId);
   return {
-    conceptLabel: "관계 시작",
-    observation: "여럿이 있을 때 먼저 분위기를 살피는 장면이 반복됐어요.",
-    stageText: "윤곽",
-    evidenceText: "서로 다른 팩 2개 · 맥락 2개",
-    question: "다른 자리에서는 먼저 말을 꺼내는 때도 있어?",
-    packTitle: "우리는 아직도 통하는 편",
+    areaLabel: area.label,
+    conceptLabel: concept.label,
+    directionA: concept.directionA,
+    directionB: concept.directionB,
+    selfPosition: -0.6,
+    others: {
+      source: "shareSafeOthers",
+      direction: "a",
+      stage: "outline",
+      position: -0.5,
+      range: "medium",
+    },
+    cardCount: 3,
     ...overrides,
   };
 }
 
-test("strictly decodes only the six bounded concept share-card fields", () => {
+function conceptCard(overrides = {}) {
+  return {
+    nickname: "겹냥",
+    axes: [
+      conceptAxis(0),
+      conceptAxis(4, {
+        selfPosition: 0.7,
+        others: {
+          source: "shareSafeOthers",
+          direction: "contextual",
+          stage: "outline",
+          range: "split",
+        },
+      }),
+      conceptAxis(8, {
+        others: {
+          source: "shareSafeOthers",
+          direction: "b",
+          stage: "clear",
+          position: 0.75,
+          range: "narrow",
+        },
+        cardCount: 7,
+      }),
+    ],
+    ...overrides,
+  };
+}
+
+test("strictly decodes the public three-axis concept share card", () => {
   const decoded = decodeConceptProfileShareCardModel(conceptCard());
   assert.deepEqual(decoded, conceptCard());
-  assert.deepEqual(Object.keys(decoded), [
-    "conceptLabel",
-    "observation",
-    "stageText",
-    "evidenceText",
-    "question",
-    "packTitle",
-  ]);
+  assert.deepEqual(Object.keys(decoded), ["nickname", "axes"]);
   assert.equal(Object.isFrozen(decoded), true);
+  assert.equal(Object.isFrozen(decoded.axes), true);
+  assert.equal(Object.isFrozen(decoded.axes[0].others), true);
 
   for (const invalid of [
-    { ...conceptCard(), conceptId: "rel.initiation" },
-    { ...conceptCard(), stageText: "흔적" },
-    { ...conceptCard(), observation: " 앞뒤 공백" },
+    { ...conceptCard(), privateOthers: {} },
+    { ...conceptCard(), nickname: "겹" },
+    { ...conceptCard(), nickname: " 겹냥" },
+    { ...conceptCard(), axes: conceptCard().axes.slice(0, 2) },
+    {
+      ...conceptCard(),
+      axes: [...conceptCard().axes, conceptAxis(12)],
+    },
+    {
+      ...conceptCard(),
+      axes: [
+        { ...conceptCard().axes[0], conceptLabel: "없는 결" },
+        ...conceptCard().axes.slice(1),
+      ],
+    },
+    {
+      ...conceptCard(),
+      axes: [
+        { ...conceptCard().axes[0], selfPosition: 0 },
+        ...conceptCard().axes.slice(1),
+      ],
+    },
+    {
+      ...conceptCard(),
+      axes: [
+        {
+          ...conceptCard().axes[0],
+          others: { ...conceptCard().axes[0].others, range: "narrow" },
+        },
+        ...conceptCard().axes.slice(1),
+      ],
+    },
+    {
+      ...conceptCard(),
+      axes: [
+        conceptCard().axes[0],
+        {
+          ...conceptCard().axes[1],
+          others: { ...conceptCard().axes[1].others, position: 0 },
+        },
+        conceptCard().axes[2],
+      ],
+    },
+    {
+      ...conceptCard(),
+      axes: [
+        conceptCard().axes[0],
+        conceptCard().axes[0],
+        conceptCard().axes[2],
+      ],
+    },
+    {
+      ...conceptCard(),
+      axes: [
+        { ...conceptCard().axes[0], cardCount: 0 },
+        ...conceptCard().axes.slice(1),
+      ],
+    },
     null,
     [],
   ]) {
@@ -226,52 +314,49 @@ test("strictly decodes only the six bounded concept share-card fields", () => {
   }
 });
 
-test("accepts exact-max Korean and unbroken Latin copy and rejects max plus one", () => {
-  const fields = [
-    ["conceptLabel", CONCEPT_COPY_LIMITS.conceptLabel],
-    ["observation", CONCEPT_COPY_LIMITS.observation],
-    ["evidenceText", CONCEPT_COPY_LIMITS.evidenceText],
-    ["question", CONCEPT_COPY_LIMITS.question],
-    ["packTitle", CONCEPT_COPY_LIMITS.packTitle],
-  ];
-  for (const [field, maximum] of fields) {
-    for (const character of ["가", "W"]) {
-      assert.doesNotThrow(() =>
-        decodeConceptProfileShareCardModel(
-          conceptCard({ [field]: character.repeat(maximum) }),
-        ),
-      );
-      assert.throws(
-        () =>
-          decodeConceptProfileShareCardModel(
-            conceptCard({ [field]: character.repeat(maximum + 1) }),
-          ),
-        /Invalid concept profile share card/,
-      );
-    }
-  }
-});
-
-test("counts astral copy with JavaScript UTF-16 code-unit limits", () => {
-  const fields = [
-    ["conceptLabel", CONCEPT_COPY_LIMITS.conceptLabel],
-    ["observation", CONCEPT_COPY_LIMITS.observation],
-    ["evidenceText", CONCEPT_COPY_LIMITS.evidenceText],
-    ["question", CONCEPT_COPY_LIMITS.question],
-    ["packTitle", CONCEPT_COPY_LIMITS.packTitle],
-  ];
-  for (const [field, maximum] of fields) {
-    const exact = "😀".repeat(maximum / 2);
-    assert.equal(exact.length, maximum);
-    assert.doesNotThrow(() =>
-      decodeConceptProfileShareCardModel(conceptCard({ [field]: exact })),
-    );
+test("rejects private, unsettled, out-of-range, and unknown axis data", () => {
+  const base = conceptCard();
+  for (const others of [
+    {
+      source: "privateOthers",
+      direction: "a",
+      stage: "outline",
+      position: -0.5,
+      range: "medium",
+    },
+    {
+      source: "shareSafeOthers",
+      direction: "unsettled",
+      stage: "outline",
+      position: 0,
+      range: "medium",
+    },
+    {
+      source: "shareSafeOthers",
+      direction: "a",
+      stage: "outline",
+      position: 0.5,
+      range: "medium",
+    },
+  ]) {
     assert.throws(
       () =>
-        decodeConceptProfileShareCardModel(
-          conceptCard({ [field]: `${exact}😀` }),
-        ),
+        decodeConceptProfileShareCardModel({
+          ...base,
+          axes: [{ ...base.axes[0], others }, ...base.axes.slice(1)],
+        }),
       /Invalid concept profile share card/,
     );
   }
+  assert.throws(
+    () =>
+      decodeConceptProfileShareCardModel({
+        ...base,
+        axes: [
+          { ...base.axes[0], selfPosition: Number.NaN },
+          ...base.axes.slice(1),
+        ],
+      }),
+    /Invalid concept profile share card/,
+  );
 });

@@ -15,13 +15,38 @@ export type RelationshipProfileShareCardModel = Readonly<{
   counts: OwnerProfileCounts;
 }>;
 
-export type ConceptProfileShareCardModel = Readonly<{
+export type ConceptProfileShareOthers =
+  | Readonly<{
+      source: "shareSafeOthers";
+      direction: "a" | "b";
+      stage: "outline" | "clear";
+      position: number;
+      range: "medium" | "narrow";
+    }>
+  | Readonly<{
+      source: "shareSafeOthers";
+      direction: "contextual";
+      stage: "outline" | "clear";
+      range: "split";
+    }>;
+
+export type ConceptProfileShareAxis = Readonly<{
+  areaLabel: string;
   conceptLabel: string;
-  observation: string;
-  stageText: "윤곽" | "선명";
-  evidenceText: string;
-  question: string;
-  packTitle: string;
+  directionA: string;
+  directionB: string;
+  selfPosition: number;
+  others: ConceptProfileShareOthers;
+  cardCount: number;
+}>;
+
+export type ConceptProfileShareCardModel = Readonly<{
+  nickname: string;
+  axes: readonly [
+    ConceptProfileShareAxis,
+    ConceptProfileShareAxis,
+    ConceptProfileShareAxis,
+  ];
 }>;
 
 export type ProfileShareCardModel =
