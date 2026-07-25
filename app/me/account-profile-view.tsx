@@ -438,14 +438,14 @@ export default function AccountProfileView({
             className={styles.conceptShareAction}
             aria-labelledby="concept-share-title"
           >
-            <h2 id="concept-share-title">한 장면에서 시작한 이야기를 나눠요</h2>
-            <p>안전하게 공유할 수 있는 결만 골라 한 장에 담아드려요.</p>
+            <h2 id="concept-share-title">세 가지 겹을 한 장에 담아요</h2>
+            <p>공유 가능한 익명 시선만 골라 보여드려요.</p>
             <button
               className={styles.primary}
               type="button"
               onClick={() => openSharePicker()}
             >
-              한 장으로 나누기
+              내 겹 공유하기
             </button>
           </section>
         ) : hasConceptHooks ? (
@@ -575,23 +575,25 @@ export default function AccountProfileView({
           <p className={styles.eyebrow}>공유할 결 고르기</p>
           <h2>어떤 이야기로 이어갈까요?</h2>
           <div role="radiogroup" aria-label="공유할 결">
-            {conceptProfile!.shareOptions.map((option, index) => (
-              <button
-                key={option.conceptId}
-                type="button"
-                role="radio"
-                aria-checked={
-                  option.conceptId === selectedConceptShare?.conceptId
-                }
-                onClick={() => setSelectedShareId(option.conceptId)}
-              >
-                <strong>
-                  {index === 0 ? "추천 · " : ""}
-                  {option.safeCopy}
-                </strong>
-                <span>{option.safeQuestion}</span>
-              </button>
-            ))}
+            {conceptProfile!.shareOptions.map((option, index) => {
+              const axis = option.bundle[0];
+              return (
+                <button
+                  key={option.conceptId}
+                  type="button"
+                  role="radio"
+                  aria-checked={
+                    option.conceptId === selectedConceptShare?.conceptId
+                  }
+                  onClick={() => setSelectedShareId(option.conceptId)}
+                >
+                  <strong>
+                    {index === 0 ? "추천 · " : ""}
+                    {axis.areaLabel} · {axis.directionA}—{axis.directionB}
+                  </strong>
+                </button>
+              );
+            })}
           </div>
           {selectedConceptShare ? (
             <button

@@ -203,7 +203,7 @@ flowchart LR
 - `a`/`b`인 self와 others는 marker를 쓴다. others에는 stage에 따른 넓은/중간/좁은 익명 band를 더하지만 이는 확률·신뢰구간이 아니다. `contextual`은 중앙 marker 없이 양쪽 split, `unsettled`은 marker 없이 넓은 neutral 상태로 표현한다. band와 pattern은 UI가 direction/stage/position에서 파생하며 API에 범위 필드를 추가하지 않는다.
 - 8개 area summary API는 catalog order를 따르고 self 질문을 같은 `cardKey` 기준으로 영역 안에서 한 번만 세어 `cardCount`, `packCount`, `contextCount`, count-derived `stage`만 제공한다. 전면 rail은 `cardCount`와 `stage`만 표시하고 팩·맥락 수는 대표 카드의 기존 상세에만 둔다. 같은 카드가 같은 영역의 두 결에 연결되면 영역에서는 한 번, 각 결에서는 각각 한 번 세며 네 결의 방향을 합산하지 않는다.
 - source pair가 있으면 대표 결은 정확히 3개다. `difference → contextual → repeated → emerging`의 one-per-kind와 kind 내부 rank를 유지하면서 unused area를 우선하고, 부족분도 global rank의 unused area부터 채운 뒤에만 중복 area를 허용한다. 공유 가능한 hook 보장은 달성 가능한 영역 다양성을 줄이지 않는 범위에서 유지한다.
-- `/me` 1차 결과는 양쪽 endpoint, 내 위치, 지인 익명 상태, 고유 문항 수와 stage를 먼저 표시하고 `profileLead`, observation, 대화형 question은 제거한다. 공유 picker와 안전 문구·9:16 Canvas/PNG 계약은 issue #162까지 변경하지 않는다.
+- `/me` 1차 결과는 양쪽 endpoint, 내 위치, 지인 익명 상태, 고유 문항 수와 stage를 먼저 표시하고 `profileLead`, observation, 대화형 question은 제거한다. 공유 가능한 결이 3개 이상이면 `영역 · A—B` picker와 `내 겹 공유하기`를 표시하고, 부족하면 concept 공유 카드 대신 `시선 더 모으기`를 유지한다.
 
 ## 9. 24팩·240문항 전수 매핑 결과
 
@@ -291,22 +291,11 @@ flowchart LR
 
 ## 10. 공유 결과의 최소 단위
 
-사용자에게 32개의 결이나 모든 답변을 보여주지 않는다. 한 장의 공유 결과는 다음 중 이야기 가치가 가장 높은 3개만 고른다.
+사용자에게 32개의 결이나 모든 답변을 보여주지 않는다. owner가 공유 가능한 결 하나를 고르면 그 결을 첫 축에 고정하고, 전체 공유 가능 후보의 stable rank를 따라 가능한 한 다른 영역의 결 2개를 더 고른다. 다른 영역을 선택할 수 없을 때만 영역 중복을 허용한다. 공유 가능한 결이 3개보다 적으면 3축을 축소하거나 채우지 않고 concept 공유 카드를 만들지 않는다.
 
-1. **대표 결**: 여러 맥락에서 반복된 나의 방향
-2. **반전 결**: 나의 예상과 주변의 인식이 크게 달랐던 방향
-3. **맥락 결**: 상황에 따라 양쪽 모습이 모두 선명했던 방향
-4. **새로 진해진 결**: 이번 팩으로 처음 윤곽이 생기거나 바뀐 방향
+한 장의 public 모델은 owner가 공개하기로 정한 닉네임과 정확히 3개의 축만 가진다. 각 축은 catalog에서 검증한 영역·결·A/B endpoint, settled인 내 위치, 공개 기준을 통과한 익명 지인 결과, 고유 문항 수로 제한한다. 지인 결과가 `a`/`b`이면 `outline=중간`, `clear=좁은` 비통계적 범위와 익명 marker를 표시하고, `contextual`이면 위치 없이 양쪽 split으로 표시한다. 내 방향이 contextual·unsettled이거나 지인 근거가 outline 미만인 결은 공유 후보가 아니다.
 
-예시:
-
-> **재윤의 이번 결**
->
-> 관계는 먼저 여는데, 생각은 혼자 정리하는 편
-> 나: 준비를 미리 하는 쪽 · 주변: 움직이며 맞추는 쪽
-> 이번에 새로 선명해진 결: 마무리 안정
-
-각 줄을 누르면 “어떤 장면 때문에?”를 열 수 있다. 공유하는 사람은 세 줄 중 하나만 골라 보낼 수도 있다. 이 방식이면 모든 설문 결과를 공개하지 않고도 여러 방향으로 대화가 이어진다.
+1080×1920 PNG에는 `● 나 · ○ 지인` 범례와 이 3축만 그린다. 관찰문·질문·자연어 성격 해석·유형·점수·퍼센트·응답자 수·개별 답변·관계별 원자료·내부 ID·관리 URL·secret은 모델·DOM·PNG에 포함하지 않는다. 첫 축의 source pack 공개 초대를 카드와 함께 공유하고 수신자의 같은 팩 CTA는 기존 `same_pack_cta`를 유지한다. Web Share가 파일을 지원하지 않거나 취소·`NotAllowedError`·실패하면 생성된 링크를 보존한 채 이미지 저장과 링크 복사를 제공한다.
 
 ## 11. 후보 결의 생존 기준
 

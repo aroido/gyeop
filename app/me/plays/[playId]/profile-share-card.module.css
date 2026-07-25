@@ -123,6 +123,159 @@
   font-size: 1.15rem;
 }
 
+.conceptPreview {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.conceptHeader span {
+  background: #050505 !important;
+  color: #fff !important;
+}
+
+.conceptAxes {
+  display: grid;
+  min-height: 0;
+  align-content: center;
+  gap: 0.65rem;
+  padding: 0.1rem 0.25rem 0.3rem 0;
+}
+
+.conceptAxis {
+  display: grid;
+  min-width: 0;
+  gap: 0.35rem;
+  padding: 0.55rem;
+  border: 1px solid #050505;
+  border-radius: 0.7rem;
+  background: #315cff;
+  box-shadow: 0.24rem 0.24rem 0 #050505;
+}
+
+.conceptAxis[data-axis="2"] {
+  background: #dfff00;
+}
+
+.conceptAxis[data-axis="3"] {
+  background: #ff4d42;
+}
+
+.axisHeading {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.axisHeading > p {
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.16rem 0.35rem;
+  border-radius: 99rem;
+  background: #050505;
+  color: #fff;
+  font-size: 0.54rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.axisHeading h2 {
+  margin: 0;
+  font-size: clamp(0.78rem, 3.7vw, 1rem);
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+
+.axisEndpoints {
+  display: flex;
+  min-width: 0;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.55rem;
+  font-weight: 900;
+}
+
+.axisEndpoints span {
+  max-width: 47%;
+  overflow-wrap: anywhere;
+}
+
+.axisEndpoints span:last-child {
+  text-align: right;
+}
+
+.axisTrack {
+  position: relative;
+  height: 1.1rem;
+  margin: 0 0.3rem;
+  border-top: 0.14rem solid #050505;
+}
+
+.selfMarker,
+.othersMarker {
+  position: absolute;
+  top: -0.74rem;
+  z-index: 2;
+  width: 1rem;
+  height: 1rem;
+  transform: translateX(-50%);
+  font-size: 0.8rem;
+  line-height: 1rem;
+  text-align: center;
+}
+
+.othersMarker {
+  top: -0.78rem;
+  color: #fff;
+  text-shadow:
+    -1px -1px 0 #050505,
+    1px -1px 0 #050505,
+    -1px 1px 0 #050505,
+    1px 1px 0 #050505;
+}
+
+.othersRange {
+  position: absolute;
+  top: -0.37rem;
+  height: 0.55rem;
+  transform: translateX(-50%);
+  border: 1px solid #050505;
+  border-radius: 99rem;
+  background: #f5f1e9;
+}
+
+.othersRange[data-range="medium"] {
+  width: 34%;
+}
+
+.othersRange[data-range="narrow"] {
+  width: 18%;
+}
+
+.othersRange[data-range="split-start"],
+.othersRange[data-range="split-end"] {
+  width: 24%;
+  transform: none;
+}
+
+.othersRange[data-range="split-start"] {
+  left: 0;
+}
+
+.othersRange[data-range="split-end"] {
+  right: 0;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (max-height: 40.625rem) {
   .preview {
     aspect-ratio: 4 / 5;
@@ -193,5 +346,33 @@
   .brand {
     font-size: 0.85rem;
     line-height: 1;
+  }
+
+  .conceptAxes {
+    gap: 0.35rem;
+  }
+
+  .conceptAxis {
+    gap: 0.2rem;
+    padding: 0.35rem;
+    border-radius: 0.5rem;
+    box-shadow: 0.14rem 0.14rem 0 #050505;
+  }
+
+  .axisHeading > p {
+    padding: 0.1rem 0.25rem;
+    font-size: 0.47rem;
+  }
+
+  .axisHeading h2 {
+    font-size: clamp(0.68rem, 3vw, 0.8rem);
+  }
+
+  .axisEndpoints {
+    font-size: 0.48rem;
+  }
+
+  .axisTrack {
+    height: 0.65rem;
   }
 }

@@ -8,15 +8,11 @@ import {
   OwnerFlowHttpError,
 } from "@/lib/owner-flow/owner-flow-client";
 import type {
+  ConceptProfileShareCardModel,
   ProfileShareCardModel,
   ProfileShareSelection,
 } from "@/lib/owner-profile/owner-profile";
-import type { ConceptShareOption } from "@/lib/owner-profile/concept-profile";
-import { conceptById } from "@/lib/concepts/catalog-core.mjs";
-import {
-  buildProfileShareCardModel,
-  decodeConceptProfileShareCardModel,
-} from "@/lib/owner-profile/profile-share-card-core.mjs";
+import { buildProfileShareCardModel } from "@/lib/owner-profile/profile-share-card-core.mjs";
 import {
   loadOwnerProfile,
   OwnerProfileHttpError,
@@ -32,6 +28,7 @@ import {
   listShareLinks,
   recordShareAction,
   rotateShareLink,
+  type ShareActionEvent,
   type ShareEntrySource,
   type ShareLink,
   ShareLinkHttpError,
@@ -86,7 +83,7 @@ function isAuthenticationRequired(error: unknown) {
 async function readManagerState(
   playId: string,
   shareSelection: ProfileShareSelection | null | undefined,
-  conceptShareOption: ConceptShareOption | null,
+  conceptShareCard: ConceptProfileShareCardModel | null,
 ): Promise<
   | Extract<State, { kind: "ready" }>
   | Extract<State, { kind: "share_unavailable" }>
@@ -95,7 +92,7 @@ async function readManagerState(
   const isLegacyCard = shareSelection !== undefined;
   const [{ play, pack }, links, profile] = await Promise.all([
     loadOwnerFlow(playId),
-    conceptShareOption || isLegacyCard
+    conceptShareCard || isLegacyCard
       ? Promise.resolve([])
       : listShareLinks(playId),
     isLegacyCard ? loadOwnerProfile(playId) : Promise.resolve(null),
@@ -107,16 +104,8 @@ async function readManagerState(
   ) {
     throw new Error("terminal");
   }
-  const shareCard: ProfileShareCardModel | null = conceptShareOption
-    ? decodeConceptProfileShareCardModel({
-        conceptLabel: conceptById(conceptShareOption.conceptId).label,
-        observation: conceptShareOption.safeCopy,
-        stageText:
-          conceptShareOption.shareEvidence.stage === "clear" ? "선명" : "윤곽",
-        evidenceText: `서로 다른 팩 ${conceptShareOption.shareEvidence.evidence.packCount}개 · 맥락 ${conceptShareOption.shareEvidence.evidence.contextCount}개`,
-        question: conceptShareOption.safeQuestion,
-        packTitle: pack.title,
-      })
+  const shareCard: ProfileShareCardModel | null = conceptShareCard
+    ? conceptShareCard
     : profile && shareSelection
       ? buildProfileShareCardModel(profile, shareSelection)
       : null;
@@ -155,16 +144,27 @@ function canShareFile(file: File) {
   }
 }
 
+async function recordShareActionBestEffort(
+  playId: string,
+  linkId: string,
+  event: ShareActionEvent,
+  entrySource: ShareEntrySource,
+) {
+  await recordShareAction(playId, linkId, event, entrySource).catch(
+    () => undefined,
+  );
+}
+
 export default function ShareLinkManager({
   playId,
   entrySource,
   shareSelection,
-  conceptShareOption,
+  conceptShareCard,
 }: {
   playId: string | null;
   entrySource: ShareEntrySource;
   shareSelection?: ProfileShareSelection | null;
-  conceptShareOption: ConceptShareOption | null;
+  conceptShareCard: ConceptProfileShareCardModel | null;
 }) {
   const [state, setState] = useState<State>(
     playId ? { kind: "loading" } : { kind: "terminal" },
@@ -225,7 +225,7 @@ export default function ShareLinkManager({
       const next = await readManagerState(
         playId,
         shareSelection,
-        conceptShareOption,
+        conceptShareCard,
       );
       if (next.kind === "ready") {
         setSelectedKind(next.shareCard ? "public" : next.defaultShareKind);
@@ -239,7 +239,7 @@ export default function ShareLinkManager({
   useEffect(() => {
     if (!playId) return;
     let active = true;
-    void readManagerState(playId, shareSelection, conceptShareOption)
+    void readManagerState(playId, shareSelection, conceptShareCard)
       .then((next) => {
         if (active) {
           if (next.kind === "ready") {
@@ -258,7 +258,7 @@ export default function ShareLinkManager({
     return () => {
       active = false;
     };
-  }, [playId, shareSelection, conceptShareOption]);
+  }, [playId, shareSelection, conceptShareCard]);
 
   useEffect(() => {
     if (!shareCard) return;
@@ -383,16 +383,16 @@ export default function ShareLinkManager({
         files: [cardFile.file],
       });
       setForceCardFallback(false);
-      setFeedback({
-        tone: "status",
-        message: "공유 메뉴로 카드와 링크를 전달했어요.",
-      });
-      void recordShareAction(
+      await recordShareActionBestEffort(
         playId,
         link.linkId,
         "share_handoff_succeeded",
         entrySource,
-      ).catch(() => undefined);
+      );
+      setFeedback({
+        tone: "status",
+        message: "공유 메뉴로 카드와 링크를 전달했어요.",
+      });
     } catch (caught) {
       if (!link) {
         setFeedback({
@@ -510,16 +510,16 @@ export default function ShareLinkManager({
     try {
       const shareData = buildShareData(readyLink.inviteUrl, state.packTitle);
       await navigator.share(shareData);
-      setFeedback({
-        tone: "status",
-        message: "공유 메뉴로 링크를 전달했어요.",
-      });
-      void recordShareAction(
+      await recordShareActionBestEffort(
         playId,
         readyLink.linkId,
         "share_handoff_succeeded",
         entrySource,
-      ).catch(() => undefined);
+      );
+      setFeedback({
+        tone: "status",
+        message: "공유 메뉴로 링크를 전달했어요.",
+      });
     } catch (caught) {
       const cancelled = isShareCancellation(caught);
       setFeedback(
@@ -547,17 +547,17 @@ export default function ShareLinkManager({
       if (!navigator.clipboard?.writeText) throw new Error("unavailable");
       await navigator.clipboard.writeText(readyLink.inviteUrl);
       setManualCopyRequired(false);
+      await recordShareActionBestEffort(
+        playId,
+        readyLink.linkId,
+        "share_link_copied",
+        entrySource,
+      );
       setFeedback({
         tone: "status",
         message:
           "링크를 복사했어요. 카카오톡이나 인스타그램 DM, 문자에 붙여넣어 보내세요.",
       });
-      void recordShareAction(
-        playId,
-        readyLink.linkId,
-        "share_link_copied",
-        entrySource,
-      ).catch(() => undefined);
     } catch {
       manualFallback = true;
       setManualCopyRequired(true);

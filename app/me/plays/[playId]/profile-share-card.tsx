@@ -6,6 +6,7 @@ import {
   PROFILE_SHARE_FILENAME,
 } from "@/lib/owner-profile/profile-share-card-core.mjs";
 import type {
+  ConceptProfileShareAxis,
   ConceptProfileShareCardModel,
   ProfileShareCardModel,
   ProfileShareCardPresentation,
@@ -100,7 +101,25 @@ function drawTextBlock(
 function isConceptShareCard(
   model: ProfileShareCardModel,
 ): model is ConceptProfileShareCardModel {
-  return "conceptLabel" in model;
+  return "axes" in model;
+}
+
+function positionPercent(position: number) {
+  return `${Math.max(0, Math.min(100, ((position + 1) / 2) * 100))}%`;
+}
+
+function rangePositionPercent(position: number, range: "medium" | "narrow") {
+  const halfWidth = range === "medium" ? 17 : 9;
+  const center = ((position + 1) / 2) * 100;
+  return `${Math.max(halfWidth, Math.min(100 - halfWidth, center))}%`;
+}
+
+function positionText(axis: ConceptProfileShareAxis, position: number) {
+  return position <= -0.25
+    ? axis.directionA
+    : position >= 0.25
+      ? axis.directionB
+      : "두 끝점 사이";
 }
 
 export function ProfileShareCardPreview({
@@ -111,23 +130,85 @@ export function ProfileShareCardPreview({
   if (isConceptShareCard(model)) {
     return (
       <article
-        className={styles.preview}
-        aria-label={`${model.conceptLabel} 공유 카드 미리보기`}
+        className={`${styles.preview} ${styles.conceptPreview}`}
+        aria-label={`${model.nickname}의 3축 겹 공유 카드 미리보기`}
       >
-        <header>
-          <p>겹 · {model.conceptLabel}</p>
-          <span>{model.packTitle}</span>
+        <header className={styles.conceptHeader}>
+          <p>{model.nickname}의 겹</p>
+          <span aria-label="범례: 채운 원은 나, 빈 원은 지인">
+            ● 나 / ○ 지인
+          </span>
         </header>
-        <section className={styles.result}>
-          <p>{model.stageText}</p>
-          <h2>{model.observation}</h2>
-          <strong>{model.evidenceText}</strong>
-        </section>
-        <section className={styles.detail}>
-          <p className={styles.detailLabel}>대화 이어가기</p>
-          <p className={styles.question}>{model.question}</p>
-          <p className={styles.distribution}>같은 팩 답하기</p>
-        </section>
+        <div className={styles.conceptAxes}>
+          {model.axes.map((axis, index) => (
+            <section
+              className={styles.conceptAxis}
+              data-axis={index + 1}
+              key={`${axis.areaLabel}:${axis.conceptLabel}`}
+              aria-label={`${index + 1}번째 축, ${axis.areaLabel}, ${axis.conceptLabel}`}
+            >
+              <div className={styles.axisHeading}>
+                <p>
+                  {axis.areaLabel} · 고유 문항 {axis.cardCount}
+                </p>
+                <h2>{axis.conceptLabel}</h2>
+              </div>
+              <div className={styles.axisEndpoints} aria-hidden="true">
+                <span>{axis.directionA}</span>
+                <span>{axis.directionB}</span>
+              </div>
+              <div className={styles.axisTrack} aria-hidden="true">
+                {axis.others.direction === "contextual" ? (
+                  <>
+                    <span
+                      className={styles.othersRange}
+                      data-range="split-start"
+                    />
+                    <span
+                      className={styles.othersRange}
+                      data-range="split-end"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <span
+                      className={styles.othersRange}
+                      data-range={axis.others.range}
+                      style={{
+                        left: rangePositionPercent(
+                          axis.others.position,
+                          axis.others.range,
+                        ),
+                      }}
+                    />
+                    <span
+                      className={styles.othersMarker}
+                      style={{
+                        left: positionPercent(axis.others.position),
+                      }}
+                    >
+                      ○
+                    </span>
+                  </>
+                )}
+                <span
+                  className={styles.selfMarker}
+                  style={{ left: positionPercent(axis.selfPosition) }}
+                >
+                  ●
+                </span>
+              </div>
+              <p className={styles.srOnly}>
+                {axis.directionA}에서 {axis.directionB} 방향. 내 위치는{" "}
+                {positionText(axis, axis.selfPosition)} 쪽. 지인 익명 집계는{" "}
+                {axis.others.direction === "contextual"
+                  ? "상황에 따라 양쪽 범위"
+                  : `${positionText(axis, axis.others.position)} 쪽 익명 범위`}
+                . 고유 문항 {axis.cardCount}개.
+              </p>
+            </section>
+          ))}
+        </div>
         <strong className={styles.brand}>겹</strong>
       </article>
     );
@@ -317,89 +398,132 @@ async function renderConceptShareCard(
   context.fillStyle = "#050505";
   context.fillRect(0, 0, canvas.width, canvas.height);
   for (const [offset, color] of [
-    [66, "#ff4d42"],
-    [44, "#dfff00"],
-    [22, "#315cff"],
+    [54, "#ff4d42"],
+    [36, "#dfff00"],
+    [18, "#315cff"],
   ] as const) {
-    roundedRect(context, 72 + offset, 136 + offset, 936, 1680, 52);
+    roundedRect(context, 72 + offset, 100 + offset, 900, 1710, 52);
     context.fillStyle = color;
     context.fill();
   }
-  roundedRect(context, 72, 100, 936, 1720, 52);
+  roundedRect(context, 72, 82, 900, 1710, 52);
   context.fillStyle = "#f5f1e9";
   context.fill();
 
-  roundedRect(context, 72, 100, 936, 270, 52);
+  roundedRect(context, 72, 82, 900, 250, 52);
   context.fillStyle = "#315cff";
   context.fill();
   drawTextBlock(
     context,
-    `겹 · ${model.conceptLabel}`,
+    `${model.nickname}의 겹`,
     130,
-    150,
-    820,
-    75,
-    48,
-    28,
+    130,
+    650,
+    80,
+    58,
+    32,
     "#ffffff",
   );
-  drawTextBlock(context, model.packTitle, 130, 255, 820, 70, 30, 16, "#dfff00");
-
-  context.fillStyle = "#315cff";
   context.font = '900 34px Pretendard, "Apple SD Gothic Neo", sans-serif';
-  context.fillText(model.stageText, 130, 440);
-  drawTextBlock(
-    context,
-    model.observation,
-    130,
-    500,
-    820,
-    520,
-    74,
-    30,
-    "#050505",
-    950,
-  );
-
-  roundedRect(context, 130, 1040, 820, 160, 38);
   context.fillStyle = "#dfff00";
-  context.fill();
-  drawTextBlock(
-    context,
-    `${model.stageText} · ${model.evidenceText}`,
-    170,
-    1070,
-    740,
-    100,
-    34,
-    18,
-    "#050505",
-  );
+  context.fillText("● 나  /  ○ 지인", 130, 245);
 
-  roundedRect(context, 130, 1210, 820, 350, 40);
-  context.fillStyle = "#050505";
-  context.fill();
-  context.fillStyle = "#dfff00";
-  context.font = '900 30px Pretendard, "Apple SD Gothic Neo", sans-serif';
-  context.fillText("대화 이어가기", 180, 1260);
-  drawTextBlock(
-    context,
-    model.question,
-    180,
-    1320,
-    720,
-    150,
-    42,
-    24,
-    "#ffffff",
-  );
-  context.fillStyle = "#ffffff";
-  context.font = '900 30px Pretendard, "Apple SD Gothic Neo", sans-serif';
-  context.fillText("같은 팩 답하기", 180, 1490);
+  const cardColors = ["#315cff", "#dfff00", "#ff4d42"] as const;
+  const cardY = [390, 815, 1240] as const;
+  model.axes.forEach((axis, index) => {
+    const y = cardY[index];
+    roundedRect(context, 140, y + 18, 790, 350, 34);
+    context.fillStyle = "#050505";
+    context.fill();
+    roundedRect(context, 122, y, 790, 350, 34);
+    context.fillStyle = cardColors[index];
+    context.fill();
+
+    roundedRect(context, 160, y + 28, 330, 58, 29);
+    context.fillStyle = "#050505";
+    context.fill();
+    drawTextBlock(
+      context,
+      `${axis.areaLabel} · 고유 문항 ${axis.cardCount}`,
+      186,
+      y + 41,
+      280,
+      36,
+      28,
+      18,
+      "#ffffff",
+    );
+    drawTextBlock(
+      context,
+      axis.conceptLabel,
+      160,
+      y + 108,
+      710,
+      58,
+      42,
+      24,
+      "#050505",
+    );
+    drawTextBlock(
+      context,
+      axis.directionA,
+      160,
+      y + 184,
+      285,
+      42,
+      28,
+      16,
+      "#050505",
+    );
+    const right = fittedText(context, axis.directionB, 285, 42, 28, 16);
+    context.font = `900 ${right.fontSize}px Pretendard, "Apple SD Gothic Neo", sans-serif`;
+    context.fillStyle = "#050505";
+    right.lines.forEach((line, lineIndex) => {
+      context.fillText(
+        line,
+        875 - context.measureText(line).width,
+        y + 184 + lineIndex * right.lineHeight,
+      );
+    });
+
+    const startX = 180;
+    const endX = 850;
+    const trackY = y + 274;
+    context.fillStyle = "#050505";
+    context.fillRect(startX, trackY, endX - startX, 8);
+    if (axis.others.direction === "contextual") {
+      context.fillStyle = "#f5f1e9";
+      context.fillRect(startX, trackY - 16, 150, 40);
+      context.fillRect(endX - 150, trackY - 16, 150, 40);
+    } else {
+      const othersX =
+        startX + ((axis.others.position + 1) / 2) * (endX - startX);
+      const rangeWidth = axis.others.range === "medium" ? 190 : 105;
+      context.fillStyle = "#f5f1e9";
+      context.fillRect(
+        Math.max(startX, othersX - rangeWidth / 2),
+        trackY - 16,
+        Math.min(rangeWidth, endX - Math.max(startX, othersX - rangeWidth / 2)),
+        40,
+      );
+      context.beginPath();
+      context.arc(othersX, trackY + 4, 20, 0, Math.PI * 2);
+      context.fillStyle = "#f5f1e9";
+      context.fill();
+      context.lineWidth = 6;
+      context.strokeStyle = "#050505";
+      context.stroke();
+    }
+    const selfX = startX + ((axis.selfPosition + 1) / 2) * (endX - startX);
+    context.beginPath();
+    context.arc(selfX, trackY + 4, 16, 0, Math.PI * 2);
+    context.fillStyle = "#050505";
+    context.fill();
+  });
 
   context.fillStyle = "#050505";
-  context.font = '950 72px Pretendard, "Apple SD Gothic Neo", sans-serif';
-  context.fillText("겹", 130, 1680);
+  context.font = '950 54px Pretendard, "Apple SD Gothic Neo", sans-serif';
+  context.fillText("겹", 130, 1702);
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(

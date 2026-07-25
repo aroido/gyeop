@@ -2,9 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import afterWork from "../../content/packs/after-work-v3.json" with { type: "json" };
-import { CONCEPT_CATALOG_V1 } from "../../lib/concepts/catalog-core.mjs";
+import {
+  CONCEPT_CATALOG_V1,
+  conceptById,
+} from "../../lib/concepts/catalog-core.mjs";
 import {
   buildConceptProfile,
+  buildConceptShareBundle,
   conceptCardKey,
   decodeConceptProfile,
   selectConceptProfileSourcePairs,
@@ -65,6 +69,9 @@ function clone(value) {
 }
 
 const TEST_CONCEPTS = CONCEPT_CATALOG_V1.concepts.slice(0, 8);
+const SHARE_CONCEPTS = [0, 4, 8, 12].map(
+  (index) => CONCEPT_CATALOG_V1.concepts[index],
+);
 
 function syntheticPair(
   packNumber,
@@ -204,59 +211,38 @@ function expectInvalid(mutator, source = builtProfile()) {
 }
 
 function shareableProfile() {
-  const value = clone(builtProfile());
-  const hook = value.hooks[0];
-  const conceptDirection = "미리 구조를 잡는다";
-  const evidence = {
-    cardCount: 3,
-    packCount: 2,
-    contextCount: 2,
-    packs: [
-      {
-        packSlug: "after-work",
-        packTitle: "퇴근 후 본캐",
-        contexts: ["계획"],
-      },
-      {
-        packSlug: "coworker",
-        packTitle: "퇴근 전의 우리",
-        contexts: ["업무·공유"],
-      },
-    ],
-  };
-  hook.shareSafeOthers = {
-    status: "available",
-    stage: "outline",
-    direction: "a",
-    directionText: conceptDirection,
-    position: -1,
-    evidence,
-  };
-  hook.shareEvidence = {
-    status: "available",
-    source: "shareSafeOthers",
-    stage: "outline",
-    direction: "a",
-    directionText: conceptDirection,
-    observation:
-      "주변 시선에서는 여러 장면에서 “미리 구조를 잡는다” 쪽이 반복됐어요.",
-    question: "너는 내가 어떤 장면에서 그렇게 보였어?",
-    evidence: clone(evidence),
-  };
-  hook.shareEligible = true;
-  hook.shareSourcePlayId = hook.profileSourcePlayId;
-  hook.shareSourcePackSlug = "after-work";
-  hook.shareSourcePackTitle = "퇴근 후 본캐";
-  value.shareOptions = [
-    {
-      conceptId: hook.conceptId,
-      safeCopy: hook.shareEvidence.observation,
-      safeQuestion: hook.shareEvidence.question,
-      shareEvidence: clone(hook.shareEvidence),
-      sourcePlayId: hook.shareSourcePlayId,
-    },
-  ];
-  return decodeConceptProfile(value);
+  const signals = (indices) =>
+    new Map(
+      indices.map((index) => [
+        index,
+        SHARE_CONCEPTS.slice(0, 3).map((concept) => ({
+          conceptId: concept.id,
+          directionForOptionA: "a",
+        })),
+      ]),
+    );
+  return buildConceptProfile({
+    pairs: [1, 2].map((packNumber) => {
+      const indices = packNumber === 1 ? [0, 1] : [2];
+      return syntheticPair(packNumber, {
+        signals: signals(indices),
+        relationships: [
+          {
+            relationshipCode: "old_friend",
+            sightCount: 3,
+            status: "available",
+            counts: new Map(
+              indices.map((index) => [
+                `shared-card-${index + 1}`,
+                { a: 3, b: 0 },
+              ]),
+            ),
+          },
+        ],
+        includeFillers: false,
+      });
+    }),
+  });
 }
 
 test("selects one immutable concept source per slug by completion time", () => {
@@ -537,7 +523,7 @@ test("does not sum collecting sights across plays and keeps romantic evidence pr
   assert.deepEqual(romantic.shareOptions, []);
 });
 
-test("allows only outline non-romantic evidence into share options", () => {
+test("keeps fewer than three eligible concepts in the collecting fallback", () => {
   const result = buildConceptProfile({
     pairs: [1, 2].map((packNumber) =>
       syntheticPair(packNumber, {
@@ -562,9 +548,61 @@ test("allows only outline non-romantic evidence into share options", () => {
   assert.equal(hook.shareSafeOthers.status, "available");
   assert.equal(hook.shareSafeOthers.stage, "outline");
   assert.equal(hook.shareEligible, true);
+  assert.deepEqual(result.shareOptions, []);
+});
+
+test("builds representative-first three-axis bundles with maximum area diversity", () => {
+  const result = shareableProfile();
+  assert.equal(result.shareOptions.length, 3);
+  for (const option of result.shareOptions) {
+    assert.equal(option.bundle.length, 3);
+    assert.equal(
+      option.bundle[0].conceptLabel,
+      conceptById(option.conceptId).label,
+    );
+    assert.equal(
+      new Set(option.bundle.map(({ conceptLabel }) => conceptLabel)).size,
+      3,
+    );
+    assert.equal(
+      new Set(option.bundle.map(({ areaLabel }) => areaLabel)).size,
+      3,
+    );
+    assert.equal("safeCopy" in option, false);
+    assert.equal("safeQuestion" in option, false);
+    assert.equal(
+      option.sourcePlayId,
+      result.hooks.find(({ conceptId }) => conceptId === option.conceptId)
+        ?.shareSourcePlayId,
+    );
+  }
+});
+
+test("bundle selection preserves rank order and duplicates areas only when unavoidable", () => {
+  const candidates = [0, 1, 4, 8].map((index) => {
+    const concept = CONCEPT_CATALOG_V1.concepts[index];
+    return { conceptId: concept.id, areaId: concept.areaId };
+  });
   assert.deepEqual(
-    result.shareOptions.map(({ conceptId }) => conceptId),
-    [TEST_CONCEPTS[0].id],
+    buildConceptShareBundle(candidates, candidates[1].conceptId).map(
+      ({ conceptId }) => conceptId,
+    ),
+    [candidates[1].conceptId, candidates[2].conceptId, candidates[3].conceptId],
+  );
+
+  const twoAreas = [0, 1, 4, 5].map((index) => {
+    const concept = CONCEPT_CATALOG_V1.concepts[index];
+    return { conceptId: concept.id, areaId: concept.areaId };
+  });
+  const selected = buildConceptShareBundle(twoAreas, twoAreas[0].conceptId);
+  assert.deepEqual(
+    selected.map(({ conceptId }) => conceptId),
+    [twoAreas[0].conceptId, twoAreas[2].conceptId, twoAreas[1].conceptId],
+  );
+  assert.equal(new Set(selected.map(({ areaId }) => areaId)).size, 2);
+  assert.equal(
+    buildConceptShareBundle(twoAreas.slice(0, 2), twoAreas[0].conceptId),
+    null,
   );
 });
 
