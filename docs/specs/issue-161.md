@@ -20,7 +20,7 @@ Issue: https://github.com/aroido/gyeop/issues/161
 - [ ] 기존 shareable-hook 보장은 달성 가능한 최대 area 다양성을 깨지 않는 후보 선택/조정 범위에서만 유지한다. pairs가 비어 있지 않으면 대표 결은 정확히 3개여야 하고, 후보가 3개 미만인 응답은 fail-closed invalid다. pairs가 비어 있을 때만 빈 fallback을 허용한다.
 - [ ] `/me`의 1차 결과 UI에서 자연어 `profileLead`, `observation`, 대화형 `question`/blockquote와 긴 도움말을 제거하고, 대표 결 카드에는 영역명, 결 이름, `directionA — directionB`, 내 위치, 허용된 지인 익명 범위, 고유 문항 수, 근거 단계만 표시한다.
 - [ ] 대표 카드의 `trace`, `outline`, `clear`를 색 농도 대신 기존 hard-offset 카드 뒤 신호층 1장, 2장, 3장으로 구분한다. 전면에는 `cardCount`만 표시하고 `packCount`와 `contextCount`는 기존 상세 진입 후에만 표시한다.
-- [ ] 나머지 영역은 방향값 없이 `cardCount`, `packCount`, `contextCount`, `stage`만 보여주는 compact area rail로 표시한다.
+- [ ] 나머지 영역은 방향값 없이 `cardCount`와 `stage`만 전면에 보여주는 compact area rail로 표시한다. `packCount`와 `contextCount`는 API와 대표 카드의 기존 상세에만 남긴다.
 - [ ] 결과 바로 다음에 기존 공유 동작을 사용하는 대표 공유 CTA를 정확히 한 번만 배치한다. 질문팩 관리는 별도 보조 영역으로 유지한다.
 - [ ] 기존 feature flag/빈 결과 fallback, owner 인증, private `Cache-Control: no-store`, 공유 실패 fallback, 접근성 focus 복귀, 기존 분석 이벤트 경계를 보존한다.
 - [ ] API와 클라이언트 strict decoder, 단위·통합·E2E 테스트, 제품 결정 문서, 모바일 시각 QA 산출물을 함께 갱신한다.
@@ -65,7 +65,7 @@ Issue: https://github.com/aroido/gyeop/issues/161
 - [ ] `directionA`와 `directionB`는 축의 양끝에 텍스트로 함께 표시한다. 내 위치와 익명 집계는 모양, 레이블, 접근성 이름을 함께 사용해 색상이나 좌표만으로 구분하지 않는다.
 - [ ] self와 available others의 direction이 `a`/`b`이면 marker를 표시하고 others에만 stage 기반 `wide/medium/narrow` band를 더한다. `contextual`은 중앙 marker 없는 split pattern/status, `unsettled`은 marker 없는 neutral band/status로 표시한다.
 - [ ] `trace/outline/clear`의 카드 뒤 신호층은 각각 1/2/3장으로 고정하고 reduced motion에서는 전환·이동 애니메이션 없이 최종 상태만 표시한다.
-- [ ] compact area rail은 8개 영역 모두를 누락 없이 표시하되 방향 축을 그리지 않고 근거 수와 단계만 표현한다.
+- [ ] compact area rail은 8개 영역 모두를 누락 없이 표시하되 방향 축을 그리지 않고 고유 문항 수와 단계만 표현한다. 팩 수와 맥락 수는 전면 rail에 노출하지 않는다.
 - [ ] 320px에서 가로 스크롤, 텍스트 잘림, 축 endpoint 겹침이 없어야 한다. 390px과 430px에서는 정보 순서와 한 번의 공유 CTA를 유지하며 여백만 확장한다.
 - [ ] 200% 확대에서도 DOM 읽기 순서, 카드 내용, focus ring, 최소 44×44px 상호작용 영역이 유지되고 고정 높이로 콘텐츠를 자르지 않는다.
 

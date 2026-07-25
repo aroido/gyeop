@@ -424,10 +424,7 @@ export default function AccountProfileView({
                 {conceptProfile!.areaSummaries.map((area) => (
                   <li data-stage={area.stage} key={area.areaId}>
                     <strong>{area.areaLabel}</strong>
-                    <span>
-                      문항 {area.cardCount} · 팩 {area.packCount} · 맥락{" "}
-                      {area.contextCount}
-                    </span>
+                    <span>문항 {area.cardCount}</span>
                     <small>{STAGE_TEXT[area.stage]}</small>
                   </li>
                 ))}

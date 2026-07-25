@@ -280,6 +280,9 @@ test.describe("concept owner profile live", () => {
           .getByRole("heading", { name: "8개 영역의 쌓임" })
           .locator("..");
         await expect(areaRail.locator("li")).toHaveCount(8);
+        await expect(areaRail.locator("li").first()).toContainText(/문항 \d+/);
+        await expect(areaRail).not.toContainText("팩");
+        await expect(areaRail).not.toContainText("맥락");
         await expect(page.locator("[data-layer-count]")).toHaveCount(0);
         await expect(
           page.getByRole("heading", { name: "관계별로 보는 나" }),
