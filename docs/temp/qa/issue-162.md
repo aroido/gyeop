@@ -1,6 +1,6 @@
 # Issue 162 독립 QA
 
-검증 구현 HEAD: `41ba6d9633cf7e954026059acf354d1424d6126b`
+검증 구현 HEAD: `d0ce43b22da7c4103a60543dff811c384c0e0ae3`
 비교 기준: `1b27c9ca8c563f43b68a7a12fd249a43e7b9914a`
 
 ## QA 판정
@@ -29,6 +29,7 @@ P0/P1 Findings: 0
 1. `app/me/plays/[playId]/profile-share-card.tsx`의 포맷 오류가 수정되어 `pnpm format:check`가 통과했다.
 2. live 대표 흐름의 3축 문항 수 assertion이 축별 strict-safe 검사로 바뀌어 concept E2E 5/5가 통과했다.
 3. screenshot 경로가 `docs/temp/qa/issue-162`로 바뀌었고 요구된 PNG가 정확히 9개 생성됐다.
+4. source policy 검사가 폐기된 `한 장으로 나누기` 대신 현재 결과-first heading `세 가지 겹을 한 장에 담아요`를 요구하며, CTA `내 겹 공유하기` 검사는 그대로 유지된다.
 
 ## 검증 명령과 결과
 
@@ -50,6 +51,15 @@ P0/P1 Findings: 0
 - `GYEOP_E2E_PORT=32163 pnpm exec playwright test tests/e2e/share-links.spec.ts --project=mobile-chromium`
   - PASS: 21/21.
   - 기존 relationship 카드, native share 취소/실패, `NotAllowedError`, PNG/context/toBlob/font 경계, 수동 복사 focus, mixed query 404, 1080×1920 concept Canvas와 320/390/430 접근성 회귀를 확인했다.
+- `node scripts/verify-owner-profile.mjs`
+  - PASS: 현재 `/me` heading `세 가지 겹을 한 장에 담아요`와 CTA `내 겹 공유하기` 계약을 모두 확인한다.
+- `pnpm test:owner-profile`
+  - PASS: 로컬 DB 초기화 후 source verifier와 owner profile unit/integration 8/8.
+  - 초기 실행의 integration 2건은 앞선 live QA의 analytics/idempotency 상태 때문에 전역 event count가 증가하지 않았고, DB 초기화 후 같은 명령이 통과했다.
+- `node --test tests/unit/account-owner-profile.test.mjs tests/unit/concept-profile.test.mjs tests/unit/profile-share-card.test.mjs`
+  - PASS: 32/32.
+- `pnpm exec prettier --check scripts/verify-owner-profile.mjs`
+  - PASS.
 - `git diff --check 1b27c9c..HEAD`
   - PASS.
 - 코드 계약 독립 검토
