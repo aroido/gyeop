@@ -204,6 +204,7 @@ flowchart LR
 - 8개 area summary API는 catalog order를 따르고 self 질문을 같은 `cardKey` 기준으로 영역 안에서 한 번만 세어 `cardCount`, `packCount`, `contextCount`, count-derived `stage`만 제공한다. 전면 rail은 `cardCount`와 `stage`만 표시하고 팩·맥락 수는 대표 카드의 기존 상세에만 둔다. 같은 카드가 같은 영역의 두 결에 연결되면 영역에서는 한 번, 각 결에서는 각각 한 번 세며 네 결의 방향을 합산하지 않는다.
 - source pair가 있으면 대표 결은 정확히 3개다. `difference → contextual → repeated → emerging`의 one-per-kind와 kind 내부 rank를 유지하면서 unused area를 우선하고, 부족분도 global rank의 unused area부터 채운 뒤에만 중복 area를 허용한다. 공유 가능한 hook 보장은 달성 가능한 영역 다양성을 줄이지 않는 범위에서 유지한다.
 - `/me` 1차 결과는 양쪽 endpoint, 내 위치, 지인 익명 상태, 고유 문항 수와 stage를 먼저 표시하고 `profileLead`, observation, 대화형 question은 제거한다. 공유 가능한 결이 3개 이상이면 `영역 · A—B` picker와 `내 겹 공유하기`를 표시하고, 부족하면 concept 공유 카드 대신 `시선 더 모으기`를 유지한다.
+- 누적 전후 시각 기준은 [상위개념 프로필 정밀도 성장 목업](../design/mockups/concept-profile-v2/29-app-style-precision-growth.png)을 따른다.
 
 ## 9. 24팩·240문항 전수 매핑 결과
 
