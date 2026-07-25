@@ -11,7 +11,7 @@ Issue: https://github.com/aroido/gyeop/issues/162
 
 - [ ] #161의 owner-only `ConceptProfile`과 기존 집계를 재사용해 선택한 공유 가능 결을 첫 축으로, 다른 `shareEligible` 결 최대 2개를 보조 축으로 고정한 공유 번들을 만든다.
 - [ ] 번들은 정확히 3개의 서로 다른 `concept`를 요구하고, 가능한 경우 세 축 모두 서로 다른 `area`를 선택한다. 서로 다른 영역이 3개 미만일 때만 같은 영역을 허용한다.
-- [ ] 세 축 모두 `shareEvidence.status === "available"`, `shareSafeOthers.status === "available"`, stage `outline|clear`, direction `a|b|contextual`을 만족해야 한다. 하나라도 부족하면 새 상위개념 공유 카드를 만들지 않는다.
+- [ ] 세 축 모두 `shareEvidence.status === "available"`, `shareSafeOthers.status === "available"`, others stage `outline|clear`, others direction `a|b|contextual`을 만족해야 한다. `self`는 available이면서 direction `a|b`인 축만 허용하고 self `contextual|unsettled`은 정확한 한 위치로 표현하지 않고 공유 후보에서 제외한다. 하나라도 부족하면 새 상위개념 공유 카드를 만들지 않는다.
 - [ ] 3축 전용 `ConceptProfileShareCardModel`과 strict decoder를 만들고 기존 관계별 `RelationshipProfileShareCardModel` 경로는 분리해 보존한다.
 - [ ] `/me` 공유 picker에는 `영역 · A—B` 레이블을 사용하고 주인이 고른 대표 축을 항상 첫 축으로 유지한다.
 - [ ] 관리 화면의 공유 미리보기와 1080×1920 PNG를 같은 3축 정보·GYEOP 팔레트·hard-offset 카드 스타일로 렌더한다.
@@ -38,6 +38,10 @@ Issue: https://github.com/aroido/gyeop/issues/162
 - docs/product/concept-graph-design.md
 - docs/product/decision-log.md
 - docs/design/mockups/concept-profile-v2/29-app-style-precision-growth.png
+- lib/concepts/catalog-core.mjs
+- lib/share-links/share-link-client.ts
+- app/i/[publicId]/invite-entry.tsx
+- app/api/responses/[id]/events/route.ts
 - AGENTS.md
 
 ## 사용자 흐름 영향
@@ -63,17 +67,20 @@ Issue: https://github.com/aroido/gyeop/issues/162
 - [ ] `ConceptProfile`의 owner-only 응답 경계, feature flag, `Cache-Control: private, no-store`를 유지한다.
 - [ ] server-side `buildConceptProfile` 결과에 대표 option별 3축 번들을 결정할 최소 공개 안전 필드를 추가하거나 기존 hook을 option과 결합하되, client가 임의의 보조 축을 선택하지 않게 한다.
 - [ ] 대표 축의 `sourcePlayId`는 선택한 결의 기존 share-safe source를 사용한다. 보조 축의 source가 달라도 same-pack CTA와 entry URL은 대표 축 source 하나만 사용한다.
-- [ ] `ConceptProfileShareCardModel`은 top-level exact keys와 정확히 3개 axes를 가진다. 각 axis는 catalog로 다시 식별 가능한 `areaLabel`, `conceptLabel`, `directionA`, `directionB`, `selfPosition`, `othersPosition`, stage 기반 `othersRange`, `cardCount`만 가진다.
-- [ ] decoder는 label/endpoints를 catalog와 대조해 내부 `conceptId`/`areaId`를 파생하고, 중복 concept, 달성 가능한 area 다양성 위반, 비정상 위치·범위, stage/range 불일치, 3축 미만·초과, unknown/extra key를 fail-closed로 거부한다.
-- [ ] `selfPosition`과 `othersPosition`은 #161 public position 축의 유한 범위 `[-1, 1]`을 사용한다. `othersRange`는 stage/direction에서 server가 만든 익명 표현만 허용하고 raw score·표본 수·개인별 값은 포함하지 않는다.
-- [ ] contextual others는 양쪽 split range만 허용하고 단일 aggregate marker를 그리지 않는다. unsettled는 공유 불가라 모델에 들어올 수 없다.
+- [ ] `ConceptProfileShareCardModel`의 top-level exact keys는 `nickname`, `axes`이고 `axes` 길이는 정확히 3이다. 각 axis exact keys는 `areaLabel`, `conceptLabel`, `directionA`, `directionB`, `selfPosition`, `others`, `cardCount`다.
+- [ ] settled `others` exact union은 `{ source: "shareSafeOthers", direction: "a"|"b", stage: "outline"|"clear", position, range: "medium"|"narrow" }`다. `outline↔medium`, `clear↔narrow`만 허용한다.
+- [ ] contextual `others` exact union은 `{ source: "shareSafeOthers", direction: "contextual", stage: "outline"|"clear", range: "split" }`다. `position` 키를 포함하지 않고 renderer도 단일 marker를 그리지 않는다.
+- [ ] `selfPosition`과 settled others `position`은 #161 public position 축의 유한 범위 `[-1, 1]`을 사용하고 catalog direction threshold와 부호가 일치해야 한다. `cardCount`는 해당 source evidence의 중복 제거된 양의 정수다.
+- [ ] standalone share-card decoder는 top-level/axis/others union exact keys, catalog labels/endpoints로 파생한 concept identity, 중복 concept, position, stage/range, cardCount, unknown/extra key를 fail-closed로 검증한다.
+- [ ] 대표 축 고정과 달성 가능한 area 다양성은 전체 eligible universe를 가진 server `buildConceptShareBundle`과 owner `ConceptProfile` decoder가 검증한다. standalone public card만 보고 제외된 후보를 추측하거나 다양성을 재판정하지 않는다.
+- [ ] `others.range`는 server가 stage/direction에서 만든 익명 enum이며 raw 좌표·score·표본 수·개인별 값은 포함하지 않는다. unsettled는 공유 불가라 model에 들어올 수 없다.
 - [ ] nickname은 인증된 owner account display value를 관리 화면에서 카드 모델에 bounded text로 전달하되 owner/visitor ID, 관계명, respondent count, `privateOthers`, 원문 응답을 포함하지 않는다.
 - [ ] 저장소 schema와 public invite/one-to-one token에는 변화가 없다.
 
 ## 구현 계획
 
-- [ ] `lib/owner-profile/concept-profile-core.mjs`: 선택된 대표 share option을 첫 축으로 고정하고 catalog rank 순서를 재사용해 다른 영역을 우선하는 두 보조 축을 결정한다. 정확히 3개를 만들 수 있을 때만 option을 노출한다.
-- [ ] `lib/owner-profile/concept-profile.ts`: 3축 bundle과 share-safe axis의 readonly client type을 추가하고 기존 profile exact decoder가 server 결과의 중복·eligibility·diversity·representative source를 검증하게 한다.
+- [ ] `lib/owner-profile/concept-profile-core.mjs`: 선택된 대표 share option을 첫 축으로 고정하고 기존 `rankCandidate` 결과 순서를 그대로 재사용해 다른 영역을 우선하는 두 보조 축을 결정한다. catalog index는 기존 마지막 tie-break로만 남긴다. 다양성을 위해 후보를 건너뛴 뒤에도 남은 후보의 `difference→contextual→repeated→emerging`, stage/evidence rank 순서를 바꾸지 않는다.
+- [ ] `lib/owner-profile/concept-profile-core.mjs`와 `lib/owner-profile/concept-profile.ts`: 각 owner-only share option에 public-safe axis와 server-selected bundle을 연결한다. 전체 eligible option universe를 가진 builder와 profile decoder가 representative-first, exact 3, eligibility, duplicate concept, 달성 가능한 최대 distinct area를 같은 deterministic 함수로 검증한다.
 - [ ] `lib/owner-profile/profile-share-card-core.mjs`: 기존 relationship decoder를 건드리지 않고 3축 concept model exact decoder와 bounded nickname/position/range/cardCount/catalog 검증을 구현한다.
 - [ ] `lib/owner-profile/owner-profile.ts`: `ConceptProfileShareCardModel`을 3축 전용 type으로 교체하고 relationship union을 보존한다.
 - [ ] `app/me/account-profile-view.tsx`: picker label과 3축 부족 fallback을 구현하고 기존 dialog focus, 중복 클릭 guard, analytics failure message를 재사용한다.
@@ -81,7 +88,9 @@ Issue: https://github.com/aroido/gyeop/issues/162
 - [ ] `app/me/plays/[playId]/share-link-manager.tsx`: 기존 공개 invite URL 생성, native share, download/copy fallback, analytics/same-pack CTA 경로를 재사용하고 concept 모델 조립에 authenticated nickname과 validated bundle만 전달한다.
 - [ ] `app/me/plays/[playId]/profile-share-card.tsx`: concept preview와 Canvas를 정확히 세 axis loop로 렌더하되 기존 relationship branch는 변경하지 않는다. font readiness, text fit, `toBlob` 실패 처리와 filename을 재사용한다.
 - [ ] `app/me/plays/[playId]/profile-share-card.module.css`: 세 축 hard-offset stack, marker/range/split, compact viewport/reduced motion/focus 스타일만 최소 변경한다.
-- [ ] `tests/unit/concept-profile.test.mjs`: representative-first, 3개 exact, distinct-area 우선, unavoidable duplicate-area, 0/1/2 eligible fallback, contextual allowed, unsettled rejected, sourcePlayId를 검증한다.
+- [ ] `lib/concepts/catalog-core.mjs`는 변경하지 않고 share-card decoder의 catalog identity SSOT로 직접 재사용한다.
+- [ ] `app/i/[publicId]/invite-entry.tsx`, `lib/share-links/share-link-client.ts`, `app/api/responses/[id]/events/route.ts`: 기존 public invite와 `same_pack_start_clicked` 기록 경계를 참조해 회귀 테스트만 보강하고 새 event/API를 만들지 않는다.
+- [ ] `tests/unit/concept-profile.test.mjs`: representative-first, 3개 exact, distinct-area 우선, unavoidable duplicate-area, diversity 때문에 skip한 뒤의 기존 rank, 0/1/2 eligible fallback, others contextual 허용, self contextual/unsettled과 others unsettled 거부, sourcePlayId를 검증한다.
 - [ ] `tests/unit/profile-share-card.test.mjs`: exact keys, catalog identity, bounds, stage range, duplicates, unknown/extra/private keys, exact three axes, nickname limits를 검증하고 relationship fixtures 회귀를 유지한다.
 - [ ] `tests/e2e/concept-profile-live.spec.ts`: `/me` picker→관리 화면 preview→Web Share/download/copy→same-pack 흐름, analytics 중복 방지, 3축 부족 fallback, owner/no-store 경계를 live fixture로 검증한다.
 - [ ] `tests/e2e/share-links.spec.ts`: legacy relationship share, mixed query rejection, native share/`NotAllowedError`/PNG failure/focus 복구가 회귀하지 않는지 검증한다.
@@ -93,7 +102,7 @@ Issue: https://github.com/aroido/gyeop/issues/162
 - [ ] `/me`에서 대표 축을 고르면 그 축이 첫 번째이고 서로 다른 share-safe 결 두 개가 더해진 정확히 3축 bundle이 만들어진다.
 - [ ] 세 개 이상의 영역이 가능하면 세 축의 영역이 모두 다르고, 부족할 때만 같은 영역을 허용하며 concept는 항상 중복되지 않는다.
 - [ ] 세 축 중 하나라도 privacy/share eligibility, stage, direction 계약을 충족하지 않으면 새 concept 공유 카드가 생성되지 않고 `/me`는 `시선 더 모으기`를 보여 준다.
-- [ ] strict decoder가 top-level/axis exact keys, exact length 3, catalog labels/endpoints, position/range, cardCount, duplicate concept, achievable area diversity를 검증하고 private·unknown·extra 데이터를 거부한다.
+- [ ] share-card decoder가 `nickname/axes`, axis/others exact union, exact length 3, catalog labels/endpoints, position, stage/range, cardCount, duplicate concept를 검증하고 private·unknown·extra 데이터를 거부한다. 전체 eligible universe를 받는 bundle validator는 representative-first와 achievable area diversity를 별도로 검증한다.
 - [ ] 공유 미리보기와 1080×1920 PNG에 닉네임, `● 나 / ○ 지인`, 세 축의 endpoint, 내 위치, 익명 집계 범위, 고유 문항 수가 동일하게 보인다.
 - [ ] `observation`, `safeCopy`, `safeQuestion`, `stageText`, 자연어 성격문, raw score, 백분율, 응답자 수, 이름·관계명·개인 답변·개별 위치가 모델·DOM·PNG에 없다.
 - [ ] contextual은 중앙 marker 없는 split range이고 unsettled은 공유 불가이며, stage range를 통계 신뢰구간으로 표현하지 않는다.
@@ -101,7 +110,7 @@ Issue: https://github.com/aroido/gyeop/issues/162
 - [ ] 대표 축의 기존 `sourcePlayId`와 public invite URL로 `나도 이 팩으로 시작하기`가 이어지고 공개·1:1 링크 정책이 변하지 않는다.
 - [ ] Web Share, download, copy, OS 미지원, 취소, `NotAllowedError`, Canvas/font/PNG 실패에서 생성 링크 보존·복구 action·focus 복귀가 동작한다.
 - [ ] 기존 팩별 relationship share model/preview/PNG와 legacy query는 회귀하지 않는다.
-- [ ] `profile_reshare_clicked`, share success, same-pack 전환 이벤트가 한 사용자 action당 중복 없이 기록된다.
+- [ ] owner 확정은 기존 owner play identity로 `profile_reshare_clicked`, canonical public link가 생긴 공유 성공은 기존 `profile_share_succeeded`, 수신자 CTA는 response identity로 `same_pack_start_clicked`, 실제 새 owner 생성은 canonical template id+slug identity로 `new_owner_pack_opened`가 기존 idempotency 경계에서 각각 한 번만 집계된다.
 - [ ] 320/390/430px, 200% 확대, 키보드, focus-visible/복귀, screen reader 읽기 순서, 색상 비의존, reduced motion 검증이 통과한다.
 - [ ] 새 DB/migration/dependency 없이 focused 검증, `./scripts/run-ai-verify --mode full`, 동일 HEAD 필수 CI, 정확한 Render merge SHA와 운영 smoke가 통과한다.
 
@@ -119,8 +128,9 @@ Issue: https://github.com/aroido/gyeop/issues/162
 
 ## 분석과 관측성
 
-- [ ] `/me` picker를 여는 것만으로 share click을 기록하지 않는다. 기존 `recordOwnerProfileReshareClicked(sourcePlayId)`가 성공한 확정 action에서만 `profile_reshare_clicked`를 한 번 기록한다.
-- [ ] native share promise resolve만 기존 share-success event로 기록하고 취소·fallback·retry는 성공으로 중복 집계하지 않는다.
+- [ ] `/me` picker를 여는 것만으로 share click을 기록하지 않는다. 기존 `recordOwnerProfileReshareClicked(sourcePlayId)`가 성공한 확정 action에서 owner play identity별 `profile_reshare_clicked`를 idempotent하게 한 번 기록한다.
+- [ ] `profile_share_succeeded`는 native share promise 자체가 아니라 profile-source owner와 canonical public link의 기존 server 집계 identity를 보존한다. 취소·fallback·retry로 링크가 재사용돼도 같은 owner play 성공을 중복 집계하지 않는다.
+- [ ] 수신자 CTA의 `same_pack_start_clicked`는 source response identity별 기존 idempotent event를, 실제 `new_owner_pack_opened`는 유효한 response capability와 같은 canonical `pack_templates.id + slug`에서 새 owner가 생성된 경우만 보존한다. click과 open의 상호 도착 순서는 요구하지 않는다.
 - [ ] same-pack CTA는 기존 `entry_source=profile_reshare`과 pack identity를 사용한다. 새 event name, payload field, 로그, 대시보드를 추가하지 않는다.
 - [ ] decoder/PNG 오류에는 민감 model이나 위치 payload를 로깅하지 않고 기존 사용자 복구 문구만 사용한다.
 
@@ -135,7 +145,8 @@ Issue: https://github.com/aroido/gyeop/issues/162
 ## 롤아웃과 복구
 
 - [ ] 기존 `GYEOP_CONCEPT_PROFILE_ENABLED` flag 안에서 배포한다. off이거나 정확한 3축이 없으면 기존 `/me` fallback과 팩별 relationship share만 보인다.
-- [ ] DB 변화가 없으므로 데이터 rollback은 없다. 회귀 시 flag를 끄거나 PR을 되돌리면 #161 프로필과 기존 relationship 공유로 복구된다.
+- [ ] DB 변화가 없으므로 데이터 rollback은 없다. 긴급하게 flag를 끄면 #161 concept profile 전체가 숨겨지고 기존 비개념 `/me` fallback과 relationship 공유만 남는다.
+- [ ] #161 프로필을 유지하면서 #162 공유만 복구해야 하면 #162 PR만 되돌린 뒤 재배포한다. 이 경우 #161의 단일축 공유 계약 코드가 함께 복원되는지 exact merge parent에서 검증한다.
 - [ ] server bundle, client decoder, preview/Canvas를 같은 PR에서 배포해 계약 불일치 시간을 만들지 않는다.
 - [ ] 병합 후 Render `live for <merge SHA>`를 확인하고 `/`, `/me`, owner profile API의 unauth 401/private no-store, feature flag true, 기존 relationship query와 concept 부족 fallback을 smoke test한다.
 
