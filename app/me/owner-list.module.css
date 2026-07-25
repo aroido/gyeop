@@ -371,6 +371,21 @@
   background: #111;
 }
 
+.conceptCard[data-stage="trace"] {
+  border-color: #444;
+  background: linear-gradient(145deg, #111 65%, #161616);
+}
+
+.conceptCard[data-stage="outline"] {
+  border-color: #53608f;
+  background: linear-gradient(145deg, #111 45%, #182044);
+}
+
+.conceptCard[data-stage="clear"] {
+  border-color: #6f87ff;
+  background: linear-gradient(145deg, #111 25%, #263d9a);
+}
+
 .conceptCard > p {
   margin: 0;
   color: #bdbdbd;
