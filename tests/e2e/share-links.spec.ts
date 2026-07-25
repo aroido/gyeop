@@ -681,6 +681,65 @@ test("attributes profile-entry share once despite same-tick activation", async (
     ]);
 });
 
+test("persists profile copy attribution before reporting success", async ({
+  page,
+}) => {
+  await installBrowserHandoff(page, {
+    share: "unsupported",
+    clipboard: "resolve",
+  });
+  await completedOwner(page);
+  const share = await installShareApi(page);
+  let releaseShareEvent: (() => void) | undefined;
+  const shareEventGate = new Promise<void>((resolve) => {
+    releaseShareEvent = resolve;
+  });
+  await page.route(`**/api/me/plays/${playId}/share-events`, async (route) => {
+    await shareEventGate;
+    await route.fallback();
+  });
+  await page.goto(`/me/plays/${playId}?entry_source=profile_reshare`);
+  await page.getByRole("button", { name: "공유 링크 만들기" }).click();
+
+  const copyButton = page.getByRole("button", { name: "링크 복사" });
+  await copyButton.click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __gyeopHandoff: { copyCalls: string[] };
+            }
+          ).__gyeopHandoff.copyCalls.length,
+      ),
+    )
+    .toBe(1);
+  await expect(
+    page.getByRole("button", { name: "복사하는 중…" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText("링크를 복사했어요", { exact: false }),
+  ).toHaveCount(0);
+
+  releaseShareEvent?.();
+  await expect(page.getByRole("status")).toContainText("링크를 복사했어요");
+  await expect(copyButton).toBeFocused();
+  expect(
+    share.calls.filter((call) => call.pathname.endsWith("/share-events")),
+  ).toEqual([
+    {
+      method: "POST",
+      pathname: `/api/me/plays/${playId}/share-events`,
+      body: {
+        event: "share_link_copied",
+        linkId: linkIds[0],
+        entrySource: "profile_reshare",
+      },
+    },
+  ]);
+});
+
 test("treats native share cancellation and failure as zero success events", async ({
   page,
 }) => {

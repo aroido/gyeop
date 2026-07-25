@@ -28,6 +28,7 @@ import {
   listShareLinks,
   recordShareAction,
   rotateShareLink,
+  type ShareActionEvent,
   type ShareEntrySource,
   type ShareLink,
   ShareLinkHttpError,
@@ -141,6 +142,17 @@ function canShareFile(file: File) {
   } catch {
     return false;
   }
+}
+
+async function recordShareActionBestEffort(
+  playId: string,
+  linkId: string,
+  event: ShareActionEvent,
+  entrySource: ShareEntrySource,
+) {
+  await recordShareAction(playId, linkId, event, entrySource).catch(
+    () => undefined,
+  );
 }
 
 export default function ShareLinkManager({
@@ -371,16 +383,16 @@ export default function ShareLinkManager({
         files: [cardFile.file],
       });
       setForceCardFallback(false);
-      setFeedback({
-        tone: "status",
-        message: "공유 메뉴로 카드와 링크를 전달했어요.",
-      });
-      void recordShareAction(
+      await recordShareActionBestEffort(
         playId,
         link.linkId,
         "share_handoff_succeeded",
         entrySource,
-      ).catch(() => undefined);
+      );
+      setFeedback({
+        tone: "status",
+        message: "공유 메뉴로 카드와 링크를 전달했어요.",
+      });
     } catch (caught) {
       if (!link) {
         setFeedback({
@@ -498,16 +510,16 @@ export default function ShareLinkManager({
     try {
       const shareData = buildShareData(readyLink.inviteUrl, state.packTitle);
       await navigator.share(shareData);
-      setFeedback({
-        tone: "status",
-        message: "공유 메뉴로 링크를 전달했어요.",
-      });
-      void recordShareAction(
+      await recordShareActionBestEffort(
         playId,
         readyLink.linkId,
         "share_handoff_succeeded",
         entrySource,
-      ).catch(() => undefined);
+      );
+      setFeedback({
+        tone: "status",
+        message: "공유 메뉴로 링크를 전달했어요.",
+      });
     } catch (caught) {
       const cancelled = isShareCancellation(caught);
       setFeedback(
@@ -535,17 +547,17 @@ export default function ShareLinkManager({
       if (!navigator.clipboard?.writeText) throw new Error("unavailable");
       await navigator.clipboard.writeText(readyLink.inviteUrl);
       setManualCopyRequired(false);
+      await recordShareActionBestEffort(
+        playId,
+        readyLink.linkId,
+        "share_link_copied",
+        entrySource,
+      );
       setFeedback({
         tone: "status",
         message:
           "링크를 복사했어요. 카카오톡이나 인스타그램 DM, 문자에 붙여넣어 보내세요.",
       });
-      void recordShareAction(
-        playId,
-        readyLink.linkId,
-        "share_link_copied",
-        entrySource,
-      ).catch(() => undefined);
     } catch {
       manualFallback = true;
       setManualCopyRequired(true);
