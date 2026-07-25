@@ -1,4 +1,4 @@
-# Issue 162 구현 스펙: [P0] 상위개념 3축 프로필 공유 카드와 같은 팩 CTA 구현
+# Issue 162 구현 스펙: 상위개념 3축 프로필 공유 카드와 같은 팩 CTA 구현
 
 Status: Reviewed
 Issue: https://github.com/aroido/gyeop/issues/162
@@ -83,7 +83,7 @@ Issue: https://github.com/aroido/gyeop/issues/162
 - [ ] `lib/owner-profile/concept-profile-core.mjs`: 선택된 대표 share option을 첫 축으로 고정하고 기존 `rankCandidate` 결과 순서를 그대로 재사용해 다른 영역을 우선하는 두 보조 축을 결정한다. catalog index는 기존 마지막 tie-break로만 남긴다. 다양성을 위해 후보를 건너뛴 뒤에도 남은 후보의 `difference→contextual→repeated→emerging`, stage/evidence rank 순서를 바꾸지 않는다.
 - [ ] `lib/owner-profile/concept-profile-core.mjs`와 `lib/owner-profile/concept-profile.ts`: 각 owner-only share option에 public-safe axis와 server-selected bundle을 연결한다. 전체 eligible option universe를 가진 builder와 profile decoder가 representative-first, exact 3, eligibility, duplicate concept, 달성 가능한 최대 distinct area를 같은 deterministic 함수로 검증한다.
 - [ ] `lib/owner-profile/profile-share-card-core.mjs`: 기존 relationship decoder를 건드리지 않고 3축 concept model exact decoder와 bounded nickname/position/range/cardCount/catalog 검증을 구현한다.
-- [ ] `lib/owner-profile/owner-profile.ts`: `ConceptProfileShareCardModel`을 3축 전용 type으로 교체하고 relationship union을 보존한다.
+- [ ] `lib/owner-profile/owner-profile.ts`: `ConceptProfileShareCardModel`을 3축 전용 type으로 변경하고 relationship union을 보존한다.
 - [ ] `app/me/account-profile-view.tsx`: picker label과 3축 부족 fallback을 구현하고 기존 dialog focus, 중복 클릭 guard, analytics failure message를 재사용한다.
 - [ ] `app/me/plays/[playId]/page.tsx`와 관리 화면 server 경계: `entry_source=profile_reshare&share_concept=<representative>`를 owner auth 뒤 다시 검증하고 정확히 일치하는 server bundle만 전달한다. legacy relationship query와의 혼합은 계속 404 처리한다.
 - [ ] `app/me/plays/[playId]/share-link-manager.tsx`: 기존 공개 invite URL 생성, native share, download/copy fallback, analytics/same-pack CTA 경로를 재사용하고 concept 모델 조립에 authenticated nickname과 validated bundle만 전달한다.
