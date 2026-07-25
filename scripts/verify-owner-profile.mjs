@@ -243,7 +243,7 @@ export function verifyOwnerProfile() {
     "recordConceptDetailOpened",
     "누적 질문 신호",
     "8개 영역의 쌓임",
-    "한 장으로 나누기",
+    "세 가지 겹을 한 장에 담아요",
     "왜 이렇게 보일까?",
     "친구가 본 내 모습을 한 장으로 나눠보세요.",
     "친구의 답이 더 모이면 내 겹을 공유할 수 있어요.",
