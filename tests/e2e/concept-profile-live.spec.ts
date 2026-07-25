@@ -254,21 +254,32 @@ test.describe("concept owner profile live", () => {
       for (const width of [320, 390, 430]) {
         await page.setViewportSize({ width, height: 800 });
         await page.goto("/me");
-        const hooks = page.locator("article").filter({ hasText: "나:" });
-        const hookCount = await hooks.count();
-        expect(hookCount).toBeGreaterThanOrEqual(3);
-        expect(hookCount).toBeLessThanOrEqual(5);
+        const hooks = page.locator("[data-concept-card]");
+        await expect(hooks).toHaveCount(3);
         await expect(hooks.first()).toHaveAttribute(
           "data-stage",
           /^(trace|outline|clear)$/,
         );
-        await expect(hooks.first().locator(":scope > strong")).toHaveText(
-          /^(흔적|윤곽|선명)$/,
-        );
-        await expect(hooks.first()).toContainText("주변:");
+        await expect(hooks.first()).toContainText(/근거 (흔적|윤곽|선명)/);
+        await expect(hooks.first()).toContainText("● 내 위치");
+        await expect(hooks.first()).toContainText("○ 지인 익명 집계");
         await expect(hooks.first()).toContainText(
           /내 답변[\s\S]*팩[\s\S]*맥락/,
         );
+        await expect(
+          hooks.first().getByLabel(/내 위치:.*근거 (흔적|윤곽|선명)/),
+        ).toBeVisible();
+        await expect(page.locator("blockquote")).toHaveCount(0);
+        await expect(
+          page.getByText(
+            "한 장면의 답이 여러 팩에서 어떤 결로 이어졌는지 살펴보세요.",
+            { exact: true },
+          ),
+        ).toHaveCount(0);
+        const areaRail = page
+          .getByRole("heading", { name: "8개 영역의 쌓임" })
+          .locator("..");
+        await expect(areaRail.locator("li")).toHaveCount(8);
         await expect(page.locator("[data-layer-count]")).toHaveCount(0);
         await expect(
           page.getByRole("heading", { name: "관계별로 보는 나" }),
@@ -279,6 +290,7 @@ test.describe("concept owner profile live", () => {
         const share = page.getByRole("button", {
           name: "한 장으로 나누기",
         });
+        await expect(share).toHaveCount(1);
         await expect(share).toBeVisible();
         expect(
           await page.evaluate(
@@ -290,7 +302,7 @@ test.describe("concept owner profile live", () => {
         expect(
           await page.evaluate(() => {
             const cards = [...document.querySelectorAll("article")].filter(
-              (element) => element.textContent?.includes("나:"),
+              (element) => element.hasAttribute("data-concept-card"),
             );
             const action = [...document.querySelectorAll("button")].find(
               (element) => element.textContent?.trim() === "한 장으로 나누기",
@@ -305,6 +317,23 @@ test.describe("concept owner profile live", () => {
         ).toBe(true);
       }
 
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto("/me");
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = "200%";
+      });
+      await expect(page.locator("[data-concept-card]")).toHaveCount(3);
+      expect(
+        await page.evaluate(
+          () =>
+            document.documentElement.scrollWidth <=
+            document.documentElement.clientWidth,
+        ),
+      ).toBe(true);
+      await page.evaluate(() => {
+        document.documentElement.style.fontSize = "";
+      });
+
       const stageStyles = await page
         .locator("article[data-stage]")
         .first()
@@ -313,7 +342,7 @@ test.describe("concept owner profile live", () => {
           const styles = ["trace", "outline", "clear"].map((stage) => {
             card.setAttribute("data-stage", stage);
             const style = getComputedStyle(card);
-            return `${style.backgroundImage}|${style.borderColor}`;
+            return style.boxShadow;
           });
           if (originalStage) card.setAttribute("data-stage", originalStage);
           return styles;
@@ -448,10 +477,23 @@ test.describe("concept owner profile live", () => {
         "한 장면의 답이 여러 팩에서 어떤 결로 이어졌는지 살펴보세요.",
         { exact: true },
       );
-      const hooks = page.locator("article").filter({ hasText: "나:" });
-      const hookCount = await hooks.count();
-      expect(hookCount).toBeGreaterThanOrEqual(3);
-      expect(hookCount).toBeLessThanOrEqual(5);
+      const hooks = page.locator("[data-concept-card]");
+      await expect(lead).toHaveCount(0);
+      await expect(hooks).toHaveCount(3);
+      const lockedStatus = hooks
+        .first()
+        .locator("p")
+        .filter({ hasText: /시선을 모으는 중 · [0-2]\/3/ })
+        .first();
+      await expect(lockedStatus).toBeVisible();
+      expect(
+        await lockedStatus.evaluate(
+          (node) =>
+            ![...node.attributes].some(
+              ({ name }) => name.startsWith("data-") || name === "aria-label",
+            ),
+        ),
+      ).toBe(true);
       const collectingAction = page.getByRole("link", {
         name: "시선 더 모으기",
       });
@@ -466,14 +508,13 @@ test.describe("concept owner profile live", () => {
         0,
       );
       const order = await Promise.all([
-        lead.boundingBox(),
         hooks.first().boundingBox(),
         hooks.last().boundingBox(),
         collectingAction.boundingBox(),
       ]);
       expect(order.every(Boolean)).toBe(true);
       expect(order[0]!.y).toBeLessThan(order[1]!.y);
-      expect(order[2]!.y).toBeLessThan(order[3]!.y);
+      expect(order[1]!.y).toBeLessThan(order[2]!.y);
     } finally {
       cleanupOwnerFixtures(userId, fixtures);
     }

@@ -229,6 +229,7 @@ function shareableProfile() {
     stage: "outline",
     direction: "a",
     directionText: conceptDirection,
+    position: -1,
     evidence,
   };
   hook.shareEvidence = {
@@ -280,10 +281,10 @@ test("selects one immutable concept source per slug by completion time", () => {
   );
 });
 
-test("turns one completed pack into three to five non-diagnostic traces", () => {
+test("turns one completed pack into exactly three non-diagnostic traces and eight area summaries", () => {
   const result = builtProfile();
   assert.equal(result.modelVersion, 1);
-  assert.ok(result.hooks.length >= 3 && result.hooks.length <= 5);
+  assert.equal(result.hooks.length, 3);
   assert.ok(
     result.hooks.every(
       ({ kind, stage }) => kind === "emerging" && stage === "trace",
@@ -294,6 +295,28 @@ test("turns one completed pack into three to five non-diagnostic traces", () => 
     result.hooks.every(
       ({ observation }) =>
         !observation.includes("유형") && !observation.includes("점수"),
+    ),
+  );
+  assert.deepEqual(
+    result.areaSummaries.map(({ areaId }) => areaId),
+    CONCEPT_CATALOG_V1.areas.map(({ id }) => id),
+  );
+  assert.equal(result.areaSummaries.length, 8);
+  assert.equal(new Set(result.hooks.map(({ areaId }) => areaId)).size, 3);
+  assert.deepEqual(Object.keys(result).sort(), [
+    "areaSummaries",
+    "hooks",
+    "modelVersion",
+    "shareOptions",
+  ]);
+  assert.ok(
+    result.hooks.every(
+      (hook) =>
+        hook.areaId === hook.conceptId.split(".")[0] &&
+        typeof hook.directionA === "string" &&
+        typeof hook.directionB === "string" &&
+        Number.isFinite(hook.self.position) &&
+        !Object.hasOwn(hook.self, "directionScore"),
     ),
   );
 });
@@ -312,6 +335,7 @@ test("normalizes option direction, dedupes by pack card key, and applies stage e
   });
   const traceHook = hookFor(trace);
   assert.equal(traceHook.self.direction, "a");
+  assert.equal(traceHook.self.position, -1);
   assert.equal(traceHook.self.stage, "trace");
   assert.equal(traceHook.self.evidence.cardCount, 2);
 
@@ -346,6 +370,40 @@ test("normalizes option direction, dedupes by pack card key, and applies stage e
   assert.equal(clearHook.self.evidence.cardCount, 6);
   assert.equal(clearHook.self.evidence.packCount, 3);
   assert.ok(clearHook.self.evidence.contextCount >= 3);
+});
+
+test("dedupes one card once per area while keeping each concept signal", () => {
+  const result = buildConceptProfile({
+    pairs: [
+      syntheticPair(1, {
+        signals: new Map([
+          [
+            0,
+            [TEST_CONCEPTS[0], TEST_CONCEPTS[1]].map((concept) => ({
+              conceptId: concept.id,
+              directionForOptionA: "a",
+            })),
+          ],
+          [
+            1,
+            [
+              {
+                conceptId: TEST_CONCEPTS[4].id,
+                directionForOptionA: "a",
+              },
+            ],
+          ],
+        ]),
+        includeFillers: false,
+      }),
+    ],
+  });
+  assert.equal(hookFor(result, 0).self.evidence.cardCount, 1);
+  assert.equal(hookFor(result, 1).self.evidence.cardCount, 1);
+  assert.equal(
+    result.areaSummaries.find(({ areaId }) => areaId === "rel").cardCount,
+    1,
+  );
 });
 
 test("weights relationship direction by pack rather than respondent volume", () => {
@@ -584,12 +642,11 @@ test("ranks difference, contextual, repeated, and emerging hooks in that order",
       [TEST_CONCEPTS[0].id, "difference"],
       [TEST_CONCEPTS[1].id, "contextual"],
       [TEST_CONCEPTS[2].id, "repeated"],
-      [TEST_CONCEPTS[3].id, "emerging"],
     ],
   );
 });
 
-test("promotes one shareable hook while retaining share options outside the top five", () => {
+test("promotes one shareable hook without reducing maximum area diversity", () => {
   const signals = (firstGroup, secondGroup) =>
     new Map([
       [
@@ -672,15 +729,10 @@ test("promotes one shareable hook while retaining share options outside the top 
 
   assert.deepEqual(
     result.hooks.map(({ conceptId }) => conceptId),
-    [
-      TEST_CONCEPTS[0].id,
-      TEST_CONCEPTS[1].id,
-      TEST_CONCEPTS[2].id,
-      TEST_CONCEPTS[3].id,
-      TEST_CONCEPTS[5].id,
-    ],
+    [TEST_CONCEPTS[0].id, TEST_CONCEPTS[1].id, TEST_CONCEPTS[5].id],
   );
   assert.equal(result.hooks.at(-1).shareEligible, true);
+  assert.equal(new Set(result.hooks.map(({ areaId }) => areaId)).size, 2);
   assert.deepEqual(
     result.shareOptions.map(({ conceptId }) => conceptId),
     lastThree.map(({ id }) => id),
@@ -696,6 +748,38 @@ test("promotes one shareable hook while retaining share options outside the top 
   );
 });
 
+test("returns only the exact empty fallback for empty pairs", () => {
+  assert.deepEqual(buildConceptProfile({ pairs: [] }), {
+    modelVersion: 1,
+    hooks: [],
+    shareOptions: [],
+    areaSummaries: [],
+  });
+  expectInvalid((value) => {
+    value.hooks.pop();
+  });
+  assert.throws(
+    () =>
+      buildConceptProfile({
+        pairs: [
+          syntheticPair(1, {
+            signals: new Map([
+              [
+                0,
+                [TEST_CONCEPTS[0], TEST_CONCEPTS[1]].map((concept) => ({
+                  conceptId: concept.id,
+                  directionForOptionA: "a",
+                })),
+              ],
+            ]),
+            includeFillers: false,
+          }),
+        ],
+      }),
+    /Invalid concept profile/,
+  );
+});
+
 test("recursively rejects unknown keys from every concept profile layer", () => {
   expectInvalid((value) => {
     value.rawVisitor = "forbidden";
@@ -707,7 +791,13 @@ test("recursively rejects unknown keys from every concept profile layer", () => 
     value.hooks[0].self.rawCount = 3;
   });
   expectInvalid((value) => {
+    value.hooks[0].self.directionScore = 1;
+  });
+  expectInvalid((value) => {
     value.hooks[0].privateOthers.direction = "a";
+  });
+  expectInvalid((value) => {
+    value.hooks[0].privateOthers.position = 0;
   });
   expectInvalid((value) => {
     value.hooks[0].self.evidence.visitorResponseId = "forbidden";
@@ -717,6 +807,9 @@ test("recursively rejects unknown keys from every concept profile layer", () => 
   });
   expectInvalid((value) => {
     value.hooks[0].profileEvidence[0].answer = "a";
+  });
+  expectInvalid((value) => {
+    value.areaSummaries[0].direction = "a";
   });
   expectInvalid((value) => {
     value.hooks[0].shareEvidence.reason = "private";
@@ -756,13 +849,26 @@ test("rejects invalid evidence counts, unions, and ordering", () => {
 
 test("rejects catalog, presentation, source, and basis mismatches", () => {
   expectInvalid((value) => {
+    value.hooks[0].areaId = "exp";
+  });
+  expectInvalid((value) => {
     value.hooks[0].areaLabel = "다른 영역";
+  });
+  expectInvalid((value) => {
+    value.hooks[0].directionA = "다른 끝점";
   });
   expectInvalid((value) => {
     value.hooks[0].conceptLabel = "다른 결";
   });
   expectInvalid((value) => {
     value.hooks[0].self.directionText = "반대 방향";
+  });
+  expectInvalid((value) => {
+    value.hooks[0].self.position = Number.NaN;
+  });
+  expectInvalid((value) => {
+    value.hooks[0].self.position =
+      value.hooks[0].self.direction === "a" ? 1 : -1;
   });
   expectInvalid((value) => {
     value.hooks[0].observation = "임의로 만든 문장";
@@ -778,6 +884,15 @@ test("rejects catalog, presentation, source, and basis mismatches", () => {
   });
   expectInvalid((value) => {
     value.hooks[0].shareSourcePlayId = "19000000-0000-4000-8000-000000000099";
+  });
+  expectInvalid((value) => {
+    value.areaSummaries.reverse();
+  });
+  expectInvalid((value) => {
+    value.areaSummaries[1] = clone(value.areaSummaries[0]);
+  });
+  expectInvalid((value) => {
+    value.areaSummaries[0].stage = "clear";
   });
 });
 

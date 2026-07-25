@@ -360,120 +360,191 @@
 
 .conceptList {
   display: grid;
-  gap: 0.85rem;
+  gap: 1.35rem;
   margin-top: 1rem;
 }
 
 .conceptCard {
+  position: relative;
+  isolation: isolate;
+  margin: 0 1rem 1rem 0;
   padding: 1rem;
-  border: 1px solid #555;
-  border-radius: 1rem;
-  background: #111;
+  border: 0.2rem solid #050505;
+  border-radius: 0.85rem;
+  background: var(--blue);
+  color: #fff;
+}
+
+.conceptCard:nth-child(3n + 2) {
+  background: var(--lime);
+  color: #050505;
+}
+
+.conceptCard:nth-child(3n) {
+  background: var(--coral);
+  color: #050505;
 }
 
 .conceptCard[data-stage="trace"] {
-  border-color: #444;
-  background: linear-gradient(145deg, #111 65%, #161616);
+  box-shadow: 0.3rem 0.3rem 0 var(--lime);
 }
 
 .conceptCard[data-stage="outline"] {
-  border-color: #53608f;
-  background: linear-gradient(145deg, #111 45%, #182044);
+  box-shadow:
+    0.3rem 0.3rem 0 var(--coral),
+    0.6rem 0.6rem 0 var(--lime);
 }
 
 .conceptCard[data-stage="clear"] {
-  border-color: #6f87ff;
-  background: linear-gradient(145deg, #111 25%, #263d9a);
+  box-shadow:
+    0.3rem 0.3rem 0 var(--blue),
+    0.6rem 0.6rem 0 var(--coral),
+    0.9rem 0.9rem 0 var(--lime);
 }
 
 .conceptCard > p {
   margin: 0;
-  color: #bdbdbd;
   font-size: 0.72rem;
   font-weight: 900;
-}
-
-.conceptCard > strong {
-  display: inline-block;
-  margin-top: 0.55rem;
-  padding: 0.18rem 0.45rem;
-  border-radius: 99rem;
-  background: var(--lime);
-  color: #050505;
-  font-size: 0.72rem;
 }
 
 .conceptCard h3 {
-  margin: 0.75rem 0 0;
-  font-size: clamp(1.35rem, 6vw, 2rem);
-  line-height: 1.12;
+  margin: 0.25rem 0 0;
+  font-size: clamp(1.6rem, 7vw, 2.35rem);
+  line-height: 1;
   word-break: keep-all;
 }
 
-.conceptCard blockquote {
-  margin: 0.7rem 0 0;
-  padding-left: 0.7rem;
-  border-left: 0.25rem solid var(--blue);
-  color: #ddd;
-  font-weight: 800;
-  line-height: 1.45;
-}
-
-.conceptComparison {
+.conceptEndpoints {
   display: grid;
-  gap: 0.45rem;
-  margin-top: 0.85rem;
-  padding: 0.75rem;
-  border-radius: 0.75rem;
-  background: #1a1a1a;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 0.18rem solid #050505;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.25;
 }
 
-.conceptComparison p {
-  margin: 0;
-  line-height: 1.45;
+.conceptEndpoints span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.conceptComparison strong {
-  color: var(--lime);
+.conceptEndpoints span:last-child {
+  text-align: right;
 }
 
-.conceptBasis {
+.conceptSignal {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
+}
+
+.conceptSignal > p,
+.conceptLocked {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-top: 0.65rem;
-}
-
-.conceptBasis p {
-  display: flex;
-  gap: 0.35rem;
+  justify-content: space-between;
+  gap: 0.25rem 0.7rem;
   margin: 0;
-  padding: 0.35rem 0.55rem;
-  border: 1px solid #444;
-  border-radius: 99rem;
-  color: #ccc;
   font-size: 0.75rem;
+  line-height: 1.35;
 }
 
-.conceptBasis strong {
-  color: #fff;
+.conceptSignalTrack {
+  position: relative;
+  min-height: 1.35rem;
+  overflow: hidden;
+  border: 0.16rem solid #050505;
+  border-radius: 99rem;
+  background: #fff;
 }
 
-.conceptCard > button {
-  width: 100%;
-  min-height: 2.75rem;
+.conceptBand,
+.conceptPattern {
+  position: absolute;
+  inset-block: 0;
+  display: block;
+}
+
+.conceptBand {
+  left: var(--concept-position);
+  width: 70%;
+  transform: translateX(-50%);
+  background: rgb(255 77 66 / 48%);
+}
+
+.conceptSignalTrack[data-band="outline"] .conceptBand {
+  width: 48%;
+}
+
+.conceptSignalTrack[data-band="clear"] .conceptBand {
+  width: 28%;
+}
+
+.conceptSelfMarker,
+.conceptOthersMarker {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: var(--concept-position);
+  width: 0.78rem;
+  height: 0.78rem;
+  transform: translate(-50%, -50%);
+  border: 0.16rem solid #050505;
+  border-radius: 50%;
+}
+
+.conceptSelfMarker {
+  background: var(--lime);
+}
+
+.conceptOthersMarker {
+  background: #fff;
+}
+
+.conceptSignalTrack[data-display="contextual"] .conceptPattern {
+  inset-inline: 0;
+  background: linear-gradient(
+    90deg,
+    var(--coral) 0 34%,
+    transparent 34% 66%,
+    var(--blue) 66%
+  );
+}
+
+.conceptSignalTrack[data-display="unsettled"] .conceptPattern {
+  inset-inline: 17%;
+  background: repeating-linear-gradient(
+    135deg,
+    #aaa 0 0.35rem,
+    #ddd 0.35rem 0.7rem
+  );
+}
+
+.conceptLocked {
+  margin-top: 0.7rem;
+  padding: 0.55rem 0.65rem;
+  border: 0.16rem dashed currentColor;
+  border-radius: 0.65rem;
+}
+
+.conceptCardMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
   margin-top: 0.8rem;
-  border: 0;
-  border-radius: 0.7rem;
-  background: var(--blue);
-  color: #fff;
-  font-weight: 900;
-  cursor: pointer;
+  padding-top: 0.65rem;
+  border-top: 0.12rem solid currentColor;
+  font-size: 0.78rem;
 }
 
 .conceptEvidence {
   margin-top: 0.8rem;
-  border-top: 1px solid #383838;
+  border-top: 0.12rem solid currentColor;
   padding-top: 0.7rem;
 }
 
@@ -481,9 +552,16 @@
   display: flex;
   min-height: 2.75rem;
   align-items: center;
-  color: var(--lime);
+  color: currentColor;
   font-weight: 900;
   cursor: pointer;
+}
+
+.conceptEvidence div {
+  padding: 0.65rem;
+  border-radius: 0.6rem;
+  background: #050505;
+  color: #fff;
 }
 
 .conceptShareAction {
@@ -512,13 +590,73 @@
   margin-top: 0.7rem;
 }
 
-.conceptEvidence div p,
-.conceptEvidence > p {
+.conceptEvidence div p {
   grid-column: 1 / -1;
   margin: 0;
   color: #bbb;
   font-size: 0.78rem;
   line-height: 1.45;
+}
+
+.conceptEvidence > p {
+  margin: 0;
+  color: currentColor;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.areaRail {
+  margin-top: 1.7rem;
+}
+
+.areaRail h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.areaRail ul {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.areaRail li {
+  display: grid;
+  min-width: 0;
+  padding: 0.65rem;
+  border: 1px solid #444;
+  border-left: 0.35rem solid var(--blue);
+  border-radius: 0.65rem;
+  background: #111;
+}
+
+.areaRail li[data-stage="outline"] {
+  border-left-color: var(--coral);
+}
+
+.areaRail li[data-stage="clear"] {
+  border-left-color: var(--lime);
+}
+
+.areaRail strong,
+.areaRail span,
+.areaRail small {
+  overflow-wrap: anywhere;
+}
+
+.areaRail span,
+.areaRail small {
+  margin-top: 0.25rem;
+  color: #bbb;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.areaRail small {
+  color: var(--lime);
 }
 
 .sharePicker {
@@ -689,11 +827,14 @@
 .logout button:focus-visible,
 .plays a:focus-visible,
 .relationshipPicker button:focus-visible,
-.conceptCard > button:focus-visible,
 .conceptEvidence summary:focus-visible,
 .sharePicker button:focus-visible {
   outline: 3px solid var(--blue);
   outline-offset: 3px;
+}
+
+.conceptEvidence summary:focus-visible {
+  outline-color: #fff;
 }
 
 .primary:disabled {

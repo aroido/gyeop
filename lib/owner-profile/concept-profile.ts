@@ -22,6 +22,7 @@ export type ConceptSourceSummary =
       stage: ConceptStage;
       direction: ConceptDirection;
       directionText: string;
+      position: number;
       evidence: ConceptEvidenceSummary;
     }>;
 
@@ -41,7 +42,10 @@ export type ConceptShareEvidence =
 export type ConceptHook = Readonly<{
   conceptId: string;
   conceptLabel: string;
+  areaId: string;
   areaLabel: string;
+  directionA: string;
+  directionB: string;
   kind: ConceptHookKind;
   basis: ConceptHookBasis;
   stage: ConceptStage;
@@ -72,8 +76,18 @@ export type ConceptShareOption = Readonly<{
   sourcePlayId: string;
 }>;
 
+export type ConceptAreaSummary = Readonly<{
+  areaId: string;
+  areaLabel: string;
+  cardCount: number;
+  packCount: number;
+  contextCount: number;
+  stage: ConceptStage;
+}>;
+
 export type ConceptProfile = Readonly<{
   modelVersion: 1;
   hooks: readonly ConceptHook[];
   shareOptions: readonly ConceptShareOption[];
+  areaSummaries: readonly ConceptAreaSummary[];
 }>;

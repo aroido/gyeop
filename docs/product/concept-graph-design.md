@@ -1,8 +1,8 @@
 # 겹 상위개념 그래프 설계 v0
 
-상태: **탐색 설계안**
+상태: **concept v1 활성 설계**
 
-이 문서는 여러 질문팩에서 쌓인 응답을 대화가 확장되는 상위개념으로 연결하기 위한 초안이다. 현재 제품 동작을 정하는 활성 SSOT가 아니며, 기존 팩·카드·프로필 집계·공개 범위를 변경하지 않는다.
+이 문서는 여러 질문팩에서 쌓인 응답을 대화가 확장되는 상위개념으로 연결하는 concept v1 계약이다. catalog·집계·owner-only 표시 경계를 정하며 기존 팩·카드와 공개 범위는 변경하지 않는다.
 
 ## 1. 해결하려는 문제
 
@@ -194,7 +194,16 @@ flowchart LR
 
 또한 가운데에 있다는 것이 흐릿하다는 뜻은 아니다. 양쪽 근거가 모두 많이 쌓였다면 “상황에 따라 달라지는 결”이 선명하게 드러난 것이다.
 
-정확한 점수식과 단계 기준은 v0에서 만들지 않는다. 먼저 실제 질문 연결 분포를 보고 `흔적 → 윤곽 → 선명` 같은 표현이 성립하는지 검증한다.
+내부 방향 점수는 A 방향 `+1`, B 방향 `-1`을 유지한다. `cardCount >= 3`, `packCount >= 2`, `contextCount >= 2`면 `outline`, 각각 `6`, `3`, `3` 이상이면 `clear`, 나머지는 `trace`다. 응답 수만으로 단계를 올리지 않고 기존 card/pack/context 근거를 함께 사용한다.
+
+### owner-only 표시 계약
+
+- API는 raw `directionScore`를 제거하고 `position = clamp(-directionScore, -1, 1)`만 제공한다. 화면의 왼쪽 `-1`은 catalog `directionA`, 오른쪽 `1`은 `directionB`다. 기존 direction과 kind 판정에는 내부 점수를 그대로 사용한다.
+- self, 공개 기준을 통과한 `privateOthers`, 공유 안전 `shareSafeOthers`의 available source만 유한한 `position`을 가진다. locked `privateOthers`는 `{ status, sightCount }`만 제공하고 UI도 `시선을 모으는 중 · n/3` 외 위치·방향·범위를 DOM·접근성 이름에 남기지 않는다.
+- `a`/`b`인 self와 others는 marker를 쓴다. others에는 stage에 따른 넓은/중간/좁은 익명 band를 더하지만 이는 확률·신뢰구간이 아니다. `contextual`은 중앙 marker 없이 양쪽 split, `unsettled`은 marker 없이 넓은 neutral 상태로 표현한다. band와 pattern은 UI가 direction/stage/position에서 파생하며 API에 범위 필드를 추가하지 않는다.
+- 8개 area summary는 catalog order를 따르고 self 질문을 같은 `cardKey` 기준으로 영역 안에서 한 번만 세어 `cardCount`, `packCount`, `contextCount`, count-derived `stage`만 제공한다. 같은 카드가 같은 영역의 두 결에 연결되면 영역에서는 한 번, 각 결에서는 각각 한 번 세며 네 결의 방향을 합산하지 않는다.
+- source pair가 있으면 대표 결은 정확히 3개다. `difference → contextual → repeated → emerging`의 one-per-kind와 kind 내부 rank를 유지하면서 unused area를 우선하고, 부족분도 global rank의 unused area부터 채운 뒤에만 중복 area를 허용한다. 공유 가능한 hook 보장은 달성 가능한 영역 다양성을 줄이지 않는 범위에서 유지한다.
+- `/me` 1차 결과는 양쪽 endpoint, 내 위치, 지인 익명 상태, 고유 문항 수와 stage를 먼저 표시하고 `profileLead`, observation, 대화형 question은 제거한다. 공유 picker와 안전 문구·9:16 Canvas/PNG 계약은 issue #162까지 변경하지 않는다.
 
 ## 9. 24팩·240문항 전수 매핑 결과
 
