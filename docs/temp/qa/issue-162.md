@@ -1,6 +1,6 @@
 # Issue 162 독립 QA
 
-검증 구현 HEAD: `65a62809868fe0fab6d9132d15a41a4b3afb25e0`
+검증 구현 HEAD: `ac729a65019f372de7af04bda9db90b167c29996`
 비교 기준: `1b27c9ca8c563f43b68a7a12fd249a43e7b9914a`
 
 ## QA 판정
@@ -50,6 +50,8 @@ P0/P1 Findings: 0
   - owner auth와 `private, no-store`, 대표 picker → 관리 화면 preview, analytics one-shot, exact 3축, 0/1/2 privacy fallback, contextual split, 320/390/430, 200% 확대, 키보드/focus 복귀, reduced motion, 실제 PNG 다운로드를 확인했다.
   - DB 초기화 전 첫 시도는 모든 magic-link 요청이 이전 로컬 상태의 429를 받아 종료됐으며 구현 assertion에는 도달하지 않았다.
   - 일반 full/CI 실행은 ignored `test-results/issue-162`에 임시 캡처해 추적된 QA 증거를 덮어쓰지 않는다.
+  - env 미지정 독립 실행도 5/5를 통과하고 ignored `test-results/issue-162`에 정확히 9개를 만들었으며 tracked QA PNG diff는 0이었다.
+  - DB 초기화 후 explicit `GYEOP_QA_SCREENSHOT_DIR=test-results/qa-explicit-ac729a6` 실행도 5/5와 정확히 9개를 확인했다. 초기 explicit 실행의 429는 구현 assertion 전 로컬 rate-limit 상태였다.
 - `GYEOP_E2E_PORT=32163 pnpm exec playwright test tests/e2e/share-links.spec.ts --project=mobile-chromium`
   - PASS: 22/22.
   - 기존 relationship 카드, native share 취소/실패, `NotAllowedError`, PNG/context/toBlob/font 경계, 수동 복사 focus, mixed query 404, 1080×1920 concept Canvas와 320/390/430 접근성 회귀를 확인했다.
