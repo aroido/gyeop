@@ -10,7 +10,8 @@ import { signInOwnerAccount } from "./owner-auth-live-fixture";
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const conceptEnabled = process.env.GYEOP_CONCEPT_PROFILE_ENABLED === "true";
 const databaseContainer = "supabase_db_gyeop";
-const screenshotDirectory = "docs/temp/qa/issue-162";
+const screenshotDirectory =
+  process.env.GYEOP_QA_SCREENSHOT_DIR ?? "test-results/issue-162";
 
 function sql(statement: string, output = false) {
   const result = execFileSync(

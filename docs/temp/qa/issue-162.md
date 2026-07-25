@@ -45,10 +45,11 @@ P0/P1 Findings: 0
   - 대표축 첫 번째, 달성 가능한 최대 영역 다양성, 불가피한 동일 영역, 0/1/2 eligible fallback, contextual 허용, unsettled/private/extra-key 거부, exact 3축 decoder와 relationship 모델 회귀를 확인했다.
 - `pnpm exec supabase db reset --local`
   - PASS: 이전 반복 실행의 로컬 인증 rate-limit 상태를 초기화했다.
-- `GYEOP_E2E_LIVE=1 GYEOP_CONCEPT_PROFILE_ENABLED=true GYEOP_E2E_PORT=32162 pnpm exec playwright test tests/e2e/concept-profile-live.spec.ts --project=mobile-chromium`
+- `GYEOP_QA_SCREENSHOT_DIR=docs/temp/qa/issue-162 GYEOP_E2E_LIVE=1 GYEOP_CONCEPT_PROFILE_ENABLED=true GYEOP_E2E_PORT=32162 pnpm exec playwright test tests/e2e/concept-profile-live.spec.ts --project=mobile-chromium`
   - PASS: 5/5.
   - owner auth와 `private, no-store`, 대표 picker → 관리 화면 preview, analytics one-shot, exact 3축, 0/1/2 privacy fallback, contextual split, 320/390/430, 200% 확대, 키보드/focus 복귀, reduced motion, 실제 PNG 다운로드를 확인했다.
   - DB 초기화 전 첫 시도는 모든 magic-link 요청이 이전 로컬 상태의 429를 받아 종료됐으며 구현 assertion에는 도달하지 않았다.
+  - 일반 full/CI 실행은 ignored `test-results/issue-162`에 임시 캡처해 추적된 QA 증거를 덮어쓰지 않는다.
 - `GYEOP_E2E_PORT=32163 pnpm exec playwright test tests/e2e/share-links.spec.ts --project=mobile-chromium`
   - PASS: 22/22.
   - 기존 relationship 카드, native share 취소/실패, `NotAllowedError`, PNG/context/toBlob/font 경계, 수동 복사 focus, mixed query 404, 1080×1920 concept Canvas와 320/390/430 접근성 회귀를 확인했다.
