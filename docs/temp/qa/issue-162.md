@@ -9,6 +9,8 @@ Reviewer Agent: issue_162_verifier
 Status: PASS
 P0/P1 Findings: 0
 
+## 발견 사항
+
 ## P0
 
 - 없음.
