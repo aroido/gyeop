@@ -21,11 +21,12 @@ P0/P1 Findings: 0
 ## 검증
 
 - Base: `a650ab39e28cc901f53267ba2eaacc38f9e8ee0b`
-- HEAD: `afdcb19f1d0665c3c10323a2f9edddbe6a58a436`
+- Implementation HEAD: `b0c899c39ae4df30a23587738ca3419f42df86fc`
 - `node scripts/verify-owner-profile.mjs`: PASS
 - `git diff --check main...HEAD`: PASS
 - focused unit: PASS, 34/34
 - typecheck, lint, format check, spec-check: PASS
+- 기존 owner-play 320/390/430px focus 동기화 회귀: PASS, 3/3
 - `pnpm test:e2e:concept:run`: PASS, 5/5
 - 지정 PNG: 정확히 9개
   - `320.png`, `390.png`, `430.png`
