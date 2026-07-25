@@ -1,6 +1,6 @@
 # Issue 161 구현 스펙: [P0] 누적 질문 신호 기반 양방향 상위개념 프로필로 개편
 
-Status: Draft
+Status: Reviewed
 Issue: https://github.com/aroido/gyeop/issues/161
 
 ## 목표
@@ -153,9 +153,9 @@ Issue: https://github.com/aroido/gyeop/issues/161
 
 ## 스펙 검토
 
-Reviewer Agent:
-Review Status: FAIL
-P0/P1 Findings:
+Reviewer Agent: issue_161_critic_final
+Review Status: PASS
+P0/P1 Findings: 0
 
 ## 리스크와 미결정 사항
 
