@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-25 — 상위개념 프로필을 양방향 누적 신호로 먼저 표시
+
+- 결정: owner-only `/me`의 concept v1 결과는 자연어 `profileLead`·observation·대화 질문 대신 서로 다른 영역을 우선한 대표 결 3개의 A/B endpoint, 내 위치, 공개 기준을 통과한 지인 익명 상태, 고유 문항 수와 근거 단계를 먼저 표시한다. 내부 `directionScore`의 `+1=A/-1=B` 판정은 유지하고 public payload에는 화면 축에 맞춘 `position = clamp(-directionScore)`만 노출한다.
+- 이유: 해석문을 읽어야 이해되는 결과보다 여러 질문이 어느 영역과 양쪽 결에 쌓였는지를 직접 보여 줘야 고정 유형·점수 없이도 변화와 근거를 즉시 확인할 수 있다. contextual을 중앙값으로, unsettled을 정밀한 위치로 표시하면 근거가 다양한 상태와 근거가 모이지 않은 상태를 혼동한다.
+- 결과: `a`/`b`는 marker와 지인 stage 기반 비통계적 band, contextual은 중앙점 없는 split, unsettled은 중앙점 없는 neutral로 표시한다. locked 지인은 `n/3` 외 위치 정보를 API·DOM에 남기지 않는다. 8개 area summary는 self `cardKey`를 영역별로 중복 제거한 count/stage만 제공하고 영역 안 네 결의 방향을 합산하지 않는다. 기존 공유 picker, `shareOptions/shareEvidence/safeCopy/safeQuestion`, 9:16 Canvas/PNG는 issue #162까지 보존하며 새 DB·마이그레이션·의존성은 없다.
+
 ## 2026-07-24 — 고정 유형 대신 32개 결에서 대화 훅을 누적
 
 - 결정: 활성 최신 24개 팩의 240문항을 8개 영역·32개 양방향 결에 1~2개씩 연결하고, `/me`에는 사람 전체를 규정하는 코드 대신 실제 여러 팩·맥락에서 나온 대화 훅 3~5개를 보여 준다. 같은 slug 반복과 한 팩 안 여러 카드는 중복 가중하지 않고 셀프·비공개 주변 시선·공유 안전 시선을 분리한다.

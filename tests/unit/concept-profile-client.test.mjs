@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  loadConceptProfile,
   recordConceptDetailOpened,
   recordConceptProfileViewed,
 } from "../../lib/owner-profile/concept-profile-client.ts";
@@ -11,6 +12,40 @@ import {
 } from "../../lib/owner-profile/owner-profile-client.ts";
 
 const playId = "15700000-0000-4000-8000-000000000001";
+
+test("concept profile client accepts only the strict private empty shape", async () => {
+  const originalFetch = globalThis.fetch;
+  const payloads = [
+    {
+      modelVersion: 1,
+      hooks: [],
+      shareOptions: [],
+      areaSummaries: [],
+    },
+    {
+      modelVersion: 1,
+      hooks: [],
+      shareOptions: [],
+      areaSummaries: [],
+      extra: true,
+    },
+  ];
+  try {
+    globalThis.fetch = async () =>
+      Response.json(payloads.shift(), {
+        headers: { "cache-control": "private, no-store" },
+      });
+    assert.deepEqual(await loadConceptProfile(), {
+      modelVersion: 1,
+      hooks: [],
+      shareOptions: [],
+      areaSummaries: [],
+    });
+    await assert.rejects(loadConceptProfile(), /Invalid concept profile/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("four owner profile events send their one exact strict body", async () => {
   const originalFetch = globalThis.fetch;

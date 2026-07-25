@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type {
@@ -13,7 +14,7 @@ import type {
 import type {
   ConceptHook,
   ConceptProfile,
-  ConceptShareOption,
+  ConceptSourceSummary,
 } from "@/lib/owner-profile/concept-profile";
 import {
   recordConceptDetailOpened,
@@ -114,6 +115,85 @@ const STAGE_TEXT = Object.freeze({
   outline: "윤곽",
   clear: "선명",
 });
+
+const BAND_TEXT = Object.freeze({
+  trace: "넓은 범위",
+  outline: "중간 범위",
+  clear: "좁은 범위",
+});
+
+function ConceptSignal({
+  source,
+  subject,
+}: {
+  source: ConceptSourceSummary;
+  subject: "내 위치" | "지인 익명 집계";
+}) {
+  if (source.status === "locked") {
+    return (
+      <p className={styles.conceptLocked}>
+        <strong>○ {subject}</strong>
+        <span>시선을 모으는 중 · {source.sightCount}/3</span>
+      </p>
+    );
+  }
+  const directional = source.direction === "a" || source.direction === "b";
+  const display = directional ? "directional" : source.direction;
+  const band =
+    subject === "지인 익명 집계" && directional
+      ? BAND_TEXT[source.stage]
+      : null;
+  const positionStyle = directional
+    ? ({
+        "--concept-position": `${((source.position + 1) / 2) * 100}%`,
+      } as CSSProperties)
+    : undefined;
+  const status =
+    source.direction === "contextual"
+      ? "상황에 따라 양쪽 모습"
+      : source.direction === "unsettled"
+        ? "아직 한쪽으로 모이지 않음"
+        : source.directionText;
+  return (
+    <div className={styles.conceptSignal}>
+      <p>
+        <strong>
+          {subject === "내 위치" ? "●" : "○"} {subject}
+        </strong>
+        <span>
+          {status}
+          {band ? ` · ${band}` : ""}
+        </span>
+      </p>
+      <div
+        className={styles.conceptSignalTrack}
+        data-band={
+          subject === "지인 익명 집계" && directional ? source.stage : undefined
+        }
+        data-display={display}
+        role="img"
+        aria-label={`${subject}: ${status}${band ? `, ${band}` : ""}, 근거 ${STAGE_TEXT[source.stage]}`}
+        style={positionStyle}
+      >
+        {directional ? (
+          <>
+            {band ? <span className={styles.conceptBand} aria-hidden /> : null}
+            <span
+              className={
+                subject === "내 위치"
+                  ? styles.conceptSelfMarker
+                  : styles.conceptOthersMarker
+              }
+              aria-hidden
+            />
+          </>
+        ) : (
+          <span className={styles.conceptPattern} aria-hidden />
+        )}
+      </div>
+    </div>
+  );
+}
 
 function ConceptEvidence({ hook }: { hook: ConceptHook }) {
   const opened = useRef(false);
@@ -241,8 +321,7 @@ export default function AccountProfileView({
     void recordConceptProfileViewed(source).catch(() => undefined);
   }, [conceptProfile]);
 
-  const openSharePicker = (option?: ConceptShareOption) => {
-    if (option) setSelectedShareId(option.conceptId);
+  const openSharePicker = () => {
     setShareError("");
     shareDialogRef.current?.showModal();
   };
@@ -275,15 +354,15 @@ export default function AccountProfileView({
           <h1 id="account-title" ref={headingRef} tabIndex={-1}>
             {profile.nickname}의 겹
           </h1>
-          <p className={styles.profileLead}>
-            {hasConceptHooks
-              ? "한 장면의 답이 여러 팩에서 어떤 결로 이어졌는지 살펴보세요."
-              : shareSelection
+          {!hasConceptHooks ? (
+            <p className={styles.profileLead}>
+              {shareSelection
                 ? "친구가 본 내 모습을 한 장으로 나눠보세요."
                 : profile.ctaPlayId
                   ? "친구의 답이 더 모이면 내 겹을 공유할 수 있어요."
                   : "질문팩에 답하고, 내가 보는 나부터 쌓아보세요."}
-          </p>
+            </p>
+          ) : null}
           {!hasConceptHooks ? (
             <Link className={styles.primary} href={primaryHref!}>
               {shareSelection
@@ -306,68 +385,51 @@ export default function AccountProfileView({
             aria-labelledby="concept-profile-title"
           >
             <div className={styles.conceptHeading}>
-              <p className={styles.eyebrow}>장면이 쌓여 보이는 결</p>
-              <h2 id="concept-profile-title">나를 단정하지 않는 대화거리</h2>
+              <p className={styles.eyebrow}>누적 질문 신호</p>
+              <h2 id="concept-profile-title">친구가 본 나</h2>
             </div>
             <div className={styles.conceptList}>
               {conceptHooks.map((hook) => (
                 <article
                   className={styles.conceptCard}
+                  data-concept-card=""
                   data-stage={hook.stage}
                   key={hook.conceptId}
                 >
-                  <p>
-                    {hook.areaLabel} · {hook.conceptLabel}
-                  </p>
-                  <strong>{STAGE_TEXT[hook.stage]}</strong>
-                  <h3>{hook.observation}</h3>
-                  <blockquote>{hook.question}</blockquote>
-                  <div
-                    className={styles.conceptComparison}
-                    aria-label={`${hook.conceptLabel} 방향 비교`}
-                  >
-                    <p>
-                      <strong>나:</strong> {hook.self.directionText}
-                    </p>
-                    <p>
-                      <strong>주변:</strong>{" "}
-                      {hook.privateOthers.status === "available"
-                        ? hook.privateOthers.directionText
-                        : `시선을 모으는 중 · ${hook.privateOthers.sightCount}/3`}
-                    </p>
+                  <p>{hook.areaLabel}</p>
+                  <h3>{hook.conceptLabel}</h3>
+                  <div className={styles.conceptEndpoints}>
+                    <span>{hook.directionA}</span>
+                    <span>{hook.directionB}</span>
                   </div>
-                  <div
-                    className={styles.conceptBasis}
-                    aria-label={`${hook.conceptLabel} 근거 요약`}
-                  >
-                    {hook.profileEvidence.map(({ source, evidence }) => (
-                      <p key={source}>
-                        <strong>
-                          {source === "self" ? "내 답변" : "주변 시선"}
-                        </strong>
-                        <span>
-                          {evidence.packCount}팩 · {evidence.contextCount}맥락
-                        </span>
-                      </p>
-                    ))}
+                  <ConceptSignal source={hook.self} subject="내 위치" />
+                  <ConceptSignal
+                    source={hook.privateOthers}
+                    subject="지인 익명 집계"
+                  />
+                  <div className={styles.conceptCardMeta}>
+                    <span>고유 문항 {hook.self.evidence.cardCount}개</span>
+                    <strong>근거 {STAGE_TEXT[hook.stage]}</strong>
                   </div>
                   <ConceptEvidence hook={hook} />
-                  {hook.shareEligible ? (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const option = conceptProfile?.shareOptions.find(
-                          ({ conceptId }) => conceptId === hook.conceptId,
-                        );
-                        if (option) openSharePicker(option);
-                      }}
-                    >
-                      이 결로 대화 시작하기
-                    </button>
-                  ) : null}
                 </article>
               ))}
             </div>
+            <section
+              className={styles.areaRail}
+              aria-labelledby="concept-area-title"
+            >
+              <h3 id="concept-area-title">8개 영역의 쌓임</h3>
+              <ul>
+                {conceptProfile!.areaSummaries.map((area) => (
+                  <li data-stage={area.stage} key={area.areaId}>
+                    <strong>{area.areaLabel}</strong>
+                    <span>문항 {area.cardCount}</span>
+                    <small>{STAGE_TEXT[area.stage]}</small>
+                  </li>
+                ))}
+              </ul>
+            </section>
           </section>
         ) : null}
 
