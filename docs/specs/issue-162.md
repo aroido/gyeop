@@ -42,6 +42,7 @@ Issue: https://github.com/aroido/gyeop/issues/162
 - lib/share-links/share-link-client.ts
 - app/i/[publicId]/invite-entry.tsx
 - app/api/responses/[id]/events/route.ts
+- app/api/me/plays/[playId]/share-events/route.ts
 - AGENTS.md
 
 ## 사용자 흐름 영향
@@ -89,7 +90,8 @@ Issue: https://github.com/aroido/gyeop/issues/162
 - [ ] `app/me/plays/[playId]/profile-share-card.tsx`: concept preview와 Canvas를 정확히 세 axis loop로 렌더하되 기존 relationship branch는 변경하지 않는다. font readiness, text fit, `toBlob` 실패 처리와 filename을 재사용한다.
 - [ ] `app/me/plays/[playId]/profile-share-card.module.css`: 세 축 hard-offset stack, marker/range/split, compact viewport/reduced motion/focus 스타일만 최소 변경한다.
 - [ ] `lib/concepts/catalog-core.mjs`는 변경하지 않고 share-card decoder의 catalog identity SSOT로 직접 재사용한다.
-- [ ] `app/i/[publicId]/invite-entry.tsx`, `lib/share-links/share-link-client.ts`, `app/api/responses/[id]/events/route.ts`: 기존 public invite와 `same_pack_start_clicked` 기록 경계를 참조해 회귀 테스트만 보강하고 새 event/API를 만들지 않는다.
+- [ ] `app/i/[publicId]/invite-entry.tsx`, `lib/share-links/share-link-client.ts`, `app/api/responses/[id]/events/route.ts`: 기존 public invite와 수신자 `source=same_pack_cta`, `same_pack_start_clicked` 기록 경계를 참조해 회귀 테스트만 보강하고 새 event/API를 만들지 않는다.
+- [ ] `app/api/me/plays/[playId]/share-events/route.ts`: owner 공유 준비의 `entry_source=profile_reshare`와 canonical public link 기반 `profile_share_succeeded` server 경계를 그대로 보존한다.
 - [ ] `tests/unit/concept-profile.test.mjs`: representative-first, 3개 exact, distinct-area 우선, unavoidable duplicate-area, diversity 때문에 skip한 뒤의 기존 rank, 0/1/2 eligible fallback, others contextual 허용, self contextual/unsettled과 others unsettled 거부, sourcePlayId를 검증한다.
 - [ ] `tests/unit/profile-share-card.test.mjs`: exact keys, catalog identity, bounds, stage range, duplicates, unknown/extra/private keys, exact three axes, nickname limits를 검증하고 relationship fixtures 회귀를 유지한다.
 - [ ] `tests/e2e/concept-profile-live.spec.ts`: `/me` picker→관리 화면 preview→Web Share/download/copy→same-pack 흐름, analytics 중복 방지, 3축 부족 fallback, owner/no-store 경계를 live fixture로 검증한다.
@@ -131,7 +133,7 @@ Issue: https://github.com/aroido/gyeop/issues/162
 - [ ] `/me` picker를 여는 것만으로 share click을 기록하지 않는다. 기존 `recordOwnerProfileReshareClicked(sourcePlayId)`가 성공한 확정 action에서 owner play identity별 `profile_reshare_clicked`를 idempotent하게 한 번 기록한다.
 - [ ] `profile_share_succeeded`는 native share promise 자체가 아니라 profile-source owner와 canonical public link의 기존 server 집계 identity를 보존한다. 취소·fallback·retry로 링크가 재사용돼도 같은 owner play 성공을 중복 집계하지 않는다.
 - [ ] 수신자 CTA의 `same_pack_start_clicked`는 source response identity별 기존 idempotent event를, 실제 `new_owner_pack_opened`는 유효한 response capability와 같은 canonical `pack_templates.id + slug`에서 새 owner가 생성된 경우만 보존한다. click과 open의 상호 도착 순서는 요구하지 않는다.
-- [ ] same-pack CTA는 기존 `entry_source=profile_reshare`과 pack identity를 사용한다. 새 event name, payload field, 로그, 대시보드를 추가하지 않는다.
+- [ ] owner가 `/me`에서 공유 관리 화면으로 들어가 링크를 준비·생성하는 upstream 경계만 `entry_source=profile_reshare`를 사용한다. 수신자의 `나도 이 팩으로 시작하기`는 기존 `/play/new?pack=<slug>&source=same_pack_cta`와 canonical template id+slug identity를 사용한다. 새 event name, payload field, 로그, 대시보드를 추가하지 않는다.
 - [ ] decoder/PNG 오류에는 민감 model이나 위치 payload를 로깅하지 않고 기존 사용자 복구 문구만 사용한다.
 
 ## 개인정보와 악용 방지
