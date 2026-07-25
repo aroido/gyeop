@@ -1,4 +1,4 @@
-# Issue 161 구현 스펙: [P0] 누적 질문 신호 기반 양방향 상위개념 프로필로 개편
+# Issue 161 구현 스펙: 누적 질문 신호 기반 양방향 상위개념 프로필로 개편
 
 Status: Reviewed
 Issue: https://github.com/aroido/gyeop/issues/161
@@ -17,7 +17,7 @@ Issue: https://github.com/aroido/gyeop/issues/161
 - [ ] 8개 영역 각각에 self 질문 신호만으로 area summary를 만든다. 같은 `cardKey`는 영역 안에서 한 번만 세고, 고유 `cardCount`, `packCount`, `contextCount`, 기존 기준으로 계산한 `stage`만 제공한다.
 - [ ] 하나의 질문이 여러 `conceptSignals`를 가져도 질문-결 연결은 각 결에 반영하되, 같은 결과 같은 영역의 집계에서는 동일 `cardKey`를 중복 계산하지 않는다. 한 영역의 4개 결 방향값은 합산, 평균 또는 단일 방향으로 변환하지 않는다.
 - [ ] 대표 결은 기존 one-per-kind 의미와 `difference → contextual → repeated → emerging` kind 순서, kind 내부 current rank를 유지한다. 선택 슬롯이 남아 있는 동안 각 kind에서 아직 선택하지 않은 `areaId` 후보를 우선 한 개씩 선택하고, 모든 kind를 훑은 뒤 3개 미만이면 global rank에서 unused area 후보를 먼저, 그래도 부족할 때만 중복 area 후보를 허용한다.
-- [ ] 기존 shareable-hook 보장은 달성 가능한 최대 area 다양성을 깨지 않는 후보 선택/교체 범위에서만 유지한다. pairs가 비어 있지 않으면 대표 결은 정확히 3개여야 하고, 후보가 3개 미만인 응답은 fail-closed invalid다. pairs가 비어 있을 때만 빈 fallback을 허용한다.
+- [ ] 기존 shareable-hook 보장은 달성 가능한 최대 area 다양성을 깨지 않는 후보 선택/조정 범위에서만 유지한다. pairs가 비어 있지 않으면 대표 결은 정확히 3개여야 하고, 후보가 3개 미만인 응답은 fail-closed invalid다. pairs가 비어 있을 때만 빈 fallback을 허용한다.
 - [ ] `/me`의 1차 결과 UI에서 자연어 `profileLead`, `observation`, 대화형 `question`/blockquote와 긴 도움말을 제거하고, 대표 결 카드에는 영역명, 결 이름, `directionA — directionB`, 내 위치, 허용된 지인 익명 범위, 고유 문항 수, 근거 단계만 표시한다.
 - [ ] 대표 카드의 `trace`, `outline`, `clear`를 색 농도 대신 기존 hard-offset 카드 뒤 신호층 1장, 2장, 3장으로 구분한다. 전면에는 `cardCount`만 표시하고 `packCount`와 `contextCount`는 기존 상세 진입 후에만 표시한다.
 - [ ] 나머지 영역은 방향값 없이 `cardCount`, `packCount`, `contextCount`, `stage`만 보여주는 compact area rail로 표시한다.
