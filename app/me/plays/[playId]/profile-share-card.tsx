@@ -108,10 +108,7 @@ function positionPercent(position: number) {
   return `${Math.max(0, Math.min(100, ((position + 1) / 2) * 100))}%`;
 }
 
-function rangePositionPercent(
-  position: number,
-  range: "medium" | "narrow",
-) {
+function rangePositionPercent(position: number, range: "medium" | "narrow") {
   const halfWidth = range === "medium" ? 17 : 9;
   const center = ((position + 1) / 2) * 100;
   return `${Math.max(halfWidth, Math.min(100 - halfWidth, center))}%`;

@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 
 import { expect, test } from "@playwright/test";
 
@@ -10,7 +10,7 @@ import { signInOwnerAccount } from "./owner-auth-live-fixture";
 const live = process.env.GYEOP_E2E_LIVE === "1";
 const conceptEnabled = process.env.GYEOP_CONCEPT_PROFILE_ENABLED === "true";
 const databaseContainer = "supabase_db_gyeop";
-const screenshotDirectory = "docs/temp/qa/issue-161";
+const screenshotDirectory = "docs/temp/qa/issue-162";
 
 function sql(statement: string, output = false) {
   const result = execFileSync(
@@ -598,13 +598,20 @@ test.describe("concept owner profile live", () => {
       for (const label of selectedAxisLabels) {
         await expect(preview.locator("[data-axis='1']")).toContainText(label);
       }
-      await expect(preview.locator("[data-axis]")).toContainText(/고유 문항/);
+      const previewAxes = preview.locator("[data-axis]");
+      for (let index = 0; index < 3; index += 1) {
+        await expect(previewAxes.nth(index)).toContainText(/고유 문항 \d+/);
+      }
       expect(await preview.innerText()).not.toMatch(
         /observation|safeCopy|safeQuestion|점수|퍼센트|응답자/,
       );
-      await expect(
-        page.getByRole("button", { name: "이 카드 공유하기" }),
-      ).toBeEnabled();
+      await preview.screenshot({
+        path: `${screenshotDirectory}/share-preview.png`,
+      });
+      const shareCard = page.getByRole("button", {
+        name: "이 카드 공유하기",
+      });
+      await expect(shareCard).toBeEnabled();
       expect(
         await page.evaluate(
           () =>
@@ -623,6 +630,19 @@ test.describe("concept owner profile live", () => {
           ),
         ),
       ).toBe(before + 1);
+      await shareCard.click();
+      const downloadCard = page.getByRole("button", { name: "이미지 저장" });
+      await expect(downloadCard).toBeVisible();
+      const downloadPromise = page.waitForEvent("download");
+      await downloadCard.click();
+      const download = await downloadPromise;
+      const sharePngPath = `${screenshotDirectory}/share-png.png`;
+      await download.saveAs(sharePngPath);
+      expect(download.suggestedFilename()).toBe("gyeop-insight.png");
+      const sharePng = readFileSync(sharePngPath);
+      expect(sharePng.subarray(1, 4).toString("ascii")).toBe("PNG");
+      expect(sharePng.readUInt32BE(16)).toBe(1080);
+      expect(sharePng.readUInt32BE(20)).toBe(1920);
     } finally {
       cleanupOwnerFixtures(userId, fixtures);
     }
@@ -710,12 +730,6 @@ test.describe("concept owner profile live", () => {
         expect(order.every(Boolean)).toBe(true);
         expect(order[0]!.y).toBeLessThan(order[1]!.y);
         expect(order[1]!.y).toBeLessThan(order[2]!.y);
-        if (responseCount === 2) {
-          await page.screenshot({
-            path: `${screenshotDirectory}/locked.png`,
-            fullPage: true,
-          });
-        }
       } finally {
         cleanupOwnerFixtures(userId, fixtures);
       }
@@ -781,10 +795,6 @@ test.describe("concept owner profile live", () => {
       await expect(unsettled).toBeVisible();
       await expect(unsettled).toHaveAttribute("data-display", "unsettled");
       await expect(unsettled).not.toHaveAttribute("style", /concept-position/);
-      await page.screenshot({
-        path: `${screenshotDirectory}/unsettled.png`,
-        fullPage: true,
-      });
     } finally {
       cleanupOwnerFixtures(userId, fixtures);
     }
