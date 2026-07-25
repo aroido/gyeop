@@ -258,10 +258,24 @@ test.describe("concept owner profile live", () => {
         const hookCount = await hooks.count();
         expect(hookCount).toBeGreaterThanOrEqual(3);
         expect(hookCount).toBeLessThanOrEqual(5);
+        await expect(hooks.first()).toHaveAttribute(
+          "data-stage",
+          /^(trace|outline|clear)$/,
+        );
+        await expect(hooks.first().locator(":scope > strong")).toHaveText(
+          /^(흔적|윤곽|선명)$/,
+        );
         await expect(hooks.first()).toContainText("주변:");
         await expect(hooks.first()).toContainText(
           /내 답변[\s\S]*팩[\s\S]*맥락/,
         );
+        await expect(page.locator("[data-layer-count]")).toHaveCount(0);
+        await expect(
+          page.getByRole("heading", { name: "관계별로 보는 나" }),
+        ).toHaveCount(0);
+        await expect(
+          page.getByRole("heading", { name: "내 질문팩 관리" }),
+        ).toBeVisible();
         const share = page.getByRole("button", {
           name: "한 장으로 나누기",
         });
@@ -290,6 +304,21 @@ test.describe("concept owner profile live", () => {
           }),
         ).toBe(true);
       }
+
+      const stageStyles = await page
+        .locator("article[data-stage]")
+        .first()
+        .evaluate((card) => {
+          const originalStage = card.getAttribute("data-stage");
+          const styles = ["trace", "outline", "clear"].map((stage) => {
+            card.setAttribute("data-stage", stage);
+            const style = getComputedStyle(card);
+            return `${style.backgroundImage}|${style.borderColor}`;
+          });
+          if (originalStage) card.setAttribute("data-stage", originalStage);
+          return styles;
+        });
+      expect(new Set(stageStyles).size).toBe(3);
 
       const detail = page
         .getByText("왜 이렇게 보일까?", { exact: true })

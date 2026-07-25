@@ -311,7 +311,11 @@ export default function AccountProfileView({
             </div>
             <div className={styles.conceptList}>
               {conceptHooks.map((hook) => (
-                <article className={styles.conceptCard} key={hook.conceptId}>
+                <article
+                  className={styles.conceptCard}
+                  data-stage={hook.stage}
+                  key={hook.conceptId}
+                >
                   <p>
                     {hook.areaLabel} · {hook.conceptLabel}
                   </p>
@@ -402,7 +406,7 @@ export default function AccountProfileView({
           </section>
         ) : null}
 
-        {stackLayers.length > 0 ? (
+        {!hasConceptHooks && stackLayers.length > 0 ? (
           <div
             className={styles.stack}
             data-layer-count={stackLayers.length}
@@ -420,7 +424,7 @@ export default function AccountProfileView({
           </div>
         ) : null}
 
-        {relationshipChoices.length > 0 ? (
+        {!hasConceptHooks && relationshipChoices.length > 0 ? (
           <section
             className={styles.relationships}
             aria-labelledby="relationship-title"
@@ -454,7 +458,7 @@ export default function AccountProfileView({
             </div>
             {selected ? <RelationshipDetail layer={selected} /> : null}
           </section>
-        ) : profile.selfLayers[0] ? (
+        ) : !hasConceptHooks && profile.selfLayers[0] ? (
           <article className={styles.seedDetail}>
             <p className={styles.eyebrow}>
               {profile.selfLayers[0].packTitle} · 내가 보는 나
