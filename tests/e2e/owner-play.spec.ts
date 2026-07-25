@@ -732,6 +732,9 @@ for (const viewport of [
       const box = await control.boundingBox();
       expect(box?.height).toBeGreaterThanOrEqual(44);
     }
+    await expect(
+      page.getByRole("heading", { name: "서운한 일이 생기면 나는?" }),
+    ).toBeFocused();
     await page.keyboard.press("Shift+Tab");
     await expect(page.getByRole("button", { name: "나가기" })).toBeFocused();
     await expect(page.getByLabel("질문 진행률")).toHaveAttribute("max", "10");
