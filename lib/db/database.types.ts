@@ -792,7 +792,7 @@ export type Database = {
       record_authenticated_owner_profile_event: {
         Args: {
           p_actor_id: string;
-          p_concept_id?: string | null;
+          p_concept_id?: string;
           p_event_name: string;
           p_play_id: string;
         };
