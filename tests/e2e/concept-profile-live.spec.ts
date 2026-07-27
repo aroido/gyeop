@@ -736,17 +736,11 @@ test.describe("concept owner profile live", () => {
           preview.getByText(`○ 지인 · 시선을 모으는 중 · ${responseCount}/3`),
         ).toHaveCount(3);
         await expect(
-          preview
-            .locator("[data-axis]")
-            .first()
-            .locator("div")
-            .first(),
+          preview.locator("[data-axis]").first().locator("div").first(),
         ).toHaveAttribute("aria-hidden", "true");
         await expect(
           preview
-            .getByText(
-              `○ 지인 · 시선을 모으는 중 · ${responseCount}/3`,
-            )
+            .getByText(`○ 지인 · 시선을 모으는 중 · ${responseCount}/3`)
             .first(),
         ).toHaveAttribute("aria-hidden", "true");
         await expect(preview.locator("[data-range]")).toHaveCount(0);
