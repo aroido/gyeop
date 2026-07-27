@@ -332,7 +332,10 @@ export default function AccountProfileView({
     setSharePending(true);
     setShareError("");
     try {
-      await recordOwnerProfileReshareClicked(selectedConceptShare.sourcePlayId);
+      await recordOwnerProfileReshareClicked(
+        selectedConceptShare.sourcePlayId,
+        selectedConceptShare.conceptId,
+      );
       router.push(
         `/me/plays/${selectedConceptShare.sourcePlayId}?entry_source=profile_reshare&share_concept=${encodeURIComponent(
           selectedConceptShare.conceptId,

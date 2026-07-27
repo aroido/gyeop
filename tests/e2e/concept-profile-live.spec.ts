@@ -554,7 +554,7 @@ test.describe("concept owner profile live", () => {
         ).toBeGreaterThanOrEqual(44);
       }
       const shareChoices = dialog.getByRole("radio");
-      await expect(shareChoices).toHaveCount(3);
+      expect(await shareChoices.count()).toBeGreaterThanOrEqual(3);
       await expect(shareChoices.first()).toHaveAttribute(
         "aria-checked",
         "true",

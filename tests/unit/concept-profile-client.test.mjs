@@ -64,7 +64,7 @@ test("four owner profile events send their one exact strict body", async () => {
       });
     };
     await recordOwnerProfileViewed(playId);
-    await recordOwnerProfileReshareClicked(playId);
+    await recordOwnerProfileReshareClicked(playId, "rel.entry");
     await recordConceptProfileViewed(playId);
     await recordConceptDetailOpened(playId, "rel.initiation");
   } finally {
@@ -74,7 +74,11 @@ test("four owner profile events send their one exact strict body", async () => {
     calls.map(({ body }) => body),
     [
       { event: "profile_viewed", playId },
-      { event: "profile_reshare_clicked", playId },
+      {
+        event: "profile_reshare_clicked",
+        playId,
+        conceptId: "rel.entry",
+      },
       { event: "concept_profile_viewed", playId },
       {
         event: "concept_detail_opened",
@@ -102,6 +106,7 @@ test("profile event clients fail closed on response or identifier drift", async 
         headers: { "cache-control": "private, no-store" },
       });
     await assert.rejects(recordOwnerProfileReshareClicked(playId));
+    await assert.rejects(recordOwnerProfileReshareClicked(playId, ""));
     await assert.rejects(recordConceptProfileViewed(playId));
     assert.throws(() => recordConceptDetailOpened(playId, ""));
     await assert.rejects(recordOwnerProfileViewed("not-a-uuid"));

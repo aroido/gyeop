@@ -57,7 +57,8 @@ export const ownerProfileEventSchema = strictJsonObject(
   (value) =>
     value.event === "concept_detail_opened"
       ? value.conceptId !== undefined
-      : value.conceptId === undefined,
+      : value.event === "profile_reshare_clicked" ||
+        value.conceptId === undefined,
 );
 
 export const ownerPublicProfileSchema = strictJsonObject({

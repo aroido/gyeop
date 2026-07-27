@@ -3,6 +3,8 @@
 Status: Reviewed
 Issue: https://github.com/aroido/gyeop/issues/166
 
+원래 독립 검토를 통과한 “migration 없음” 범위는 full verify에서 확인된 0/3 analytics 교착을 처리하지 못하므로 폐기하지 않고 이 수정 스펙의 RPC signature replacement 범위로 대체한다. 이 문서가 재검토를 통과하기 전에는 새 범위를 Reviewed로 간주하지 않는다.
+
 ## 목표
 
 concept-mapped 질문팩을 완료한 owner가 settled self 근거와 유효한 `profileSourcePlayId`를 가진 결을 세 개 이상 보유하면 지인 응답이 0/1/2명이어도 `/me`의 self-first 3축 결과와 `내 겹 공유하기`를 즉시 사용하고, 지인 위치·방향·범위만 기존 개인정보 임계값 뒤에 열리게 한다.
@@ -19,12 +21,12 @@ concept-mapped 질문팩을 완료한 owner가 settled self 근거와 유효한 
 - [ ] 공유 미리보기와 1080×1920 PNG는 기존 파랑·라임·코랄·검정 hard-offset 3축 카드, 양쪽 endpoint, `● 나 / ○ 지인` 범례를 재사용한다.
 - [ ] locked 축은 self marker와 `○ 지인 · 시선을 모으는 중 · n/3`만 렌더한다. available 축은 `trace=wide`를 포함한 기존 익명 marker와 stage band를 표시하고, contextual은 중앙 marker 없는 split, unsettled은 marker 없는 neutral 상태로 표시한다.
 - [ ] 기존 Web Share, PNG 저장, 링크 복사, 파일 공유 미지원·취소·`NotAllowedError`·Canvas 실패 복구, 생성 링크 보존, dialog/fallback 후 focus 복귀를 회귀시키지 않는다.
-- [ ] owner 인증, `Cache-Control: private, no-store`, feature flag, strict decoder, analytics idempotency, same-pack CTA와 기존 relationship 공유 경계를 유지한다. 새 raw event/payload는 만들지 않고 기존 canonical event에서 계산되는 derived funnel만 회귀 검증한다.
+- [ ] owner 인증, `Cache-Control: private, no-store`, feature flag, strict decoder, same-pack CTA와 기존 relationship 공유 경계를 유지한다. 검증된 concept 확정 요청 하나는 같은 transaction에서 canonical raw `profile_viewed`와 `profile_reshare_clicked` 한 쌍을 기록한다. raw row에는 uniqueness/idempotency를 주장하지 않고, owner subject별 중복 제거와 단계 순서는 derived funnel에서만 적용한다. 이미 존재하는 `conceptId` request 필드를 재사용하되 새 raw event·저장 property는 추가하지 않는다.
 - [ ] 제품 SSOT, focused unit/E2E/Canvas 테스트, 독립 QA verdict와 모바일·접근성 검수 이미지를 같은 구현 PR에서 갱신한다.
 
 ## 제외 범위
 
-- [ ] 새 DB 테이블·컬럼·RPC·migration·저장 형식·외부 의존성·API route를 추가하지 않는다.
+- [ ] 문서화한 인증 event RPC signature replacement 외 새 DB table·column·policy·저장 analytics property·event·API route·dependency를 추가하지 않는다. 인증된 self-first concept 확정과 기존 no-sight relationship/capability를 구분하기 위한 forward migration 하나와 nullable `p_concept_id`만 포함한다.
 - [ ] concept catalog, 질문팩 문항·signal·context, stage 기준, direction 계산, kind 우선순위, stable rank 또는 영역 다양성 알고리즘을 변경하지 않는다.
 - [ ] threshold 전후 option identity를 고정하는 별도 self-only rank, source 선택, 캐시 또는 snapshot persistence를 추가하지 않는다.
 - [ ] `privateOthers`와 `shareSafeOthers`의 관계·질문 개인정보 임계값, romantic/1:1 제외, collecting `sightCount`의 play 간 비합산 규칙을 완화하지 않는다.
@@ -47,10 +49,20 @@ concept-mapped 질문팩을 완료한 owner가 settled self 근거와 유효한 
 - lib/owner-profile/profile-share-card-core.mjs
 - lib/share-links/share-link-client.ts
 - lib/http/auth-owner.ts
+- lib/http/owner-play-schemas.ts
+- lib/http/owner-profile.ts
+- lib/db/internal-rpc.ts
+- lib/db/database.types.ts
 - app/api/me/concept-profile/route.ts
+- app/api/me/profile/events/route.ts
 - app/i/[publicId]/invite-entry.tsx
 - app/api/responses/[id]/events/route.ts
 - app/api/me/plays/[playId]/share-events/route.ts
+- supabase/migrations/20260724000100_concept_graph.sql
+- supabase/migrations/20260727000100_concept_profile_reshare.sql
+- tests/integration/owner-profile-session.test.mjs
+- supabase/tests/owner_profile.test.sql
+- supabase/tests/data_access.test.sql
 - tests/e2e/owner-play-live.spec.ts
 - AGENTS.md
 
@@ -90,7 +102,9 @@ concept-mapped 질문팩을 완료한 owner가 settled self 근거와 유효한 
 - [ ] `buildConceptShareBundle`은 각 현재 evidence snapshot에서 기존 stable rank 입력 순서, representative-first, 최대 distinct-area 규칙을 그대로 사용한다. server builder와 `decodeConceptProfile`은 그 snapshot의 self-first eligible 전체 universe를 기준으로 exact 3축, concept 중복 금지, 대표 축 첫 번째, 가능한 area 다양성을 재검증한다.
 - [ ] `buildConceptProfile`의 server rebuild가 option 구성과 source ownership의 권위자다. `app/me/plays/[playId]/page.tsx`는 owner auth 뒤 현재 rebuild 결과의 `shareConcept + option.sourcePlayId === playId`만 카드로 조립하고 불일치는 404로 닫는다.
 - [ ] standalone share-card decoder는 catalog label/endpoints, exact keys, nickname, self position, locked/available union, stage/range, cardCount와 중복 concept를 fail-closed로 검증한다.
-- [ ] owner API나 공개 초대 URL에 raw score, 응답자 ID, 개별 답변·위치, relationship code, 내부 evidence 전체를 새로 직렬화하지 않는다. DB와 public invite/one-to-one token은 변하지 않는다.
+- [ ] owner API나 공개 초대 URL에 raw score, 응답자 ID, 개별 답변·위치, relationship code, 내부 evidence 전체를 새로 직렬화하지 않는다. DB 테이블·analytics payload와 public invite/one-to-one token은 변하지 않는다.
+- [ ] concept share 확정은 `/api/me/profile/events`의 기존 optional `conceptId`를 `profile_reshare_clicked`에도 허용한다. 서버는 현재 `shareOptions`에서 `conceptId + sourcePlayId`를 재검증한 요청만 nullable `p_concept_id`와 함께 인증 RPC로 전달한다.
+- [ ] `record_authenticated_owner_profile_event`는 검증된 concept reshare에서 지인 시선 수와 무관하게 기존 `profile_viewed`와 `profile_reshare_clicked` 행을 같은 속성으로 원자 기록한다. `conceptId`는 analytics property에 저장하지 않는다. `conceptId` 없는 인증 relationship 호출과 기존 `record_owner_profile_event` 관리 capability 호출의 no-sight `not_eligible`는 유지한다.
 
 ## 구현 계획
 
@@ -98,18 +112,21 @@ concept-mapped 질문팩을 완료한 owner가 settled self 근거와 유효한 
 - [ ] `lib/owner-profile/concept-profile.ts`, `lib/owner-profile/owner-profile.ts`: `ConceptProfileShareOthers`를 locked/available exact union으로 바꾸고 기존 profile/share option 필드명은 유지한다.
 - [ ] `lib/owner-profile/profile-share-card-core.mjs`: locked exact keys와 available settled/contextual/unsettled variant를 검증하고 private 위치 키·extra key·stage/range 불일치를 거부한다. 기존 relationship decoder는 변경하지 않는다.
 - [ ] `app/me/account-profile-view.tsx`: 지인 threshold가 아니라 self-first `shareOptions` 존재 여부로 CTA/picker를 표시한다. 기존 dialog, 중복 클릭 guard, 오류 문구, focus 복귀와 `profile_reshare_clicked` 호출을 재사용한다.
+- [ ] `lib/owner-profile/owner-profile-client.ts`, `lib/http/owner-play-schemas.ts`, `lib/http/owner-profile.ts`: concept 확정 호출에 선택된 `conceptId`를 기존 event request 필드로 전달하고, 현재 server profile의 exact option과 source play를 재검증한다. conceptId 없는 relationship 호출은 바꾸지 않는다.
+- [ ] `supabase/migrations/20260727000100_concept_profile_reshare.sql`, `lib/db/internal-rpc.ts`, `lib/db/database.types.ts`: 기존 인증 profile event RPC에 nullable concept id를 추가하고 검증된 concept reshare만 no-sight에서 기존 두 raw 행을 원자 기록한다. 기존 capability RPC와 analytics allowlist는 바꾸지 않는다.
 - [ ] `app/me/plays/[playId]/page.tsx`: owner auth 뒤 server가 현재 profile을 rebuild하는 경계를 source ownership의 권위자로 유지한다. 현재 `shareConcept + sourcePlayId` option만 nickname과 카드로 조립하고 threshold/rank drift로 사라진 이전 selection과 위조는 404로 닫는다.
 - [ ] `app/me/plays/[playId]/profile-share-card.tsx`: preview와 Canvas의 axis loop에 locked 분기와 available `trace=wide`, `unsettled=neutral`을 추가한다. locked에서는 self marker와 수집 문구만, available에서는 marker/band/split/neutral만 그린다.
 - [ ] `app/me/plays/[playId]/profile-share-card.module.css`: locked 수집 문구, `wide|neutral` 상태와 320/390/430px·200% 확대 스타일만 현재 토큰 안에서 최소 추가한다.
 - [ ] `app/me/plays/[playId]/share-link-manager.tsx`, `app/i/[publicId]/invite-entry.tsx`, 공유·visitor event route는 변경하지 않고 기존 공개 링크 생성, Web Share/저장/복사 fallback, same-pack CTA와 analytics 회귀 테스트의 근거로 사용한다.
 - [ ] `tests/unit/concept-profile.test.mjs`: 지인 0/1/2 각각의 현재 snapshot에서 self eligible option과 정확히 3축이 생기고 source가 해당 candidate의 `profileSourcePlayId`인 경우, 기존 stable rank/area diversity 재계산, 같은 snapshot의 self position/cardCount 투영, self 후보 0~2 fallback을 검증한다. threshold 간 option identity/order/source 동일성은 비교하지 않는다.
 - [ ] `tests/unit/profile-share-card.test.mjs`: locked 0/1/2와 available settled/contextual/unsettled exact union, `wide|medium|narrow|split|neutral`, locked 위치 키 혼입, catalog·position·cardCount·duplicate/extra key 거부를 검증하고 relationship fixture를 보존한다.
-- [ ] `tests/unit/concept-profile-client.test.mjs`: owner-only strict decoder와 private `no-store` 응답, invalid locked payload의 fail-closed를 확인한다.
+- [ ] `tests/unit/concept-profile-client.test.mjs`: owner-only strict decoder와 private `no-store` 응답, concept reshare의 기존 `conceptId` request 전달, invalid locked payload의 fail-closed를 확인한다.
+- [ ] `tests/integration/owner-profile-session.test.mjs`, `supabase/tests/data_access.test.sql`: 인증된 self-first concept 0/3은 기존 raw event를 기록하고, conceptId 없는 relationship와 관리 capability 0/3은 계속 `not_eligible`이며 RPC signature·권한 allowlist가 정확한지 확인한다.
 - [ ] `tests/e2e/concept-profile-live.spec.ts`: 지인 0/1/2 각각 `/me` 3개 hook·공유 CTA·picker·preview를 확인하고 대표 locked fixture에서 DOM/접근성 비노출과 1080×1920 PNG, 3명 snapshot에서 available 익명 표현을 검증한다.
 - [ ] `tests/e2e/share-links.spec.ts`: 실제 preview/Canvas에서 locked others 좌표 draw가 없고 수집 문구만 있는지, available 기존 렌더, Web Share/`NotAllowedError`/저장/복사/focus 복구, same-pack source를 검증한다.
 - [ ] `tests/e2e/owner-play-live.spec.ts`: 대표 `profileSourcePlayId`의 canonical pack으로 기존 same-pack click/open과 derived `visitor_same_pack` funnel이 이어지는지 회귀 검증한다.
 - [ ] `docs/product/core-feature-priority.md`, `docs/product/concept-graph-design.md`: self 결과와 카드 공유는 즉시 열고 지인 위치·방향·범위만 임계값으로 잠그는 활성 계약과 fallback을 반영한다.
-- [ ] `docs/product/decision-log.md`: #162의 others-first eligibility를 대체하는 self-first 공유 결정, 이유, 개인정보 경계와 새 DB 없음 결론을 기록한다.
+- [ ] `docs/product/decision-log.md`: #162의 others-first eligibility를 대체하는 self-first 공유 결정, 이유, 개인정보 경계와 no-sight analytics 교착을 푸는 최소 forward migration 결론을 기록한다.
 - [ ] `docs/temp/qa/issue-166.md`와 `docs/temp/qa/issue-166/*.png`: 독립 verifier가 P0/P1/P2 판정, 명령, viewport·접근성·locked/available·share 증거를 기록한다.
 
 ## 완료 기준
@@ -124,10 +141,10 @@ concept-mapped 질문팩을 완료한 owner가 settled self 근거와 유효한 
 - [ ] 미리보기와 다운로드 PNG가 동일한 세 축·locked/available 상태를 표시하며 PNG 크기가 정확히 1080×1920이다.
 - [ ] 대표 축 source pack 공개 초대 생성과 수신자 `나도 이 팩으로 시작하기`가 기존 canonical template id+slug로 이어진다.
 - [ ] Web Share 성공, 파일 미지원, 취소, `NotAllowedError`, Canvas/font/toBlob 실패에서 기존 링크 보존, 이미지 저장·링크 복사, 사용자 상태 문구와 focus 복귀가 동작한다.
-- [ ] `profile_reshare_clicked`, `profile_share_succeeded`, `same_pack_start_clicked`, `new_owner_pack_opened`의 기존 raw 발생·idempotency 경계가 유지되고 새 event/payload를 만들지 않는다. `profile_reshare`, `visitor_same_pack` derived funnel은 `docs/engineering/core-funnel-events.md`의 기존 subject/order 규칙으로 별도 회귀 검증한다.
+- [ ] accepted concept 확정 요청은 canonical raw `profile_viewed`와 `profile_reshare_clicked` 한 쌍을 같은 transaction에서 기록하며, 재요청은 raw row를 다시 만들 수 있다. 새 analytics event/property는 만들지 않고 `conceptId`는 현재 option 검증용 request/RPC 인자로만 쓰며 저장하지 않는다. `profile_share_succeeded`와 `new_owner_pack_opened`는 raw event 이름이 아니라 각각 기존 share raw event와 `pack_opened`에서 계산하는 derived stage다. `profile_reshare`와 `visitor_same_pack`은 `docs/engineering/core-funnel-events.md`의 기존 owner/response subject 중복 제거와 단계 순서를 별도 회귀 검증한다.
 - [ ] owner session 없는 concept API는 401이고 owner 응답과 오류 응답은 `Cache-Control: private, no-store`를 유지한다. 위조된 concept/source play, mixed legacy query와 invalid model은 404 또는 strict decoder 실패로 닫힌다.
 - [ ] 320/390/430px, 200% 확대, 키보드, focus-visible/복귀, screen reader 읽기 순서, 색상 비의존, reduced motion 검증이 통과한다.
-- [ ] 제품 SSOT 세 문서가 같은 계약으로 갱신되고 새 DB/migration/dependency 없이 focused 검증, `./scripts/run-ai-verify --mode full`, 동일 HEAD 필수 CI가 통과한다.
+- [ ] 제품 SSOT 세 문서가 같은 계약으로 갱신되고 정확히 한 개의 forward migration 외 새 DB schema/dependency 없이 focused 검증, `./scripts/run-ai-verify --mode full`, 동일 HEAD 필수 CI가 통과한다.
 
 ## 테스트 계획
 
@@ -143,9 +160,9 @@ concept-mapped 질문팩을 완료한 owner가 settled self 근거와 유효한 
 
 ## 분석과 관측성
 
-- [ ] picker 열기만으로 event를 기록하지 않고, 공유 내용을 확정할 때 대표 결의 `profileSourcePlayId`로 기존 `profile_reshare_clicked`를 owner play별 한 번 기록한다.
-- [ ] canonical public link가 준비된 공유 성공은 기존 `profile_share_succeeded`, 수신자 CTA는 response별 `same_pack_start_clicked`, 실제 새 owner 생성은 canonical template id+slug의 `new_owner_pack_opened` raw 경계를 유지한다.
-- [ ] 새 raw event·property·payload는 추가하지 않는다. `profile_reshare`와 `visitor_same_pack` derived funnel은 `docs/engineering/core-funnel-events.md`의 canonical subject와 ordered stage 규칙으로 검증하며 raw event 성공과 derived funnel 성공을 같은 주장으로 합치지 않는다.
+- [ ] picker 열기만으로 raw event를 기록하지 않는다. 검증된 공유 확정 요청을 받아들일 때 대표 결의 `profileSourcePlayId`에 canonical raw `profile_viewed`와 `profile_reshare_clicked` 한 쌍을 같은 transaction에서 순서대로 insert한다. raw table에는 owner play별 uniqueness를 두지 않는다.
+- [ ] canonical public link의 공유 성공은 raw `share_handoff_succeeded|share_link_copied`와 `entrySource=profile_reshare`에서 derived `profile_share_succeeded`가 된다. 수신자 CTA는 raw `same_pack_start_clicked`, 실제 새 owner 생성은 raw `pack_opened`와 `entrySource=same_pack_cta`에서 derived `new_owner_pack_opened`가 된다.
+- [ ] 새 raw event·저장 property는 추가하지 않는다. 기존 request의 optional `conceptId`는 server option 검증과 내부 RPC 분기에만 쓰고 analytics row에는 넣지 않는다. `profile_reshare`는 owner play, `visitor_same_pack`은 response subject를 단계별로 중복 제거한 derived funnel이며 raw row 중복과 동일한 개념이 아니다. raw event 성공과 derived stage 성공을 같은 주장으로 합치지 않는다.
 - [ ] 지인 locked/available 상태, `sightCount`, 위치, 모델 또는 응답 내용을 새 analytics property·로그·대시보드에 추가하지 않는다.
 - [ ] decoder/Canvas 실패는 민감 payload를 기록하지 않고 기존 사용자 복구 문구와 오류 경계를 재사용한다.
 
@@ -160,12 +177,14 @@ concept-mapped 질문팩을 완료한 owner가 settled self 근거와 유효한 
 
 ## 롤아웃과 복구
 
-- [ ] 기존 `GYEOP_CONCEPT_PROFILE_ENABLED` flag 안에서 server builder, strict decoder, `/me`, preview/Canvas를 같은 PR로 배포해 계약 불일치 시간을 만들지 않는다.
+- [ ] rollout은 nullable `p_concept_id default null`이 있는 forward migration을 먼저 적용한 뒤 앱을 배포한다. 기존 앱의 3-key RPC 호출은 default 인자 때문에 migration 이후에도 동작한다. 앱을 먼저 배포해 old 3-arg RPC에 4번째 key를 보내는 순서는 허용하지 않는다.
 - [ ] feature flag가 꺼지거나 concept 결과/self 후보가 부족하면 기존 비개념 `/me`와 relationship 공유로 fail-closed 한다.
-- [ ] DB 변화가 없으므로 데이터 rollback은 없다. 회귀 시 flag를 끄거나 #166 구현 PR만 되돌리면 #162의 threshold-safe 3축 eligibility와 기존 fallback으로 복구된다.
-- [ ] 배포 후 정확한 merge SHA가 Render에서 live인지 확인하고 `/`, `/me`, unauth concept API 401/no-store, owner locked 0/1/2 공유, available 3+, same-pack CTA와 legacy relationship query를 smoke test한다.
+- [ ] rollback은 먼저 old 3-key-compatible 앱을 배포한 다음, 이미 적용된 `20260727000100` 파일을 삭제·수정·되감지 않고 별도 새 forward migration으로 3-arg 인증 RPC를 복원한다. feature flag는 concept UI/행동만 차단하며 RPC signature 복원 수단이 아니다.
+- [ ] 배포 전 local fresh reset에서 migration chain을 확인하고, 배포 후 `pnpm exec supabase migration list --linked`로 local/remote migration parity를 확인한다. 그 뒤 정확한 merge SHA가 Render에서 live인지 확인하고 `/`, `/me`, unauth concept API 401/no-store, owner locked 0/1/2 공유, available 3+, same-pack CTA와 legacy relationship query를 smoke test한다.
 
 ## 스펙 검토
+
+full verify에서 발견된 0/3 analytics 교착 때문에 기존의 “DB 변화 없음” 전제를 위와 같이 수정했고, nullable RPC 인자와 forward migration을 포함한 변경 범위를 독립 critic이 재검토했다.
 
 Reviewer Agent: issue_166_critic
 Review Status: PASS

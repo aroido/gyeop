@@ -37,25 +37,34 @@ export async function recordOwnerProfileEventResponse(input: {
 }) {
   let result;
   try {
-    if (
+    const validatesConcept =
       input.event === "concept_profile_viewed" ||
-      input.event === "concept_detail_opened"
-    ) {
+      input.event === "concept_detail_opened" ||
+      (input.event === "profile_reshare_clicked" &&
+        input.conceptId !== undefined);
+    if (validatesConcept) {
       if (!conceptProfileEnabled()) return ownerNotFoundResponse();
       const profile = await loadAuthenticatedOwnerConceptProfile();
       const eligible =
         input.event === "concept_profile_viewed"
           ? profile.hooks[0]?.profileSourcePlayId === input.playId
-          : profile.hooks.some(
-              (hook) =>
-                hook.profileSourcePlayId === input.playId &&
-                hook.conceptId === input.conceptId,
-            );
+          : input.event === "concept_detail_opened"
+            ? profile.hooks.some(
+                (hook) =>
+                  hook.profileSourcePlayId === input.playId &&
+                  hook.conceptId === input.conceptId,
+              )
+            : profile.shareOptions.some(
+                (option) =>
+                  option.sourcePlayId === input.playId &&
+                  option.conceptId === input.conceptId,
+              );
       if (!eligible) return ownerNotFoundResponse();
     }
     result = await recordAuthenticatedOwnerProfileEvent({
       playId: input.playId,
       event: input.event,
+      conceptId: input.conceptId,
     });
   } catch (error) {
     return authenticatedOwnerFailureResponse(error);

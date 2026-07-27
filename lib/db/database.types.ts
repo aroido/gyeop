@@ -790,7 +790,12 @@ export type Database = {
         Returns: string;
       };
       record_authenticated_owner_profile_event: {
-        Args: { p_actor_id: string; p_event_name: string; p_play_id: string };
+        Args: {
+          p_actor_id: string;
+          p_concept_id?: string | null;
+          p_event_name: string;
+          p_play_id: string;
+        };
         Returns: Json;
       };
       record_authenticated_owner_share_action: {

@@ -298,6 +298,8 @@ flowchart LR
 
 1080×1920 PNG에는 `● 나 · ○ 지인` 범례와 이 3축만 그린다. 첫 축의 기존 `profileSourcePlayId`가 초대 source이며 server는 현재 owner profile rebuild 결과와 맞지 않는 이전·위조 selection을 404로 닫는다. 관찰문·질문·자연어 성격 해석·유형·점수·퍼센트·응답자 수·개별 답변·관계별 원자료·내부 ID·관리 URL·secret은 모델·DOM·PNG에 포함하지 않는다. 첫 축의 source pack 공개 초대를 카드와 함께 공유하고 수신자의 같은 팩 CTA는 기존 `same_pack_cta`를 유지한다. Web Share가 파일을 지원하지 않거나 취소·`NotAllowedError`·실패하면 생성된 링크를 보존한 채 이미지 저장과 링크 복사를 제공한다.
 
+공유 확정 analytics는 기존 `profile_reshare_clicked` raw event와 `packVersion + entrySource=profile_reshare` property를 유지한다. client가 기존 optional `conceptId` request 필드에 선택 결을 넣으면 server는 현재 `shareOptions`의 `(conceptId, profileSourcePlayId)`를 확인하고, 검증된 인증 concept 요청만 0/1/2 시선에서도 같은 raw event를 기록한다. `conceptId`는 analytics에 저장하지 않으며, conceptId 없는 relationship/관리 capability 재공유는 기존 no-sight `not_eligible` 경계를 유지한다.
+
 ## 11. 후보 결의 생존 기준
 
 32개를 처음부터 전부 제품에 넣지 않는다. 전체 240개 질문을 연결해본 뒤 아래를 만족한 결만 남긴다.

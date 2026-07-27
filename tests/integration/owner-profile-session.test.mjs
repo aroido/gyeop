@@ -13,6 +13,7 @@ import {
 
 const root = new URL("../../", import.meta.url).pathname;
 const versionId = "e05e6366-2a00-4798-8273-0af5f16aad10";
+const conceptVersionId = "ff63ec5c-11de-456d-a3a2-28ad65758e0f";
 const proxySecret = Buffer.alloc(32, 27).toString("base64url");
 const rateSecret = randomBytes(32).toString("base64url");
 const accountDeleteKey = Buffer.alloc(32, 26).toString("base64url");
@@ -44,6 +45,7 @@ const serverEnv = {
   ACCOUNT_DELETE_REAUTH_ACTIVE_VERSION: "v1",
   ACCOUNT_DELETE_REAUTH_KEYRING: JSON.stringify({ v1: accountDeleteKey }),
   APP_URL: appUrl,
+  GYEOP_CONCEPT_PROFILE_ENABLED: "true",
   ORIGIN_PROXY_SECRET: proxySecret,
   RATE_LIMIT_SECRET: rateSecret,
   GYEOP_NEXT_DIST_DIR: ".next/integration-owner-profile-3107",
@@ -126,7 +128,7 @@ function claimOwner(credential) {
   );
 }
 
-function insertOwner(credential, completed) {
+function insertOwner(credential, completed, packVersionId = versionId) {
   const hash = hashHex(credential);
   sql(`
     with fixed_time as (select clock_timestamp() as value)
@@ -134,7 +136,7 @@ function insertOwner(credential, completed) {
       id, pack_version_id, management_secret_hash, management_expires_at,
       last_active_at, status, current_position, created_at, updated_at
     ) select
-      '${credential.playId}', '${versionId}', decode('${hash}', 'hex'),
+      '${credential.playId}', '${packVersionId}', decode('${hash}', 'hex'),
       value + interval '7 days', value, 'draft', ${completed ? 10 : 1}, value, value
     from fixed_time;
     ${
@@ -142,10 +144,10 @@ function insertOwner(credential, completed) {
         ? `insert into public.self_answers (
             pack_play_id, pack_version_id, card_id, choice
           )
-          select '${credential.playId}', '${versionId}', card.id,
+          select '${credential.playId}', '${packVersionId}', card.id,
             case when card.position % 2 = 0 then 'b' else 'a' end
           from public.pack_cards as card
-          where card.pack_version_id = '${versionId}';
+          where card.pack_version_id = '${packVersionId}';
           update public.pack_plays
           set status = 'completed', completed_at = clock_timestamp()
           where id = '${credential.playId}';`
@@ -375,11 +377,146 @@ test("profile access requires Auth and stays scoped to the requested owned play"
   assert.equal(event.status, 204, serverLog);
   assert.equal(
     sql(
-      "select count(*) from public.analytics_events where event_name = 'profile_viewed' and visitor_response_id is null and properties = jsonb_build_object('packVersion', 'old-friend-v2')",
+      `select count(*) from public.analytics_events
+       where event_name = 'profile_viewed'
+         and owner_play_id = '${ownerA.playId}'
+         and visitor_response_id is null
+         and properties = jsonb_build_object('packVersion', 'old-friend-v2')`,
       true,
     ),
-    String(initialProfileViewCount + 1),
+    "1",
   );
+});
+
+test("zero-sight concept reshare records the canonical event without relaxing legacy eligibility", async () => {
+  const initialProfileViewCount = Number(
+    sql(
+      "select count(*) from public.analytics_events where event_name = 'profile_viewed'",
+      true,
+    ),
+  );
+  const initialProfileReshareCount = Number(
+    sql(
+      "select count(*) from public.analytics_events where event_name = 'profile_reshare_clicked'",
+      true,
+    ),
+  );
+  const owner = createOwnerCredential();
+  const draft = createOwnerCredential();
+  insertOwner(owner, true, conceptVersionId);
+  insertOwner(draft, false, conceptVersionId);
+  claimOwner(owner);
+  claimOwner(draft);
+
+  const conceptResponse = await ownerRequest("/api/me/concept-profile", {
+    cookie: testAccount.cookie,
+  });
+  assert.equal(conceptResponse.status, 200, serverLog);
+  const conceptProfile = await conceptResponse.json();
+  const option = conceptProfile.shareOptions.find(
+    (candidate) => candidate.sourcePlayId === owner.playId,
+  );
+  assert.ok(option);
+  assert.equal(
+    conceptProfile.shareOptions.some(
+      (candidate) => candidate.sourcePlayId === draft.playId,
+    ),
+    false,
+  );
+  const assertRawCounts = (profileViewed, profileReshareClicked) => {
+    assert.equal(
+      Number(
+        sql(
+          "select count(*) from public.analytics_events where event_name = 'profile_viewed'",
+          true,
+        ),
+      ),
+      profileViewed,
+    );
+    assert.equal(
+      Number(
+        sql(
+          "select count(*) from public.analytics_events where event_name = 'profile_reshare_clicked'",
+          true,
+        ),
+      ),
+      profileReshareClicked,
+    );
+  };
+
+  const legacy = await ownerRequest("/api/me/profile/events", {
+    method: "POST",
+    ip: "198.51.100.131",
+    cookie: testAccount.cookie,
+    body: { event: "profile_reshare_clicked", playId: owner.playId },
+  });
+  assert.equal(legacy.status, 404);
+  assertRawCounts(initialProfileViewCount, initialProfileReshareCount);
+
+  const forgedConcept = await ownerRequest("/api/me/profile/events", {
+    method: "POST",
+    ip: "198.51.100.132",
+    cookie: testAccount.cookie,
+    body: {
+      event: "profile_reshare_clicked",
+      playId: owner.playId,
+      conceptId: "rel.forged",
+    },
+  });
+  assert.equal(forgedConcept.status, 404);
+  assertRawCounts(initialProfileViewCount, initialProfileReshareCount);
+
+  const wrongSource = await ownerRequest("/api/me/profile/events", {
+    method: "POST",
+    ip: "198.51.100.133",
+    cookie: testAccount.cookie,
+    body: {
+      event: "profile_reshare_clicked",
+      playId: draft.playId,
+      conceptId: option.conceptId,
+    },
+  });
+  assert.equal(wrongSource.status, 404);
+  assertRawCounts(initialProfileViewCount, initialProfileReshareCount);
+
+  const concept = await ownerRequest("/api/me/profile/events", {
+    method: "POST",
+    ip: "198.51.100.134",
+    cookie: testAccount.cookie,
+    body: {
+      event: "profile_reshare_clicked",
+      playId: owner.playId,
+      conceptId: option.conceptId,
+    },
+  });
+  assert.equal(concept.status, 204, serverLog);
+  assert.equal(
+    sql(
+      `select count(*) from public.analytics_events
+       where event_name = 'profile_reshare_clicked'
+         and owner_play_id = '${owner.playId}'
+         and visitor_response_id is null
+         and properties = jsonb_build_object(
+           'packVersion', 'old-friend-v3',
+           'entrySource', 'profile_reshare'
+         )`,
+      true,
+    ),
+    "1",
+  );
+  assertRawCounts(initialProfileViewCount + 1, initialProfileReshareCount + 1);
+  assert.equal(
+    sql(
+      `select public.record_owner_profile_event(
+         '${owner.playId}',
+         decode('${hashHex(owner)}', 'hex'),
+         'profile_reshare_clicked'
+       )->>'outcome'`,
+      true,
+    ),
+    "not_eligible",
+  );
+  assertRawCounts(initialProfileViewCount + 1, initialProfileReshareCount + 1);
 });
 
 test("submitted public sights refresh live and reveal only at three samples", async () => {
@@ -446,10 +583,17 @@ test("submitted public sights refresh live and reveal only at three samples", as
   assert.equal(eligibleReshare.status, 204, serverLog);
   assert.equal(
     sql(
-      "select count(*) from public.analytics_events where event_name = 'profile_reshare_clicked' and visitor_response_id is null and properties = jsonb_build_object('packVersion', 'old-friend-v2', 'entrySource', 'profile_reshare')",
+      `select count(*) from public.analytics_events
+       where event_name = 'profile_reshare_clicked'
+         and owner_play_id = '${owner.playId}'
+         and visitor_response_id is null
+         and properties = jsonb_build_object(
+           'packVersion', 'old-friend-v2',
+           'entrySource', 'profile_reshare'
+         )`,
       true,
     ),
-    String(initialProfileReshareCount + 1),
+    "1",
   );
   assert.equal(
     sql(

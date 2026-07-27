@@ -4,7 +4,7 @@
 
 - 결정: owner가 settled self 근거와 유효한 `profileSourcePlayId`가 있는 결을 세 개 이상 가지면 지인 응답이 0/1/2명이어도 기존 stable rank·영역 다양성으로 정확히 3축을 만들어 `/me`의 `내 겹 공유하기`를 연다. `ConceptShareOption.sourcePlayId`는 대표 결의 `profileSourcePlayId`, 축의 고유 문항 수는 self evidence를 사용한다.
 - 이유: 공유가 지인 응답과 same-pack 새 owner를 모으는 입구인데 지인 근거 outline을 먼저 요구하면 owner→visitor 핵심 루프가 거꾸로 잠긴다. self 위치는 이미 owner가 공개할 수 있는 자신의 결과이고, 개인정보 임계값은 익명 지인의 위치·방향·범위에만 적용하면 된다.
-- 결과: locked `shareSafeOthers`는 `sightCount` 0/1/2만 모델에 남기고 미리보기·접근성 이름·DOM style/data·Canvas에는 `시선을 모으는 중 · n/3` 외 위치·방향·범위를 넣지 않는다. available은 기존 익명 `wide/medium/narrow`, split, neutral 표현을 쓴다. `shareEligible`만 self-first로 재정의하고 `shareEvidence`·`shareSource*` schema/생성/decoder는 유지한다. 서버는 매 snapshot에서 기존 rank·area diversity·profile source를 다시 계산하고 현재 option과 다른 URL은 404로 닫는다. 새 DB·migration·dependency·raw analytics event는 추가하지 않는다.
+- 결과: locked `shareSafeOthers`는 `sightCount` 0/1/2만 모델에 남기고 미리보기·접근성 이름·DOM style/data·Canvas에는 `시선을 모으는 중 · n/3` 외 위치·방향·범위를 넣지 않는다. available은 기존 익명 `wide/medium/narrow`, split, neutral 표현을 쓴다. `shareEligible`만 self-first로 재정의하고 `shareEvidence`·`shareSource*` schema/생성/decoder는 유지한다. 서버는 매 snapshot에서 기존 rank·area diversity·profile source를 다시 계산하고 현재 option과 다른 URL은 404로 닫는다. full verify에서 드러난 기존 no-sight analytics gate와의 교착은 테이블·컬럼·새 raw event 없이 인증 event RPC에 nullable concept id를 추가하는 forward migration 하나로 푼다. 서버가 현재 option을 검증한 concept 확정만 기존 raw 행을 기록하고, conceptId 없는 relationship/관리 capability의 `not_eligible`는 유지한다.
 
 ## 2026-07-26 — 상위개념 공유 카드를 익명 3축으로 고정
 
