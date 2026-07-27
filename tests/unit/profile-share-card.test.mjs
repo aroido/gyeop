@@ -197,6 +197,7 @@ function conceptAxis(catalogIndex, overrides = {}) {
     directionB: concept.directionB,
     selfPosition: -0.6,
     others: {
+      status: "available",
       source: "shareSafeOthers",
       direction: "a",
       stage: "outline",
@@ -216,6 +217,7 @@ function conceptCard(overrides = {}) {
       conceptAxis(4, {
         selfPosition: 0.7,
         others: {
+          status: "available",
           source: "shareSafeOthers",
           direction: "contextual",
           stage: "outline",
@@ -224,6 +226,7 @@ function conceptCard(overrides = {}) {
       }),
       conceptAxis(8, {
         others: {
+          status: "available",
           source: "shareSafeOthers",
           direction: "b",
           stage: "clear",
@@ -314,10 +317,47 @@ test("strictly decodes the public three-axis concept share card", () => {
   }
 });
 
-test("rejects private, unsettled, out-of-range, and unknown axis data", () => {
+test("accepts locked, trace, and unsettled public axis states", () => {
+  const decoded = decodeConceptProfileShareCardModel({
+    nickname: "겹냥",
+    axes: [
+      conceptAxis(0, {
+        others: { status: "locked", sightCount: 2 },
+      }),
+      conceptAxis(4, {
+        others: {
+          status: "available",
+          source: "shareSafeOthers",
+          direction: "a",
+          stage: "trace",
+          position: -0.5,
+          range: "wide",
+        },
+      }),
+      conceptAxis(8, {
+        others: {
+          status: "available",
+          source: "shareSafeOthers",
+          direction: "unsettled",
+          stage: "trace",
+          range: "neutral",
+        },
+      }),
+    ],
+  });
+  assert.deepEqual(decoded.axes[0].others, {
+    status: "locked",
+    sightCount: 2,
+  });
+  assert.equal(decoded.axes[1].others.range, "wide");
+  assert.equal(decoded.axes[2].others.range, "neutral");
+});
+
+test("rejects private, leaking locked, out-of-range, and mismatched axis data", () => {
   const base = conceptCard();
   for (const others of [
     {
+      status: "available",
       source: "privateOthers",
       direction: "a",
       stage: "outline",
@@ -325,6 +365,7 @@ test("rejects private, unsettled, out-of-range, and unknown axis data", () => {
       range: "medium",
     },
     {
+      status: "available",
       source: "shareSafeOthers",
       direction: "unsettled",
       stage: "outline",
@@ -332,10 +373,35 @@ test("rejects private, unsettled, out-of-range, and unknown axis data", () => {
       range: "medium",
     },
     {
+      status: "available",
+      source: "shareSafeOthers",
+      direction: "contextual",
+      stage: "trace",
+      range: "split",
+    },
+    {
+      status: "available",
       source: "shareSafeOthers",
       direction: "a",
       stage: "outline",
       position: 0.5,
+      range: "medium",
+    },
+    {
+      status: "locked",
+      sightCount: 2,
+      direction: "a",
+    },
+    {
+      status: "locked",
+      sightCount: 3,
+    },
+    {
+      status: "available",
+      source: "shareSafeOthers",
+      direction: "a",
+      stage: "trace",
+      position: -0.5,
       range: "medium",
     },
   ]) {

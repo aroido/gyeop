@@ -278,12 +278,11 @@ export function verifyOwnerProfile() {
   );
   assert.match(
     accountView,
-    /await recordOwnerProfileReshareClicked\(selectedConceptShare\.sourcePlayId\)/,
+    /await recordOwnerProfileReshareClicked\(\s*selectedConceptShare\.sourcePlayId,\s*selectedConceptShare\.conceptId,\s*\)/,
   );
   assert.ok(
-    accountView.indexOf(
-      "await recordOwnerProfileReshareClicked(selectedConceptShare.sourcePlayId)",
-    ) < accountView.indexOf("router.push("),
+    accountView.indexOf("await recordOwnerProfileReshareClicked(") <
+      accountView.indexOf("router.push("),
     "concept share must record the reshare before navigation",
   );
   const pickerBody = accountView.slice(

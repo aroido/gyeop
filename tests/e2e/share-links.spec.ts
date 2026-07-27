@@ -47,6 +47,7 @@ function conceptAxis(
     directionB: concept.directionB,
     selfPosition: -0.7,
     others: {
+      status: "available",
       source: "shareSafeOthers",
       direction: "a",
       stage: "outline",
@@ -66,6 +67,7 @@ function conceptShareCard() {
       conceptAxis(7, {
         selfPosition: 0.65,
         others: {
+          status: "available",
           source: "shareSafeOthers",
           direction: "contextual",
           stage: "outline",
@@ -74,6 +76,7 @@ function conceptShareCard() {
       }),
       conceptAxis(11, {
         others: {
+          status: "available",
           source: "shareSafeOthers",
           direction: "b",
           stage: "clear",
@@ -319,6 +322,7 @@ async function installBrowserHandoff(
         fontSize: number;
       }>;
       canvasCreateCount: number;
+      canvasArcCount: number;
       resolveShare?: () => void;
       resolveCopy?: () => void;
     };
@@ -330,6 +334,7 @@ async function installBrowserHandoff(
       canvasText: [],
       canvasDraws: [],
       canvasCreateCount: 0,
+      canvasArcCount: 0,
     };
     (
       window as typeof window & { __gyeopHandoff: HandoffState }
@@ -408,6 +413,26 @@ async function installBrowserHandoff(
       return maximumWidth === undefined
         ? fillText.call(this, text, x, y)
         : fillText.call(this, text, x, y, maximumWidth);
+    };
+    const arc = CanvasRenderingContext2D.prototype.arc;
+    CanvasRenderingContext2D.prototype.arc = function (
+      x,
+      y,
+      radius,
+      startAngle,
+      endAngle,
+      counterclockwise,
+    ) {
+      state.canvasArcCount += 1;
+      return arc.call(
+        this,
+        x,
+        y,
+        radius,
+        startAngle,
+        endAngle,
+        counterclockwise,
+      );
     };
   }, options);
 }
@@ -1114,6 +1139,43 @@ test("fits three catalog axes inside the real 1080x1920 canvas", async ({
       await target.__renderConceptShareCardForTest(value);
     }, invalid),
   ).rejects.toThrow("Invalid concept profile share card");
+});
+
+test("renders locked concept axes without peer position draws", async ({
+  page,
+}) => {
+  await installBrowserHandoff(page, {
+    share: "unsupported",
+    clipboard: "resolve",
+  });
+  await page.goto("data:text/html,<main></main>");
+  await page.addScriptTag({ content: conceptRendererHarness });
+  const model = {
+    ...conceptShareCard(),
+    axes: conceptShareCard().axes.map((axis, index) => ({
+      ...axis,
+      others: { status: "locked", sightCount: index },
+    })),
+  };
+  const rendered = await page.evaluate(async (value) => {
+    const target = window as typeof window & {
+      __gyeopHandoff: {
+        canvasArcCount: number;
+        canvasText: string[];
+      };
+      __renderConceptShareCardForTest: (model: unknown) => Promise<File>;
+    };
+    await target.__renderConceptShareCardForTest(value);
+    return {
+      arcCount: target.__gyeopHandoff.canvasArcCount,
+      text: target.__gyeopHandoff.canvasText.join(""),
+    };
+  }, model);
+
+  expect(rendered.arcCount).toBe(3);
+  for (const count of [0, 1, 2]) {
+    expect(rendered.text).toContain(`○ 지인 · 시선을 모으는 중 · ${count}/3`);
+  }
 });
 
 test("renders legal maximum Korean card copy into a 1080x1920 PNG", async ({

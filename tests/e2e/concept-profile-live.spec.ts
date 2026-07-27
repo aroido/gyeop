@@ -554,7 +554,7 @@ test.describe("concept owner profile live", () => {
         ).toBeGreaterThanOrEqual(44);
       }
       const shareChoices = dialog.getByRole("radio");
-      await expect(shareChoices).toHaveCount(3);
+      expect(await shareChoices.count()).toBeGreaterThanOrEqual(3);
       await expect(shareChoices.first()).toHaveAttribute(
         "aria-checked",
         "true",
@@ -679,7 +679,12 @@ test.describe("concept owner profile live", () => {
             responseCount,
           }),
         );
-        await page.setViewportSize({ width: 390, height: 844 });
+        const viewport = [
+          { width: 320, height: 568 },
+          { width: 390, height: 844 },
+          { width: 430, height: 932 },
+        ][responseCount];
+        await page.setViewportSize(viewport);
         await page.goto("/me");
 
         const lead = page.getByText(
@@ -710,27 +715,56 @@ test.describe("concept owner profile live", () => {
               ),
           ),
         ).toBe(true);
-        const collectingAction = page.getByRole("link", {
-          name: "시선 더 모으기",
-        });
-        await expect(collectingAction).toBeVisible();
-        await expect(
-          page.getByRole("button", { name: "내 겹 공유하기" }),
-        ).toHaveCount(0);
+        const share = page.getByRole("button", { name: "내 겹 공유하기" });
+        await expect(share).toBeVisible();
         await expect(
           page.getByRole("link", { name: "내 겹 공유하기" }),
         ).toHaveCount(0);
-        await expect(page.locator("main header").getByRole("link")).toHaveCount(
-          0,
+        await share.click();
+        const dialog = page.getByRole("dialog");
+        await expect(dialog).toBeVisible();
+        expect(await dialog.getByRole("radio").count()).toBeGreaterThanOrEqual(
+          3,
         );
-        const order = await Promise.all([
-          hooks.first().boundingBox(),
-          hooks.last().boundingBox(),
-          collectingAction.boundingBox(),
-        ]);
-        expect(order.every(Boolean)).toBe(true);
-        expect(order[0]!.y).toBeLessThan(order[1]!.y);
-        expect(order[1]!.y).toBeLessThan(order[2]!.y);
+        await dialog
+          .getByRole("button", { name: "이 내용으로 공유 카드 확인" })
+          .click();
+        const preview = page.getByLabel(/의 3축 겹 공유 카드 미리보기$/);
+        await expect(preview).toBeVisible();
+        await expect(preview.locator("[data-axis]")).toHaveCount(3);
+        await expect(
+          preview.getByText(`○ 지인 · 시선을 모으는 중 · ${responseCount}/3`),
+        ).toHaveCount(3);
+        await expect(
+          preview.locator("[data-axis]").first().locator("div").first(),
+        ).toHaveAttribute("aria-hidden", "true");
+        await expect(
+          preview
+            .getByText(`○ 지인 · 시선을 모으는 중 · ${responseCount}/3`)
+            .first(),
+        ).toHaveAttribute("aria-hidden", "true");
+        await expect(preview.locator("[data-range]")).toHaveCount(0);
+        await expect(preview.locator('[style*="left:"]')).toHaveCount(3);
+        expect(await preview.innerText()).not.toMatch(
+          /지인 익명 집계는.*쪽 익명 범위/,
+        );
+        if (responseCount === 2) {
+          await page.evaluate(() => {
+            document.documentElement.style.fontSize = "200%";
+          });
+          expect(
+            await page.evaluate(
+              () =>
+                document.documentElement.scrollWidth <=
+                document.documentElement.clientWidth,
+            ),
+          ).toBe(true);
+          expect(
+            await preview.evaluate(
+              (node) => node.scrollWidth <= node.clientWidth,
+            ),
+          ).toBe(true);
+        }
       } finally {
         cleanupOwnerFixtures(userId, fixtures);
       }

@@ -42,14 +42,21 @@ export async function loadOwnerProfile(playId: string): Promise<OwnerProfile> {
 async function recordOwnerProfileEvent(
   playId: string,
   event: "profile_viewed" | "profile_reshare_clicked",
+  conceptId?: string,
 ): Promise<void> {
-  if (!isOwnerPlayId(playId)) throw new OwnerProfileHttpError(400);
+  if (!isOwnerPlayId(playId) || conceptId === "") {
+    throw new OwnerProfileHttpError(400);
+  }
   const response = await fetch("/api/me/profile/events", {
     method: "POST",
     cache: "no-store",
     credentials: "same-origin",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ event, playId }),
+    body: JSON.stringify(
+      conceptId === undefined
+        ? { event, playId }
+        : { event, playId, conceptId },
+    ),
     keepalive: true,
   });
   privateNoStore(response);
@@ -62,6 +69,7 @@ export function recordOwnerProfileViewed(playId: string): Promise<void> {
 
 export function recordOwnerProfileReshareClicked(
   playId: string,
+  conceptId?: string,
 ): Promise<void> {
-  return recordOwnerProfileEvent(playId, "profile_reshare_clicked");
+  return recordOwnerProfileEvent(playId, "profile_reshare_clicked", conceptId);
 }

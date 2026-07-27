@@ -197,7 +197,7 @@ P0 프로필은 주인이 자신의 응답과 누적 상태를 확인하는 비�
 - 내가 보는 나와 주변 시선: 서로 합산하지 않은 별도 근거
 - 부족 상태: 임계값을 넘기 전에는 `시선을 모으는 중 · n/3` 외 위치·방향·범위를 payload와 DOM에서 완전히 제외
 - 8개 영역 rail: self 질문을 같은 `cardKey` 기준으로 영역 안에서 한 번만 세고 전면에는 고유 문항 수와 단계만 표시하며, 팩·맥락 수는 대표 카드의 기존 상세에만 두고 네 결의 방향은 합산하지 않음
-- 공유 후보: 비연애 공개 관계의 안전한 근거가 윤곽 이상인 결 전체
+- 공유 후보: settled self 근거와 유효한 `profileSourcePlayId`가 있는 결 전체. 비연애 공개 관계의 지인 근거는 후보 자격이 아니라 축별 locked/available 표현만 결정
 - 내 질문팩 관리: draft 이어하기, 완료 팩 공유와 과거 version 재현
 
 상위개념 집계와 노출은 다음 규칙을 따른다.
@@ -221,9 +221,11 @@ P0 프로필은 주인이 자신의 응답과 누적 상태를 확인하는 비�
 
 새로운 시선이 도착하면 프로필의 수치와 레이어 상태가 실제로 변했다는 피드백을 제공한다.
 
-계정 통합 `/me`의 concept profile은 전체 공유 가능 후보를 stable rank로 보존한다. 공유 가능한 결이 3개 이상이면 주인이 `영역 · A—B` picker에서 대표 결 하나를 확인하고 `내 겹 공유하기`를 진행한다. 공유 묶음은 선택한 결을 첫 축에 고정한 뒤 기존 rank를 지키면서 가능한 한 서로 다른 영역의 결 2개를 더 고른다. 후보가 3개보다 적으면 concept 공유 CTA를 표시하지 않고 `시선 더 모으기`와 기존 팩 관리 행동을 유지한다.
+계정 통합 `/me`의 concept profile은 settled self 근거와 유효한 `profileSourcePlayId`가 있는 후보를 기존 stable rank로 보존한다. 후보가 3개 이상이면 지인 응답이 0/1/2명이어도 주인이 `영역 · A—B` picker에서 대표 결 하나를 확인하고 `내 겹 공유하기`를 진행한다. 공유 묶음은 선택한 결을 첫 축에 고정한 뒤 기존 rank를 지키면서 가능한 한 서로 다른 영역의 결 2개를 더 고른다. 각 현재 evidence snapshot에서 후보와 source를 다시 계산하며 threshold 전후 묶음 동일성을 보장하지 않는다. 후보가 3개보다 적으면 concept 공유 CTA를 표시하지 않고 `시선 더 모으기`와 기존 팩 관리 행동을 유지한다.
 
-`내 겹 공유하기`는 공개 프로필을 만들지 않는다. 주인이 공개하기로 정한 닉네임, `● 나 · ○ 지인`, 정확히 3개의 영역·결·A/B endpoint·고유 문항 수, settled인 내 위치와 공개 기준을 통과한 익명 지인 범위만 1080×1920 PNG에 담는다. 지인 결과가 contextual이면 중앙 marker 없이 양쪽 split으로 표시하고, 내 방향이 contextual·unsettled이거나 지인 근거가 윤곽 미만인 결은 후보에서 제외한다. 관찰문·질문·유형·점수·퍼센트·응답자 수·개별 답변·관계별 원자료·내부 ID·관리 URL·secret은 카드 데이터에서 제외한다. 서버는 query의 `share_concept`, source play, 3축 묶음을 현재 계정의 전체 공유 가능 후보로 다시 검증하며 위조·불일치는 404로 닫는다. 초대는 첫 축의 source pack을 재사용하고 수신자의 같은 팩 CTA는 기존 `same_pack_cta`를 유지한다. 파일 공유 미지원·취소·`NotAllowedError`를 포함한 실패에서는 생성된 링크를 보존하고 이미지 저장과 링크 복사를 각각 제공한다.
+`내 겹 공유하기`는 공개 프로필을 만들지 않는다. 주인이 공개하기로 정한 닉네임, `● 나 · ○ 지인`, 정확히 3개의 영역·결·A/B endpoint·self 고유 문항 수와 settled인 내 위치를 1080×1920 PNG에 담는다. 축의 `shareSafeOthers`가 locked이면 `시선을 모으는 중 · n/3` 외 위치·방향·범위를 모델·DOM·접근성 이름·Canvas에 넣지 않는다. available이면 기존 익명 marker와 `trace/outline/clear`의 wide/medium/narrow band를 사용하고 contextual은 중앙 marker 없는 split, unsettled은 marker 없는 neutral로 표시한다. 내 방향이 contextual·unsettled인 결만 공유 후보에서 제외한다. 관찰문·질문·유형·점수·퍼센트·응답자 수·개별 답변·관계별 원자료·내부 ID·관리 URL·secret은 카드 데이터에서 제외한다. 서버는 query의 `share_concept`, 대표 결의 `profileSourcePlayId`, 3축 묶음을 현재 계정의 전체 공유 가능 후보로 다시 검증하며 위조·snapshot drift·불일치는 404로 닫는다. 초대는 첫 축의 source pack을 재사용하고 수신자의 같은 팩 CTA는 기존 `same_pack_cta`를 유지한다. 파일 공유 미지원·취소·`NotAllowedError`를 포함한 실패에서는 생성된 링크를 보존하고 이미지 저장과 링크 복사를 각각 제공한다.
+
+picker 확정 시 client는 기존 profile event request의 `conceptId` 필드를 대표 결의 `profileSourcePlayId`와 함께 보낸다. 서버가 현재 `shareOptions`에서 둘의 조합을 다시 확인한 경우에만 인증 event RPC가 지인 시선 수와 무관하게 기존 `profile_viewed`와 `profile_reshare_clicked` raw 행을 원자 기록한다. `conceptId`는 analytics property에 저장하지 않는다. conceptId 없는 기존 relationship 재공유와 관리 capability 경로는 계속 지인 시선 1건 이상을 요구한다.
 
 submitted 공개 링크 시선이 한 건 이상이면 해당 팩 상태 가까이에 `시선 더 모으기`를 한 번만 표시한다. 0건에서는 재공유 CTA를 표시하지 않는다. CTA는 새 play나 공개 프로필·관계 카드 이미지를 만들지 않고 같은 owner play의 공유 관리 화면으로 돌아간다. 브라우저가 전체 링크를 더는 가지고 있지 않으면 secret을 복원하지 않고 기존 active 링크의 안전한 재발급 뒤에만 다시 공유한다.
 

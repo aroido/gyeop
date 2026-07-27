@@ -710,6 +710,7 @@ export async function recordAuthenticatedOwnerProfileEvent(input: {
     | "profile_reshare_clicked"
     | "concept_profile_viewed"
     | "concept_detail_opened";
+  conceptId?: string;
 }): Promise<OwnerProfileEventResult> {
   return withOwnerMutationActor(async ({ actor, signal }) => {
     const { data, error } = await getInternalClient()
@@ -717,6 +718,7 @@ export async function recordAuthenticatedOwnerProfileEvent(input: {
         p_play_id: input.playId,
         p_actor_id: actor.uid,
         p_event_name: input.event,
+        p_concept_id: input.conceptId,
       })
       .abortSignal(signal);
     if (error) {
