@@ -718,7 +718,7 @@ export async function recordAuthenticatedOwnerProfileEvent(input: {
         p_play_id: input.playId,
         p_actor_id: actor.uid,
         p_event_name: input.event,
-        p_concept_id: input.conceptId ?? null,
+        p_concept_id: input.conceptId,
       })
       .abortSignal(signal);
     if (error) {
