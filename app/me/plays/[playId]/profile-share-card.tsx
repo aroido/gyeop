@@ -150,7 +150,7 @@ export function ProfileShareCardPreview({
               key={`${axis.areaLabel}:${axis.conceptLabel}`}
               aria-label={`${index + 1}번째 축, ${axis.areaLabel}, ${axis.conceptLabel}`}
             >
-              <div className={styles.axisHeading}>
+              <div className={styles.axisHeading} aria-hidden="true">
                 <p>
                   {axis.areaLabel} · 고유 문항 {axis.cardCount}
                 </p>
@@ -206,7 +206,7 @@ export function ProfileShareCardPreview({
                 </span>
               </div>
               {axis.others.status === "locked" ? (
-                <p className={styles.collectingStatus}>
+                <p className={styles.collectingStatus} aria-hidden="true">
                   ○ 지인 · 시선을 모으는 중 · {axis.others.sightCount}/3
                 </p>
               ) : null}

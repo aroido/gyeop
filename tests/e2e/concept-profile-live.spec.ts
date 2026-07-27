@@ -679,7 +679,12 @@ test.describe("concept owner profile live", () => {
             responseCount,
           }),
         );
-        await page.setViewportSize({ width: 390, height: 844 });
+        const viewport = [
+          { width: 320, height: 568 },
+          { width: 390, height: 844 },
+          { width: 430, height: 932 },
+        ][responseCount];
+        await page.setViewportSize(viewport);
         await page.goto("/me");
 
         const lead = page.getByText(
@@ -730,11 +735,42 @@ test.describe("concept owner profile live", () => {
         await expect(
           preview.getByText(`○ 지인 · 시선을 모으는 중 · ${responseCount}/3`),
         ).toHaveCount(3);
+        await expect(
+          preview
+            .locator("[data-axis]")
+            .first()
+            .locator("div")
+            .first(),
+        ).toHaveAttribute("aria-hidden", "true");
+        await expect(
+          preview
+            .getByText(
+              `○ 지인 · 시선을 모으는 중 · ${responseCount}/3`,
+            )
+            .first(),
+        ).toHaveAttribute("aria-hidden", "true");
         await expect(preview.locator("[data-range]")).toHaveCount(0);
         await expect(preview.locator('[style*="left:"]')).toHaveCount(3);
         expect(await preview.innerText()).not.toMatch(
           /지인 익명 집계는.*쪽 익명 범위/,
         );
+        if (responseCount === 2) {
+          await page.evaluate(() => {
+            document.documentElement.style.fontSize = "200%";
+          });
+          expect(
+            await page.evaluate(
+              () =>
+                document.documentElement.scrollWidth <=
+                document.documentElement.clientWidth,
+            ),
+          ).toBe(true);
+          expect(
+            await preview.evaluate(
+              (node) => node.scrollWidth <= node.clientWidth,
+            ),
+          ).toBe(true);
+        }
       } finally {
         cleanupOwnerFixtures(userId, fixtures);
       }
