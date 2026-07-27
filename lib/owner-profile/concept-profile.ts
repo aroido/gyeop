@@ -82,17 +82,30 @@ export type ConceptProfileShareAxis = Readonly<{
   selfPosition: number;
   others:
     | Readonly<{
-        source: "shareSafeOthers";
-        direction: "a" | "b";
-        stage: "outline" | "clear";
-        position: number;
-        range: "medium" | "narrow";
+        status: "locked";
+        sightCount: 0 | 1 | 2;
       }>
     | Readonly<{
+        status: "available";
+        source: "shareSafeOthers";
+        direction: "a" | "b";
+        stage: ConceptStage;
+        position: number;
+        range: "wide" | "medium" | "narrow";
+      }>
+    | Readonly<{
+        status: "available";
         source: "shareSafeOthers";
         direction: "contextual";
         stage: "outline" | "clear";
         range: "split";
+      }>
+    | Readonly<{
+        status: "available";
+        source: "shareSafeOthers";
+        direction: "unsettled";
+        stage: ConceptStage;
+        range: "neutral";
       }>;
   cardCount: number;
 }>;

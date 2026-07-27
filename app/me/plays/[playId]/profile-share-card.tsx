@@ -108,8 +108,11 @@ function positionPercent(position: number) {
   return `${Math.max(0, Math.min(100, ((position + 1) / 2) * 100))}%`;
 }
 
-function rangePositionPercent(position: number, range: "medium" | "narrow") {
-  const halfWidth = range === "medium" ? 17 : 9;
+function rangePositionPercent(
+  position: number,
+  range: "wide" | "medium" | "narrow",
+) {
+  const halfWidth = range === "wide" ? 26 : range === "medium" ? 17 : 9;
   const center = ((position + 1) / 2) * 100;
   return `${Math.max(halfWidth, Math.min(100 - halfWidth, center))}%`;
 }
@@ -158,39 +161,43 @@ export function ProfileShareCardPreview({
                 <span>{axis.directionB}</span>
               </div>
               <div className={styles.axisTrack} aria-hidden="true">
-                {axis.others.direction === "contextual" ? (
-                  <>
-                    <span
-                      className={styles.othersRange}
-                      data-range="split-start"
-                    />
-                    <span
-                      className={styles.othersRange}
-                      data-range="split-end"
-                    />
-                  </>
-                ) : (
-                  <>
-                    <span
-                      className={styles.othersRange}
-                      data-range={axis.others.range}
-                      style={{
-                        left: rangePositionPercent(
-                          axis.others.position,
-                          axis.others.range,
-                        ),
-                      }}
-                    />
-                    <span
-                      className={styles.othersMarker}
-                      style={{
-                        left: positionPercent(axis.others.position),
-                      }}
-                    >
-                      ○
-                    </span>
-                  </>
-                )}
+                {axis.others.status === "available" ? (
+                  axis.others.direction === "contextual" ? (
+                    <>
+                      <span
+                        className={styles.othersRange}
+                        data-range="split-start"
+                      />
+                      <span
+                        className={styles.othersRange}
+                        data-range="split-end"
+                      />
+                    </>
+                  ) : axis.others.direction === "unsettled" ? (
+                    <span className={styles.othersRange} data-range="neutral" />
+                  ) : (
+                    <>
+                      <span
+                        className={styles.othersRange}
+                        data-range={axis.others.range}
+                        style={{
+                          left: rangePositionPercent(
+                            axis.others.position,
+                            axis.others.range,
+                          ),
+                        }}
+                      />
+                      <span
+                        className={styles.othersMarker}
+                        style={{
+                          left: positionPercent(axis.others.position),
+                        }}
+                      >
+                        ○
+                      </span>
+                    </>
+                  )
+                ) : null}
                 <span
                   className={styles.selfMarker}
                   style={{ left: positionPercent(axis.selfPosition) }}
@@ -198,12 +205,21 @@ export function ProfileShareCardPreview({
                   ●
                 </span>
               </div>
+              {axis.others.status === "locked" ? (
+                <p className={styles.collectingStatus}>
+                  ○ 지인 · 시선을 모으는 중 · {axis.others.sightCount}/3
+                </p>
+              ) : null}
               <p className={styles.srOnly}>
                 {axis.directionA}에서 {axis.directionB} 방향. 내 위치는{" "}
-                {positionText(axis, axis.selfPosition)} 쪽. 지인 익명 집계는{" "}
-                {axis.others.direction === "contextual"
-                  ? "상황에 따라 양쪽 범위"
-                  : `${positionText(axis, axis.others.position)} 쪽 익명 범위`}
+                {positionText(axis, axis.selfPosition)} 쪽.{" "}
+                {axis.others.status === "locked"
+                  ? `지인은 시선을 모으는 중 ${axis.others.sightCount}/3`
+                  : axis.others.direction === "contextual"
+                    ? "지인 익명 집계는 상황에 따라 양쪽 범위"
+                    : axis.others.direction === "unsettled"
+                      ? "지인 익명 집계는 아직 한쪽으로 모이지 않은 범위"
+                      : `지인 익명 집계는 ${positionText(axis, axis.others.position)} 쪽 익명 범위`}
                 . 고유 문항 {axis.cardCount}개.
               </p>
             </section>
@@ -491,21 +507,40 @@ async function renderConceptShareCard(
     const trackY = y + 274;
     context.fillStyle = "#050505";
     context.fillRect(startX, trackY, endX - startX, 8);
-    if (axis.others.direction === "contextual") {
+    if (axis.others.status === "locked") {
+      drawTextBlock(
+        context,
+        `○ 지인 · 시선을 모으는 중 · ${axis.others.sightCount}/3`,
+        160,
+        y + 304,
+        650,
+        28,
+        22,
+        16,
+        "#050505",
+      );
+    } else if (axis.others.direction === "contextual") {
       context.fillStyle = "#f5f1e9";
       context.fillRect(startX, trackY - 16, 150, 40);
       context.fillRect(endX - 150, trackY - 16, 150, 40);
+    } else if (axis.others.direction === "unsettled") {
+      context.fillStyle = "#f5f1e9";
+      context.fillRect(startX, trackY - 16, endX - startX, 40);
     } else {
       const othersX =
         startX + ((axis.others.position + 1) / 2) * (endX - startX);
-      const rangeWidth = axis.others.range === "medium" ? 190 : 105;
-      context.fillStyle = "#f5f1e9";
-      context.fillRect(
-        Math.max(startX, othersX - rangeWidth / 2),
-        trackY - 16,
-        Math.min(rangeWidth, endX - Math.max(startX, othersX - rangeWidth / 2)),
-        40,
+      const rangeWidth =
+        axis.others.range === "wide"
+          ? 300
+          : axis.others.range === "medium"
+            ? 190
+            : 105;
+      const rangeStart = Math.max(
+        startX,
+        Math.min(endX - rangeWidth, othersX - rangeWidth / 2),
       );
+      context.fillStyle = "#f5f1e9";
+      context.fillRect(rangeStart, trackY - 16, rangeWidth, 40);
       context.beginPath();
       context.arc(othersX, trackY + 4, 20, 0, Math.PI * 2);
       context.fillStyle = "#f5f1e9";

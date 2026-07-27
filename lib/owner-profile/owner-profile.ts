@@ -17,17 +17,30 @@ export type RelationshipProfileShareCardModel = Readonly<{
 
 export type ConceptProfileShareOthers =
   | Readonly<{
-      source: "shareSafeOthers";
-      direction: "a" | "b";
-      stage: "outline" | "clear";
-      position: number;
-      range: "medium" | "narrow";
+      status: "locked";
+      sightCount: 0 | 1 | 2;
     }>
   | Readonly<{
+      status: "available";
+      source: "shareSafeOthers";
+      direction: "a" | "b";
+      stage: "trace" | "outline" | "clear";
+      position: number;
+      range: "wide" | "medium" | "narrow";
+    }>
+  | Readonly<{
+      status: "available";
       source: "shareSafeOthers";
       direction: "contextual";
       stage: "outline" | "clear";
       range: "split";
+    }>
+  | Readonly<{
+      status: "available";
+      source: "shareSafeOthers";
+      direction: "unsettled";
+      stage: "trace" | "outline" | "clear";
+      range: "neutral";
     }>;
 
 export type ConceptProfileShareAxis = Readonly<{

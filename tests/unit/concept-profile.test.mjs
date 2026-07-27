@@ -267,7 +267,7 @@ test("selects one immutable concept source per slug by completion time", () => {
   );
 });
 
-test("turns one completed pack into exactly three non-diagnostic traces and eight area summaries", () => {
+test("turns one completed pack into self-first locked share options and eight area summaries", () => {
   const result = builtProfile();
   assert.equal(result.modelVersion, 1);
   assert.equal(result.hooks.length, 3);
@@ -276,7 +276,21 @@ test("turns one completed pack into exactly three non-diagnostic traces and eigh
       ({ kind, stage }) => kind === "emerging" && stage === "trace",
     ),
   );
-  assert.deepEqual(result.shareOptions, []);
+  assert.ok(result.shareOptions.length >= 3);
+  assert.ok(
+    result.shareOptions.every(
+      ({ sourcePlayId, bundle }) =>
+        sourcePlayId === "19000000-0000-4000-8000-000000000023" &&
+        bundle.length === 3 &&
+        bundle.every(
+          ({ others, cardCount }) =>
+            cardCount > 0 &&
+            Object.keys(others).join(",") === "status,sightCount" &&
+            others.status === "locked" &&
+            others.sightCount === 0,
+        ),
+    ),
+  );
   assert.ok(
     result.hooks.every(
       ({ observation }) =>
@@ -428,8 +442,14 @@ test("weights relationship direction by pack rather than respondent volume", () 
   assert.equal(hook.privateOthers.stage, "outline");
   assert.equal(hook.privateOthers.direction, "unsettled");
   assert.equal(hook.shareSafeOthers.status, "locked");
-  assert.equal(hook.shareEligible, false);
-  assert.deepEqual(result.shareOptions, []);
+  assert.equal(hook.shareEligible, true);
+  assert.equal(hook.shareEvidence.status, "unavailable");
+  assert.equal(hook.shareSourcePlayId, null);
+  assert.ok(
+    result.shareOptions.every(({ bundle }) =>
+      bundle.every(({ others }) => others.status === "locked"),
+    ),
+  );
 });
 
 test("requires both directions across two cards, packs, and contexts for contextual", () => {
@@ -519,11 +539,17 @@ test("does not sum collecting sights across plays and keeps romantic evidence pr
   assert.equal(romanticHook.privateOthers.status, "available");
   assert.equal(romanticHook.privateOthers.stage, "outline");
   assert.equal(romanticHook.shareSafeOthers.status, "locked");
-  assert.equal(romanticHook.shareEligible, false);
-  assert.deepEqual(romantic.shareOptions, []);
+  assert.equal(romanticHook.shareEligible, true);
+  assert.equal(romanticHook.shareEvidence.status, "unavailable");
+  assert.equal(romanticHook.shareSourcePlayId, null);
+  assert.ok(
+    romantic.shareOptions.every(({ bundle }) =>
+      bundle.every(({ others }) => others.status === "locked"),
+    ),
+  );
 });
 
-test("keeps fewer than three eligible concepts in the collecting fallback", () => {
+test("keeps share evidence independent from self-first option eligibility", () => {
   const result = buildConceptProfile({
     pairs: [1, 2].map((packNumber) =>
       syntheticPair(packNumber, {
@@ -548,7 +574,13 @@ test("keeps fewer than three eligible concepts in the collecting fallback", () =
   assert.equal(hook.shareSafeOthers.status, "available");
   assert.equal(hook.shareSafeOthers.stage, "outline");
   assert.equal(hook.shareEligible, true);
-  assert.deepEqual(result.shareOptions, []);
+  assert.equal(hook.shareEvidence.status, "available");
+  assert.ok(result.shareOptions.length >= 3);
+  assert.ok(
+    result.shareOptions.some(({ bundle }) =>
+      bundle.some(({ others }) => others.status === "locked"),
+    ),
+  );
 });
 
 test("builds representative-first three-axis bundles with maximum area diversity", () => {
@@ -573,7 +605,14 @@ test("builds representative-first three-axis bundles with maximum area diversity
     assert.equal(
       option.sourcePlayId,
       result.hooks.find(({ conceptId }) => conceptId === option.conceptId)
-        ?.shareSourcePlayId,
+        ?.profileSourcePlayId,
+    );
+    const representative = result.hooks.find(
+      ({ conceptId }) => conceptId === option.conceptId,
+    );
+    assert.equal(
+      option.bundle[0].cardCount,
+      representative.self.evidence.cardCount,
     );
   }
 });
@@ -684,7 +723,7 @@ test("ranks difference, contextual, repeated, and emerging hooks in that order",
   );
 });
 
-test("promotes one shareable hook without reducing maximum area diversity", () => {
+test("keeps existing profile rank and area diversity under self-first eligibility", () => {
   const signals = (firstGroup, secondGroup) =>
     new Map([
       [
@@ -767,22 +806,13 @@ test("promotes one shareable hook without reducing maximum area diversity", () =
 
   assert.deepEqual(
     result.hooks.map(({ conceptId }) => conceptId),
-    [TEST_CONCEPTS[0].id, TEST_CONCEPTS[1].id, TEST_CONCEPTS[5].id],
+    [TEST_CONCEPTS[0].id, TEST_CONCEPTS[1].id, TEST_CONCEPTS[4].id],
   );
-  assert.equal(result.hooks.at(-1).shareEligible, true);
+  assert.ok(result.hooks.every(({ shareEligible }) => shareEligible));
   assert.equal(new Set(result.hooks.map(({ areaId }) => areaId)).size, 2);
   assert.deepEqual(
-    result.shareOptions.map(({ conceptId }) => conceptId),
-    lastThree.map(({ id }) => id),
-  );
-  assert.deepEqual(
-    result.shareOptions
-      .map(({ conceptId }) => conceptId)
-      .filter(
-        (conceptId) =>
-          !result.hooks.some((hook) => hook.conceptId === conceptId),
-      ),
-    TEST_CONCEPTS.slice(6, 8).map(({ id }) => id),
+    result.shareOptions.slice(0, 3).map(({ conceptId }) => conceptId),
+    TEST_CONCEPTS.slice(0, 3).map(({ id }) => id),
   );
 });
 

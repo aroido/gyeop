@@ -243,6 +243,10 @@
   background: #f5f1e9;
 }
 
+.othersRange[data-range="wide"] {
+  width: 52%;
+}
+
 .othersRange[data-range="medium"] {
   width: 34%;
 }
@@ -263,6 +267,20 @@
 
 .othersRange[data-range="split-end"] {
   right: 0;
+}
+
+.othersRange[data-range="neutral"] {
+  right: 0;
+  left: 0;
+  width: 100%;
+  transform: none;
+}
+
+.collectingStatus {
+  margin: -0.15rem 0 0;
+  font-size: 0.52rem;
+  font-weight: 900;
+  line-height: 1.2;
 }
 
 .srOnly {
