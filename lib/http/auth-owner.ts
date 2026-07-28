@@ -23,7 +23,7 @@ import {
 import { conceptProfileEnabled } from "../owner-profile/concept-profile-feature.mjs";
 import type { ConceptProfile } from "../owner-profile/concept-profile.ts";
 import type { ParsedOwnerCookie } from "../owner-play/owner-play-session.ts";
-import { packManifestHistory } from "../packs/catalog.ts";
+import { packManifestHistory, packManifests } from "../packs/catalog.ts";
 import { parseRateLimitSecret } from "../security/network-key.mjs";
 import { validateAppUrl } from "./http-boundary-core.mjs";
 import { ownerAuthRequiredResponse } from "./auth-errors.ts";
@@ -227,6 +227,7 @@ export async function loadAuthenticatedOwnerPageProfiles(
           plays,
           profiles,
           manifests: packManifestHistory,
+          currentManifests: packManifests,
         }),
       })
     : null;
@@ -241,6 +242,7 @@ export async function loadAuthenticatedOwnerConceptProfile(): Promise<ConceptPro
       plays,
       profiles,
       manifests: packManifestHistory,
+      currentManifests: packManifests,
     }),
   });
 }

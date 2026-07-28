@@ -2,9 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import afterWork from "../../content/packs/after-work-v3.json" with { type: "json" };
+import coworkerV1 from "../../content/packs/coworker-v1.json" with { type: "json" };
+import coworkerV2 from "../../content/packs/coworker-v2.json" with { type: "json" };
+import groupChatRoleV1 from "../../content/packs/group-chat-role-v1.json" with { type: "json" };
+import groupChatRoleV2 from "../../content/packs/group-chat-role-v2.json" with { type: "json" };
+import groupChatRoleV3 from "../../content/packs/group-chat-role-v3.json" with { type: "json" };
+import oldFriendV1 from "../../content/packs/old-friend-v1.json" with { type: "json" };
+import oldFriendV2 from "../../content/packs/old-friend-v2.json" with { type: "json" };
+import oldFriendV3 from "../../content/packs/old-friend-v3.json" with { type: "json" };
 import {
   CONCEPT_CATALOG_V1,
   conceptById,
+  isConceptContextV1,
 } from "../../lib/concepts/catalog-core.mjs";
 import {
   buildConceptProfile,
@@ -15,12 +24,12 @@ import {
 } from "../../lib/owner-profile/concept-profile-core.mjs";
 import { parseConceptProfileEnabled } from "../../lib/owner-profile/concept-profile-feature.mjs";
 
-function summary(id, completedAt) {
+function summary(id, completedAt, manifest = afterWork) {
   return {
     id,
-    packSlug: afterWork.slug,
-    packVersion: afterWork.version,
-    packTitle: afterWork.title,
+    packSlug: manifest.slug,
+    packVersion: manifest.version,
+    packTitle: manifest.title,
     status: "completed",
     answeredCount: 10,
     updatedAt: "2026-07-24T23:59:00.000Z",
@@ -28,15 +37,15 @@ function summary(id, completedAt) {
   };
 }
 
-function profile(playId) {
+function profile(playId, manifest = afterWork) {
   return {
     playId,
-    packSlug: afterWork.slug,
-    packVersion: afterWork.version,
-    packTitle: afterWork.title,
+    packSlug: manifest.slug,
+    packVersion: manifest.version,
+    packTitle: manifest.title,
     sightCount: 0,
     sightStatus: "empty",
-    cards: afterWork.cards.map((card, index) => ({
+    cards: manifest.cards.map((card, index) => ({
       cardId: card.id,
       position: card.position,
       ownerPrompt: card.ownerPrompt,
@@ -60,6 +69,7 @@ function builtProfile() {
       plays: [play],
       profiles: [profile(play.id)],
       manifests: [afterWork],
+      currentManifests: [afterWork],
     }),
   });
 }
@@ -258,12 +268,150 @@ test("selects one immutable concept source per slug by completion time", () => {
     plays: [older, newer],
     profiles: [profile(older.id), profile(newer.id)],
     manifests: [afterWork],
+    currentManifests: [afterWork],
   });
   assert.equal(pairs.length, 1);
   assert.equal(pairs[0].summary.id, newer.id);
   assert.equal(
     conceptCardKey(afterWork.slug, afterWork.version, afterWork.cards[0].id),
     "after-work\0after-work-v3\0clock-out",
+  );
+});
+
+test("adapts only unchanged historical cards to current concept signals", () => {
+  const cases = [
+    {
+      historical: coworkerV1,
+      current: coworkerV2,
+      count: 10,
+      excluded: [],
+    },
+    {
+      historical: groupChatRoleV1,
+      current: groupChatRoleV3,
+      count: 8,
+      excluded: ["decision", "inside-joke"],
+    },
+    {
+      historical: groupChatRoleV2,
+      current: groupChatRoleV3,
+      count: 8,
+      excluded: ["decision", "inside-joke"],
+    },
+    {
+      historical: oldFriendV1,
+      current: oldFriendV3,
+      count: 9,
+      excluded: ["celebration"],
+    },
+    {
+      historical: oldFriendV2,
+      current: oldFriendV3,
+      count: 10,
+      excluded: [],
+    },
+  ];
+  for (const { historical, current, count, excluded } of cases) {
+    const play = summary(
+      "19000000-0000-4000-8000-000000000031",
+      "2026-07-24T00:00:00.000Z",
+      historical,
+    );
+    const [pair] = selectConceptProfileSourcePairs({
+      plays: [play],
+      profiles: [profile(play.id, historical)],
+      manifests: [historical],
+      currentManifests: [current],
+    });
+    assert.equal(pair.manifest.cards.length, 10);
+    assert.equal(
+      pair.manifest.cards.filter(({ conceptSignals }) => conceptSignals.length)
+        .length,
+      count,
+      historical.version,
+    );
+    assert.deepEqual(
+      pair.manifest.cards
+        .filter(({ conceptSignals }) => conceptSignals.length === 0)
+        .map(({ id }) => id),
+      excluded,
+      historical.version,
+    );
+    assert.ok(
+      pair.manifest.cards.every(
+        ({ conceptContext, conceptSignals }) =>
+          isConceptContextV1(conceptContext) && Array.isArray(conceptSignals),
+      ),
+    );
+  }
+});
+
+test("treats every compatibility field mismatch as no concept contribution", () => {
+  const fields = [
+    ["id", "changed-card"],
+    ["position", 99],
+    ["ownerPrompt", "바뀐 주인 질문"],
+    ["visitorPrompt", "바뀐 방문자 질문"],
+    ["optionA", "바뀐 A"],
+    ["optionB", "바뀐 B"],
+  ];
+  for (const [field, value] of fields) {
+    const historical = clone(afterWork);
+    historical.version = `after-work-${field}-v2`;
+    historical.cards[0][field] = value;
+    const play = summary(
+      "19000000-0000-4000-8000-000000000032",
+      "2026-07-24T00:00:00.000Z",
+      historical,
+    );
+    const profileA = profile(play.id, historical);
+    profileA.cards[0].selfChoice = "a";
+    const profileB = clone(profileA);
+    profileB.cards[0].selfChoice = "b";
+    const select = (sourceProfile) =>
+      selectConceptProfileSourcePairs({
+        plays: [play],
+        profiles: [sourceProfile],
+        manifests: [historical],
+        currentManifests: [afterWork],
+      });
+    const pairsA = select(profileA);
+    const pairsB = select(profileB);
+    assert.deepEqual(pairsA[0].manifest.cards[0].conceptSignals, [], field);
+    assert.deepEqual(
+      buildConceptProfile({ pairs: pairsA }),
+      buildConceptProfile({ pairs: pairsB }),
+      field,
+    );
+  }
+});
+
+test("uses authoritative current manifests despite concept history order", () => {
+  const historicalConcept = clone(coworkerV1);
+  historicalConcept.version = "coworker-v0";
+  historicalConcept.conceptVersion = 1;
+  historicalConcept.cards = coworkerV2.cards.map((card) => ({
+    ...card,
+    conceptSignals: [],
+  }));
+  const play = summary(
+    "19000000-0000-4000-8000-000000000033",
+    "2026-07-24T00:00:00.000Z",
+    coworkerV1,
+  );
+  const select = (manifests) =>
+    selectConceptProfileSourcePairs({
+      plays: [play],
+      profiles: [profile(play.id, coworkerV1)],
+      manifests,
+      currentManifests: [coworkerV2],
+    });
+  const first = select([historicalConcept, coworkerV1]);
+  const last = select([coworkerV1, historicalConcept]);
+  assert.deepEqual(first, last);
+  assert.deepEqual(
+    first[0].manifest.cards[0].conceptSignals,
+    coworkerV2.cards[0].conceptSignals,
   );
 });
 

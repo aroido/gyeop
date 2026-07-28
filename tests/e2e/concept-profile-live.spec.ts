@@ -259,7 +259,7 @@ test.describe("concept owner profile live", () => {
       fixtures.push(
         insertCompletedConceptPlay({
           userId,
-          packVersion: "old-friend-v3",
+          packVersion: "old-friend-v2",
           requiredCards: ["conflict", "celebration", "hard-day"],
         }),
         insertCompletedConceptPlay({

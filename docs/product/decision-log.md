@@ -1,5 +1,11 @@
 # 제품 의사결정 기록
 
+## 2026-07-28 — 과거 완료 팩은 문항 의미가 같은 카드만 상위개념에 연결
+
+- 결정: `packManifests`를 현재 상위개념 신호의 SSOT로 두고 `packManifestHistory`는 과거 완료 팩의 exact slug/version 복원에만 쓴다. 과거 카드와 같은 위치의 현재 카드가 id·position·주인/방문자 질문·A/B 선택지까지 모두 같을 때만 현재 맥락과 신호를 재사용하며, 다른 카드는 빈 신호로 집계에서 제외한다.
+- 이유: 발행된 과거 답을 수정하거나 달라진 질문 의미를 현재 결로 추정하지 않으면서, 내용이 그대로인 과거 완료 기록은 누적 프로필의 실제 근거로 복구해야 한다.
+- 결과: 과거 매니페스트 10장과 owner 선택, 최신 팩 집계, 개인정보·공유 임계값은 유지한다. DB·API schema·UI·migration은 바꾸지 않으며 빈 신호 카드는 방향·근거·단계에 기여하지 않는다.
+
 ## 2026-07-27 — self 결과는 즉시 공유하고 지인 위치만 임계값 뒤에 공개
 
 - 결정: owner가 settled self 근거와 유효한 `profileSourcePlayId`가 있는 결을 세 개 이상 가지면 지인 응답이 0/1/2명이어도 기존 stable rank·영역 다양성으로 정확히 3축을 만들어 `/me`의 `내 겹 공유하기`를 연다. `ConceptShareOption.sourcePlayId`는 대표 결의 `profileSourcePlayId`, 축의 고유 문항 수는 self evidence를 사용한다.
