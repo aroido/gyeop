@@ -206,7 +206,7 @@ P0 프로필은 주인이 자신의 응답과 누적 상태를 확인하는 비�
 2. 같은 slug를 여러 번 완료했으면 `completedAt DESC, playId ASC`로 한 source만 선택하고, 같은 팩 안 여러 카드는 팩 평균으로 묶어 중복 가중하지 않는다.
 3. 셀프와 주변 시선의 방향은 따로 계산한다. 주변 시선은 기존 관계 3명·관계 안 카드 3표본을 통과한 값만 사용하며, 서로 다른 play·관계·카드의 2+1을 합치지 않는다.
 4. 비공개 `privateOthers`에는 연애 관계가 포함될 수 있지만 공유용 `shareSafeOthers`는 `romantic`과 1:1을 제외한 기존 7개 공개 관계에서 별도로 계산한다.
-5. 삭제·철회·무효 응답과 draft, 1:1, 다른 version의 카드는 방향에 포함하지 않는다.
+5. 삭제·철회·무효 응답과 draft, 1:1은 방향에 포함하지 않는다. 주변 시선은 source play와 exact version인 응답만 사용하며 다른 version 응답을 합치지 않는다. 1번의 과거 self 호환 projection은 이 규칙과 별개다.
 6. AI 요약 없이 검수된 결·맥락과 결정적 문장 템플릿만 사용한다. 점수·퍼센트·응답자 수·개별 답변은 화면과 공유 카드에 노출하지 않는다.
 7. 기존 관계 레이어와 팩별 원본 집계는 삭제하지 않는다. concept UI가 꺼졌을 때와 하위 관리 화면에서 현재 privacy threshold를 그대로 보존한다.
 8. 내부 `directionScore`의 `+1=A`, `-1=B` 판정은 유지한다. owner-only public payload에서는 raw score를 제거하고 `position = clamp(-directionScore, -1, 1)`만 노출해 화면의 `-1=A`, `1=B` 축과 맞춘다.
