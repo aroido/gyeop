@@ -388,6 +388,24 @@ test("profile access requires Auth and stays scoped to the requested owned play"
   );
 });
 
+test("legacy completed pack contributes to the concept profile", async () => {
+  const owner = createOwnerCredential();
+  insertOwner(owner, true);
+  claimOwner(owner);
+
+  const response = await ownerRequest("/api/me/concept-profile", {
+    cookie: testAccount.cookie,
+  });
+  assert.equal(response.status, 200, serverLog);
+  const conceptProfile = await response.json();
+  const option = conceptProfile.shareOptions.find(
+    ({ sourcePlayId }) => sourcePlayId === owner.playId,
+  );
+  assert.ok(option);
+  assert.equal(option.bundle.length, 3);
+  assert.ok(option.bundle.every(({ cardCount }) => cardCount > 0));
+});
+
 test("zero-sight concept reshare records the canonical event without relaxing legacy eligibility", async () => {
   const initialProfileViewCount = Number(
     sql(

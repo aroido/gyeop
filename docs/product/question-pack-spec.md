@@ -6,6 +6,8 @@
 
 concept v1 매니페스트는 루트 `conceptVersion: 1`과 카드별 `conceptContext`, `conceptSignals`를 가진다. `conceptSignals`는 정확히 1~2개이며 각 항목은 `{ "conceptId", "directionForOptionA" }` exact key만 허용한다. 결 정의는 `content/concepts-v1.json`의 8개 영역·32개 양방향 결, 카드 연결은 활성 최신 매니페스트가 런타임 SSOT다. 검수 추적 자료 `concept-card-mapping-v0.tsv`는 240문항·289신호, `concept-card-rewrites-v0.tsv`는 재작성 48문항과 일치해야 한다.
 
+과거 완료 팩의 상위개념 호환 projection은 `packManifestHistory`의 exact slug/version 카드 10장과 owner 선택을 그대로 둔다. 같은 위치의 현재 `packManifests` 카드와 `id`, `position`, `ownerPrompt`, `visitorPrompt`, `optionA`, `optionB`가 모두 같으면 현재 `conceptContext`와 `conceptSignals`를 재사용한다. 하나라도 다르면 현재 `conceptContext`와 빈 `conceptSignals` 배열을 사용하며, 빈 배열은 상위개념 방향·근거·단계에 기여하지 않는다. 이 runtime projection의 빈 배열은 발행된 concept v1 매니페스트의 1~2개 신호 계약을 완화하지 않는다.
+
 저장 답은 화면 위치가 아니라 계속 의미 식별자 `"a" | "b"`다. owner의 global ordinal 1~10과 visitor의 required 1~3, optional 4~5를 기준으로 홀수는 A/B, 짝수는 B/A 순서로 렌더한다. 뒤로 가기·재개에서도 같은 ordinal을 사용하고 optional에서 홀짝을 다시 시작하지 않는다.
 
 발행된 version/card는 불변이다. 새 content migration과 generated seed는 expected template/version/card를 DB readback한 뒤에만 발행하고 pointer를 옮긴다. 공개 `GET /api/packs/[slug]`는 current-only이며, owner의 과거 play는 소유권 검증 뒤 `pack_plays.pack_version_id`에 연결된 exact historical pack을 읽는다.
