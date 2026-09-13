@@ -1,10 +1,14 @@
 # GYEOP Agent Entry Point
 
-Read and follow `.codex/AGENTS.md` before making product, design, documentation, or implementation changes.
+Read `.codex/AGENTS.md` and then the smallest matching source:
 
-Use one matching local skill instead of chaining several:
+- product decisions, planning, or viral-flow review: `.codex/skills/gyeop-product/SKILL.md`
+- question packs and cards: `.codex/skills/gyeop-question-pack-design/SKILL.md`
+- GitHub issue definition: `.codex/skills/gyeop-issue-writer/SKILL.md`
+- issue execution: `.codex/skills/gyeop-task/SKILL.md`
+- user-authorized, bounded repository guidance or agent configuration: this file
+  and the affected guidance/configuration file; use a branch and PR without the
+  task harness
 
-- `.codex/skills/gyeop-product/SKILL.md` for product decisions, documents, and viral-flow review
-- `.codex/skills/gyeop-question-pack-design/SKILL.md` for question packs and cards
-- `.codex/skills/gyeop-issue-writer/SKILL.md` for GitHub issue definition and registration
-- `.codex/skills/gyeop-task/SKILL.md` for issue execution, including the implementation spec
+Use one matching skill when a skill applies. The deeper contract owns product
+invariants, SSOT routing, verification, and task-harness boundaries.
