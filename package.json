@@ -6,7 +6,7 @@
   "engines": {
     "node": "24.16.0"
   },
-  "packageManager": "pnpm@11.13.0",
+  "packageManager": "pnpm@11.13.1",
   "scripts": {
     "predev": "node --env-file-if-exists=.env.local scripts/validate-env.mjs",
     "dev": "GYEOP_LOCAL_DEV_DIRECT=1 next dev --hostname 127.0.0.1",
