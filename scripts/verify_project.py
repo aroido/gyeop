@@ -32,11 +32,8 @@ EXPECTED_SKILLS = {
     "gyeop-question-pack-design",
     "gyeop-task",
 }
-EXPECTED_AGENTS = {
-    "critic": ("gpt-5.6-sol", "xhigh"),
-    "gyeop-core": ("gpt-5.6-sol", "xhigh"),
-    "verifier": ("gpt-5.6-sol", "xhigh"),
-}
+EXPECTED_AGENTS = {"critic", "gyeop-core", "verifier"}
+MODEL_OVERRIDE_KEYS = {"model", "model_reasoning_effort"}
 EXPECTED_MOCKUPS = 7
 LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 IGNORED_DIRS = {".git", ".next", "coverage", "dist", "node_modules", "playwright-report", "test-results"}
@@ -86,22 +83,21 @@ def read_toml(path: Path) -> dict[str, object]:
 
 def verify_model_routing() -> None:
     config = read_toml(ROOT / ".codex" / "config.toml")
-    if (config.get("model"), config.get("model_reasoning_effort")) != (
-        "gpt-5.6-terra",
-        "low",
-    ):
-        fail("root Codex model must be gpt-5.6-terra with low reasoning effort")
+    config_overrides = MODEL_OVERRIDE_KEYS & set(config)
+    if config_overrides:
+        fail("root Codex config must inherit model settings, not override them")
 
     agents_root = ROOT / ".codex" / "agents"
     actual = {path.stem for path in agents_root.glob("*.toml")}
     if actual != set(EXPECTED_AGENTS):
         fail(f"agent files differ: expected={sorted(EXPECTED_AGENTS)} actual={sorted(actual)}")
-    for name, expected in EXPECTED_AGENTS.items():
+    for name in EXPECTED_AGENTS:
         agent = read_toml(agents_root / f"{name}.toml")
         if agent.get("name") != name:
             fail(f"agent name differs from filename: {name}")
-        if (agent.get("model"), agent.get("model_reasoning_effort")) != expected:
-            fail(f"agent model routing differs: {name}")
+        agent_overrides = MODEL_OVERRIDE_KEYS & set(agent)
+        if agent_overrides:
+            fail(f"agent must inherit model settings: {name}")
         for field in ("description", "developer_instructions"):
             if not isinstance(agent.get(field), str) or not agent[field].strip():
                 fail(f"missing {field}: {name}")
