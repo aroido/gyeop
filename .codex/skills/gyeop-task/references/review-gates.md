@@ -2,7 +2,8 @@
 
 ## Spec reviewer gate
 
-Use an independent `critic` context.
+Review the specification against the issue and active SSOT. Use an independent
+`critic` context when scope, risk, or uncertainty warrants it.
 
 The review must include:
 
@@ -15,15 +16,16 @@ The review must include:
 Implementation starts only when P0/P1 findings are zero and the spec records:
 
 - `Status: Reviewed`
-- `Reviewer Agent: <name>`
+- `Reviewer Agent: <actual reviewer identity>`
 - `Review Status: PASS`
 - `P0/P1 Findings: 0`
 
-Each field must begin at the start of a line, appear exactly once, and contain the exact allowed value. Blank reviewer names and `TODO`, `TBD`, or `Not run` are invalid.
+Each field must begin at the start of a line, appear exactly once, and contain the exact allowed value. The reviewer field must identify the agent or person that actually performed the review; for self-review, use `<identity> (self-review)`. Blank names and `TODO`, `TBD`, or `Not run` are invalid. Do not name an independent reviewer that did not participate.
 
 ## QA gate
 
-Use an independent `verifier` context.
+Perform QA against the reviewed scope, diff, and evidence. Use an independent
+`verifier` context when it materially improves confidence.
 
 QA must include:
 
@@ -35,7 +37,7 @@ QA must include:
 
 PR creation and merge are blocked by `Status: FAIL` or any P0/P1 finding.
 
-The QA artifact must contain exactly one line-start field for each of `Reviewer Agent`, `Status`, and `P0/P1 Findings`, with a valid reviewer, `PASS`, and `0`. Record focused checks or manual evidence in the verification section; `scripts/task-harness pr` owns the one full-verification run for the exact clean HEAD.
+The QA artifact must contain exactly one line-start field for each of `Reviewer Agent`, `Status`, and `P0/P1 Findings`, with the actual reviewer identity, `PASS`, and `0`. For self-review, use `<identity> (self-review)`; do not claim an independent verifier that did not participate. Record focused checks or manual evidence in the verification section; `scripts/task-harness pr` owns the one full-verification run for the exact clean HEAD.
 
 The task harness fixes the QA artifact before checking or reusing the exact-HEAD full-verification marker, then requires it to be byte-for-byte unchanged and the QA gate to still pass afterward. Merge requires the PR's recorded verification HEAD to equal the current head and the named `verify` CI check to pass.
 

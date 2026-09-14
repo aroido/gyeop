@@ -37,13 +37,16 @@ Do not silently revive behavior that exists only in archived or older documents.
 - Prefer one clear path over speculative modes in P0.
 - Keep A/B as the only answer format in P0.
 - Do not add payments, ads, public user search, chat, comments, rankings, or MBTI-style fixed labels without an explicit product decision.
-- Use one matching project skill in `.codex/skills/`; do not chain skills when one entry point covers the work.
-- Use `$gyeop-product` for product decisions, planning documents, and viral-flow review.
-- Use `$gyeop-question-pack-design` for pack and card content.
-- Use `$gyeop-issue-writer` when creating or splitting GitHub work.
-- Use `$gyeop-task` for issue execution and its implementation spec; keep one issue per worktree, branch, spec, and PR.
+- Use one matching project skill in `.codex/skills/` when one covers the work.
+- Product decisions, planning documents, and viral-flow review use
+  `$gyeop-product`; pack and card content use `$gyeop-question-pack-design`.
+- GitHub issue definition uses `$gyeop-issue-writer`; issue execution uses
+  `$gyeop-task` and keeps one issue per worktree, branch, spec, and PR.
+- A user-authorized, bounded change limited to repository guidance or agent
+  configuration uses a branch and PR without creating an issue or invoking the
+  task harness.
 - Treat `status:*` labels as task workflow truth and GitHub Project as an optional synchronized view.
 
 ## Completion gate
 
-For issue work, `scripts/task-harness pr` reuses an exact clean-HEAD verification marker or runs `./scripts/run-ai-verify --mode full` once when absent; do not run it separately before `pr`. Outside the harness, run it before declaring meaningful project work complete. Report the failing command and cause when verification does not pass.
+For issue work, `scripts/task-harness pr` reuses an exact clean-HEAD verification marker or runs `./scripts/run-ai-verify --mode full` once when absent; do not run it separately before `pr`. Outside the harness, run it before declaring meaningful project work complete. Guidance/configuration-only changes require link/config syntax validation and diff review; report broader verification as not applicable. Report the failing command and cause when verification does not pass.

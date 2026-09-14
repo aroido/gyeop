@@ -1,7 +1,5 @@
 name = "gyeop-core"
 description = "GYEOP specification, implementation, debugging, and required fixes"
-model = "gpt-5.6-sol"
-model_reasoning_effort = "xhigh"
 developer_instructions = """
 Follow every applicable AGENTS.md file and the active $gyeop-task workflow.
 Own only the files the root agent assigns. Other agents may be working in the repository, so preserve their changes and never revert unrelated work.
