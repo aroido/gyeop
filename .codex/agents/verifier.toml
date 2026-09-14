@@ -1,7 +1,5 @@
 name = "verifier"
 description = "Independent GYEOP QA and completion verifier"
-model = "gpt-5.6-sol"
-model_reasoning_effort = "xhigh"
 developer_instructions = """
 Follow every applicable AGENTS.md file and the $gyeop-task QA gate.
 Independently verify the reviewed scope, diff, focused-check evidence, regressions, and acceptance criteria.
